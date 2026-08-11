@@ -1,0 +1,381 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>DN1C Export PDF 2</title>
+  <link rel="stylesheet" href="app.css">
+</head>
+<body>
+  <div class="app-container">
+    <!-- Header -->
+    <header class="app-header">
+      <div class="header-brand">
+        <div class="logo-badge">PDF</div>
+        <div class="header-titles">
+          <h1 id="headerProjectTitle">Новый проект</h1>
+          <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>
+        </div>
+      </div>
+      <div class="header-actions">
+        <button class="btn btn-secondary btn-sm" id="btnImportYaml" title="Импортировать настройки из YAML">📥 Импорт YAML</button>
+        <button class="btn btn-secondary btn-sm" id="btnExportYaml" title="Экспортировать настройки в YAML">📤 Экспорт YAML</button>
+      </div>
+    </header>
+
+    <!-- Navigation Tabs -->
+    <nav class="nav-tabs">
+      <button class="tab-btn active" data-tab="tab-project">
+        <span class="tab-icon">📋</span> Данные проекта
+      </button>
+      <button class="tab-btn" data-tab="tab-task">
+        <span class="tab-icon">🎯</span> Описание задания
+      </button>
+      <button class="tab-btn" data-tab="tab-spec">
+        <span class="tab-icon">📝</span> Описание и спецификации
+      </button>
+      <button class="tab-btn" data-tab="tab-scenes">
+        <span class="tab-icon">🖼️</span> Сцены и страницы
+        <span class="badge" id="sceneCountBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-settings">
+        <span class="tab-icon">⚙️</span> Настройки PDF
+      </button>
+      <button class="tab-btn" data-tab="tab-history">
+        <span class="tab-icon">📜</span> История изменений
+      </button>
+    </nav>
+
+    <!-- Toast Notification -->
+    <div id="toastNotification" class="toast hidden"></div>
+
+    <!-- Main Content Area -->
+    <main class="app-content">
+      <!-- TAB 1: PROJECT INFO -->
+      <section id="tab-project" class="tab-pane active">
+        <!-- Section 1: Помещение и изделие -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">🛋️</span>
+            <span class="card-header-title">Помещение и изделие</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="inputRoomName">Комната / Помещение / Место *</label>
+              <input type="text" id="inputRoomName" class="form-control" placeholder="например: Кухня-гостиная">
+            </div>
+
+            <div class="form-group">
+              <label for="inputFurnitureName">Название мебели / Изделие *</label>
+              <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Кухонный гарнитур">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputAddress">Адрес объекта</label>
+              <input type="text" id="inputAddress" class="form-control" placeholder="г. Москва, ул. Примерная, д. 10">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: О проекте -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">📋</span>
+            <span class="card-header-title">О проекте</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="inputArticul">Артикул / Код проекта</label>
+              <input type="text" id="inputArticul" class="form-control" placeholder="PRJ-2026-001">
+            </div>
+
+            <div class="form-group">
+              <label for="inputStatus">Статус проекта</label>
+              <select id="inputStatus" class="form-control">
+                <option value="В РАБОТЕ">В РАБОТЕ</option>
+                <option value="НА СОГЛАСОВАНИИ">НА СОГЛАСОВАНИИ</option>
+                <option value="УТВЕРЖДЕН">УТВЕРЖДЕН</option>
+                <option value="В ПРОИЗВОДСТВО">В ПРОИЗВОДСТВО</option>
+                <option value="АРХИВ">АРХИВ</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="inputVersion">Версия проекта</label>
+              <input type="number" id="inputVersion" class="form-control" min="1" value="1">
+            </div>
+
+            <div class="form-group">
+              <label for="inputRevision">Ревизия</label>
+              <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 3: Данные заказчика -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">👤</span>
+            <span class="card-header-title">Данные заказчика</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="inputCustomer">Заказчик / Клиент</label>
+              <input type="text" id="inputCustomer" class="form-control" placeholder="Иванов И.И.">
+            </div>
+
+            <div class="form-group">
+              <label for="inputPhone">Телефон</label>
+              <input type="text" id="inputPhone" class="form-control" placeholder="+7 (999) 000-00-00">
+            </div>
+
+            <div class="form-group">
+              <label for="inputEmail">Email</label>
+              <input type="email" id="inputEmail" class="form-control" placeholder="client@example.com">
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: TASK BRIEF & REQUIREMENTS -->
+      <section id="tab-task" class="tab-pane">
+        <!-- Section 1: Техническое задание -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">🎯</span>
+            <span class="card-header-title">Техническое задание и цели проекта</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="inputTaskDescription">Подробное описание задания и задачи проектирования</label>
+              <textarea id="inputTaskDescription" class="form-control" rows="4" placeholder="Опишите задачу проекта, ключевые функциональные требования, состав комплекта и назначение мебели..."></textarea>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section 2: Особенности помещения и замеры -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">📐</span>
+            <span class="card-header-title">Особенности помещения и условия монтажа</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="inputTaskDimensions">Габариты и привязка к помещению</label>
+              <textarea id="inputTaskDimensions" class="form-control" rows="4" placeholder="Габаритные размеры ниш, высоты чистового потолка, привязка к стенам и коммуникациям..."></textarea>
+            </div>
+
+            <div class="form-group">
+              <label for="inputTaskWishes">Особые условия и ограничения</label>
+              <textarea id="inputTaskWishes" class="form-control" rows="4" placeholder="Ограничения по заносу, пожелания по скрытому монтажу, врезке встроенной техники..."></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 3: SPECIFICATIONS & DESCRIPTION -->
+      <section id="tab-spec" class="tab-pane">
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">📝</span>
+            <span class="card-header-title">Описание проекта и спецификации (для страниц PDF)</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="inputMaterials">🛠️ Материалы и фурнитура</label>
+              <textarea id="inputMaterials" class="form-control" rows="3" placeholder="Фасады (материал, цвет, покрытие), корпус, фурнитура (направляющие, петли, подъемники), столешницы..."></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputAppliances">🔌 Техника и оборудование</label>
+              <textarea id="inputAppliances" class="form-control" rows="3" placeholder="Встраиваемая бытовая техника: варочная панель, духовой шкаф, вытяжка, посудомоечная машина, холодильник, мойка, смеситель..."></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputLighting">💡 Подсветка и электрика</label>
+              <textarea id="inputLighting" class="form-control" rows="3" placeholder="LED-лента, цветовая температура (3000K/4000K), мощность, блоки питания 24V, выключатели, схема подключения..."></textarea>
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputNotes">📋 Пояснительная записка и технические требования</label>
+              <textarea id="inputNotes" class="form-control" rows="3" placeholder="Технические требования, условия монтажа и эксплуатации, особые указания к проекту..."></textarea>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 2: SCENES & PAGES -->
+      <section id="tab-scenes" class="tab-pane">
+        <div class="scenes-toolbar">
+          <span class="info-text">Настройте сопоставление сцен SketchUp с шаблонами страниц PDF:</span>
+          <div class="scenes-quick-actions">
+            <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes">Выбрать все</button>
+            <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes">Снять выбор</button>
+            <button class="btn btn-xs btn-secondary" id="btnAutoMapScenes">Авто-шаблоны</button>
+          </div>
+        </div>
+
+        <div class="table-container">
+          <table class="scenes-table" id="scenesTable">
+            <thead>
+              <tr>
+                <th width="40">Вкл</th>
+                <th width="40">№</th>
+                <th>Сцена SketchUp</th>
+                <th width="190">Шаблон страницы</th>
+                <th>Описание на листе</th>
+                <th width="70">Порядок</th>
+              </tr>
+            </thead>
+            <tbody id="scenesTableBody">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <!-- TAB 3: PDF SETTINGS -->
+      <section id="tab-settings" class="tab-pane">
+        <div class="form-grid">
+          <div class="form-group">
+            <label for="selectPageSize">Формат листа</label>
+            <select id="selectPageSize" class="form-control">
+              <option value="A4">A4 (210 x 297 мм)</option>
+              <option value="A3">A3 (297 x 420 мм)</option>
+              <option value="A2">A2 (420 x 594 мм)</option>
+              <option value="LETTER">US Letter</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="selectPageLayout">Ориентация страницы</label>
+            <select id="selectPageLayout" class="form-control">
+              <option value="landscape">Альбомная (Landscape)</option>
+              <option value="portrait">Книжная (Portrait)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="selectQuality">Качество рендера сцен</label>
+            <select id="selectQuality" class="form-control">
+              <option value="1.0">Черновое (Draft, 1x)</option>
+              <option value="2.0" selected>Стандартное HD (2x, 2400px)</option>
+              <option value="3.0">Максимальное Ultra-HD (3x, 3600px)</option>
+            </select>
+          </div>
+
+          <div class="form-group">
+            <label for="selectStamp">Водяной знак / Штамп</label>
+            <select id="selectStamp" class="form-control">
+              <option value="draft">НЕ УТВЕРЖДЕН (Draft)</option>
+              <option value="approved">В ПРОИЗВОДСТВО (Approved)</option>
+              <option value="custom">Пользовательский текст</option>
+              <option value="none">Без водяного знака</option>
+            </select>
+          </div>
+
+          <div class="form-group full-width" id="customStampGroup" style="display: none;">
+            <label for="inputCustomStamp">Текст пользовательского штампа</label>
+            <input type="text" id="inputCustomStamp" class="form-control" placeholder="например: ПРЕДВАРИТЕЛЬНЫЙ ЭСКИЗ">
+          </div>
+
+          <div class="form-group">
+            <label for="inputPrimaryColor">Цвет акцентов / заголовков</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="inputPrimaryColor" value="#005EB0">
+              <span class="color-hex" id="primaryColorHex">#005EB0</span>
+            </div>
+          </div>
+
+          <div class="form-group">
+            <label for="inputStampColor">Цвет водяного знака</label>
+            <div class="color-picker-wrapper">
+              <input type="color" id="inputStampColor" value="#D32F2F">
+              <span class="color-hex" id="stampColorHex">#D32F2F</span>
+            </div>
+          </div>
+
+          <div class="form-group full-width">
+            <div class="checkbox-group">
+              <label class="checkbox-label">
+                <input type="checkbox" id="chkSaveBackup" checked>
+                <span>Сохранять резервную копию модели (.skp) с номером ревизии</span>
+              </label>
+              <label class="checkbox-label">
+                <input type="checkbox" id="chkAntialias" checked>
+                <span>Сглаживание линий рендера (Antialiasing)</span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: HISTORY -->
+      <section id="tab-history" class="tab-pane">
+        <div class="history-toolbar">
+          <span class="info-text">Журнал изменений и ревизий проекта:</span>
+          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry">+ Добавить запись</button>
+        </div>
+
+        <div class="table-container">
+          <table class="history-table" id="historyTable">
+            <thead>
+              <tr>
+                <th width="130">Дата</th>
+                <th>Описание правок / ревизии</th>
+                <th width="60">Удалить</th>
+              </tr>
+            </thead>
+            <tbody id="historyTableBody">
+              <!-- Dynamically populated via JS -->
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </main>
+
+    <!-- Progress Overlay -->
+    <div id="progressOverlay" class="progress-overlay hidden">
+      <div class="progress-card">
+        <div class="progress-spinner"></div>
+        <h3 id="progressTitle">Генерация PDF документа...</h3>
+        <p id="progressMessage">Подготовка сцен к рендерингу</p>
+        <div class="progress-bar-track">
+          <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
+        </div>
+        <span class="progress-percent" id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- Export Success Modal -->
+    <div id="successModal" class="modal-overlay hidden">
+      <div class="modal-card">
+        <div class="modal-icon">🎉</div>
+        <h3>PDF успешно создан!</h3>
+        <p class="modal-file-path" id="successPdfPath"></p>
+        <div class="modal-actions">
+          <button class="btn btn-secondary" id="btnOpenPdfFolder">📂 Открыть папку</button>
+          <button class="btn btn-primary" id="btnCloseSuccessModal">Готово</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Footer Action Bar -->
+    <footer class="app-footer">
+      <div class="footer-left">
+        <button class="btn btn-secondary" id="btnSaveData" title="Записать текущие реквизиты, сцены и настройки в файл модели SketchUp">💾 Сохранить</button>
+        <span class="footer-hint">Сохраняет настройки в модель .skp</span>
+      </div>
+      <div class="footer-right">
+        <label class="footer-checkbox-label" title="Автоматически открыть созданный PDF в программе по умолчанию">
+          <input type="checkbox" id="chkAutoOpen" checked>
+          <span>Открыть после экспорта</span>
+        </label>
+        <button class="btn btn-success" id="btnStartExport">🚀 Экспорт в PDF</button>
+      </div>
+    </footer>
+  </div>
+
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,730 @@
+/* -------------------------------------------------------------------------------
+   DN1C Export PDF 2 - SketchUp Native Theme Stylesheet
+   Trimble SketchUp UI Palette (Red / Trimble Blue / Light Clean Desktop Theme)
+------------------------------------------------------------------------------- */
+
+:root {
+  /* SketchUp Core Palette */
+  --su-red: #ea212d;
+  --su-red-hover: #d31b26;
+  --su-red-active: #b8151f;
+  --su-red-light: #fef2f2;
+  --su-red-border: #fca5a5;
+
+  --trimble-blue: #005f9e;
+  --trimble-blue-hover: #004c80;
+
+  /* Neutrals & Surfaces */
+  --bg-app: #edf0f4;
+  --bg-header: #ffffff;
+  --bg-card: #ffffff;
+  --bg-input: #ffffff;
+  --bg-input-alt: #f8fafc;
+  --bg-hover: #f1f5f9;
+  --bg-active: #e2e8f0;
+
+  --text-main: #1e293b;
+  --text-muted: #64748b;
+  --text-dim: #94a3b8;
+
+  --border-color: #d1d5db;
+  --border-light: #e5e7eb;
+  --border-focus: #ea212d;
+
+  --primary: #ea212d;
+  --primary-hover: #d31b26;
+  --accent-cyan: #005f9e;
+  --success: #10b981;
+  --success-hover: #059669;
+  --danger: #ef4444;
+  --warning: #f59e0b;
+
+  --radius-sm: 4px;
+  --radius-md: 6px;
+  --radius-lg: 10px;
+
+  --shadow-sm: 0 1px 3px rgba(0, 0, 0, 0.08);
+  --shadow-main: 0 4px 12px rgba(0, 0, 0, 0.12);
+  --shadow-glow: 0 0 0 3px rgba(234, 33, 45, 0.2);
+}
+
+* {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  user-select: none;
+}
+
+body {
+  background-color: var(--bg-app);
+  color: var(--text-main);
+  font-size: 13px;
+  line-height: 1.5;
+  overflow: hidden;
+}
+
+.app-container {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  width: 100vw;
+}
+
+/* Header */
+.app-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  background-color: var(--bg-header);
+  border-bottom: 1px solid var(--border-color);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.header-brand {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.logo-badge {
+  background: linear-gradient(135deg, #ea212d, #b91c1c);
+  color: #fff;
+  font-weight: 900;
+  font-size: 11.5px;
+  letter-spacing: 1px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  box-shadow: 0 2px 5px rgba(234, 33, 45, 0.35);
+}
+
+.header-titles {
+  display: flex;
+  flex-direction: column;
+  max-width: 520px;
+}
+
+.header-titles h1 {
+  font-size: 14.5px;
+  font-weight: 700;
+  color: #0f172a;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-titles .subtitle {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.header-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* Tabs Navigation (SketchUp Style) */
+.nav-tabs {
+  display: flex;
+  background-color: #e5e9f0;
+  border-bottom: 1px solid var(--border-color);
+  padding: 0 12px;
+  gap: 4px;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  background: none;
+  border: none;
+  border-bottom: 3px solid transparent;
+  color: #475569;
+  padding: 10px 14px;
+  font-size: 12.5px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  position: relative;
+  top: 1px;
+}
+
+.tab-btn:hover {
+  color: var(--su-red);
+  background-color: rgba(255, 255, 255, 0.5);
+}
+
+.tab-btn.active {
+  color: var(--su-red);
+  background-color: var(--bg-app);
+  border-bottom-color: var(--su-red);
+  border-top-left-radius: 4px;
+  border-top-right-radius: 4px;
+}
+
+.tab-icon {
+  font-size: 14px;
+}
+
+.badge {
+  background-color: var(--su-red);
+  color: #fff;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 6px;
+  border-radius: 10px;
+}
+
+/* Content Area */
+.app-content {
+  flex: 1;
+  padding: 16px 18px;
+  overflow-y: auto;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+}
+
+.tab-pane {
+  display: none;
+}
+
+.tab-pane.active {
+  display: block;
+  animation: fadeIn 0.15s ease-in-out;
+}
+
+#tab-history.active,
+#tab-scenes.active {
+  display: flex;
+  flex-direction: column;
+  flex: 1;
+  min-height: 0;
+  height: 100%;
+}
+
+#tab-history .table-container,
+#tab-scenes .table-container {
+  flex: 1;
+  max-height: none;
+  min-height: 0;
+  margin-top: 8px;
+  overflow-y: auto;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(2px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Settings Cards & Sections */
+.settings-card {
+  background-color: var(--bg-card);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 16px 18px;
+  margin-bottom: 14px;
+  box-shadow: var(--shadow-sm);
+}
+
+.settings-card:last-child {
+  margin-bottom: 0;
+}
+
+.card-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 14px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid var(--border-light);
+}
+
+.card-header-icon {
+  font-size: 16px;
+}
+
+.card-header-title {
+  font-size: 12.5px;
+  font-weight: 700;
+  color: #0f172a;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+/* Forms & Grids */
+.form-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 12px 14px;
+}
+
+.form-group {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.form-group.full-width {
+  grid-column: span 2;
+}
+
+label {
+  font-size: 11.5px;
+  font-weight: 600;
+  color: #475569;
+}
+
+.form-control {
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 7px 10px;
+  font-size: 12.5px;
+  outline: none;
+  transition: border-color 0.15s, box-shadow 0.15s;
+  user-select: text;
+}
+
+.form-control:focus {
+  border-color: var(--su-red);
+  box-shadow: var(--shadow-glow);
+}
+
+textarea.form-control {
+  resize: vertical;
+  min-height: 80px;
+  line-height: 1.45;
+}
+
+/* Checkbox & Color Controls */
+.checkbox-group {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  background-color: var(--bg-input-alt);
+  padding: 12px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-light);
+}
+
+.checkbox-label {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #334155;
+  cursor: pointer;
+}
+
+.checkbox-label input[type="checkbox"] {
+  accent-color: var(--su-red);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+.color-picker-wrapper {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background-color: var(--bg-input);
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+}
+
+.color-picker-wrapper input[type="color"] {
+  border: none;
+  background: none;
+  width: 26px;
+  height: 26px;
+  cursor: pointer;
+}
+
+.color-hex {
+  font-family: monospace;
+  font-size: 12px;
+  color: #475569;
+  font-weight: 600;
+}
+
+/* Tables */
+.table-container {
+  background-color: var(--bg-card);
+  border-radius: var(--radius-sm);
+  border: 1px solid var(--border-color);
+  max-height: 420px;
+  overflow-y: auto;
+  margin-top: 8px;
+  box-shadow: var(--shadow-sm);
+}
+
+.scenes-toolbar, .history-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 6px;
+}
+
+.info-text {
+  font-size: 12px;
+  color: #475569;
+}
+
+.scenes-quick-actions {
+  display: flex;
+  gap: 6px;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+th {
+  background-color: #f1f5f9;
+  color: #475569;
+  font-size: 11.5px;
+  font-weight: 700;
+  padding: 8px 10px;
+  border-bottom: 1px solid var(--border-color);
+  position: sticky;
+  top: 0;
+  z-index: 2;
+}
+
+td {
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border-light);
+  font-size: 12.5px;
+  background-color: #ffffff;
+}
+
+tr:hover td {
+  background-color: #f8fafc;
+}
+
+/* Table inline inputs */
+.table-input {
+  width: 100%;
+  background-color: var(--bg-input-alt);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 4px 6px;
+  font-size: 12px;
+  user-select: text;
+}
+
+.table-input:focus {
+  background-color: #ffffff;
+  border-color: var(--su-red);
+  outline: none;
+  box-shadow: 0 0 0 2px rgba(234, 33, 45, 0.15);
+}
+
+.table-select {
+  width: 100%;
+  background-color: var(--bg-input-alt);
+  border: 1px solid var(--border-light);
+  border-radius: var(--radius-sm);
+  color: var(--text-main);
+  padding: 4px 6px;
+  font-size: 12px;
+}
+
+.table-select:focus {
+  background-color: #ffffff;
+  border-color: var(--su-red);
+  outline: none;
+}
+
+.order-btn-group {
+  display: flex;
+  gap: 4px;
+}
+
+.btn-icon {
+  background: #f1f5f9;
+  border: 1px solid var(--border-light);
+  color: #475569;
+  width: 22px;
+  height: 22px;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  transition: all 0.15s;
+}
+
+.btn-icon:hover {
+  background: var(--su-red);
+  border-color: var(--su-red);
+  color: #fff;
+}
+
+.btn-icon:disabled {
+  opacity: 0.35;
+  cursor: not-allowed;
+  background: #f1f5f9;
+  color: #94a3b8;
+  border-color: var(--border-light);
+}
+
+.btn-delete {
+  color: var(--danger);
+}
+
+.btn-delete:hover {
+  background: var(--danger);
+  border-color: var(--danger);
+  color: #fff;
+}
+
+/* Buttons (SketchUp UI Style) */
+.btn {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 15px;
+  border-radius: var(--radius-sm);
+  font-size: 12.5px;
+  font-weight: 600;
+  border: 1px solid transparent;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.btn-sm {
+  padding: 5px 10px;
+  font-size: 11.5px;
+}
+
+.btn-xs {
+  padding: 3px 8px;
+  font-size: 11px;
+}
+
+.btn-primary {
+  background: linear-gradient(180deg, #ea212d, #d31b26);
+  color: #fff;
+  border-color: #b8151f;
+  box-shadow: 0 1px 2px rgba(234, 33, 45, 0.25);
+}
+
+.btn-primary:hover {
+  background: linear-gradient(180deg, #f02d39, #b8151f);
+  box-shadow: 0 2px 6px rgba(234, 33, 45, 0.35);
+}
+
+.btn-secondary {
+  background-color: #ffffff;
+  color: #334155;
+  border: 1px solid #cbd5e1;
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.04);
+}
+
+.btn-secondary:hover {
+  background-color: #f1f5f9;
+  border-color: #94a3b8;
+  color: #0f172a;
+}
+
+.btn-success {
+  background: linear-gradient(180deg, #ea212d, #cb1924);
+  color: #fff;
+  border-color: #ab121c;
+  box-shadow: 0 2px 6px rgba(234, 33, 45, 0.3);
+}
+
+.btn-success:hover {
+  background: linear-gradient(180deg, #ff2e3b, #b5141f);
+  box-shadow: 0 3px 10px rgba(234, 33, 45, 0.4);
+}
+
+/* Footer Action Bar */
+.app-footer {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 10px 18px;
+  background-color: #ffffff;
+  border-top: 1px solid var(--border-color);
+  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.04);
+}
+
+.footer-left {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+
+.footer-hint {
+  font-size: 11.5px;
+  color: #64748b;
+  font-weight: 500;
+  white-space: nowrap;
+}
+
+.footer-right {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+}
+
+.footer-checkbox-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12.5px;
+  font-weight: 500;
+  color: #334155;
+  cursor: pointer;
+  user-select: none;
+  padding: 4px 6px;
+  border-radius: var(--radius-sm);
+  transition: background-color 0.15s;
+}
+
+.footer-checkbox-label:hover {
+  background-color: #f1f5f9;
+  color: #0f172a;
+}
+
+.footer-checkbox-label input[type="checkbox"] {
+  accent-color: var(--su-red);
+  width: 16px;
+  height: 16px;
+  cursor: pointer;
+}
+
+/* Overlays and Modals */
+.progress-overlay, .modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(3px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 100;
+}
+
+.hidden {
+  display: none !important;
+}
+
+.progress-card, .modal-card {
+  background-color: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
+  padding: 24px 30px;
+  width: 420px;
+  text-align: center;
+  box-shadow: var(--shadow-main);
+  animation: scaleUp 0.15s ease;
+}
+
+@keyframes scaleUp {
+  from { transform: scale(0.96); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+
+.progress-spinner {
+  width: 36px;
+  height: 36px;
+  border: 3px solid #e2e8f0;
+  border-top-color: var(--su-red);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+  margin: 0 auto 12px;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
+
+.progress-bar-track {
+  background-color: #e2e8f0;
+  border-radius: 6px;
+  height: 8px;
+  overflow: hidden;
+  margin: 15px 0 6px;
+}
+
+.progress-bar-fill {
+  background: linear-gradient(90deg, #ea212d, #ff5757);
+  height: 100%;
+  transition: width 0.2s ease;
+}
+
+.progress-percent {
+  font-size: 11.5px;
+  color: var(--text-muted);
+  font-weight: 600;
+}
+
+.modal-icon {
+  font-size: 42px;
+  margin-bottom: 8px;
+}
+
+.modal-file-path {
+  font-size: 11.5px;
+  color: #334155;
+  word-break: break-all;
+  background-color: #f1f5f9;
+  border: 1px solid var(--border-light);
+  padding: 8px 10px;
+  border-radius: var(--radius-sm);
+  margin: 12px 0 16px;
+  user-select: text;
+}
+
+.modal-actions {
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+}
+
+/* Toast */
+.toast {
+  position: absolute;
+  top: 15px;
+  right: 20px;
+  padding: 8px 14px;
+  border-radius: var(--radius-sm);
+  font-size: 12px;
+  font-weight: 600;
+  z-index: 50;
+  box-shadow: var(--shadow-main);
+  animation: slideDown 0.2s ease;
+}
+
+@keyframes slideDown {
+  from { transform: translateY(-10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+
+.toast.success {
+  background-color: #059669;
+  color: #fff;
+}
+
+.toast.error {
+  background-color: #dc2626;
+  color: #fff;
+}

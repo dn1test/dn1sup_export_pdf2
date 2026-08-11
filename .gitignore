@@ -1,0 +1,19 @@
+# OS metadata
+.DS_Store
+Thumbs.db
+
+# Temp files
+*.tmp
+*.temp
+temp_*
+/tmp
+
+# Generated PDF tests
+test_output*.pdf
+*_preview.pdf
+
+# Ruby / Bundler
+.bundle/
+vendor/bundle/
+.ruby-lsp/
+.solargraph/

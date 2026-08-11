@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <defs>
+    <linearGradient id="boltGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FBBF24"/>
+      <stop offset="100%" stop-color="#EA580C"/>
+    </linearGradient>
+    <linearGradient id="pdfBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1E293B"/>
+      <stop offset="100%" stop-color="#0F172A"/>
+    </linearGradient>
+  </defs>
+  <!-- Background Circle / Plate -->
+  <rect x="4" y="4" width="40" height="40" rx="10" fill="url(#pdfBg)" stroke="#334155" stroke-width="1.5"/>
+  <!-- Document silhouette -->
+  <path d="M 12 12 C 12 10.5 13.5 9 15 9 L 27 9 L 34 16 L 34 37 C 34 38.5 32.5 40 31 40 L 15 40 C 13.5 40 12 38.5 12 37 Z" fill="#334155" opacity="0.6"/>
+  <!-- Fast Lightning Bolt -->
+  <path d="M 28 8 L 16 26 L 24 26 L 20 42 L 34 22 L 25 22 Z" fill="url(#boltGrad)" stroke="#7C2D12" stroke-width="0.8"/>
+</svg>

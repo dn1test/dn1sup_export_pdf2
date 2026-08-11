@@ -1,0 +1,320 @@
+# frozen_string_literal: true
+
+# -------------------------------------------------------------------------------
+# Comprehensive End-to-End Test Suite for DN1C Export PDF 2
+# -------------------------------------------------------------------------------
+
+require_relative "mock_sketchup"
+require_relative "../main"
+require "pdf/core"
+
+if defined?(Sketchup) && Sketchup.respond_to?(:version)
+  puts "Комплексные тесты мок-модели предназначены для запуска через терминал вне SketchUp GUI."
+  return
+end
+
+class TestRunner
+  def initialize
+    @passed = 0
+    @failed = 0
+  end
+
+  def assert(condition, message)
+    if condition
+      puts "  [PASS] #{message}"
+      @passed += 1
+    else
+      puts "  [FAIL] #{message}"
+      @failed += 1
+    end
+  end
+
+  def run_all
+    puts "=========================================================="
+    puts "  Комплексное тестирование DN1C Export PDF 2"
+    puts "=========================================================="
+
+    test_models_and_attributes
+    test_yaml_import_export
+    test_pdf_export_a4_landscape
+    test_pdf_export_a3_portrait
+    test_pdf_export_with_custom_stamp
+    test_pdf_export_page_filtering
+    test_default_pdf_path_next_to_skp
+    test_pdf_export_description_page
+    test_room_and_furniture_composition
+
+    puts "\n=========================================================="
+    puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
+    puts "=========================================================="
+
+    exit(@failed.zero? ? 0 : 1)
+  end
+
+  private
+
+  def test_models_and_attributes
+    puts "\n--- 1. Тест моделей данных и SketchUp Attribute Dictionaries ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Test/Apartment.skp")
+    model.pages.add("01. Обложка")
+    model.pages.add("02. Пояснения и спецификации")
+    model.pages.add("03. Визуализация")
+    model.pages.add("04. Общий вид 1")
+    model.pages.add("05. Общий вид 2")
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:name_project] = "Тестовый проект виллы"
+    project_data.project_info[:articul] = "VILLA-777"
+    project_data.project_info[:version] = 2
+    project_data.project_info[:revision] = 5
+
+    # Сохраняем в модель
+    project_data.sync_with_model_scenes(model)
+    assert(project_data.scenes.size == 5, "Корректно обнаружено 5 сцен в модели")
+    assert(project_data.scenes[0].page_type == :cover, "Сцена '01. Обложка' распознана как :cover")
+    assert(project_data.scenes[1].page_type == :explain, "Сцена '02. Пояснения...' распознана как :explain")
+    assert(project_data.scenes[2].page_type == :visual, "Сцена '03. Визуализация' распознана как :visual")
+    assert(project_data.scenes[3].page_type == :general, "Сцена '04. Общий вид' распознана как :general")
+
+    project_data.save_to_model(model)
+    assert(!model.attributes["DN1C_ExportPDF"].nil?, "Атрибуты DN1C_ExportPDF сохранены в модели")
+
+    # Читаем в новый объект
+    loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded_data.load_from_model(model)
+    assert(loaded_data.project_info[:name_project] == "Тестовый проект виллы", "Имя проекта загружено из атрибутов модели")
+    assert(loaded_data.project_info[:articul] == "VILLA-777", "Артикул загружен из атрибутов модели")
+    assert(loaded_data.project_info[:revision] == 5, "Номер ревизии загружен из атрибутов модели")
+  end
+
+  def test_yaml_import_export
+    puts "\n--- 2. Тест экспорта и импорта конфигурации YAML ---"
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:name_project] = "Пентхаус на Мосфильмовской"
+    project_data.project_info[:name_customer] = "Ковалев Дмитрий"
+    project_data.project_info[:notes] = "Мрамор Calacatta, дубовый паркет Coswick, техника Miele."
+    project_data.history << { date: "2026.08.10", description: "Утверждение планировки" }
+
+    yaml_path = File.expand_path("test_project_config.yaml", __dir__)
+    project_data.save_to_yaml(yaml_path)
+    assert(File.exist?(yaml_path), "YAML файл конфигурации успешно создан на диске")
+
+    loaded_yaml_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded_yaml_data.load_from_yaml(yaml_path)
+    assert(loaded_yaml_data.project_info[:name_project] == "Пентхаус на Мосфильмовской", "Имя проекта корректно загружено из YAML")
+    assert(loaded_yaml_data.project_info[:name_customer] == "Ковалев Дмитрий", "Имя заказчика корректно загружено из YAML")
+    assert(loaded_yaml_data.history.size >= 2, "История изменений корректно прочитана из YAML")
+
+    File.delete(yaml_path) if File.exist?(yaml_path)
+  end
+
+  def test_pdf_export_a4_landscape
+    puts "\n--- 3. Тест генерации PDF: Формат A4 Альбомная ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Villa/villa_model.skp")
+    scenes = [
+      Sketchup::MockPage.new("Обложка", "Титульный лист"),
+      Sketchup::MockPage.new("Пояснительная записка", "Содержание и ведомость отделки"),
+      Sketchup::MockPage.new("Вид 1", "Главный фасад"),
+      Sketchup::MockPage.new("Вид 2", "Интерьер гостиной")
+    ]
+    model.pages = Sketchup::MockPages.new(scenes)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info = {
+      name_project:  "Загородная резиденция 'Сосны'",
+      description:   "Архитектурный проект двухэтажного коттеджа",
+      name_customer: "Смирнов В.А.",
+      address:       "МО, Новорижское шоссе, КП 'Сосны'",
+      articul:       "VIL-2026-09",
+      version:       1,
+      revision:      2,
+      status:        "В РАБОТЕ",
+      designer:      "DESTUDIONS Architecture",
+      notes:         "Материалы фасада: клинкерный кирпич Roben, планкен из термоясеня, алюминиевые витражи Reynaers."
+    }
+
+    project_data.pdf_settings[:page_size] = "A4"
+    project_data.pdf_settings[:page_layout] = "landscape"
+    project_data.pdf_settings[:stamp_type] = "draft"
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.sync_with_model_scenes(model)
+
+    pdf_out = File.expand_path("test_a4_landscape.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    result_path = controller.export(pdf_out)
+
+    assert(File.exist?(result_path), "Файл PDF test_a4_landscape.pdf создан")
+    assert(File.size(result_path) > 15_000, "Размер PDF файла составляет #{File.size(result_path)} байт (не пустой)")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_pdf_export_a3_portrait
+    puts "\n--- 4. Тест генерации PDF: Формат A3 Книжная ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Commercial/shop.skp")
+    scenes = [
+      Sketchup::MockPage.new("Обложка"),
+      Sketchup::MockPage.new("План торгового зала"),
+      Sketchup::MockPage.new("Визуализация витрины")
+    ]
+    model.pages = Sketchup::MockPages.new(scenes)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:name_project] = "Флагманский бутик одежды"
+    project_data.pdf_settings[:page_size] = "A3"
+    project_data.pdf_settings[:page_layout] = "portrait"
+    project_data.pdf_settings[:stamp_type] = "approved"
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.sync_with_model_scenes(model)
+
+    pdf_out = File.expand_path("test_a3_portrait.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    result_path = controller.export(pdf_out)
+
+    assert(File.exist?(result_path), "Файл PDF test_a3_portrait.pdf создан")
+    assert(File.size(result_path) > 12_000, "Размер A3 PDF файла: #{File.size(result_path)} байт")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_pdf_export_with_custom_stamp
+    puts "\n--- 5. Тест водяного знака / пользовательского штампа ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Hotel/hotel.skp")
+    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Обложка"), Sketchup::MockPage.new("Лобби")])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:name_project] = "Отель Grand Palace"
+    project_data.pdf_settings[:stamp_type] = "custom"
+    project_data.pdf_settings[:stamp_custom] = "КОНФИДЕНЦИАЛЬНО"
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.sync_with_model_scenes(model)
+
+    pdf_out = File.expand_path("test_custom_stamp.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    result_path = controller.export(pdf_out)
+    assert(File.exist?(result_path), "PDF с пользовательским штампом 'КОНФИДЕНЦИАЛЬНО' сгенерирован")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_pdf_export_page_filtering
+    puts "\n--- 6. Тест фильтрации сцен (отключение сцен и пропуск) ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Test/filtering.skp")
+    s1 = Sketchup::MockPage.new("Сцена 1 - Включена", "", true)
+    s2 = Sketchup::MockPage.new("Сцена 2 - Пропущена", "", false)
+    s3 = Sketchup::MockPage.new("Сцена 3 - Включена", "", true)
+    model.pages = Sketchup::MockPages.new([s1, s2, s3])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.sync_with_model_scenes(model)
+
+    # Отключаем вторую сцену
+    project_data.scenes[1].enabled = false
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    pdf_out = File.expand_path("test_filtered.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    result_path = controller.export(pdf_out)
+    assert(File.exist?(result_path), "PDF с выборочными сценами успешно создан")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_default_pdf_path_next_to_skp
+    puts "\n--- 7. Тест сохранения PDF по умолчанию рядом с файлом SKP ---"
+
+    model_file = "U:/Projects/Interior/Kitchen_Design.skp"
+    model = Sketchup::MockModel.new(model_file)
+    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("01. Вид")])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:version] = 1
+    project_data.project_info[:revision] = 4
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    default_path = controller.send(:resolve_default_pdf_path)
+
+    expected_path = "U:/Projects/Interior/Kitchen_Design_v01_r004.pdf"
+    assert(default_path == expected_path, "Путь по умолчанию '#{default_path}' находится рядом с SKP файлом ('#{expected_path}')")
+  end
+
+  def test_pdf_export_description_page
+    puts "\n--- 8. Тест страницы описания проекта (Материалы, Подсветка, Пояснения) ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Interior/Villa.skp")
+    scenes = [
+      Sketchup::MockPage.new("01. Обложка"),
+      Sketchup::MockPage.new("02. Описание и спецификации"),
+      Sketchup::MockPage.new("03. Перспектива")
+    ]
+    model.pages = Sketchup::MockPages.new(scenes)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:name_project] = "Вилла в Сочи"
+    project_data.project_info[:materials] = "Фасады: МДФ эмаль RAL 9003, корпус: Egger 18мм, фурнитура: Blum Legrabox."
+    project_data.project_info[:appliances] = "Духовой шкаф Miele, индукционная варочная панель Bosch, вытяжка Elica."
+    project_data.project_info[:lighting] = "Светодиодная подсветка 3000K в скрытом профиле, блок питания 24V 150W."
+    project_data.project_info[:notes] = "Монтаж производить строго по осям согласно строительному плану."
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.sync_with_model_scenes(model)
+
+    assert(project_data.scenes[1].page_type == :description, "Сцена '02. Описание...' автоматически распознана как :description")
+
+    pdf_out = File.expand_path("test_description_page.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    result_path = controller.export(pdf_out)
+    assert(File.exist?(result_path), "PDF со страницей описания и спецификаций успешно создан")
+    assert(File.size(result_path) > 15_000, "Размер PDF файла со страницей описания: #{File.size(result_path)} байт")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_room_and_furniture_composition
+    puts "\n--- 9. Тест формирования названия проекта из комнаты и мебели ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Interior/Kitchen.skp")
+    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("01. Обложка")])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:room_name] = "Кухня-столовая"
+    project_data.project_info[:furniture_name] = "Остров с барной стойкой"
+    project_data.project_info[:address] = "г. Санкт-Петербург, Невский пр., 100"
+    project_data.project_info[:name_project] = "#{project_data.project_info[:room_name]} — #{project_data.project_info[:furniture_name]}"
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.save_to_model(model)
+
+    loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded_data.load_from_model(model)
+
+    assert(loaded_data.project_info[:room_name] == "Кухня-столовая", "Помещение 'Кухня-столовая' сохранено в модель")
+    assert(loaded_data.project_info[:furniture_name] == "Остров с барной стойкой", "Изделие 'Остров с барной стойкой' сохранено в модель")
+    assert(loaded_data.project_info[:address] == "г. Санкт-Петербург, Невский пр., 100", "Адрес сохранен в данные проекта")
+    assert(loaded_data.project_info[:name_project] == "Кухня-столовая — Остров с барной стойкой", "Заголовок проекта корректно составлен из помещения и мебели")
+
+    pdf_out = File.expand_path("test_cover_composition.pdf", __dir__)
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(loaded_data, model)
+    result_path = controller.export(pdf_out)
+    assert(File.exist?(result_path), "PDF с титульным листом и составным заголовком успешно сгенерирован")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+end
+
+TestRunner.new.run_all
