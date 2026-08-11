@@ -180,3 +180,186 @@ def file_loaded(file)
   $LOADED_FEATURES_MOCK ||= []
   $LOADED_FEATURES_MOCK << file
 end
+
+# -------------------------------------------------------------------------------
+# Mock Geom & LayOut API for Testing
+# -------------------------------------------------------------------------------
+module Geom
+  class Point2d
+    attr_accessor :x, :y
+    def initialize(x = 0, y = 0)
+      @x = x.to_f
+      @y = y.to_f
+    end
+  end
+
+  class Bounds2d
+    attr_accessor :x, :y, :width, :height
+    def initialize(x = 0, y = 0, w = 1, h = 1)
+      if x.is_a?(Point2d) && y.is_a?(Point2d)
+        @x = x.x
+        @y = x.y
+        @width = y.x - x.x
+        @height = y.y - x.y
+      else
+        @x = x.to_f
+        @y = y.to_f
+        @width = w.to_f
+        @height = h.to_f
+      end
+    end
+  end
+end
+
+module Layout
+  class PageInfo
+    attr_accessor :width, :height, :left_margin, :right_margin, :top_margin, :bottom_margin, :display_margins
+    def initialize
+      @width = 11.6929
+      @height = 8.2677
+      @left_margin = 0.2
+      @right_margin = 0.2
+      @top_margin = 0.2
+      @bottom_margin = 0.2
+      @display_margins = false
+    end
+  end
+
+  class Page
+    attr_accessor :name
+    def initialize(name = "Page 1")
+      @name = name
+    end
+  end
+
+  class Pages
+    include Enumerable
+    def initialize
+      @pages = [Page.new("Page 1")]
+    end
+
+    def each(&block)
+      @pages.each(&block)
+    end
+
+    def count
+      @pages.size
+    end
+
+    def size
+      @pages.size
+    end
+
+    def initial
+      @pages.first
+    end
+
+    def first
+      @pages.first
+    end
+
+    def add(name)
+      p = Page.new(name)
+      @pages << p
+      p
+    end
+  end
+
+  class Layer
+    attr_accessor :name
+    def initialize(name = "Default")
+      @name = name
+    end
+  end
+
+  class Layers
+    def initialize
+      @layers = [Layer.new("Default")]
+    end
+
+    def first
+      @layers.first
+    end
+
+    def add(name)
+      l = Layer.new(name)
+      @layers << l
+      l
+    end
+  end
+
+  class Style
+    attr_accessor :font_size, :font_family, :fill_color, :stroke_color
+  end
+
+  class Entity
+    attr_accessor :style
+    def initialize
+      @style = Style.new
+    end
+  end
+
+  class SketchUpModel < Entity
+    RASTER_RENDER = 0
+    VECTOR_RENDER = 1
+    HYBRID_RENDER = 2
+
+    attr_accessor :skp_path, :bounds, :scenes, :current_scene, :render_mode
+
+    def initialize(skp_path, bounds)
+      super()
+      @skp_path = skp_path
+      @bounds = bounds
+      @scenes = ["Last Saved SketchUp View", "01. Обложка", "02. Описание", "03. Вид", "Scene 1", "Scene 2"]
+      @current_scene = 1
+      @render_mode = RASTER_RENDER
+    end
+
+    def render_needed?
+      true
+    end
+
+    def render
+      true
+    end
+  end
+
+  class FormattedText < Entity
+    attr_accessor :text, :bounds
+    def initialize(text, bounds)
+      super()
+      @text = text
+      @bounds = bounds
+    end
+  end
+
+  class Document
+    attr_accessor :page_info, :pages, :layers, :entities
+
+    def initialize(template_path = nil)
+      @page_info = PageInfo.new
+      @pages     = Pages.new
+      @layers    = Layers.new
+      @entities  = []
+    end
+
+    def add_entity(entity, layer, page = nil)
+      @entities << { entity: entity, layer: layer, page: page }
+    end
+
+    def export(pdf_path, options = nil)
+      FileUtils.mkdir_p(File.dirname(pdf_path))
+      # Создаем валидный тестовый PDF
+      pdf = Prawn::Document.new(page_size: "A4", page_layout: :landscape)
+      pdf.text "Mock LayOut API Export"
+      pdf.render_file(pdf_path)
+      true
+    end
+
+    def save(layout_path)
+      FileUtils.mkdir_p(File.dirname(layout_path))
+      File.write(layout_path, "MOCK_LAYOUT_DOCUMENT_CONTENT")
+      true
+    end
+  end
+end

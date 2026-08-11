@@ -56,6 +56,12 @@
     btnAutoMapScenes: document.getElementById("btnAutoMapScenes"),
 
     // Tab 3 Inputs
+    selectExportEngine: document.getElementById("selectExportEngine"),
+    engineHintText: document.getElementById("engineHintText"),
+    layoutRenderModeGroup: document.getElementById("layoutRenderModeGroup"),
+    selectLayoutRenderMode: document.getElementById("selectLayoutRenderMode"),
+    layoutSaveFileGroup: document.getElementById("layoutSaveFileGroup"),
+    chkSaveLayoutFile: document.getElementById("chkSaveLayoutFile"),
     selectPageSize: document.getElementById("selectPageSize"),
     selectPageLayout: document.getElementById("selectPageLayout"),
     selectQuality: document.getElementById("selectQuality"),
@@ -164,6 +170,12 @@
     els.inputNotes.value = info.notes || "";
 
     // PDF Settings
+    const engine = settings.export_engine || "prawn";
+    if (els.selectExportEngine) els.selectExportEngine.value = engine;
+    if (els.selectLayoutRenderMode) els.selectLayoutRenderMode.value = settings.layout_render_mode || "raster";
+    if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
+    updateEngineUI();
+
     els.selectPageSize.value = settings.page_size || "A4";
     els.selectPageLayout.value = settings.page_layout || "landscape";
     els.selectQuality.value = (settings.scale_factor || 2.0).toString();
@@ -186,6 +198,21 @@
     updateHeaderTitles();
     renderScenesTable();
     renderHistoryTable();
+  }
+
+  // Update LayOut / Prawn Engine UI State
+  function updateEngineUI() {
+    const isLayout = els.selectExportEngine && els.selectExportEngine.value === "layout";
+    if (els.layoutRenderModeGroup) els.layoutRenderModeGroup.style.display = isLayout ? "flex" : "none";
+    if (els.layoutSaveFileGroup) els.layoutSaveFileGroup.style.display = isLayout ? "flex" : "none";
+
+    if (els.engineHintText) {
+      if (isLayout) {
+        els.engineHintText.textContent = "LayOut API создает полноценный документ LayOut со страницами и видовыми экранами SketchUp и экспортирует его в PDF.";
+      } else {
+        els.engineHintText.textContent = "Prawn генерирует PDF напрямую, используя векторные примитивы и высококачественные растровые рендеры сцен.";
+      }
+    }
   }
 
   // Update Header Title & Subtitle
@@ -391,6 +418,9 @@
     };
 
     state.pdf_settings = {
+      export_engine: els.selectExportEngine ? els.selectExportEngine.value : "prawn",
+      layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "raster",
+      save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
       page_size: els.selectPageSize.value,
       page_layout: els.selectPageLayout.value,
       scale_factor: parseFloat(els.selectQuality.value) || 2.0,
@@ -413,6 +443,11 @@
     els.inputFurnitureName.addEventListener("input", updateHeaderTitles);
     els.inputCustomer.addEventListener("input", updateHeaderTitles);
     els.inputAddress.addEventListener("input", updateHeaderTitles);
+
+    // Export engine select change
+    if (els.selectExportEngine) {
+      els.selectExportEngine.addEventListener("change", updateEngineUI);
+    }
 
     // Stamp select change
     els.selectStamp.addEventListener("change", (e) => {

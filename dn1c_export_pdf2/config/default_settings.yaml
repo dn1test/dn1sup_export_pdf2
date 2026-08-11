@@ -24,6 +24,9 @@ project_info:
   notes: "Монтаж производить после завершения чистовых отделочных работ."
 
 pdf_settings:
+  export_engine: "prawn"        # 'prawn' (Prawn PDF) или 'layout' (SketchUp LayOut API)
+  layout_render_mode: "raster"  # 'raster' (Растровый), 'vector' (Векторный), 'hybrid' (Гибридный)
+  save_layout_file: true        # Сохранять файл .layout рядом с PDF (для LayOut API)
   page_size: "A4"          # 'A4', 'A3', 'A2', 'LETTER'
   page_layout: "landscape" # 'landscape' или 'portrait'
   margin: 15               # Отступ от края листа (в пунктах)

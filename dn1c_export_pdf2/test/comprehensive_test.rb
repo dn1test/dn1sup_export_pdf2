@@ -43,6 +43,7 @@ class TestRunner
     test_default_pdf_path_next_to_skp
     test_pdf_export_description_page
     test_room_and_furniture_composition
+    test_layout_api_export
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -314,6 +315,69 @@ class TestRunner
     assert(File.exist?(result_path), "PDF с титульным листом и составным заголовком успешно сгенерирован")
 
     File.delete(pdf_out) if File.exist?(pdf_out)
+  end
+
+  def test_layout_api_export
+    puts "\n--- 10. Тест экспорта через SketchUp LayOut Ruby API ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Interior/Penthouse.skp")
+    scenes = [
+      Sketchup::MockPage.new("01. Обложка"),
+      Sketchup::MockPage.new("02. Описание и спецификации"),
+      Sketchup::MockPage.new("03. Содержание"),
+      Sketchup::MockPage.new("04. Визуализация"),
+      Sketchup::MockPage.new("05. Общий вид")
+    ]
+    model.pages = Sketchup::MockPages.new(scenes)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info = {
+      name_project:   "Пентхаус 'Панорама'",
+      room_name:      "Гостиная-студия",
+      furniture_name: "Медиа-зона со стеллажами",
+      name_customer:  "Романов А.В.",
+      address:        "г. Москва, Пресненская наб., 12",
+      articul:        "PAN-2026-X",
+      version:        1,
+      revision:       3,
+      status:         "В РАБОТЕ",
+      materials:      "Шпон американского ореха, металлокаркас латунь, подсветка 2700K.",
+      appliances:     "Аудиосистема Hi-Fi, панель OLED 85'.",
+      lighting:       "Профиль Arlight 24V, сенсорное диммирование.",
+      notes:          "Скрытая проводка коммуникаций в теле перегородки."
+    }
+
+    # Настройки для LayOut API
+    project_data.pdf_settings[:export_engine] = "layout"
+    project_data.pdf_settings[:layout_render_mode] = "vector"
+    project_data.pdf_settings[:save_layout_file] = true
+    project_data.pdf_settings[:page_size] = "A3"
+    project_data.pdf_settings[:page_layout] = "landscape"
+    project_data.pdf_settings[:stamp_type] = "approved"
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    project_data.sync_with_model_scenes(model)
+
+    pdf_out    = File.expand_path("test_layout_export.pdf", __dir__)
+    layout_out = File.expand_path("test_layout_export.layout", __dir__)
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+    File.delete(layout_out) if File.exist?(layout_out)
+
+    assert(DN1Code::ExportPdf2::Service::LayoutBuilder.available?, "Сервис LayOutBuilder определяет доступность LayOut API")
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    result_path = controller.export(pdf_out)
+
+    assert(File.exist?(result_path), "Файл PDF успешно создан через LayOut API: #{File.basename(result_path)}")
+    assert(File.exist?(layout_out), "Файл проекта LayOut (.layout) успешно сохранен рядом с PDF")
+
+    # Проверка сохранения настроек LayOut в атрибуты модели
+    saved_settings = model.get_attribute("DN1C_ExportPDF", "pdf_settings")
+    assert(!saved_settings.nil? && saved_settings.include?("layout"), "Настройка 'export_engine: layout' сохранена в атрибуты модели")
+
+    File.delete(pdf_out) if File.exist?(pdf_out)
+    File.delete(layout_out) if File.exist?(layout_out)
   end
 end
 

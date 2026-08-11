@@ -18,6 +18,7 @@ require_relative "service/gem_loader"
 require_relative "service/font_service"
 require_relative "service/render_service"
 require_relative "service/pdf_builder"
+require_relative "service/layout_builder"
 
 # Загрузка моделей данных
 require_relative "model/scene_item"

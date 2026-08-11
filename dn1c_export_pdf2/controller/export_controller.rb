@@ -27,9 +27,17 @@ module DN1Code
         end
 
         def export(custom_output_path = nil, &progress_block)
+          settings = @project_data.pdf_settings
+          engine   = settings[:export_engine].to_s.downcase
+
+          if engine == "layout"
+            # Генерация страниц и экспорт через SketchUp LayOut Ruby API
+            return Service::LayoutBuilder.export(self, custom_output_path, &progress_block)
+          end
+
+          # По умолчанию: Генерация через автономный Prawn PDF движок
           Service::GemLoader.ensure_prawn_loaded!
 
-          settings = @project_data.pdf_settings
           enabled_scenes = @project_data.scenes.select { |s| s.enabled && s.page_type != :skip }
 
           if enabled_scenes.empty?

@@ -48,19 +48,22 @@ module DN1Code
 
         def default_pdf_settings
           {
-            page_size:       "A4",
-            page_layout:     "landscape",
-            margin:          15,
-            image_width:     2400,
-            scale_factor:    2.0,
-            antialias:       true,
-            stamp_type:      "draft",
-            stamp_custom:    "НЕ УТВЕРЖДЕН",
-            auto_open_pdf:   true,
-            save_skp_backup: true,
-            primary_color:   "005EB0",
-            secondary_color: "64748B",
-            stamp_color:     "D32F2F"
+            export_engine:      "prawn",
+            layout_render_mode: "raster",
+            save_layout_file:   true,
+            page_size:          "A4",
+            page_layout:        "landscape",
+            margin:             15,
+            image_width:        2400,
+            scale_factor:       2.0,
+            antialias:          true,
+            stamp_type:         "draft",
+            stamp_custom:       "НЕ УТВЕРЖДЕН",
+            auto_open_pdf:      true,
+            save_skp_backup:    true,
+            primary_color:      "005EB0",
+            secondary_color:    "64748B",
+            stamp_color:        "D32F2F"
           }
         end
 

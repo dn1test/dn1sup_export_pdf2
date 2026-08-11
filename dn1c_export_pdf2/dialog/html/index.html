@@ -236,6 +236,41 @@
 
       <!-- TAB 3: PDF SETTINGS -->
       <section id="tab-settings" class="tab-pane">
+        <!-- Engine Selection Card -->
+        <div class="settings-card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <span class="card-header-icon">⚙️</span>
+            <span class="card-header-title">Метод генерации и движок экспорта</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="selectExportEngine">Движок создания PDF документа *</label>
+              <select id="selectExportEngine" class="form-control">
+                <option value="prawn" selected>⚡ Prawn PDF (Автономный быстрый генератор без LayOut)</option>
+                <option value="layout">📐 SketchUp LayOut API (Создание страниц LayOut и экспорт в PDF)</option>
+              </select>
+              <span class="field-hint" id="engineHintText">Prawn генерирует PDF напрямую, используя векторные примитивы и высококачественные растровые рендеры сцен.</span>
+            </div>
+
+            <!-- LayOut Specific Options (Shown when LayOut engine is selected) -->
+            <div class="form-group" id="layoutRenderModeGroup" style="display: none;">
+              <label for="selectLayoutRenderMode">Режим отображения видовых экранов LayOut</label>
+              <select id="selectLayoutRenderMode" class="form-control">
+                <option value="raster" selected>Растровый (Raster, быстро)</option>
+                <option value="vector">Векторный (Vector, четкие линии)</option>
+                <option value="hybrid">Гибридный (Hybrid, растр + вектор)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="layoutSaveFileGroup" style="display: none;">
+              <label class="checkbox-label" style="margin-top: 26px;">
+                <input type="checkbox" id="chkSaveLayoutFile" checked>
+                <span>Сохранять проект (.layout) рядом с PDF</span>
+              </label>
+            </div>
+          </div>
+        </div>
+
         <div class="form-grid">
           <div class="form-group">
             <label for="selectPageSize">Формат листа</label>
