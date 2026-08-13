@@ -34,8 +34,13 @@ class TestRunner
     puts "  Комплексное тестирование DN1C Export PDF 2"
     puts "=========================================================="
 
+    test_default_blank_parameters
     test_models_and_attributes
+    test_yaml_filename_resolution
     test_yaml_import_export
+    test_auto_yaml_save_on_sketchup_save
+    test_priority_reading_yaml_primary_model_secondary
+    test_save_auto_both_library_and_yaml
     test_pdf_export_a4_landscape
     test_pdf_export_a3_portrait
     test_pdf_export_with_custom_stamp
@@ -53,6 +58,28 @@ class TestRunner
   end
 
   private
+
+  def test_default_blank_parameters
+    puts "\n--- 0. Тест параметров по умолчанию (только пустые подсказки) ---"
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    info = project_data.project_info
+
+    assert(info[:room_name] == "", "Поле room_name изначально пустое")
+    assert(info[:furniture_name] == "", "Поле furniture_name изначально пустое")
+    assert(info[:name_project] == "", "Поле name_project изначально пустое")
+    assert(info[:description] == "", "Поле description изначально пустое")
+    assert(info[:name_customer] == "", "Поле name_customer изначально пустое")
+    assert(info[:phone] == "", "Поле phone изначально пустое")
+    assert(info[:email] == "", "Поле email изначально пустое")
+    assert(info[:address] == "", "Поле address изначально пустое")
+    assert(info[:articul] == "", "Поле articul изначально пустое")
+    assert(info[:materials] == "", "Поле materials изначально пустое")
+    assert(info[:appliances] == "", "Поле appliances изначально пустое")
+    assert(info[:lighting] == "", "Поле lighting изначально пустое")
+    assert(info[:notes] == "", "Поле notes изначально пустое")
+    assert(project_data.history.empty?, "История изменений изначально пустая")
+  end
 
   def test_models_and_attributes
     puts "\n--- 1. Тест моделей данных и SketchUp Attribute Dictionaries ---"
@@ -89,8 +116,34 @@ class TestRunner
     assert(loaded_data.project_info[:revision] == 5, "Номер ревизии загружен из атрибутов модели")
   end
 
+  def test_yaml_filename_resolution
+    puts "\n--- 2. Тест правил именования YAML (Артикул / Имя файла SKP) ---"
+
+    model = Sketchup::MockModel.new("U:/Projects/Villa/Apartment_Final.skp")
+
+    # Вариант 1: Артикул указан
+    info_with_art = { articul: "PRJ-2026-X" }
+    resolved_1 = DN1Code::ExportPdf2::Model::ProjectData.resolve_yaml_filename(info_with_art, model)
+    assert(resolved_1 == "PRJ-2026-X.yaml", "Имя YAML взято из артикула: #{resolved_1}")
+
+    # Вариант 2: Артикул с недопустимыми символами (санитизация)
+    info_with_bad_art = { articul: "PRJ/2026:01*A" }
+    resolved_2 = DN1Code::ExportPdf2::Model::ProjectData.resolve_yaml_filename(info_with_bad_art, model)
+    assert(resolved_2 == "PRJ_2026_01_A.yaml", "Имя YAML с очищенными спецсимволами: #{resolved_2}")
+
+    # Вариант 3: Артикул пустой -> берется имя файла модели
+    info_empty_art = { articul: "" }
+    resolved_3 = DN1Code::ExportPdf2::Model::ProjectData.resolve_yaml_filename(info_empty_art, model)
+    assert(resolved_3 == "Apartment_Final.yaml", "При пустом артикуле имя взято из имени файла модели: #{resolved_3}")
+
+    # Вариант 4: Артикул nil -> берется имя файла модели
+    info_nil_art = { articul: nil }
+    resolved_4 = DN1Code::ExportPdf2::Model::ProjectData.resolve_yaml_filename(info_nil_art, model)
+    assert(resolved_4 == "Apartment_Final.yaml", "При nil артикуле имя взято из имени файла модели: #{resolved_4}")
+  end
+
   def test_yaml_import_export
-    puts "\n--- 2. Тест экспорта и импорта конфигурации YAML ---"
+    puts "\n--- 3. Тест экспорта и импорта конфигурации YAML ---"
 
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     project_data.project_info[:name_project] = "Пентхаус на Мосфильмовской"
@@ -106,9 +159,118 @@ class TestRunner
     loaded_yaml_data.load_from_yaml(yaml_path)
     assert(loaded_yaml_data.project_info[:name_project] == "Пентхаус на Мосфильмовской", "Имя проекта корректно загружено из YAML")
     assert(loaded_yaml_data.project_info[:name_customer] == "Ковалев Дмитрий", "Имя заказчика корректно загружено из YAML")
-    assert(loaded_yaml_data.history.size >= 2, "История изменений корректно прочитана из YAML")
+    assert(loaded_yaml_data.history.size >= 1, "История изменений корректно прочитана из YAML")
 
     File.delete(yaml_path) if File.exist?(yaml_path)
+  end
+
+  def test_auto_yaml_save_on_sketchup_save
+    puts "\n--- 4. Тест автоматического создания YAML при сохранении SketchUp файла ---"
+
+    test_dir = File.expand_path("test_auto_save_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Kitchen_Project.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    # Прикрепляем наблюдателя
+    DN1Code::ExportPdf2::Service::ObserverService.attach_model_observer(model)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "KITCHEN-777"
+    project_data.project_info[:name_project] = "Кухня Модерн"
+    project_data.save_to_model(model)
+
+    # Имитируем сохранение модели SketchUp (Ctrl+S / File -> Save)
+    model.save
+
+    expected_yaml = File.join(test_dir, "KITCHEN-777.yaml")
+    assert(File.exist?(expected_yaml), "При сохранении SKP автоматически создан YAML по артикулу: #{File.basename(expected_yaml)}")
+
+    # Проверяем содержимое созданного YAML
+    loaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded.load_from_yaml(expected_yaml)
+    assert(loaded.project_info[:name_project] == "Кухня Модерн", "Содержимое автоматически созданного YAML файла корректно")
+
+    # Теперь очищаем артикул и сохраняем модель снова
+    project_data.project_info[:articul] = ""
+    project_data.project_info[:name_project] = "Кухня Без Артикула"
+    project_data.save_to_model(model)
+    model.save
+
+    fallback_yaml = File.join(test_dir, "Kitchen_Project.yaml")
+    assert(File.exist?(fallback_yaml), "При пустом артикуле создан YAML с именем модели SKP: #{File.basename(fallback_yaml)}")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_priority_reading_yaml_primary_model_secondary
+    puts "\n--- 5. Тест иерархии чтения: ПЕРВИЧНО YAML, ВТОРИЧНО библиотека модели ---"
+
+    test_dir = File.expand_path("test_priority_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Bedroom.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    # 1. Записываем в библиотеку модели одно значение
+    model_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    model_data.project_info[:articul] = "BED-01"
+    model_data.project_info[:name_project] = "Имя из библиотеки модели"
+    model_data.save_to_model(model)
+
+    # 2. Создаем рядом файл BED-01.yaml с другим значением (внешнее редактирование)
+    yaml_file = File.join(test_dir, "BED-01.yaml")
+    yaml_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    yaml_data.project_info[:articul] = "BED-01"
+    yaml_data.project_info[:name_project] = "Имя из файла YAML (Первично)"
+    yaml_data.save_to_yaml(yaml_file)
+
+    # 3. Вызываем автоматическую загрузку
+    test_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    source = test_data.load_auto(model)
+
+    assert(source == :yaml, "Источник загрузки определен как :yaml (первично)")
+    assert(test_data.project_info[:name_project] == "Имя из файла YAML (Первично)", "Загружены данные из YAML файла, имеющего высший приоритет")
+
+    # 4. Удаляем YAML файл и проверяем вторичную загрузку из библиотеки модели
+    File.delete(yaml_file) if File.exist?(yaml_file)
+
+    fallback_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    fallback_source = fallback_data.load_auto(model)
+
+    assert(fallback_source == :model, "При отсутствии YAML источник загрузки определен как :model (вторично)")
+    # Библиотека модели была синхронизирована при первой загрузке из YAML
+    assert(!fallback_data.project_info[:name_project].empty?, "Данные успешно прочитаны из библиотеки модели")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_save_auto_both_library_and_yaml
+    puts "\n--- 6. Тест save_auto: одновременное сохранение в библиотеку и YAML файл ---"
+
+    test_dir = File.expand_path("test_save_auto_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Office.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "OFFICE-900"
+    project_data.project_info[:name_project] = "Кабинет Руководителя"
+
+    # Вызываем save_auto
+    project_data.save_auto(model)
+
+    # Проверка 1: Сохранено в библиотеку модели
+    dict_saved = model.get_attribute("DN1C_ExportPDF", "project_info")
+    assert(!dict_saved.nil? && dict_saved.include?("OFFICE-900"), "Данные сохранены в словарь атрибутов модели")
+
+    # Проверка 2: Сохранено в YAML файл рядом с SKP
+    yaml_file = File.join(test_dir, "OFFICE-900.yaml")
+    assert(File.exist?(yaml_file), "Данные сохранены в файл #{File.basename(yaml_file)}")
+
+    FileUtils.rm_rf(test_dir)
   end
 
   def test_pdf_export_a4_landscape

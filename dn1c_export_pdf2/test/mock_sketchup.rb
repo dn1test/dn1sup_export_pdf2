@@ -79,14 +79,42 @@ module Sketchup
     end
   end
 
+  class AppObserver
+    def onNewModel(model); end
+    def onOpenModel(model); end
+    def onActivateModel(model); end
+    def onPreSaveModel(model); end
+    def onPostSaveModel(model); end
+    def onSaveModel(model); end
+    def onQuit; end
+  end
+
+  class ModelObserver
+    def onPreSaveModel(model); end
+    def onPostSaveModel(model); end
+    def onSaveModel(model); end
+    def onErase(model); end
+  end
+
   class MockModel
-    attr_accessor :path, :pages, :active_view, :attributes
+    attr_accessor :path, :pages, :active_view, :attributes, :observers
 
     def initialize(path = "U:/Projects/SampleProject/model.skp")
       @path = path
       @pages = MockPages.new
       @active_view = MockView.new
       @attributes = {}
+      @observers = []
+    end
+
+    def add_observer(obs)
+      @observers << obs unless @observers.include?(obs)
+      true
+    end
+
+    def remove_observer(obs)
+      @observers.delete(obs)
+      true
     end
 
     def get_attribute(dict, key, default = nil)
@@ -98,11 +126,43 @@ module Sketchup
       @attributes[dict][key] = value
     end
 
+    def save(new_path = nil)
+      @path = new_path if new_path && !new_path.empty?
+
+      # Pre-save event
+      @observers.each { |o| o.onPreSaveModel(self) if o.respond_to?(:onPreSaveModel) }
+      Sketchup.observers.each { |o| o.onPreSaveModel(self) if o.respond_to?(:onPreSaveModel) }
+
+      FileUtils.mkdir_p(File.dirname(@path))
+      File.write(@path, "MOCK_SKP_CONTENT")
+
+      # Post-save event
+      @observers.each do |o|
+        o.onPostSaveModel(self) if o.respond_to?(:onPostSaveModel)
+        o.onSaveModel(self) if o.respond_to?(:onSaveModel)
+      end
+      Sketchup.observers.each do |o|
+        o.onPostSaveModel(self) if o.respond_to?(:onPostSaveModel)
+        o.onSaveModel(self) if o.respond_to?(:onSaveModel)
+      end
+
+      true
+    end
+
     def save_copy(backup_path)
       FileUtils.mkdir_p(File.dirname(backup_path))
       File.write(backup_path, "MOCK_SKP_BACKUP_CONTENT")
       true
     end
+  end
+
+  def self.observers
+    @observers ||= []
+  end
+
+  def self.add_observer(obs)
+    observers << obs unless observers.include?(obs)
+    true
   end
 
   def self.active_model
@@ -111,6 +171,14 @@ module Sketchup
 
   def self.active_model=(model)
     @active_model = model
+  end
+
+  def self.status_text=(text)
+    @status_text = text
+  end
+
+  def self.status_text
+    @status_text
   end
 
   def self.register_extension(ext, load_on_start = true)

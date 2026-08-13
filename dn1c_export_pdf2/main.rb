@@ -19,6 +19,7 @@ require_relative "service/font_service"
 require_relative "service/render_service"
 require_relative "service/pdf_builder"
 require_relative "service/layout_builder"
+require_relative "service/observer_service"
 
 # Загрузка моделей данных
 require_relative "model/scene_item"
@@ -52,8 +53,7 @@ module DN1Code
       end
 
       project_data = Model::ProjectData.new
-      project_data.load_from_model(model)
-      project_data.sync_with_model_scenes(model)
+      project_data.load_auto(model)
 
       enabled = project_data.scenes.select { |s| s.enabled && s.page_type != :skip }
       if enabled.empty?
@@ -71,8 +71,11 @@ module DN1Code
       end
     end
 
-    # Регистрация команд, меню и панели инструментов
+    # Регистрация команд, меню, панели инструментов и наблюдателей SketchUp
     unless file_loaded?(__FILE__)
+      # Регистрация наблюдателя сохранения и открытия моделей SketchUp
+      Service::ObserverService.register!
+
       # Создание пункта меню в Plugins
       menu = UI.menu("Plugins")
       submenu = menu.add_submenu(NAME_EXTENSION)

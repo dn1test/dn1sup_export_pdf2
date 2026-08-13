@@ -3,6 +3,7 @@
 require "yaml"
 require "json"
 require "time"
+require "fileutils"
 
 module DN1Code
   module ExportPdf2
@@ -16,33 +17,31 @@ module DN1Code
           @project_info = default_project_info
           @pdf_settings = default_pdf_settings
           @scenes       = []
-          @history      = [
-            { date: Time.now.strftime("%Y.%m.%d"), description: "Инициализация проекта" }
-          ]
+          @history      = []
         end
 
         def default_project_info
           {
-            room_name:      "Кухня-гостиная",
-            furniture_name: "Кухонный гарнитур",
-            name_project:   "Кухня-гостиная — Кухонный гарнитур",
-            description:    "Концептуальный дизайн-проект и спецификации",
-            name_customer:  "Заказчик",
-            phone:          "+7 (000) 000-00-00",
-            email:          "info@example.com",
-            address:        "г. Москва, ул. Примерная, д. 1",
-            articul:        "PRJ-001",
-            version:        1,
-            revision:       1,
+            room_name:        "",
+            furniture_name:   "",
+            name_project:     "",
+            description:      "",
+            name_customer:    "",
+            phone:            "",
+            email:            "",
+            address:          "",
+            articul:          "",
+            version:          1,
+            revision:         1,
             status:           "В РАБОТЕ",
-            task_description: "Разработка полного комплекта чертежей и 3D визуализаций изделия согласно габаритам помещения и пожеланиям заказчика.",
-            task_dimensions:  "Монтажный проем: 3200 x 2650 x 600 мм. Привязка розеток фартука по схеме развертки стен.",
-            task_wishes:      "Предусмотреть интеграцию встроенного холодильника, посудомоечной машины 60см и скрытую вытяжку.",
-            materials:        "Фасады: МДФ эмаль матовая, корпус: ЛДСП Egger 18мм, фурнитура: Blum Legrabox / Aventos HF.",
-            appliances:       "Встроенный духовой шкаф, индукционная варочная панель 60см, вытяжка полновстраиваемая, посудомоечная машина 60см, холодильник встроенный.",
-            lighting:         "Светодиодная лента 3000K CRI>95 в алюминиевом профиле, блок питания 24V с запасом 30%, сенсорный выключатель.",
-            notes:            "Монтаж производить после завершения чистовой отделки стен и укладки напольного покрытия. Выводы электрики согласно схеме.",
-            edit:             "Правки не внесены"
+            task_description: "",
+            task_dimensions:  "",
+            task_wishes:      "",
+            materials:        "",
+            appliances:       "",
+            lighting:         "",
+            notes:            "",
+            edit:             ""
           }
         end
 
@@ -65,6 +64,126 @@ module DN1Code
             secondary_color:    "64748B",
             stamp_color:        "D32F2F"
           }
+        end
+
+        # Очистка имени от запрещенных символов файловой системы
+        def self.sanitize_filename(name)
+          name.to_s.gsub(/[\\\/:\*\?"<>\|]/, "_").strip
+        end
+
+        # Определение имени YAML файла на основе артикула или имени файла модели
+        def self.resolve_yaml_filename(project_info, model = nil)
+          articul = project_info && project_info[:articul] ? project_info[:articul].to_s.strip : ""
+          if !articul.empty?
+            clean_name = sanitize_filename(articul)
+            return "#{clean_name}.yaml" unless clean_name.empty?
+          end
+
+          if model && model.respond_to?(:path) && !model.path.to_s.empty?
+            clean_path = model.path.to_s.tr("\\", "/")
+            base_name = File.basename(clean_path, ".*")
+            clean_base = sanitize_filename(base_name)
+            return "#{clean_base}.yaml" unless clean_base.empty?
+          end
+
+          "project_config.yaml"
+        end
+
+        # Поиск существующего YAML файла рядом с моделью SketchUp
+        def self.find_yaml_path_for_model(model)
+          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
+
+          clean_path = model.path.to_s.tr("\\", "/")
+          dir = File.dirname(clean_path)
+          base_name = File.basename(clean_path, ".*")
+
+          # 1. Проверяем артикул из атрибутов модели
+          raw_info = model.get_attribute(ATTR_DICT, "project_info", nil) rescue nil
+          if raw_info
+            begin
+              info = JSON.parse(raw_info, symbolize_names: true)
+              articul = info[:articul].to_s.strip
+              if !articul.empty?
+                art_yaml = File.join(dir, "#{sanitize_filename(articul)}.yaml")
+                return art_yaml if File.exist?(art_yaml)
+
+                art_yml = File.join(dir, "#{sanitize_filename(articul)}.yml")
+                return art_yml if File.exist?(art_yml)
+              end
+            rescue StandardError
+              # Ignore
+            end
+          end
+
+          # 2. Проверяем имя файла модели <model_basename>.yaml / .yml
+          model_yaml = File.join(dir, "#{base_name}.yaml")
+          return model_yaml if File.exist?(model_yaml)
+
+          model_yml = File.join(dir, "#{base_name}.yml")
+          return model_yml if File.exist?(model_yml)
+
+          nil
+        end
+
+        # Получение имени YAML файла для текущего экземпляра
+        def yaml_filename(model = nil)
+          self.class.resolve_yaml_filename(@project_info, model)
+        end
+
+        # Полный путь к YAML файлу рядом с моделью
+        def yaml_path_for_model(model)
+          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
+
+          clean_path = model.path.to_s.tr("\\", "/")
+          dir = File.dirname(clean_path)
+          File.join(dir, yaml_filename(model))
+        end
+
+        # Автоматическая загрузка:
+        # ПЕРВИЧНО — YAML файл рядом с основным файлом SketchUp
+        # ВТОРИЧНО — Библиотека файла (атрибуты модели)
+        def load_auto(model)
+          loaded_from = nil
+
+          # 1. ПЕРВИЧНО: Ищем и загружаем YAML файл рядом с .skp
+          yaml_file = self.class.find_yaml_path_for_model(model)
+          if yaml_file && File.exist?(yaml_file)
+            if load_from_yaml(yaml_file)
+              loaded_from = :yaml
+              # Синхронизируем прочитанные данные в библиотеку модели
+              save_to_model(model) if model
+            end
+          end
+
+          # 2. ВТОРИЧНО: Если YAML не найден, читаем из библиотеки модели (атрибутов)
+          if loaded_from.nil? && model
+            if load_from_model(model)
+              loaded_from = :model
+            end
+          end
+
+          # Синхронизация списка сцен из модели
+          sync_with_model_scenes(model) if model
+
+          loaded_from || :default
+        end
+
+        # Автоматическое сохранение:
+        # 1. В библиотеку модели (Attribute Dictionaries)
+        # 2. В YAML файл рядом с файлом SketchUp
+        def save_auto(model)
+          return false unless model
+
+          # 1. Сохранение в библиотеку модели
+          save_to_model(model)
+
+          # 2. Сохранение в YAML файл рядом с .skp
+          if model.respond_to?(:path) && !model.path.to_s.empty?
+            target_yaml = yaml_path_for_model(model)
+            save_to_yaml(target_yaml) if target_yaml
+          end
+
+          true
         end
 
         # Синхронизация сцен из активной модели SketchUp
@@ -97,15 +216,18 @@ module DN1Code
           @scenes = new_scenes
         end
 
-        # Чтение данных из атрибутов модели SketchUp
+        # Чтение данных из атрибутов модели SketchUp (библиотека модели)
         def load_from_model(model)
           return false unless model && model.respond_to?(:get_attribute)
 
           raw_info = model.get_attribute(ATTR_DICT, "project_info", nil)
+          has_data = false
+
           if raw_info
             begin
               parsed = JSON.parse(raw_info, symbolize_names: true)
               @project_info.merge!(parsed)
+              has_data = true
             rescue StandardError
               # Ignore JSON parse errors
             end
@@ -116,6 +238,7 @@ module DN1Code
             begin
               parsed = JSON.parse(raw_settings, symbolize_names: true)
               @pdf_settings.merge!(parsed)
+              has_data = true
             rescue StandardError
               # Ignore
             end
@@ -125,7 +248,10 @@ module DN1Code
           if raw_history
             begin
               parsed = JSON.parse(raw_history, symbolize_names: true)
-              @history = parsed if parsed.is_a?(Array) && !parsed.empty?
+              if parsed.is_a?(Array)
+                @history = parsed
+                has_data = true
+              end
             rescue StandardError
               # Ignore
             end
@@ -135,8 +261,9 @@ module DN1Code
           if raw_scenes
             begin
               parsed = JSON.parse(raw_scenes, symbolize_names: true)
-              if parsed.is_a?(Array)
+              if parsed.is_a?(Array) && !parsed.empty?
                 @scenes = parsed.map { |h| SceneItem.from_h(h) }
+                has_data = true
               end
             rescue StandardError
               # Ignore
@@ -144,28 +271,46 @@ module DN1Code
           end
 
           sync_with_model_scenes(model)
-          true
+          has_data
         end
 
-        # Сохранение данных в атрибуты модели SketchUp
+        # Сохранение данных в атрибуты модели SketchUp (библиотека модели)
         def save_to_model(model)
           return false unless model && model.respond_to?(:set_attribute)
 
           model.set_attribute(ATTR_DICT, "project_info", JSON.generate(@project_info))
           model.set_attribute(ATTR_DICT, "pdf_settings", JSON.generate(@pdf_settings))
           model.set_attribute(ATTR_DICT, "history", JSON.generate(@history))
-          
+
           scenes_data = @scenes.map(&:to_h)
           model.set_attribute(ATTR_DICT, "scenes", JSON.generate(scenes_data))
           true
         end
 
-        # Загрузка из YAML-файла
+        # Загрузка из YAML-файла (поддержка структурированного и потокового форматов)
         def load_from_yaml(file_path)
           return false unless File.exist?(file_path)
 
           begin
-            docs = YAML.load_stream(File.read(file_path), symbolize_names: true)
+            content = File.read(file_path, encoding: "utf-8")
+            docs = YAML.load_stream(content, symbolize_names: true)
+            return false if docs.empty?
+
+            # Вариант 1: Структурированный одиночный хэш { project_info: ..., pdf_settings: ..., scenes: ..., history: ... }
+            if docs.size == 1 && docs[0].is_a?(Hash) && (docs[0].key?(:project_info) || docs[0].key?(:pdf_settings) || docs[0].key?(:scenes))
+              root = docs[0]
+              @project_info.merge!(root[:project_info]) if root[:project_info].is_a?(Hash)
+              @pdf_settings.merge!(root[:pdf_settings]) if root[:pdf_settings].is_a?(Hash)
+              if root[:scenes].is_a?(Array)
+                @scenes = root[:scenes].map { |h| SceneItem.from_h(h) }
+              end
+              if root[:history].is_a?(Array)
+                @history = root[:history]
+              end
+              return true
+            end
+
+            # Вариант 2: Многодокументный потоковый формат
             if docs[0].is_a?(Hash)
               @project_info.merge!(docs[0])
             end
@@ -175,9 +320,12 @@ module DN1Code
             if docs[2].is_a?(Array)
               @history = docs[2]
             end
+            if docs[3].is_a?(Hash)
+              @pdf_settings.merge!(docs[3])
+            end
             true
           rescue StandardError => e
-            warn "Ошибка загрузки YAML: #{e.message}"
+            warn "Ошибка загрузки YAML (#{file_path}): #{e.message}"
             false
           end
         end
@@ -185,10 +333,14 @@ module DN1Code
         # Сохранение в YAML-файл
         def save_to_yaml(file_path)
           FileUtils.mkdir_p(File.dirname(file_path))
+          data = {
+            project_info: @project_info,
+            pdf_settings: @pdf_settings,
+            scenes:       @scenes.map(&:to_h),
+            history:      @history
+          }
           File.open(file_path, "w:utf-8") do |f|
-            f.write @project_info.to_yaml
-            f.write @scenes.map(&:to_h).to_yaml
-            f.write @history.to_yaml
+            f.write data.to_yaml
           end
           true
         end

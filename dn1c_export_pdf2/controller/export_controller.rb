@@ -99,7 +99,7 @@ module DN1Code
 
             # Увеличение ревизии и сохранение атрибутов
             @project_data.increment_revision!("Экспорт PDF (#{File.basename(pdf_path)})")
-            @project_data.save_to_model(@model) if @model
+            @project_data.save_auto(@model) if @model
 
             progress_block&.call(total_pages, total_pages, "Экспорт успешно завершен!")
 

@@ -109,7 +109,7 @@ module DN1Code
 
             # 7. Увеличение ревизии и сохранение атрибутов
             project_data.increment_revision!("Экспорт LayOut PDF (#{File.basename(pdf_path)})")
-            project_data.save_to_model(model) if model
+            project_data.save_auto(model) if model
 
             progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")
 

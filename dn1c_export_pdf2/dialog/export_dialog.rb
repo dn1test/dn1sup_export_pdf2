@@ -40,18 +40,17 @@ module DN1Code
         end
 
         def self.setup_callbacks(dialog)
-          # Загрузка данных проекта в веб-интерфейс
+          # Загрузка данных проекта в веб-интерфейс (первично YAML, вторично библиотека модели)
           dialog.add_action_callback("getData") do |_action_context|
             model = Sketchup.active_model
             project_data = Model::ProjectData.new
-            project_data.load_from_model(model)
-            project_data.sync_with_model_scenes(model)
+            project_data.load_auto(model)
 
             json_str = JSON.generate(project_data.to_h)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
 
-          # Сохранение настроек из веб-интерфейса
+          # Сохранение настроек из веб-интерфейса (в библиотеку модели и в YAML файл)
           dialog.add_action_callback("saveData") do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
@@ -65,8 +64,8 @@ module DN1Code
                 project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
               end
 
-              project_data.save_to_model(model)
-              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в модели SketchUp', 'success');")
+              project_data.save_auto(model)
+              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в библиотеке и YAML файле', 'success');")
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения: #{e.message}', 'error');")
             end
@@ -87,7 +86,7 @@ module DN1Code
               end
 
               project_data.sync_with_model_scenes(model)
-              project_data.save_to_model(model)
+              project_data.save_auto(model)
 
               controller = Controller::ExportController.new(project_data, model)
               
