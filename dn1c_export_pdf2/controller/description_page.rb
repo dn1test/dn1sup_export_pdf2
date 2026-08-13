@@ -7,105 +7,54 @@ module DN1Code
     module Controller
       class DescriptionPage < PageBase
         def render_header
+          hdr_box = get_block_box(:description, :desc_header, 0.0, 0.0, 100.0, 7.0)
+          return unless hdr_box[:visible]
+
           scene_name = @scene_item ? @scene_item.name : "Описание и спецификация проекта"
           draw_standard_header(scene_name)
         end
 
         def render_body
-          content_top = bounds.top - 50
-          content_height = bounds.height - 85
+          # 1. Материалы и фурнитура
+          mat_box = get_block_box(:description, :desc_materials, 0.0, 9.0, 52.0, 20.0)
+          if mat_box[:visible]
+            mat_text = @info[:materials].to_s.strip.empty? ? "Спецификация материалов и фурнитуры согласно техническому заданию." : @info[:materials].to_s
+            draw_spec_card(mat_box[:x], mat_box[:y], mat_box[:width], mat_box[:height], "МАТЕРИАЛЫ И ФУРНИТУРА", mat_text)
+          end
 
-          # Проверка наличия изображения сцены
-          has_image = @image_path && File.exist?(@image_path)
+          # 2. Техника и оборудование
+          app_box = get_block_box(:description, :desc_appliances, 0.0, 31.0, 52.0, 20.0)
+          if app_box[:visible]
+            app_text = @info[:appliances].to_s.strip.empty? ? "Встраиваемая и бытовая техника согласно спецификации проекта." : @info[:appliances].to_s
+            draw_spec_card(app_box[:x], app_box[:y], app_box[:width], app_box[:height], "ТЕХНИКА И ОБОРУДОВАНИЕ", app_text)
+          end
 
-          if @settings[:page_layout].to_s == "portrait"
-            render_portrait_layout(content_top, content_height, has_image)
-          else
-            render_landscape_layout(content_top, content_height, has_image)
+          # 3. Подсветка и электрика
+          light_box = get_block_box(:description, :desc_lighting, 0.0, 53.0, 52.0, 20.0)
+          if light_box[:visible]
+            light_text = @info[:lighting].to_s.strip.empty? ? "Схема подключения и параметры освещения согласно проекту." : @info[:lighting].to_s
+            draw_spec_card(light_box[:x], light_box[:y], light_box[:width], light_box[:height], "ПОДСВЕТКА И ЭЛЕКТРИКА", light_text)
+          end
+
+          # 4. Пояснительная записка
+          note_box = get_block_box(:description, :desc_notes, 0.0, 75.0, 52.0, 20.0)
+          if note_box[:visible]
+            note_text = @info[:notes].to_s.strip.empty? ? "Монтаж и эксплуатация в соответствии со стандартами качества." : @info[:notes].to_s
+            draw_spec_card(note_box[:x], note_box[:y], note_box[:width], note_box[:height], "ПОЯСНИТЕЛЬНАЯ ЗАПИСКА", note_text)
+          end
+
+          # 5. Видовой экран / Изображение
+          img_box = get_block_box(:description, :desc_image, 55.0, 9.0, 45.0, 86.0)
+          if img_box[:visible]
+            draw_scene_image(img_box[:x], img_box[:y], img_box[:width], img_box[:height])
           end
         end
 
         def render_footer
+          ft_box = get_block_box(:description, :footer, 0.0, 96.0, 100.0, 4.0)
+          return unless ft_box[:visible]
+
           draw_standard_footer
-        end
-
-        private
-
-        def render_landscape_layout(content_top, content_height, has_image)
-          if has_image
-            col_width = (bounds.width - 20) * 0.52
-            img_width = bounds.width - col_width - 20
-            left_x    = bounds.left
-            right_x   = bounds.left + col_width + 20
-
-            render_stacked_cards(left_x, content_top, col_width, content_height)
-            draw_scene_image(right_x, content_top, img_width, content_height)
-          else
-            render_grid_cards(content_top, bounds.width, content_height)
-          end
-        end
-
-        def render_portrait_layout(content_top, content_height, has_image)
-          if has_image
-            cards_height = (content_height * 0.58).round
-            img_height   = content_height - cards_height - 12
-
-            render_stacked_cards(bounds.left, content_top, bounds.width, cards_height)
-            img_top = content_top - cards_height - 12
-            draw_scene_image(bounds.left, img_top, bounds.width, img_height)
-          else
-            render_stacked_cards(bounds.left, content_top, bounds.width, content_height)
-          end
-        end
-
-        def spec_blocks
-          [
-            {
-              title: "МАТЕРИАЛЫ И ФУРНИТУРА",
-              text:  @info[:materials].to_s.strip.empty? ? "Спецификация материалов и фурнитуры согласно техническому заданию." : @info[:materials].to_s
-            },
-            {
-              title: "ТЕХНИКА И ОБОРУДОВАНИЕ",
-              text:  @info[:appliances].to_s.strip.empty? ? "Встраиваемая и бытовая техника согласно спецификации проекта." : @info[:appliances].to_s
-            },
-            {
-              title: "ПОДСВЕТКА И ЭЛЕКТРИКА",
-              text:  @info[:lighting].to_s.strip.empty? ? "Схема подключения и параметры освещения согласно проекту." : @info[:lighting].to_s
-            },
-            {
-              title: "ПОЯСНИТЕЛЬНАЯ ЗАПИСКА",
-              text:  @info[:notes].to_s.strip.empty? ? "Монтаж и эксплуатация в соответствии со стандартами качества." : @info[:notes].to_s
-            }
-          ]
-        end
-
-        def render_stacked_cards(box_x, box_top, box_width, total_height)
-          blocks = spec_blocks
-          card_gap = 7
-          card_height = (total_height - (card_gap * (blocks.size - 1))) / blocks.size.to_f
-
-          current_y = box_top
-          blocks.each do |blk|
-            draw_spec_card(box_x, current_y, box_width, card_height, blk[:title], blk[:text])
-            current_y -= (card_height + card_gap)
-          end
-        end
-
-        def render_grid_cards(box_top, total_width, total_height)
-          blocks = spec_blocks
-          col_gap = 14
-          row_gap = 10
-          card_w  = (total_width - col_gap) / 2.0
-          card_h  = (total_height - row_gap) / 2.0
-
-          # Row 1
-          draw_spec_card(bounds.left, box_top, card_w, card_h, blocks[0][:title], blocks[0][:text])
-          draw_spec_card(bounds.left + card_w + col_gap, box_top, card_w, card_h, blocks[1][:title], blocks[1][:text])
-
-          # Row 2
-          row2_y = box_top - card_h - row_gap
-          draw_spec_card(bounds.left, row2_y, card_w, card_h, blocks[2][:title], blocks[2][:text])
-          draw_spec_card(bounds.left + card_w + col_gap, row2_y, card_w, card_h, blocks[3][:title], blocks[3][:text])
         end
 
         def draw_spec_card(x, y, width, height, title, text)

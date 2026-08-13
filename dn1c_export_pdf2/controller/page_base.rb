@@ -123,6 +123,53 @@ module DN1Code
 
           @pdf_doc.image @image_path, fit: [box_width - 4, box_height - 4], at: [box_x + 2, box_y - 2]
         end
+
+        # Получение настроек блока из пользовательской конфигурации
+        def get_block_config(page_type, block_id)
+          custom = @settings[:custom_layouts] || {}
+          pt_sym = page_type.to_sym rescue page_type
+          pt_str = page_type.to_s
+          blk_sym = block_id.to_sym rescue block_id
+          blk_str = block_id.to_s
+
+          page_cfg = custom[pt_sym] || custom[pt_str] || {}
+          page_cfg[blk_sym] || page_cfg[blk_str] || {}
+        end
+
+        # Проверка видимости блока
+        def block_visible?(page_type, block_id)
+          cfg = get_block_config(page_type, block_id)
+          return true if cfg.empty?
+          return false if cfg[:visible] == false || cfg["visible"] == false
+
+          true
+        end
+
+        # Расчет абсолютных координат блока в точках Prawn [x, y, width, height]
+        def get_block_box(page_type, block_id, def_x, def_y, def_w, def_h)
+          cfg = get_block_config(page_type, block_id)
+
+          x_pct = (cfg[:x] || cfg["x"] || def_x).to_f
+          y_pct = (cfg[:y] || cfg["y"] || def_y).to_f
+          w_pct = (cfg[:w] || cfg["w"] || def_w).to_f
+          h_pct = (cfg[:h] || cfg["h"] || def_h).to_f
+          visible = cfg.key?(:visible) ? cfg[:visible] : (cfg.key?("visible") ? cfg["visible"] : true)
+          align = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
+
+          x = bounds.left + (bounds.width * (x_pct / 100.0))
+          y = bounds.top - (bounds.height * (y_pct / 100.0))
+          width = bounds.width * (w_pct / 100.0)
+          height = bounds.height * (h_pct / 100.0)
+
+          {
+            x:       x,
+            y:       y,
+            width:   width,
+            height:  height,
+            visible: visible,
+            align:   align
+          }
+        end
       end
     end
   end

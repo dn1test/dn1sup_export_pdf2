@@ -49,12 +49,70 @@ class TestRunner
     test_pdf_export_description_page
     test_room_and_furniture_composition
     test_layout_api_export
+    test_custom_layouts_and_block_positioning
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
     puts "=========================================================="
 
     exit(@failed.zero? ? 0 : 1)
+  end
+
+  private
+
+  def test_custom_layouts_and_block_positioning
+    puts "\n--- 11. Тест кастомного размещения блоков (Layout Editor) ---"
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    settings = project_data.pdf_settings
+
+    assert(settings.key?(:custom_layouts), "Настройки pdf_settings содержат ключ :custom_layouts")
+    assert(settings[:custom_layouts].key?(:cover), "Кастомные макеты содержат шаблон :cover")
+    assert(settings[:custom_layouts].key?(:description), "Кастомные макеты содержат шаблон :description")
+    assert(settings[:custom_layouts].key?(:explain), "Кастомные макеты содержат шаблон :explain")
+    assert(settings[:custom_layouts].key?(:general), "Кастомные макеты содержат шаблон :general")
+    assert(settings[:custom_layouts].key?(:visual), "Кастомные макеты содержат шаблон :visual")
+
+    # Модифицируем координаты блоков для обложки и описания
+    settings[:custom_layouts][:cover][:cover_title] = { x: 5.0, y: 8.0, w: 90.0, h: 10.0, visible: true, align: "center" }
+    settings[:custom_layouts][:cover][:cover_subtitle] = { x: 5.0, y: 19.0, w: 90.0, h: 5.0, visible: false, align: "center" }
+    settings[:custom_layouts][:description][:desc_materials] = { x: 0.0, y: 12.0, w: 45.0, h: 25.0, visible: true }
+    settings[:custom_layouts][:description][:desc_image] = { x: 48.0, y: 12.0, w: 52.0, h: 80.0, visible: true }
+
+    # Сохраняем в YAML и проверяем чтение
+    yaml_temp = File.expand_path("test_custom_layout.yaml", __dir__)
+    File.delete(yaml_temp) if File.exist?(yaml_temp)
+
+    project_data.save_to_yaml(yaml_temp)
+    assert(File.exist?(yaml_temp), "YAML с кастомными координатами блоков успешно сохранен")
+
+    loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded_data.load_from_yaml(yaml_temp)
+
+    loaded_layouts = loaded_data.pdf_settings[:custom_layouts]
+    assert(!loaded_layouts.nil?, "Кастомные макеты успешно прочитаны из YAML")
+    assert(loaded_layouts[:cover][:cover_title][:align] == "center" || loaded_layouts[:cover]["cover_title"]["align"] == "center", "Выравнивание заголовка обложки сохранено")
+
+    # Тестируем экспорт PDF с кастомным макетом
+    model = Sketchup::MockModel.new("U:/Projects/CustomLayout/LivingRoom.skp")
+    model.pages.add("01. Титул")
+    model.pages.add("02. Спецификации")
+    loaded_data.project_info[:room_name] = "Гостиная"
+    loaded_data.project_info[:furniture_name] = "Стенка ТВ"
+    loaded_data.project_info[:materials] = "Шпон дуба, стекло матовое, ручки профиль"
+    loaded_data.sync_with_model_scenes(model)
+
+    pdf_out = File.expand_path("test_custom_layout_export.pdf", __dir__)
+    File.delete(pdf_out) if File.exist?(pdf_out)
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(loaded_data, model)
+    result_pdf = controller.export(pdf_out)
+
+    assert(File.exist?(result_pdf), "PDF с кастомной компоновкой блоков успешно сгенерирован")
+    assert(File.size(result_pdf) > 20000, "Размер PDF с кастомным макетом валиден (#{File.size(result_pdf)} байт)")
+
+    File.delete(yaml_temp) if File.exist?(yaml_temp)
+    File.delete(pdf_out) if File.exist?(pdf_out)
   end
 
   private

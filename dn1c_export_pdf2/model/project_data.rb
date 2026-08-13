@@ -45,6 +45,49 @@ module DN1Code
           }
         end
 
+        def default_custom_layouts
+          {
+            cover: {
+              cover_accent_bar:   { x: 0.0, y: 0.0, w: 100.0, h: 1.5, visible: true },
+              cover_articul:      { x: 65.0, y: 2.5, w: 35.0, h: 4.0, visible: true, align: "right" },
+              cover_title:        { x: 0.0, y: 3.5, w: 65.0, h: 8.0, visible: true, align: "left" },
+              cover_subtitle:     { x: 0.0, y: 11.5, w: 100.0, h: 5.0, visible: true, align: "left" },
+              cover_divider:      { x: 0.0, y: 16.5, w: 100.0, h: 0.5, visible: true },
+              cover_hero_image:   { x: 0.0, y: 19.0, w: 56.0, h: 76.0, visible: true },
+              cover_project_card: { x: 59.0, y: 19.0, w: 41.0, h: 46.0, visible: true },
+              cover_history_card: { x: 59.0, y: 67.0, w: 41.0, h: 28.0, visible: true },
+              footer:             { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
+            },
+            description: {
+              desc_header:     { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true },
+              desc_materials:  { x: 0.0, y: 9.0, w: 52.0, h: 20.0, visible: true },
+              desc_appliances: { x: 0.0, y: 31.0, w: 52.0, h: 20.0, visible: true },
+              desc_lighting:   { x: 0.0, y: 53.0, w: 52.0, h: 20.0, visible: true },
+              desc_notes:      { x: 0.0, y: 75.0, w: 52.0, h: 20.0, visible: true },
+              desc_image:      { x: 55.0, y: 9.0, w: 45.0, h: 86.0, visible: true },
+              footer:          { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
+            },
+            explain: {
+              explain_header: { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true },
+              explain_toc:    { x: 0.0, y: 9.0, w: 48.0, h: 86.0, visible: true },
+              explain_specs:  { x: 52.0, y: 9.0, w: 48.0, h: 35.0, visible: true },
+              explain_image:  { x: 52.0, y: 47.0, w: 48.0, h: 48.0, visible: true },
+              footer:         { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
+            },
+            general: {
+              general_header: { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true },
+              general_image:  { x: 0.0, y: 9.0, w: 100.0, h: 73.0, visible: true },
+              general_note:   { x: 0.0, y: 84.0, w: 100.0, h: 11.0, visible: true },
+              footer:         { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
+            },
+            visual: {
+              visual_header: { x: 0.0, y: 0.0, w: 100.0, h: 6.0, visible: true },
+              visual_image:  { x: 0.0, y: 7.0, w: 100.0, h: 88.0, visible: true },
+              footer:        { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
+            }
+          }
+        end
+
         def default_pdf_settings
           {
             export_engine:      "prawn",
@@ -62,7 +105,8 @@ module DN1Code
             save_skp_backup:    true,
             primary_color:      "005EB0",
             secondary_color:    "64748B",
-            stamp_color:        "D32F2F"
+            stamp_color:        "D32F2F",
+            custom_layouts:     default_custom_layouts
           }
         end
 

@@ -38,6 +38,9 @@
         <span class="tab-icon">🖼️</span> Сцены и страницы
         <span class="badge" id="sceneCountBadge">0</span>
       </button>
+      <button class="tab-btn" data-tab="tab-layout">
+        <span class="tab-icon">📐</span> Размещение блоков
+      </button>
       <button class="tab-btn" data-tab="tab-settings">
         <span class="tab-icon">⚙️</span> Настройки PDF
       </button>
@@ -231,6 +234,164 @@
               <!-- Dynamically populated via JS -->
             </tbody>
           </table>
+        </div>
+      </section>
+
+      <!-- TAB: LAYOUT & BLOCK POSITIONING (WYSIWYG) -->
+      <section id="tab-layout" class="tab-pane">
+        <!-- Toolbar -->
+        <div class="layout-toolbar">
+          <div class="layout-toolbar-group">
+            <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
+            <select id="selectLayoutTemplate" class="form-control toolbar-select">
+              <option value="cover">🏷️ Титульный лист (Cover)</option>
+              <option value="description">📝 Описание и спецификации (Description)</option>
+              <option value="explain">📋 Содержание и ведомость (Explain)</option>
+              <option value="general">🖼️ Общий вид (General)</option>
+              <option value="visual">👁️ Визуализация (Visual)</option>
+            </select>
+            <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
+          </div>
+
+          <div class="layout-toolbar-group">
+            <button class="btn btn-xs btn-secondary active" id="btnToggleSnap" title="Магнитная привязка к сетке (шаг 2%)">
+              🧲 Привязка: <span id="snapStatusText">Вкл</span>
+            </button>
+            <button class="btn btn-xs btn-secondary active" id="btnToggleGuides" title="Отображение направляющих полей и координатной сетки">
+              📏 Сетка: <span id="guidesStatusText">Вкл</span>
+            </button>
+          </div>
+
+          <div class="layout-toolbar-group">
+            <div class="zoom-controls">
+              <button class="btn btn-xs btn-secondary" id="btnZoomOut" title="Уменьшить масштаб">➖</button>
+              <span class="zoom-text" id="zoomLevelText">100%</span>
+              <button class="btn btn-xs btn-secondary" id="btnZoomIn" title="Увеличить масштаб">➕</button>
+              <button class="btn btn-xs btn-secondary" id="btnZoomFit" title="Вписать в окно">Fit</button>
+            </div>
+            <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить расположение блоков текущего шаблона к исходным позициям">
+              ↺ Сбросить макет
+            </button>
+          </div>
+        </div>
+
+        <!-- Layout Workspace -->
+        <div class="layout-workspace">
+          <!-- Canvas Area -->
+          <div class="layout-canvas-container" id="layoutCanvasContainer">
+            <div class="layout-page-sheet landscape" id="layoutPageSheet">
+              <div class="sheet-margins-guide"></div>
+              <div class="sheet-grid-overlay" id="sheetGridOverlay"></div>
+              <div class="layout-blocks-layer" id="layoutBlocksLayer">
+                <!-- Dynamically injected blocks with drag handles and resize markers -->
+              </div>
+            </div>
+          </div>
+
+          <!-- Inspector Sidebar -->
+          <aside class="layout-inspector-panel">
+            <!-- Section 1: Layers / Block List -->
+            <div class="inspector-card">
+              <div class="inspector-card-header">
+                <span class="inspector-header-icon">📑</span>
+                <span class="inspector-header-title">Блоки на странице</span>
+              </div>
+              <div class="inspector-blocks-list" id="inspectorBlocksList">
+                <!-- Dynamically generated block layer items -->
+              </div>
+            </div>
+
+            <!-- Section 2: Selected Block Properties -->
+            <div class="inspector-card" id="selectedBlockCard">
+              <div class="inspector-card-header">
+                <span class="inspector-header-icon">🎯</span>
+                <span class="inspector-header-title" id="inspectorSelectedBlockTitle">Свойства блока</span>
+              </div>
+              
+              <div id="inspectorEmptyState" class="inspector-empty-state">
+                <span>Выберите блок на холсте для настройки</span>
+              </div>
+
+              <div id="inspectorPropertiesForm" class="inspector-props-form hidden">
+                <!-- Quick Alignment Toolbar -->
+                <div class="prop-group">
+                  <span class="prop-label">Выравнивание блока</span>
+                  <div class="align-btn-grid">
+                    <button class="btn btn-xs btn-secondary" id="btnAlignLeft" title="Выровнять по левому краю поля">⫷ Влево</button>
+                    <button class="btn btn-xs btn-secondary" id="btnAlignCenterH" title="Выровнять по горизонтальному центру">⫿ Центр</button>
+                    <button class="btn btn-xs btn-secondary" id="btnAlignRight" title="Выровнять по правому краю поля">⫸ Вправо</button>
+                    <button class="btn btn-xs btn-secondary" id="btnAlignTop" title="Выровнять по верхнему краю поля">⫪ Верх</button>
+                    <button class="btn btn-xs btn-secondary" id="btnAlignCenterV" title="Выровнять по вертикальному центру">⫻ Середина</button>
+                    <button class="btn btn-xs btn-secondary" id="btnAlignBottom" title="Выровнять по нижнему краю поля">⫫ Низ</button>
+                    <button class="btn btn-xs btn-secondary full-span" id="btnAlignFullWidth" title="Растянуть блок на всю ширину поля (100%)">↔ Во всю ширину</button>
+                  </div>
+                </div>
+
+                <!-- Coordinates & Dimensions -->
+                <div class="prop-group">
+                  <span class="prop-label">Координаты и размеры (%)</span>
+                  <div class="coords-grid">
+                    <div class="coord-field">
+                      <label for="inputBlockX">X (слева)</label>
+                      <div class="input-unit-wrap">
+                        <input type="number" id="inputBlockX" class="form-control form-control-xs" min="0" max="100" step="0.5">
+                        <span class="unit-badge">%</span>
+                      </div>
+                    </div>
+                    <div class="coord-field">
+                      <label for="inputBlockY">Y (сверху)</label>
+                      <div class="input-unit-wrap">
+                        <input type="number" id="inputBlockY" class="form-control form-control-xs" min="0" max="100" step="0.5">
+                        <span class="unit-badge">%</span>
+                      </div>
+                    </div>
+                    <div class="coord-field">
+                      <label for="inputBlockW">Ширина (W)</label>
+                      <div class="input-unit-wrap">
+                        <input type="number" id="inputBlockW" class="form-control form-control-xs" min="2" max="100" step="0.5">
+                        <span class="unit-badge">%</span>
+                      </div>
+                    </div>
+                    <div class="coord-field">
+                      <label for="inputBlockH">Высота (H)</label>
+                      <div class="input-unit-wrap">
+                        <input type="number" id="inputBlockH" class="form-control form-control-xs" min="1" max="100" step="0.5">
+                        <span class="unit-badge">%</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <!-- Text Alignment & Options -->
+                <div class="prop-group" id="blockTypographyGroup">
+                  <span class="prop-label">Выравнивание текста</span>
+                  <div class="text-align-group">
+                    <button class="btn btn-xs btn-secondary" data-align="left" id="btnTextAlignLeft" title="По левому краю">⬅ Влево</button>
+                    <button class="btn btn-xs btn-secondary" data-align="center" id="btnTextAlignCenter" title="По центру">⏸ Центр</button>
+                    <button class="btn btn-xs btn-secondary" data-align="right" id="btnTextAlignRight" title="По правому краю">➡ Вправо</button>
+                  </div>
+                </div>
+
+                <!-- Visibility Toggle -->
+                <div class="prop-group">
+                  <label class="checkbox-label">
+                    <input type="checkbox" id="chkBlockVisible" checked>
+                    <span>Отображать этот блок в PDF</span>
+                  </label>
+                </div>
+              </div>
+            </div>
+
+            <!-- Quick Help / Tips -->
+            <div class="layout-quick-tips">
+              <div class="tip-header">💡 Быстрые подсказки:</div>
+              <ul class="tip-list">
+                <li>Перетаскивайте блоки мышью по холсту</li>
+                <li>Тяните за маркеры по углам для изменения размера</li>
+                <li>Скрывайте ненужные блоки иконкой 👁️</li>
+              </ul>
+            </div>
+          </aside>
         </div>
       </section>
 
