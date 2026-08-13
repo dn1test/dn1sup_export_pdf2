@@ -50,6 +50,41 @@ module DN1Code
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
 
+          # Обновить все данные во всех хранилищах (модель, сцены, YAML)
+          dialog.add_action_callback("refreshData") do |_action_context, data_json|
+            begin
+              payload = JSON.parse(data_json, symbolize_names: true)
+              model = Sketchup.active_model
+              project_data = Model::ProjectData.new
+              project_data.project_info.merge!(payload[:project_info]) if payload[:project_info]
+              project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
+              project_data.history = payload[:history] if payload[:history]
+
+              if payload[:scenes].is_a?(Array)
+                project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
+              end
+
+              # Синхронизация сцен из активной модели
+              project_data.sync_with_model_scenes(model)
+
+              # Сохранение во все хранилища (библиотека модели + YAML файл)
+              project_data.save_auto(model)
+
+              yaml_name = project_data.yaml_filename(model)
+
+              # Обновляем UI свежими данными
+              refreshed_json = JSON.generate(project_data.to_h)
+              dialog.execute_script("window.app && window.app.loadData(#{refreshed_json});")
+              dialog.execute_script("window.app && window.app.showNotification('Все данные и YAML (#{yaml_name}) успешно обновлены', 'success');")
+
+              if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
+                Sketchup.status_text = "DN1C Export PDF: Все данные и YAML (#{yaml_name}) обновлены"
+              end
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка обновления: #{e.message}', 'error');")
+            end
+          end
+
           # Сохранение настроек из веб-интерфейса (в библиотеку модели и в YAML файл)
           dialog.add_action_callback("saveData") do |_action_context, data_json|
             begin
@@ -64,8 +99,10 @@ module DN1Code
                 project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
               end
 
+              project_data.sync_with_model_scenes(model)
               project_data.save_auto(model)
-              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в библиотеке и YAML файле', 'success');")
+              yaml_name = project_data.yaml_filename(model)
+              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в библиотеке и YAML (#{yaml_name})', 'success');")
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения: #{e.message}', 'error');")
             end

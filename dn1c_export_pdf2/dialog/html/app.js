@@ -25,6 +25,7 @@
     // Header Titles
     headerProjectTitle: document.getElementById("headerProjectTitle"),
     headerProjectSubtitle: document.getElementById("headerProjectSubtitle"),
+    headerProjectArticul: document.getElementById("headerProjectArticul"),
 
     // Tab 1 Inputs
     inputRoomName: document.getElementById("inputRoomName"),
@@ -81,7 +82,7 @@
     btnAddHistoryEntry: document.getElementById("btnAddHistoryEntry"),
 
     // Global Actions
-    btnSaveData: document.getElementById("btnSaveData"),
+    btnRefreshData: document.getElementById("btnRefreshData"),
     btnStartExport: document.getElementById("btnStartExport"),
     btnImportYaml: document.getElementById("btnImportYaml"),
     btnExportYaml: document.getElementById("btnExportYaml"),
@@ -227,8 +228,18 @@
     const subParts = [customer, address].filter(Boolean);
     const subText = subParts.length ? subParts.join(" — ") : "Заказчик — Адрес объекта";
 
+    const articul = (els.inputArticul ? els.inputArticul.value : "").trim();
+
     if (els.headerProjectTitle) els.headerProjectTitle.textContent = pTitle;
     if (els.headerProjectSubtitle) els.headerProjectSubtitle.textContent = subText;
+    if (els.headerProjectArticul) {
+      els.headerProjectArticul.textContent = articul || "—";
+      if (!articul) {
+        els.headerProjectArticul.classList.add("empty");
+      } else {
+        els.headerProjectArticul.classList.remove("empty");
+      }
+    }
   }
 
   // Render Scenes Table
@@ -443,6 +454,9 @@
     els.inputFurnitureName.addEventListener("input", updateHeaderTitles);
     els.inputCustomer.addEventListener("input", updateHeaderTitles);
     els.inputAddress.addEventListener("input", updateHeaderTitles);
+    if (els.inputArticul) {
+      els.inputArticul.addEventListener("input", updateHeaderTitles);
+    }
 
     // Export engine select change
     if (els.selectExportEngine) {
@@ -502,12 +516,6 @@
       renderHistoryTable();
     });
 
-    // Save Data
-    els.btnSaveData.addEventListener("click", () => {
-      const data = collectFormData();
-      callRuby("saveData", JSON.stringify(data));
-    });
-
     // Start Export
     els.btnStartExport.addEventListener("click", () => {
       const data = collectFormData();
@@ -524,6 +532,14 @@
 
       callRuby("startExport", JSON.stringify(data));
     });
+
+    // Refresh Data (all storages, scenes & YAML)
+    if (els.btnRefreshData) {
+      els.btnRefreshData.addEventListener("click", () => {
+        const data = collectFormData();
+        callRuby("refreshData", JSON.stringify(data));
+      });
+    }
 
     // Import / Export YAML
     els.btnImportYaml.addEventListener("click", () => {

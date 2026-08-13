@@ -170,17 +170,32 @@ module DN1Code
 
         # Автоматическое сохранение:
         # 1. В библиотеку модели (Attribute Dictionaries)
-        # 2. В YAML файл рядом с файлом SketchUp
+        # 2. В YAML файл рядом с файлом SketchUp (с автоматическим обновлением имени YAML при изменении артикула)
         def save_auto(model)
           return false unless model
 
-          # 1. Сохранение в библиотеку модели
+          # 1. Находим текущий существующий YAML файл до обновления атрибутов модели
+          old_yaml = self.class.find_yaml_path_for_model(model)
+
+          # 2. Сохранение в библиотеку модели (атрибуты)
           save_to_model(model)
 
-          # 2. Сохранение в YAML файл рядом с .skp
+          # 3. Сохранение в YAML файл рядом с .skp
           if model.respond_to?(:path) && !model.path.to_s.empty?
             target_yaml = yaml_path_for_model(model)
-            save_to_yaml(target_yaml) if target_yaml
+            if target_yaml
+              if save_to_yaml(target_yaml)
+                # Если имя YAML файла изменилось (например, при смене или очистке артикула),
+                # удаляем старый YAML файл во избежание дубликатов
+                if old_yaml && File.exist?(old_yaml)
+                  old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
+                  target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
+                  if old_norm != target_norm
+                    File.delete(old_yaml) rescue nil
+                  end
+                end
+              end
+            end
           end
 
           true

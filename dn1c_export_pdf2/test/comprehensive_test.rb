@@ -247,7 +247,7 @@ class TestRunner
   end
 
   def test_save_auto_both_library_and_yaml
-    puts "\n--- 6. Тест save_auto: одновременное сохранение в библиотеку и YAML файл ---"
+    puts "\n--- 6. Тест save_auto: одновременное сохранение в библиотеку, обновление YAML и переименование файла при смене артикула ---"
 
     test_dir = File.expand_path("test_save_auto_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -259,7 +259,7 @@ class TestRunner
     project_data.project_info[:articul] = "OFFICE-900"
     project_data.project_info[:name_project] = "Кабинет Руководителя"
 
-    # Вызываем save_auto
+    # Вызываем save_auto первый раз
     project_data.save_auto(model)
 
     # Проверка 1: Сохранено в библиотеку модели
@@ -267,8 +267,28 @@ class TestRunner
     assert(!dict_saved.nil? && dict_saved.include?("OFFICE-900"), "Данные сохранены в словарь атрибутов модели")
 
     # Проверка 2: Сохранено в YAML файл рядом с SKP
-    yaml_file = File.join(test_dir, "OFFICE-900.yaml")
-    assert(File.exist?(yaml_file), "Данные сохранены в файл #{File.basename(yaml_file)}")
+    yaml_file_1 = File.join(test_dir, "OFFICE-900.yaml")
+    assert(File.exist?(yaml_file_1), "Данные сохранены в файл #{File.basename(yaml_file_1)}")
+
+    # Проверка 3: Изменение артикула -> вызов save_auto (кнопка Обновить)
+    project_data.project_info[:articul] = "OFFICE-901"
+    project_data.project_info[:name_project] = "Кабинет Руководителя (Обновленный)"
+    project_data.save_auto(model)
+
+    yaml_file_2 = File.join(test_dir, "OFFICE-901.yaml")
+    assert(File.exist?(yaml_file_2), "При смене артикула создан новый YAML файл #{File.basename(yaml_file_2)}")
+    assert(!File.exist?(yaml_file_1), "Старый YAML файл #{File.basename(yaml_file_1)} автоматически удален")
+
+    dict_saved_2 = model.get_attribute("DN1C_ExportPDF", "project_info")
+    assert(!dict_saved_2.nil? && dict_saved_2.include?("OFFICE-901"), "Атрибуты модели обновлены на новый артикул")
+
+    # Проверка 4: Очистка артикула -> имя YAML возвращается к имени файла модели Office.yaml
+    project_data.project_info[:articul] = ""
+    project_data.save_auto(model)
+
+    yaml_file_3 = File.join(test_dir, "Office.yaml")
+    assert(File.exist?(yaml_file_3), "При очистке артикула создан файл по имени модели #{File.basename(yaml_file_3)}")
+    assert(!File.exist?(yaml_file_2), "Предыдущий файл артикула #{File.basename(yaml_file_2)} удален")
 
     FileUtils.rm_rf(test_dir)
   end
