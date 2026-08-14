@@ -8,11 +8,23 @@ require "fileutils"
 module DN1Code
   module ExportPdf2
     module Model
+      # Модель данных проекта: хранит информацию о проекте, сценах, истории ревизий и параметрах PDF.
+      # Поддерживает двухуровневую синхронизацию: первичный источник — YAML файл рядом с SKP,
+      # вторичный источник — библиотека модели (Attribute Dictionaries SketchUp).
       class ProjectData
+        # Имя словаря атрибутов SketchUp для хранения данных
         ATTR_DICT = "DN1C_ExportPDF"
 
-        attr_accessor :project_info, :scenes, :history, :pdf_settings
+        # @return [Hash] метаданные и реквизиты проекта (название, заказчик, артикул, ревизия и т.д.)
+        attr_accessor :project_info
+        # @return [Array<SceneItem>] список сцен модели и их параметров экспорта
+        attr_accessor :scenes
+        # @return [Array<Hash>] история изменений и ревизий проекта
+        attr_accessor :history
+        # @return [Hash] параметры экспорта PDF (размер листа, поля, штамп, движок, макеты)
+        attr_accessor :pdf_settings
 
+        # Инициализирует новый экземпляр ProjectData со значениями по умолчанию
         def initialize
           @project_info = default_project_info
           @pdf_settings = default_pdf_settings
@@ -20,6 +32,8 @@ module DN1Code
           @history      = []
         end
 
+        # Возвращает структуру метаданных проекта по умолчанию с пустыми полями
+        # @return [Hash] хэш с параметрами проекта
         def default_project_info
           {
             room_name:        "",
@@ -45,6 +59,8 @@ module DN1Code
           }
         end
 
+        # Возвращает конфигурацию визуальных блоков макета страниц по умолчанию (в процентах)
+        # @return [Hash] хэш с координатами и свойствами блоков для каждого типа страницы
         def default_custom_layouts
           {
             cover: {
@@ -88,6 +104,8 @@ module DN1Code
           }
         end
 
+        # Возвращает базовые настройки экспорта PDF по умолчанию
+        # @return [Hash] хэш с параметрами PDF (размер листа, ориентация, цвета, штамп и т.д.)
         def default_pdf_settings
           {
             export_engine:      "prawn",
@@ -110,12 +128,17 @@ module DN1Code
           }
         end
 
-        # Очистка имени от запрещенных символов файловой системы
+        # Очищает строку имени от запрещенных символов файловой системы
+        # @param name [String, Object] исходное имя файла
+        # @return [String] безопасное для файловой системы имя
         def self.sanitize_filename(name)
           name.to_s.gsub(/[\\\/:\*\?"<>\|]/, "_").strip
         end
 
-        # Определение имени YAML файла на основе артикула или имени файла модели
+        # Определяет имя YAML файла на основе артикула или имени файла модели
+        # @param project_info [Hash] метаданные проекта
+        # @param model [Sketchup::Model, nil] экземпляр модели SketchUp
+        # @return [String] имя файла YAML (например, "ART-100.yaml" или "ModelName.yaml")
         def self.resolve_yaml_filename(project_info, model = nil)
           articul = project_info && project_info[:articul] ? project_info[:articul].to_s.strip : ""
           if !articul.empty?
@@ -133,7 +156,9 @@ module DN1Code
           "project_config.yaml"
         end
 
-        # Поиск существующего YAML файла рядом с моделью SketchUp
+        # Ищет существующий YAML файл конфигурации рядом с файлом модели SketchUp
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [String, nil] абсолютный путь к существующему YAML файлу или nil
         def self.find_yaml_path_for_model(model)
           return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
 
@@ -166,15 +191,43 @@ module DN1Code
           model_yml = File.join(dir, "#{base_name}.yml")
           return model_yml if File.exist?(model_yml)
 
+          # 3. Проверяем project_config.yaml / .yml
+          cfg_yaml = File.join(dir, "project_config.yaml")
+          return cfg_yaml if File.exist?(cfg_yaml)
+
+          cfg_yml = File.join(dir, "project_config.yml")
+          return cfg_yml if File.exist?(cfg_yml)
+
+          # 4. Если в модели вообще нет атрибутов, сканируем папку модели на наличие YAML файла конфигурации проекта
+          if raw_info.nil?
+            all_yamls = Dir.glob(File.join(dir, "*.{yaml,yml}")).reject do |f|
+              File.basename(f).start_with?("~", ".")
+            end
+
+            if all_yamls.size == 1
+              return all_yamls.first
+            elsif all_yamls.size > 1
+              # Ищем файл, содержащий project_info
+              matching = all_yamls.find do |f|
+                File.read(f, 500, encoding: "utf-8").include?("project_info") rescue false
+              end
+              return matching if matching
+            end
+          end
+
           nil
         end
 
-        # Получение имени YAML файла для текущего экземпляра
+        # Возвращает целевое имя YAML файла для текущего экземпляра проекта
+        # @param model [Sketchup::Model, nil] модель SketchUp
+        # @return [String] имя файла YAML
         def yaml_filename(model = nil)
           self.class.resolve_yaml_filename(@project_info, model)
         end
 
-        # Полный путь к YAML файлу рядом с моделью
+        # Возвращает полный путь к целевому YAML файлу рядом с файлом модели SketchUp
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [String, nil] путь к файлу YAML или nil, если модель не сохранена
         def yaml_path_for_model(model)
           return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
 
@@ -183,9 +236,11 @@ module DN1Code
           File.join(dir, yaml_filename(model))
         end
 
-        # Автоматическая загрузка:
-        # ПЕРВИЧНО — YAML файл рядом с основным файлом SketchUp
-        # ВТОРИЧНО — Библиотека файла (атрибуты модели)
+        # Автоматическая загрузка данных с приоритетом:
+        # 1. ПЕРВИЧНО: YAML файл рядом с файлом SketchUp (.skp)
+        # 2. ВТОРИЧНО: Библиотека файла (атрибуты модели SketchUp)
+        # @param model [Sketchup::Model, nil] модель SketchUp
+        # @return [Symbol] источник загрузки (:yaml, :model или :default)
         def load_auto(model)
           loaded_from = nil
 
@@ -212,9 +267,11 @@ module DN1Code
           loaded_from || :default
         end
 
-        # Автоматическое сохранение:
+        # Автоматическое сохранение данных проекта:
         # 1. В библиотеку модели (Attribute Dictionaries)
-        # 2. В YAML файл рядом с файлом SketchUp (с автоматическим обновлением имени YAML при изменении артикула)
+        # 2. В файл YAML рядом с файлом SketchUp (с автоматическим удалением старого файла при смене артикула)
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [Boolean] true в случае успешного сохранения
         def save_auto(model)
           return false unless model
 
@@ -245,7 +302,9 @@ module DN1Code
           true
         end
 
-        # Синхронизация сцен из активной модели SketchUp
+        # Синхронизирует список сцен с активной моделью SketchUp, сохраняя настроенные параметры
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [void]
         def sync_with_model_scenes(model)
           return unless model && model.respond_to?(:pages)
 
@@ -275,7 +334,9 @@ module DN1Code
           @scenes = new_scenes
         end
 
-        # Чтение данных из атрибутов модели SketchUp (библиотека модели)
+        # Читает данные проекта из словарей атрибутов модели SketchUp (библиотека модели)
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [Boolean] true, если данные были успешно прочитаны
         def load_from_model(model)
           return false unless model && model.respond_to?(:get_attribute)
 
@@ -333,7 +394,9 @@ module DN1Code
           has_data
         end
 
-        # Сохранение данных в атрибуты модели SketchUp (библиотека модели)
+        # Сохраняет данные проекта в словарь атрибутов модели SketchUp (библиотека модели)
+        # @param model [Sketchup::Model] модель SketchUp
+        # @return [Boolean] true в случае успешного сохранения
         def save_to_model(model)
           return false unless model && model.respond_to?(:set_attribute)
 
@@ -346,17 +409,41 @@ module DN1Code
           true
         end
 
-        # Загрузка из YAML-файла (поддержка структурированного и потокового форматов)
+        # Рекурсивно преобразует строковые ключи вложенных хэшей и массивов в Symbol
+        # @param obj [Object] исходный объект (Hash, Array или примитив)
+        # @return [Object] объект с символьными ключами
+        def self.deep_symbolize_keys(obj)
+          case obj
+          when Hash
+            obj.each_with_object({}) do |(k, v), result|
+              result[k.to_s.to_sym] = deep_symbolize_keys(v)
+            end
+          when Array
+            obj.map { |e| deep_symbolize_keys(e) }
+          else
+            obj
+          end
+        end
+
+        # Загружает данные проекта из файла YAML (поддерживает однодокументный и потоковый форматы)
+        # @param file_path [String] путь к YAML файлу
+        # @return [Boolean] true в случае успешной загрузки
         def load_from_yaml(file_path)
           return false unless File.exist?(file_path)
 
           begin
             content = File.read(file_path, encoding: "utf-8")
-            docs = YAML.load_stream(content, symbolize_names: true)
-            return false if docs.empty?
+            raw_docs = begin
+                         YAML.load_stream(content, symbolize_names: true)
+                       rescue ArgumentError
+                         YAML.load_stream(content)
+                       end
+            return false if raw_docs.nil? || raw_docs.empty?
+
+            docs = raw_docs.map { |d| self.class.deep_symbolize_keys(d) }
 
             # Вариант 1: Структурированный одиночный хэш { project_info: ..., pdf_settings: ..., scenes: ..., history: ... }
-            if docs.size == 1 && docs[0].is_a?(Hash) && (docs[0].key?(:project_info) || docs[0].key?(:pdf_settings) || docs[0].key?(:scenes))
+            if docs.size == 1 && docs[0].is_a?(Hash) && (docs[0].key?(:project_info) || docs[0].key?(:pdf_settings) || docs[0].key?(:scenes) || docs[0].key?(:history))
               root = docs[0]
               @project_info.merge!(root[:project_info]) if root[:project_info].is_a?(Hash)
               @pdf_settings.merge!(root[:pdf_settings]) if root[:pdf_settings].is_a?(Hash)
@@ -389,7 +476,9 @@ module DN1Code
           end
         end
 
-        # Сохранение в YAML-файл
+        # Сохраняет данные проекта в YAML файл
+        # @param file_path [String] путь к сохраняемому YAML файлу
+        # @return [Boolean] true в случае успешного сохранения
         def save_to_yaml(file_path)
           FileUtils.mkdir_p(File.dirname(file_path))
           data = {
@@ -404,7 +493,9 @@ module DN1Code
           true
         end
 
-        # Увеличение номера ревизии и добавление записи в историю
+        # Увеличивает номер ревизии проекта (+1) и добавляет запись с таймштампом в историю
+        # @param description [String] текстовое описание причины создания новой ревизии
+        # @return [void]
         def increment_revision!(description = "Экспорт в PDF")
           @project_info[:revision] = (@project_info[:revision] || 0) + 1
           @history << {
@@ -413,6 +504,8 @@ module DN1Code
           }
         end
 
+        # Преобразует все данные проекта в стандартный Ruby Hash
+        # @return [Hash] хэш со всеми полями проекта, настройками, сценами и историей
         def to_h
           {
             project_info: @project_info,

@@ -6,22 +6,50 @@ module DN1Code
   module ExportPdf2
     module Service
       module ObserverService
-        @app_observer   = nil
-        @model_observer = nil
-        @attached_models = {}
+        @app_observer          = nil
+        @model_observer        = nil
+        @attached_models       = {}
+        @session_opened_models = {}
+
+        class << self
+          attr_accessor :session_opened_models
+        end
 
         class AppObserverHandler < (defined?(Sketchup::AppObserver) ? Sketchup::AppObserver : Object)
           def onNewModel(model)
             ObserverService.attach_model_observer(model)
+            Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
           end
 
           def onOpenModel(model)
             ObserverService.attach_model_observer(model)
-            ObserverService.handle_model_opened(model)
+            # Сбрасываем кэш сессии для только что открытой модели, чтобы гарантировать инкремент
+            if model && model.respond_to?(:path) && !model.path.to_s.empty?
+              clean_p = model.path.to_s.tr("\\", "/").downcase
+              ObserverService.session_opened_models.delete(clean_p)
+            end
+
+            # В SketchUp на Windows при onOpenModel данные модели могут инициализироваться асинхронно
+            if defined?(UI) && UI.respond_to?(:start_timer)
+              UI.start_timer(0.05, false) do
+                active = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? (Sketchup.active_model || model) : model
+                ObserverService.handle_model_opened(active, true)
+              end
+            else
+              ObserverService.handle_model_opened(model, true)
+            end
           end
 
           def onActivateModel(model)
             ObserverService.attach_model_observer(model)
+            if defined?(UI) && UI.respond_to?(:start_timer)
+              UI.start_timer(0.05, false) do
+                active = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? (Sketchup.active_model || model) : model
+                ObserverService.handle_model_opened(active, false)
+              end
+            else
+              ObserverService.handle_model_opened(model, false)
+            end
           end
 
           def onPreSaveModel(model)
@@ -61,9 +89,11 @@ module DN1Code
               Sketchup.add_observer(@app_observer)
             end
 
-            # Прикрепление к текущей активной модели
+            # Прикрепление к текущей активной модели и инициализация сессии открытия
             if Sketchup.respond_to?(:active_model) && Sketchup.active_model
-              attach_model_observer(Sketchup.active_model)
+              model = Sketchup.active_model
+              attach_model_observer(model)
+              handle_model_opened(model, false) if model.respond_to?(:path) && !model.path.to_s.empty?
             end
           end
 
@@ -79,12 +109,33 @@ module DN1Code
             @attached_models[model_id] = true
           end
 
-          # Обработка открытия модели: загрузка настроек (YAML первично, библиотека вторично)
-          def handle_model_opened(model)
+          # Обработка открытия модели: загрузка настроек, автоматическое увеличение номера ревизии (+1) и синхронизация
+          def handle_model_opened(model, force = false)
             return unless model
+
+            model_path = model.respond_to?(:path) ? model.path.to_s.tr("\\", "/") : ""
+            return if model_path.empty?
+
+            norm_path = model_path.downcase
+            # Если модель уже обработана в текущей сессии SketchUp и не запрошен принудительный инкремент
+            return if @session_opened_models[norm_path] && !force
+
+            @session_opened_models[norm_path] = true
 
             project_data = Model::ProjectData.new
             project_data.load_auto(model)
+
+            # Увеличиваем номер ревизии при открытии существующего рабочего файла проекта
+            project_data.increment_revision!("Открытие рабочего файла")
+            project_data.save_auto(model)
+
+            Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
+
+            if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
+              yaml_name = project_data.yaml_filename(model)
+              rev = project_data.project_info[:revision]
+              Sketchup.status_text = "DN1C Export PDF: Открыт проект #{yaml_name} (Ревизия r#{sprintf('%03d', rev)})"
+            end
           rescue StandardError => e
             warn "[DN1C Export PDF] Ошибка при автозагрузке проекта: #{e.message}"
           end
@@ -94,7 +145,8 @@ module DN1Code
             return unless model
 
             project_data = Model::ProjectData.new
-            project_data.load_from_model(model)
+            has_data = project_data.load_from_model(model)
+            project_data.load_auto(model) unless has_data
             project_data.sync_with_model_scenes(model)
             project_data.save_to_model(model)
           rescue StandardError => e

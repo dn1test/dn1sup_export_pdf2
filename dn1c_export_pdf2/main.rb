@@ -37,14 +37,21 @@ require_relative "controller/export_controller"
 # Загрузка пользовательского интерфейса
 require_relative "dialog/export_dialog"
 
+# Пространство имен плагина DN1Code
 module DN1Code
+  # Основной модуль плагина DN1C Export PDF 2
   module ExportPdf2
     extend self
 
+    # Открывает главное модальное/интерактивное окно настроек и экспорта в PDF
+    # @return [void]
     def open_export_dialog
       Dialog::ExportDialog.show_dialog
     end
 
+    # Выполняет быстрый экспорт активных сцен текущей модели SketchUp
+    # с использованием сохраненных или стандартных параметров без открытия диалога
+    # @return [void]
     def quick_export
       model = Sketchup.active_model
       unless model

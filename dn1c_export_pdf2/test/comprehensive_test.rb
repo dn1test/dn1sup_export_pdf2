@@ -50,6 +50,7 @@ class TestRunner
     test_room_and_furniture_composition
     test_layout_api_export
     test_custom_layouts_and_block_positioning
+    test_reopening_project_file_preserves_revision_and_yaml_string_keys
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -618,6 +619,56 @@ class TestRunner
 
     File.delete(pdf_out) if File.exist?(pdf_out)
     File.delete(layout_out) if File.exist?(layout_out)
+  end
+
+  def test_reopening_project_file_preserves_revision_and_yaml_string_keys
+    puts "\n--- 12. Тест автоматического увеличения ревизии (+1) при открытии рабочего файла и поддержка строковых ключей YAML ---"
+
+    test_dir = File.expand_path("test_reopen_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Project_Reopen.skp")
+    yaml_file = File.join(test_dir, "ART-REOPEN-100.yaml")
+
+    # Создаем YAML файл со строковыми ключами (как при внешнем создании или ручном редактировании)
+    yaml_content = <<~YAML
+      project_info:
+        articul: "ART-REOPEN-100"
+        name_project: "Проект с ревизией 7"
+        version: 2
+        revision: 7
+        status: "В РАБОТЕ"
+      pdf_settings:
+        page_size: "A3"
+        page_layout: "landscape"
+    YAML
+    File.write(yaml_file, yaml_content, encoding: "utf-8")
+
+    # 1. Симулируем открытие существующей модели SketchUp
+    model = Sketchup::MockModel.new(skp_file)
+
+    # Вызываем ObserverService.handle_model_opened (открытие файла проекта)
+    DN1Code::ExportPdf2::Service::ObserverService.handle_model_opened(model)
+
+    # 2. Проверяем загрузку данных в проект: ревизия 7 автоматически увеличилась до 8
+    loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    src = loaded_data.load_auto(model)
+
+    assert(src == :yaml, "При открытии файла источник определен как :yaml")
+    assert(loaded_data.project_info[:revision] == 8, "Номер ревизии автоматически увеличен до 8 при открытии файла проекта")
+    assert(loaded_data.project_info[:version] == 2, "Версия проекта (2) корректно прочитана")
+    assert(loaded_data.project_info[:articul] == "ART-REOPEN-100", "Артикул корректно прочитан")
+    assert(loaded_data.history.any? { |h| h[:description].include?("Открытие рабочего файла") }, "В историю изменений добавлена запись об открытии файла")
+
+    # 3. Симулируем сохранение модели (pre_save / post_save)
+    DN1Code::ExportPdf2::Service::ObserverService.handle_pre_save(model)
+    DN1Code::ExportPdf2::Service::ObserverService.handle_post_save(model)
+
+    rechecked_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    rechecked_data.load_auto(model)
+    assert(rechecked_data.project_info[:revision] == 8, "После pre_save и post_save ревизия осталась равной 8")
+
+    FileUtils.rm_rf(test_dir)
   end
 end
 

@@ -1368,15 +1368,18 @@
       }
     },
 
-    onExportSuccess: function (pdfPath) {
+    onExportSuccess: function (pdfPath, newRevision) {
       els.progressOverlay.classList.add("hidden");
       state.lastExportedPdf = pdfPath;
       els.successPdfPath.textContent = pdfPath;
       els.successModal.classList.remove("hidden");
 
-      // Auto increment revision locally
-      const revInput = els.inputRevision;
-      revInput.value = (parseInt(revInput.value, 10) || 1) + 1;
+      // Auto update revision locally from backend
+      if (els.inputRevision) {
+        els.inputRevision.value = (newRevision !== undefined && newRevision !== null)
+          ? newRevision
+          : ((parseInt(els.inputRevision.value, 10) || 1) + 1);
+      }
     },
 
     onExportError: function (errorMsg) {

@@ -3,7 +3,13 @@
 module DN1Code
   module ExportPdf2
     module Service
+      # Сервис проверки и динамической загрузки сторонних библиотек (gem prawn, pdf-core, ttfunk)
+      # в среде встроенного Ruby интерпретатора SketchUp.
       module GemLoader
+        # Проверяет наличие и загружает gem Prawn и сопутствующие библиотеки.
+        # В случае отсутствия выполняет поиск в локальных путях пользователя
+        # или выводит сообщение пользователю с инструкцией по установке.
+        # @return [Boolean] true, если Prawn успешно загружен или уже определен, иначе false
         def self.ensure_prawn_loaded!
           return true if defined?(Prawn::Document)
 

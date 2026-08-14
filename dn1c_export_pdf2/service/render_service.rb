@@ -7,11 +7,16 @@ require "fileutils"
 module DN1Code
   module ExportPdf2
     module Service
+      # Сервис высококачественного рендеринга видов и сцен модели SketchUp во временные растровые изображения (PNG).
       module RenderService
         # Соотношение сторон для стандартных печатных листов ISO A (A4, A3, A2) = 1 / sqrt(2) ≈ 0.7071
         DEFAULT_ISO_RATIO = 0.7071
 
-        # Рендеринг сцены во временный PNG-файл
+        # Выполняет переключение на указанную сцену в SketchUp и экспорт растрового изображения во временный PNG-файл
+        # @param model [Sketchup::Model] активная модель SketchUp
+        # @param scene [Sketchup::Page, nil] сцена для рендеринга
+        # @param options [Hash] параметры рендера (:image_width, :image_height, :scale_factor, :antialias, :ratio)
+        # @return [String] путь к созданному временному файлу PNG
         def self.render_scene_temp(model, scene, options = {})
           width        = options[:image_width] || 2400
           ratio        = options[:ratio] || DEFAULT_ISO_RATIO
@@ -45,7 +50,9 @@ module DN1Code
           temp_file
         end
 
-        # Безопасное удаление временных файлов после завершения сборки PDF
+        # Выполняет безопасное удаление временных файлов изображений после завершения сборки PDF
+        # @param file_paths [Array<String>, String] список путей к временным файлам
+        # @return [void]
         def self.safe_cleanup_files(file_paths)
           # Запуск сборщика мусора для освобождения дескрипторов файлов в Windows
           GC.start
@@ -60,7 +67,12 @@ module DN1Code
           end
         end
 
-        # Создание простого fallback изображения (1x1 или базовый PNG) для тестов
+        # Создает минимальное валидное PNG-изображение (1x1 пиксель) для тестов и автономного режима
+        # @param file_path [String] путь к сохраняемому PNG-файлу
+        # @param width [Integer] ширина в пикселях
+        # @param height [Integer] высота в пикселях
+        # @param label [String] текстовая метка
+        # @return [void]
         def self.create_fallback_image(file_path, width = 800, height = 600, label = "")
           png_1x1 = [
             0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A,

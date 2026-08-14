@@ -11,9 +11,30 @@ module DN1Code
         DIALOG_ID = "DN1C_ExportPdf2_Dialog"
         @dialog = nil
 
+        def self.refresh_if_open(model = nil)
+          if @dialog && @dialog.visible?
+            model ||= (defined?(Sketchup) ? Sketchup.active_model : nil)
+            return unless model
+
+            Service::ObserverService.handle_model_opened(model, false) if defined?(Service::ObserverService)
+
+            project_data = Model::ProjectData.new
+            project_data.load_auto(model)
+
+            json_str = JSON.generate(project_data.to_h)
+            @dialog.execute_script("window.app && window.app.loadData(#{json_str});")
+          end
+        end
+
         def self.show_dialog
+          model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+          if model && model.respond_to?(:path) && !model.path.to_s.empty?
+            Service::ObserverService.handle_model_opened(model, false) if defined?(Service::ObserverService)
+          end
+
           if @dialog && @dialog.visible?
             @dialog.bring_to_front
+            refresh_if_open(model)
             return
           end
 
@@ -43,6 +64,10 @@ module DN1Code
           # Загрузка данных проекта в веб-интерфейс (первично YAML, вторично библиотека модели)
           dialog.add_action_callback("getData") do |_action_context|
             model = Sketchup.active_model
+            if model && model.respond_to?(:path) && !model.path.to_s.empty?
+              Service::ObserverService.handle_model_opened(model, false) if defined?(Service::ObserverService)
+            end
+
             project_data = Model::ProjectData.new
             project_data.load_auto(model)
 
@@ -133,7 +158,8 @@ module DN1Code
               end
 
               escaped_path = JSON.generate(pdf_file)
-              dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path});")
+              new_rev = project_data.project_info[:revision] || 1
+              dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev});")
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.onExportError(#{JSON.generate(e.message)});")
             end
