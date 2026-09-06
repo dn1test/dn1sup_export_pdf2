@@ -126,7 +126,7 @@ module DN1Code
 
               @pdf_doc.fill_color @primary_col
               Service::FontService.apply_style(@pdf_doc, :small)
-              @pdf_doc.text_box date_str, at: [hist_box[:x], hy], width: 85
+              @pdf_doc.text_box date_str, at: [hist_box[:x], hy], width: 85, height: 18, overflow: :shrink_to_fit
 
               @pdf_doc.fill_color "334155"
               Service::FontService.apply_style(@pdf_doc, :body)

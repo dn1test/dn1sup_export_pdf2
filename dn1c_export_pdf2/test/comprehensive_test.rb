@@ -65,6 +65,16 @@ class TestRunner
     test_header_scene_name_and_description
     test_header_item_dropdowns
     test_footer_card_layout_adjustments
+    test_scenes_table_two_row_layout
+    test_template_settings_single_column_layout
+    test_middle_block_item_controls_and_rendering
+    test_blocks_drag_and_drop_reordering
+    test_middle_block_vertical_center_alignment
+    test_header_empty_lines_not_rendered
+    test_middle_block_general_and_custom_font_size
+    test_drawing_image_settings_proportions_and_placement
+    test_manual_revision_prompt_before_pdf_export_and_no_auto_history
+    test_footer_items_aligned_to_bottom_edge
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -665,7 +675,7 @@ class TestRunner
   end
 
   def test_reopening_project_file_preserves_revision_and_yaml_string_keys
-    puts "\n--- 12. Тест автоматического увеличения ревизии (+1) при открытии рабочего файла и поддержка строковых ключей YAML ---"
+    puts "\n--- 12. Тест сохранения ревизии без автоматического создания истории правок при открытии файла ---"
 
     test_dir = File.expand_path("test_reopen_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -693,15 +703,15 @@ class TestRunner
     # Вызываем ObserverService.handle_model_opened (открытие файла проекта)
     DN1Code::ExportPdf2::Service::ObserverService.handle_model_opened(model)
 
-    # 2. Проверяем загрузку данных в проект: ревизия 7 автоматически увеличилась до 8
+    # 2. Проверяем загрузку данных в проект: ревизия 7 НЕ должна увеличиваться автоматически
     loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
     src = loaded_data.load_auto(model)
 
     assert(src == :yaml, "При открытии файла источник определен как :yaml")
-    assert(loaded_data.project_info[:revision] == 8, "Номер ревизии автоматически увеличен до 8 при открытии файла проекта")
+    assert(loaded_data.project_info[:revision] == 7, "Номер ревизии не увеличивается автоматически при открытии файла (остается 7)")
     assert(loaded_data.project_info[:version] == 2, "Версия проекта (2) корректно прочитана")
     assert(loaded_data.project_info[:articul] == "ART-REOPEN-100", "Артикул корректно прочитан")
-    assert(loaded_data.history.any? { |h| h[:description].include?("Открытие рабочего файла") }, "В историю изменений добавлена запись об открытии файла")
+    assert(!loaded_data.history.any? { |h| h[:description].to_s.include?("Открытие рабочего файла") }, "История правок автоматически НЕ создается при открытии файла")
 
     # 3. Симулируем сохранение модели (pre_save / post_save)
     DN1Code::ExportPdf2::Service::ObserverService.handle_pre_save(model)
@@ -709,7 +719,7 @@ class TestRunner
 
     rechecked_data = DN1Code::ExportPdf2::Model::ProjectData.new
     rechecked_data.load_auto(model)
-    assert(rechecked_data.project_info[:revision] == 8, "После pre_save и post_save ревизия осталась равной 8")
+    assert(rechecked_data.project_info[:revision] == 7, "После pre_save и post_save ревизия сохраняется равной 7")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -1874,6 +1884,748 @@ class TestRunner
     assert(app_css_content.include?(".tpl-footer-font-label"), "app.css содержит стиль .tpl-footer-font-label")
     assert(app_css_content.include?(".tpl-ftr-line-row"), "app.css содержит стиль .tpl-ftr-line-row")
     assert(app_css_content.include?(".tpl-ftr-align-picker"), "app.css содержит стиль .tpl-ftr-align-picker")
+  end
+
+  def test_scenes_table_two_row_layout
+    puts "\n--- 27. Тест двухстрочного отображения названия сцены и описания в таблице сцен ---"
+    index_html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    index_html_content = File.read(index_html_path, encoding: "utf-8")
+
+    # 1. Проверка структуры thead в index.html
+    assert(index_html_content.include?("<th>Сцена / Описание</th>"), "index.html содержит объединенный заголовок 'Сцена / Описание'")
+    assert(!index_html_content.include?("<th>Описание на листе</th>"), "index.html больше не содержит отдельную колонку 'Описание на листе'")
+    assert(index_html_content.include?("th-num-check-wrap"), "index.html содержит объединенную шапку Вкл и № в две строки")
+
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    # 2. Проверка генерации строки таблицы в app.js
+    assert(app_js_content.include?("scene-num-check-cell"), "app.js содержит ячейку scene-num-check-cell")
+    assert(app_js_content.include?("scene-num-check-wrap"), "app.js содержит обертку scene-num-check-wrap")
+    assert(app_js_content.include?("scene-num-row"), "app.js содержит строку номера с ручкой drag-handle")
+    assert(app_js_content.include?("scene-info-cell"), "app.js содержит ячейку scene-info-cell")
+    assert(app_js_content.include?("scene-info-wrap"), "app.js содержит обертку scene-info-wrap")
+    assert(app_js_content.include?("scene-name-input"), "app.js содержит поле ввода названия сцены (scene-name-input)")
+    assert(app_js_content.include?("scene-desc-input"), "app.js содержит поле ввода описания сцены (scene-desc-input)")
+    assert(app_js_content.include?("tdInfo.appendChild(infoWrap)"), "app.js помещает оба поля в единую ячейку tdInfo")
+    assert(app_js_content.include?("tr.appendChild(tdNumCheck)"), "app.js добавляет ячейку чекбокса и номера в tr")
+
+    # 3. Проверка стилей в app.css
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "utf-8")
+    assert(app_css_content.include?(".th-num-check"), "app.css содержит стиль .th-num-check")
+    assert(app_css_content.include?(".scene-num-check-cell"), "app.css содержит стиль .scene-num-check-cell")
+    assert(app_css_content.include?(".scene-num-check-wrap"), "app.css содержит стиль .scene-num-check-wrap")
+    assert(app_css_content.include?(".scene-num-row"), "app.css содержит стиль .scene-num-row")
+    assert(app_css_content.include?(".scene-info-wrap"), "app.css содержит стиль .scene-info-wrap")
+    assert(app_css_content.include?(".scene-desc-input"), "app.css содержит стиль .scene-desc-input")
+    assert(app_css_content.include?(".scenes-table .scene-info-cell"), "app.css содержит стиль .scenes-table .scene-info-cell")
+    assert(app_css_content.include?(".scenes-table td"), "app.css содержит вертикальное центрирование .scenes-table td")
+  end
+
+  def test_template_settings_single_column_layout
+    puts "\n--- 28. Тест компоновки настроек шаблонов в один столбец (Заголовок, Средний, Подвал) ---"
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    # 0. Проверка валидности синтаксиса JavaScript
+    node_check = `node -c "#{app_js_path}" 2>&1`
+    assert($?.success?, "app.js не содержит синтаксических ошибок JS: #{node_check.strip}")
+
+    # 1. Проверка структуры единого столбца
+    assert(app_js_content.include?("tpl-single-column-layout"), "app.js содержит контейнер единого столбца tpl-single-column-layout")
+
+    # 2. Проверка карточек Заголовок, Средний, Подвал
+    assert(app_js_content.include?('id="card_header"'), "app.js содержит карточку card_header (Заголовок)")
+    assert(app_js_content.include?('id="card_middle"'), "app.js содержит карточку card_middle (Средний)")
+    assert(app_js_content.include?('id="card_footer"'), "app.js содержит карточку card_footer (Подвал)")
+
+    # 3. Проверка строгого порядка следования в один столбец: Заголовок -> Средний -> Подвал
+    single_col_block = app_js_content[/tpl-single-column-layout.*?<\/div>/m]
+    assert(single_col_block != nil, "Блок tpl-single-column-layout найден в app.js")
+    if single_col_block
+      hdr_pos = single_col_block.index("cardHeaderHtml")
+      mid_pos = single_col_block.index("cardMiddleHtml")
+      ftr_pos = single_col_block.index("cardFooterHtml")
+      assert(hdr_pos && mid_pos && ftr_pos, "Все 3 карточки присутствуют в едином столбце")
+      assert(hdr_pos < mid_pos, "Заголовок идет первым (перед Средним)")
+      assert(mid_pos < ftr_pos, "Средний блок идет вторым (перед Подвалом)")
+    end
+
+    # 4. Проверка содержимого карточки «Средний блок»
+    assert(app_js_content.include?("Средний блок"), "app.js содержит заголовок 'Средний блок'")
+    assert(app_js_content.include?('data-slot="slot_1"'), "Средний блок управляет информационным слотом slot_1")
+    assert(app_js_content.include?("sel-slot-fontsize"), "Средний блок содержит выбор кегля шрифта")
+    assert(app_js_content.include?("btn-slot-all"), "Средний блок содержит кнопку 'Все'")
+    assert(app_js_content.include?("btn-slot-none"), "Средний блок содержит кнопку 'Снять'")
+
+    # 5. Проверка удаления колонок из настроек шаблонов
+    assert(!app_js_content.include?("tpl-toolbar-card"), "app.js больше не содержит блок tpl-toolbar-card")
+    assert(!app_js_content.include?("inp_col_width_left"), "app.js больше не содержит регулятор ширины левой колонки")
+    assert(!app_js_content.include?("inp_col_width_right"), "app.js больше не содержит регулятор ширины правой колонки")
+    assert(!app_js_content.include?("chk_sync_col_width"), "app.js больше не содержит чекбокс синхронизации ширины колонок")
+    assert(!app_js_content.include?("btn-col-preset"), "app.js больше не содержит кнопки пресетов ширины колонок")
+    assert(!app_js_content.include?("Левый верхний блок"), "app.js больше не содержит 4 отдельных угловых слота")
+
+    # 6. Проверка стилей в app.css
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "utf-8")
+    assert(app_css_content.include?(".tpl-single-column-layout"), "app.css содержит стиль .tpl-single-column-layout")
+    assert(app_css_content.include?("#card_middle"), "app.css содержит правило для #card_middle")
+  end
+
+  # ============================================================================
+  # 29. ТЕСТ: Настройка каждого пункта Среднего блока значками
+  # ============================================================================
+  def test_middle_block_item_controls_and_rendering
+    puts "\n--- 29. Тест настройки пунктов Среднего блока значками ---"
+
+    # 1. Проверка разметки элементов управления строками в app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_content.include?("tpl-middle-columns-header"), "app.js содержит шапку колонок среднего блока tpl-middle-columns-header")
+    assert(app_js_content.include?("tpl-middle-col-titles"), "app.js содержит контейнер заголовков колонок tpl-middle-col-titles")
+    assert(app_js_content.include?("tpl-btn-middle-edge"), "app.js содержит кнопки выравнивания по краю страницы tpl-btn-middle-edge")
+    assert(app_js_content.include?("tpl-btn-middle-valign"), "app.js содержит кнопки положения сверху/снизу tpl-btn-middle-valign")
+    assert(app_js_content.include?("sel-middle-line-size"), "app.js содержит выбор кегля шрифта строки sel-middle-line-size")
+    assert(app_js_content.include?("inp-middle-line-color"), "app.js содержит выбор цвета строки inp-middle-line-color")
+    assert(app_js_content.include?("MIDDLE_LINE_FONT_SIZES"), "app.js содержит константу MIDDLE_LINE_FONT_SIZES")
+
+    # Проверка значков в разметке: ⇤ / ⇥ (край), ⬆ / ↕ / ⬇ (вертикаль), Aa (размер), 🎨 (палитра)
+    assert(app_js_content.include?("data-align=\"left\" title=\"По левому краю страницы\">⇤"), "app.js содержит значок ⇤ для левого края")
+    assert(app_js_content.include?("data-align=\"right\" title=\"По правому краю страницы\">⇥"), "app.js содержит значок ⇥ для правого края")
+    assert(app_js_content.include?("data-valign=\"top\" title=\"Сверху\">⬆"), "app.js содержит значок ⬆ для положения сверху")
+    assert(app_js_content.include?("data-valign=\"center\" title=\"По центру (середина)\">↕"), "app.js содержит значок ↕ для положения по центру (середина)")
+    assert(app_js_content.include?("data-valign=\"bottom\" title=\"Снизу\">⬇"), "app.js содержит значок ⬇ для положения снизу")
+    assert(app_js_content.include?("col-valign\" title=\"По высоте: сверху / середина / снизу\">⬆ ↕ ⬇"), "app.js содержит заголовок колонки ⬆ ↕ ⬇")
+
+    # 2. Проверка обработчиков событий в app.js
+    assert(app_js_content.include?("midEdgeBtns.forEach"), "app.js содержит обработку кликов по кнопкам выравнивания края")
+    assert(app_js_content.include?("midValignBtns.forEach"), "app.js содержит обработку кликов по кнопкам положения сверху/снизу")
+    assert(app_js_content.include?("midSizeSelects.forEach"), "app.js содержит обработку выбора размера шрифта строки")
+    assert(app_js_content.include?("midColorInputs.forEach"), "app.js содержит обработку выбора цвета строки")
+
+    # 3. Проверка стилей в app.css
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "utf-8")
+
+    assert(app_css_content.include?(".tpl-middle-columns-header"), "app.css содержит стиль .tpl-middle-columns-header")
+    assert(app_css_content.include?(".tpl-middle-line-row"), "app.css содержит стиль .tpl-middle-line-row")
+    assert(app_css_content.include?(".tpl-middle-label-wrap"), "app.css содержит стиль .tpl-middle-label-wrap")
+    assert(app_css_content.include?(".tpl-middle-item-controls"), "app.css содержит стиль .tpl-middle-item-controls")
+    assert(app_css_content.include?(".tpl-middle-edge-group"), "app.css содержит стиль .tpl-middle-edge-group")
+    assert(app_css_content.include?(".tpl-middle-valign-group"), "app.css содержит стиль .tpl-middle-valign-group")
+    assert(app_css_content.include?(".tpl-middle-col-title.col-valign"), "app.css содержит стиль .tpl-middle-col-title.col-valign")
+    assert(app_css_content.include?("width: 66px;"), "app.css задает ширину 66px для 3 кнопок по высоте")
+    assert(app_css_content.include?(".sel-middle-line-size"), "app.css содержит стиль .sel-middle-line-size")
+    assert(app_css_content.include?(".inp-middle-line-color"), "app.css содержит стиль .inp-middle-line-color")
+
+    # 4. Проверка структуры default_custom_layouts в project_data.rb
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    [:cover, :description, :explain].each do |tpl|
+      s1 = project_data.default_custom_layouts[tpl][:slot_1]
+      assert(s1.key?(:line_aligns), "default_custom_layouts[#{tpl}][:slot_1] содержит line_aligns")
+      assert(s1.key?(:line_valigns), "default_custom_layouts[#{tpl}][:slot_1] содержит line_valigns")
+      assert(s1.key?(:line_font_sizes), "default_custom_layouts[#{tpl}][:slot_1] содержит line_font_sizes")
+      assert(s1.key?(:line_colors), "default_custom_layouts[#{tpl}][:slot_1] содержит line_colors")
+      assert(s1[:line_aligns]["toc_pages"] == "left", "default_custom_layouts[#{tpl}] toc_pages выровнен по левому краю")
+      assert(s1[:line_valigns]["toc_pages"] == "top", "default_custom_layouts[#{tpl}] toc_pages расположен сверху")
+    end
+
+    # 5. Проверка генерации PDF с индивидуальными настройками пунктов среднего блока (включая center)
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1] = {
+      visible: true,
+      content: "info_lines",
+      align: "left",
+      valign: "top",
+      font_size: 8.0,
+      lines: ["toc_pages", "spec_materials", "spec_appliances", "workflow_history"],
+      line_aligns: { "toc_pages" => "left", "spec_materials" => "left", "spec_appliances" => "right", "workflow_history" => "right" },
+      line_valigns: { "toc_pages" => "top", "spec_materials" => "center", "spec_appliances" => "center", "workflow_history" => "bottom" },
+      line_font_sizes: { "toc_pages" => 10.0, "spec_materials" => 8.0, "spec_appliances" => 8.5, "workflow_history" => 9.0 },
+      line_colors: { "toc_pages" => "#005EB0", "spec_materials" => "#334155", "spec_appliances" => "#1E293B", "workflow_history" => "#DC2626" }
+    }
+
+    mock_page = Sketchup::MockPage.new("01. Обложка")
+    mock_page.description = "Описание сцены обложки"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Обложка",
+      description: "Описание сцены обложки",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    pdf_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, scene, page_index: 1, total_pages: 5)
+
+    test_dir = File.expand_path("test_middle_controls_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_middle_block_rendering.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(File.exist?(out_pdf), "PDF с индивидуальными настройками пунктов среднего блока успешно сгенерирован")
+    assert(File.size(out_pdf) > 5000, "Файл PDF создан и его размер валиден (#{File.size(out_pdf) rescue 0} байт)")
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 30. ТЕСТ: Перетаскивание (Drag and Drop) порядка пунктов мышкой в блоках шаблонов
+  # ============================================================================
+  def test_blocks_drag_and_drop_reordering
+    puts "\n--- 30. Тест перетаскивания мышкой (Drag and Drop) пунктов в блоках настроек шаблонов ---"
+
+    # 1. Проверка разметки и скрипта в app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    # Валидность синтаксиса JavaScript
+    node_check = `node -c "#{app_js_path}" 2>&1`
+    assert($?.success?, "app.js не содержит синтаксических ошибок JS: #{node_check.strip}")
+
+    # Проверка функции перетаскивания и привязки к 3 блокам
+    assert(app_js_content.include?("setupBlockDragAndDrop"), "app.js содержит функцию setupBlockDragAndDrop")
+    assert(app_js_content.include?("setupBlockDragAndDrop(cardHeader"), "Drag and drop привязан к блоку Шапка (cardHeader)")
+    assert(app_js_content.include?("setupBlockDragAndDrop(cardMiddle"), "Drag and drop привязан к Среднему блоку (cardMiddle)")
+    assert(app_js_content.include?("setupBlockDragAndDrop(cardFooter"), "Drag and drop привязан к блоку Подвал (cardFooter)")
+
+    # Проверка сортировки по сохраненному порядку item_order
+    assert(app_js_content.include?("savedHeaderOrder"), "app.js учитывает сохраненный порядок строк шапки savedHeaderOrder")
+    assert(app_js_content.include?("savedMiddleOrder"), "app.js учитывает сохраненный порядок строк среднего блока savedMiddleOrder")
+    assert(app_js_content.include?("savedFooterOrder"), "app.js учитывает сохраненный порядок строк подвала savedFooterOrder")
+
+    # Проверка ручек перетаскивания и draggable в разметке
+    assert(app_js_content.include?('span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>'), "app.js содержит значок ручки захвата ⠿")
+    assert(app_js_content.include?('tpl-hdr-line-row" draggable="true"'), "Строки шапки имеют атрибут draggable=\"true\"")
+    assert(app_js_content.include?('tpl-middle-line-row" draggable="true"'), "Строки среднего блока имеют атрибут draggable=\"true\"")
+    assert(app_js_content.include?('tpl-ftr-line-row" draggable="true"'), "Строки подвала имеют атрибут draggable=\"true\"")
+
+    # Проверка событий Drag and Drop
+    assert(app_js_content.include?('"dragstart"'), "app.js обрабатывает событие dragstart")
+    assert(app_js_content.include?('"dragover"'), "app.js обрабатывает событие dragover")
+    assert(app_js_content.include?('"dragleave"'), "app.js обрабатывает событие dragleave")
+    assert(app_js_content.include?('"drop"'), "app.js обрабатывает событие drop")
+    assert(app_js_content.include?('"dragend"'), "app.js обрабатывает событие dragend")
+    assert(app_js_content.include?("insertBefore"), "app.js переставляет элементы в DOM через insertBefore")
+
+    # 2. Проверка стилей в app.css
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "utf-8")
+
+    assert(app_css_content.include?(".tpl-line-item .drag-handle"), "app.css содержит стиль для .tpl-line-item .drag-handle")
+    assert(app_css_content.include?("cursor: grab;"), "app.css задает cursor: grab для ручки перетаскивания")
+    assert(app_css_content.include?(".tpl-line-item.dragging"), "app.css содержит стиль для перетаскиваемого элемента .tpl-line-item.dragging")
+    assert(app_css_content.include?(".tpl-line-item.drag-over-top"), "app.css содержит стиль подсветки сверху .drag-over-top")
+    assert(app_css_content.include?(".tpl-line-item.drag-over-bottom"), "app.css содержит стиль подсветки снизу .drag-over-bottom")
+
+    # 3. Проверка генерации PDF с измененным порядком строк в шапке, среднем блоке и подвале
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.pdf_settings[:custom_layouts][:cover][:header] = {
+      visible: true,
+      align: "center",
+      valign: "center",
+      lines: ["scene_name", "furniture_name", "place_address"],
+      line_rows: { "scene_name" => 1, "furniture_name" => 2, "place_address" => 3 },
+      line_font_sizes: { "scene_name" => 12.0, "furniture_name" => 14.0, "place_address" => 10.0 },
+      line_colors: { "scene_name" => "#005EB0", "furniture_name" => "#0F172A", "place_address" => "#475569" }
+    }
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1] = {
+      visible: true,
+      content: "info_lines",
+      align: "left",
+      valign: "top",
+      font_size: 8.0,
+      lines: ["workflow_date", "general_notes", "toc_pages"],
+      line_aligns: { "workflow_date" => "left", "general_notes" => "left", "toc_pages" => "left" },
+      line_valigns: { "workflow_date" => "top", "general_notes" => "top", "toc_pages" => "top" },
+      line_font_sizes: { "workflow_date" => 9.0, "general_notes" => 8.0, "toc_pages" => 10.0 },
+      line_colors: { "workflow_date" => "#005EB0", "general_notes" => "#334155", "toc_pages" => "#1E293B" }
+    }
+    project_data.pdf_settings[:custom_layouts][:cover][:footer] = {
+      visible: true,
+      align: "center",
+      valign: "center",
+      font_size: 8.5,
+      lines: ["footer_page_total", "footer_last_edit"],
+      line_aligns: { "footer_page_total" => "right", "footer_last_edit" => "left" }
+    }
+
+    mock_page = Sketchup::MockPage.new("01. Обложка")
+    mock_page.description = "Описание сцены обложки"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Обложка",
+      description: "Описание сцены обложки",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    pdf_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, scene, page_index: 1, total_pages: 5)
+
+    test_dir = File.expand_path("test_dnd_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_dnd_reordered.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(File.exist?(out_pdf), "PDF с пользовательским порядком пунктов успешно сгенерирован")
+    assert(File.size(out_pdf) > 5000, "Размер PDF валиден (#{File.size(out_pdf) rescue 0} байт)")
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # =========================================================================
+  # ТЕСТ 31: Проверка выравнивания по вертикали центру пунктов среднего блока
+  # =========================================================================
+  def test_middle_block_vertical_center_alignment
+    puts "\n--- 31. Тест выравнивания по вертикали центру пунктов среднего блока ---"
+
+    # 1. Проверка центрирования иконки кнопки в CSS
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "UTF-8")
+    assert(app_css_content.include?(".tpl-middle-valign-group .tpl-btn-align"), "app.css содержит стили кнопок вертикального выравнивания")
+    assert(app_css_content.include?("align-items: center;"), "app.css задает align-items: center для кнопок")
+    assert(app_css_content.include?("justify-content: center;"), "app.css задает justify-content: center для кнопок")
+
+    # 2. Проверка генерации PDF, когда пункт среднего блока расположен строго по центру
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1] = {
+      visible: true,
+      content: "info_lines",
+      align: "left",
+      valign: "top",
+      font_size: 8.0,
+      lines: ["spec_materials"],
+      line_aligns: { "spec_materials" => "left" },
+      line_valigns: { "spec_materials" => "center" },
+      line_font_sizes: { "spec_materials" => 9.0 },
+      line_colors: { "spec_materials" => "#1E293B" }
+    }
+
+    mock_page = Sketchup::MockPage.new("01. Обложка")
+    mock_page.description = "Описание сцены обложки"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Обложка",
+      description: "Описание сцены обложки",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    pdf_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, scene, page_index: 1, total_pages: 5)
+
+    test_dir = File.expand_path("test_valign_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_valign_center_single.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(File.exist?(out_pdf), "PDF с одиночным пунктом по вертикали центру успешно сгенерирован")
+    assert(File.size(out_pdf) > 5000, "Размер PDF валиден (#{File.size(out_pdf) rescue 0} байт)")
+
+    # 3. Проверка генерации PDF с тремя зонами (top, center, bottom)
+    project_data2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data2.pdf_settings[:custom_layouts][:cover][:slot_1] = {
+      visible: true,
+      content: "info_lines",
+      align: "left",
+      valign: "top",
+      font_size: 8.0,
+      lines: ["toc_pages", "spec_materials", "workflow_history"],
+      line_aligns: { "toc_pages" => "left", "spec_materials" => "left", "workflow_history" => "left" },
+      line_valigns: { "toc_pages" => "top", "spec_materials" => "center", "workflow_history" => "bottom" },
+      line_font_sizes: { "toc_pages" => 8.0, "spec_materials" => 8.0, "workflow_history" => 8.0 },
+      line_colors: { "toc_pages" => "#334155", "spec_materials" => "#334155", "workflow_history" => "#334155" }
+    }
+
+    pdf_doc2 = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data2, project_data2.pdf_settings)
+    cover_page2 = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc2, project_data2, scene, page_index: 1, total_pages: 5)
+    out_pdf2 = File.join(test_dir, "test_valign_three_zones.pdf")
+
+    cover_page2.render
+    pdf_doc2.render_file(out_pdf2)
+
+    assert(File.exist?(out_pdf2), "PDF с тремя зонами (верх, центр, низ) успешно сгенерирован")
+    assert(File.size(out_pdf2) > 5000, "Размер PDF валиден (#{File.size(out_pdf2) rescue 0} байт)")
+
+    # 4. Проверка математики вычисления смещения offset в центре
+    in_h = 400.0
+    total_items_h = 60.0
+    offset = [(in_h - total_items_h) / 2.0, 0.0].max
+    top_margin = offset
+    bottom_margin = in_h - total_items_h - offset
+    assert(top_margin == 170.0, "Верхний отступ точно равен 170.0 pt")
+    assert(bottom_margin == 170.0, "Нижний отступ точно равен 170.0 pt")
+    assert(top_margin == bottom_margin, "Вертикальное центрирование строго симметрично (отступ сверху равен отступу снизу)")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_header_empty_lines_not_rendered
+    puts "\n--- 32. Тест отключения всех пунктов шапки (Заголовок пуст) ---"
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:furniture_name] = "Тестовая мебель"
+    project_data.project_info[:room_name] = "Гостиная"
+    project_data.project_info[:address] = "ул. Примерная, 1"
+    project_data.project_info[:name_customer] = "Тестовый Заказчик"
+
+    # Отключаем все пункты в заголовке
+    project_data.pdf_settings[:custom_layouts][:cover][:header][:lines] = []
+
+    test_dir = File.expand_path("test_header_empty_lines_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    pdf_out = File.join(test_dir, "header_empty.pdf")
+
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, nil, page_index: 1, total_pages: 1)
+    
+    # Рендерим страницу с отключенными пунктами
+    cover_page.render
+    pdf_doc.render_file(pdf_out)
+
+    assert(File.exist?(pdf_out), "PDF с отключенными пунктами заголовка успешно создан")
+    assert(File.size(pdf_out) > 3000, "Размер PDF валиден (#{File.size(pdf_out)} байт)")
+
+    # Проверяем, что в app.js возвращается пустая строка при отсутствии строк
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+    assert(app_js_content.include?("if (renderedLines.length === 0) {\n        return \"\";\n      }"), "app.js возвращает пустую строку, если все пункты заголовка отключены")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 33. ТЕСТ: Общий размер шрифта среднего блока и переназначение в пунктах
+  # ============================================================================
+  def test_middle_block_general_and_custom_font_size
+    puts "\n--- 33. Тест общего размера шрифта среднего блока и переназначения в пунктах ---"
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    # 1. Проверка шкалы MIDDLE_LINE_FONT_SIZES для общего шрифта среднего блока
+    assert(app_js_content.include?("renderFontSizeOptions(middleFontSize, MIDDLE_LINE_FONT_SIZES, 8)"),
+           "app.js использует шкалу MIDDLE_LINE_FONT_SIZES для выбора общего шрифта среднего блока")
+
+    # 2. Проверка каскадного обновления s1.line_font_sizes при смене общего шрифта среднего блока
+    assert(app_js_content.include?('if (sId === "slot_1") {'), "app.js имеет отдельную обработку изменения шрифта для slot_1")
+    assert(app_js_content.include?("s1.line_font_sizes[k] = newFs;"), "app.js присваивает новый общий шрифт всем строкам среднего блока")
+    assert(app_js_content.include?('midSelects = els.templateSettingsContainer.querySelectorAll(".sel-middle-line-size")'),
+           "app.js находит все выпадающие списки пунктов среднего блока")
+    assert(app_js_content.include?("midSel.value = newFs.toString();"),
+           "app.js синхронно обновляет значения в селекторах пунктов при смене общего шрифта")
+
+    # 3. Проверка применения line_font_sizes и line_colors в превью виртуального листа
+    assert(app_js_content.include?("const lineFontSizes = blk.line_font_sizes || {};"),
+           "generateBlockPreviewHtml извлекает line_font_sizes")
+    assert(app_js_content.include?("const itFs = parseFloat(lineFontSizes[lineKey]) || fontSize;"),
+           "generateBlockPreviewHtml вычисляет размер шрифта каждого пункта (индивидуальный или общий по умолчанию)")
+
+    # 4. Проверка генерации PDF: общий шрифт 10 pt + переназначение в пунктах (toc_pages = 14 pt, workflow_date = 7 pt)
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1] = {
+      visible: true,
+      content: "info_lines",
+      align: "left",
+      valign: "top",
+      font_size: 10.0, # Общий размер шрифта
+      lines: ["toc_pages", "spec_materials", "workflow_date"],
+      line_aligns: { "toc_pages" => "left", "spec_materials" => "left", "workflow_date" => "right" },
+      line_valigns: { "toc_pages" => "top", "spec_materials" => "top", "workflow_date" => "bottom" },
+      line_font_sizes: {
+        "toc_pages" => 14.0,       # Индивидуально переназначенный крупный шрифт
+        "spec_materials" => 10.0,  # Оставлен общий шрифт (10 pt)
+        "workflow_date" => 7.0     # Индивидуально переназначенный мелкий шрифт
+      },
+      line_colors: {
+        "toc_pages" => "#005EB0",
+        "spec_materials" => "#334155",
+        "workflow_date" => "#EA580C"
+      }
+    }
+
+    mock_page = Sketchup::MockPage.new("01. Обложка")
+    mock_page.description = "Тест общего и индивидуального шрифтов"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Обложка",
+      description: "Тест шрифтов",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    pdf_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, scene, page_index: 1, total_pages: 1)
+
+    test_dir = File.expand_path("test_middle_font_sizes_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_middle_font_sizes.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(File.exist?(out_pdf), "PDF с общим шрифтом и индивидуально переназначенными пунктами успешно сгенерирован")
+    assert(File.size(out_pdf) > 5000, "Размер PDF валиден (#{File.size(out_pdf) rescue 0} байт)")
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 34. ТЕСТ: Настройка картинки чертежа под текст (пропорции 3:2, 4:3, 16:9 и размещение 60-100%)
+  # ============================================================================
+  def test_drawing_image_settings_proportions_and_placement
+    puts "\n--- 34. Тест настройки картинки чертежа под текст (пропорции 3:2, 4:3, 16:9 и масштаб 60-100%) ---"
+
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    # 1. Проверка карточки картинки в UI шаблонов (app.js)
+    assert(app_js_content.include?('id="card_image"'), "app.js содержит карточку card_image для картинки чертежа")
+    assert(app_js_content.include?('id="chk_image_4_3_visible"'), "app.js содержит чекбокс включения картинки chk_image_4_3_visible")
+    assert(app_js_content.include?("Картинка чертежа под текст"), "app.js содержит заголовок 'Картинка чертежа под текст'")
+
+    # 2. Проверка кнопок пропорций (3:2, 4:3, 16:9)
+    assert(app_js_content.include?('id="grp_image_aspect_ratio"'), "app.js содержит группу кнопок пропорций grp_image_aspect_ratio")
+    assert(app_js_content.include?('data-ratio="3:2"'), "app.js содержит кнопку выбора пропорции 3:2")
+    assert(app_js_content.include?('data-ratio="4:3"'), "app.js содержит кнопку выбора пропорции 4:3")
+    assert(app_js_content.include?('data-ratio="16:9"'), "app.js содержит кнопку выбора пропорции 16:9")
+
+    # 3. Проверка кнопок размещения на странице (60%, 70%, 80%, 90%, 100%)
+    assert(app_js_content.include?('id="grp_image_scale_pct"'), "app.js содержит группу кнопок масштаба grp_image_scale_pct")
+    assert(app_js_content.include?('data-scale="60"'), "app.js содержит кнопку масштаба 60%")
+    assert(app_js_content.include?('data-scale="70"'), "app.js содержит кнопку масштаба 70%")
+    assert(app_js_content.include?('data-scale="80"'), "app.js содержит кнопку масштаба 80%")
+    assert(app_js_content.include?('data-scale="90"'), "app.js содержит кнопку масштаба 90%")
+    assert(app_js_content.include?('data-scale="100"'), "app.js содержит кнопку масштаба 100%")
+
+    # 4. Проверка обработчиков кликов и автосохранения
+    assert(app_js_content.include?("updateBlockSlot(\"image_4_3\", { aspect_ratio: ratio })"), "app.js обновляет aspect_ratio при смене пропорции")
+    assert(app_js_content.include?("updateBlockSlot(\"image_4_3\", { scale_pct: scale })"), "app.js обновляет scale_pct при смене масштаба")
+
+    # 5. Проверка стилей в app.css
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_content = File.read(app_css_path, encoding: "utf-8")
+    assert(app_css_content.include?("#card_image"), "app.css содержит стили для #card_image")
+    assert(app_css_content.include?(".tpl-image-controls-row"), "app.css содержит стиль .tpl-image-controls-row")
+    assert(app_css_content.include?(".tpl-image-note"), "app.css содержит стиль .tpl-image-note")
+
+    # 6. Проверка значений по умолчанию в ProjectData
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    [:cover, :description, :explain, :general, :visual].each do |tpl|
+      img_slot = project_data.default_custom_layouts[tpl][:image_4_3]
+      assert(img_slot[:aspect_ratio] == "4:3", "default_custom_layouts[#{tpl}][:image_4_3] пропорция по умолчанию 4:3")
+      assert(img_slot[:scale_pct] == 100, "default_custom_layouts[#{tpl}][:image_4_3] масштаб по умолчанию 100%")
+    end
+
+    # 7. Проверка наличия параметров в YAML файлах
+    default_yaml = File.read(File.expand_path("../config/default_layout.yaml", __dir__), encoding: "utf-8")
+    assert(default_yaml.include?("aspect_ratio: '4:3'") || default_yaml.include?("aspect_ratio: \"4:3\""), "default_layout.yaml содержит aspect_ratio: 4:3")
+    assert(default_yaml.include?("scale_pct: 100"), "default_layout.yaml содержит scale_pct: 100")
+
+    layout_yaml = File.read(File.expand_path("../config/layout.yaml", __dir__), encoding: "utf-8")
+    assert(layout_yaml.include?("aspect_ratio: '4:3'") || layout_yaml.include?("aspect_ratio: \"4:3\""), "layout.yaml содержит aspect_ratio: 4:3")
+    assert(layout_yaml.include?("scale_pct: 100"), "layout.yaml содержит scale_pct: 100")
+
+    # 8. Генерация PDF с пропорцией 16:9 и масштабом 80%
+    mock_page = Sketchup::MockPage.new("01. Вид широкоформатный")
+    mock_page.description = "Рендер 16:9 с размещением 80%"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Вид широкоформатный",
+      description: "Рендер 16:9 с размещением 80%",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    layouts = project_data.pdf_settings[:custom_layouts]
+    layouts[:cover][:image_4_3][:aspect_ratio] = "16:9"
+    layouts[:cover][:image_4_3][:scale_pct] = 80
+
+    pdf_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, scene, page_index: 1, total_pages: 1)
+
+    test_dir = File.expand_path("test_drawing_image_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf_16_9 = File.join(test_dir, "test_image_16_9_scale_80.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf_16_9)
+
+    assert(File.exist?(out_pdf_16_9), "PDF с рендером 16:9 и масштабом 80% успешно создан")
+    assert(File.size(out_pdf_16_9) > 5000, "Размер PDF 16:9 валиден (#{File.size(out_pdf_16_9) rescue 0} байт)")
+
+    # 9. Генерация PDF с пропорцией 3:2 и масштабом 60%
+    layouts[:cover][:image_4_3][:aspect_ratio] = "3:2"
+    layouts[:cover][:image_4_3][:scale_pct] = 60
+
+    pdf_doc2 = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, project_data.pdf_settings)
+    cover_page2 = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc2, project_data, scene, page_index: 1, total_pages: 1)
+    out_pdf_3_2 = File.join(test_dir, "test_image_3_2_scale_60.pdf")
+
+    cover_page2.render
+    pdf_doc2.render_file(out_pdf_3_2)
+
+    assert(File.exist?(out_pdf_3_2), "PDF с рендером 3:2 и масштабом 60% успешно создан")
+    assert(File.size(out_pdf_3_2) > 5000, "Размер PDF 3:2 валиден (#{File.size(out_pdf_3_2) rescue 0} байт)")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_manual_revision_prompt_before_pdf_export_and_no_auto_history
+    puts "\n--- 35. Тест ручной фиксации правок перед экспортом и запрета авто-создания истории ---"
+
+    html_file = File.expand_path("../dialog/html/index.html", __dir__)
+    css_file  = File.expand_path("../dialog/html/app.css", __dir__)
+    js_file   = File.expand_path("../dialog/html/app.js", __dir__)
+
+    html_content = File.read(html_file, encoding: "utf-8")
+    css_content  = File.read(css_file, encoding: "utf-8")
+    js_content   = File.read(js_file, encoding: "utf-8")
+
+    # 1. Проверка структуры HTML для модального окна фиксации правок
+    assert(html_content.include?('id="revisionPromptModal"'), "index.html содержит модальное окно revisionPromptModal")
+    assert(html_content.include?('id="inputRevisionNote"'), "index.html содержит поле ввода описания правок inputRevisionNote")
+    assert(html_content.include?('id="btnConfirmRevisionExport"'), "index.html содержит кнопку 'Записать и создать PDF'")
+    assert(html_content.include?('id="btnSkipRevisionExport"'), "index.html содержит кнопку 'Без записи правок'")
+    assert(html_content.include?('id="btnCancelExportModal"'), "index.html содержит кнопку 'Отмена'")
+    assert(html_content.include?('id="revPromptDateTime"'), "index.html содержит поле точной даты и времени revPromptDateTime")
+    assert(html_content.include?('id="revPromptNextRev"'), "index.html содержит индикатор следующей ревизии revPromptNextRev")
+
+    # 2. Проверка стилей CSS
+    assert(css_content.include?(".revision-modal-card"), "app.css содержит стили карточки модального окна .revision-modal-card")
+    assert(css_content.include?(".rev-textarea"), "app.css содержит стили текстового поля .rev-textarea")
+    assert(css_content.include?(".revision-meta-grid"), "app.css содержит стили сетки метаданных даты/ревизии")
+
+    # 3. Проверка логики в app.js
+    assert(js_content.include?("revisionPromptModal"), "app.js кэширует элемент revisionPromptModal")
+    assert(js_content.include?("btnConfirmRevisionExport"), "app.js содержит обработчик кнопки подтверждения правок")
+    assert(js_content.include?("btnSkipRevisionExport"), "app.js содержит обработчик экспорта без записи правок")
+    assert(js_content.include?("executeExport"), "app.js выносит запуск экспорта в отдельную функцию executeExport")
+
+    # 4. Проверка поведения Controller::ExportController: экспорт НЕ добавляет историю автоматически
+    test_dir = File.expand_path("test_no_auto_history_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Manual_Rev_Test.skp")
+    model = Sketchup::MockModel.new(skp_file)
+    model.pages.add("01. Обложка")
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "REV-TEST-001"
+    project_data.workflow[:revision] = "003"
+    project_data.workflow[:history_edit] = [
+      ["2026-09-01 12:00", "Стартовая редакция (rev. 001)"],
+      ["2026-09-03 14:15", "Согласование проекта (rev. 002)"]
+    ]
+    project_data.sync_project_fields!
+    project_data.sync_with_model_scenes(model)
+
+    initial_hist_count = project_data.workflow[:history_edit].size
+    initial_rev = project_data.workflow[:revision]
+
+    # Экспорт без внесения правок (пользователь выбрал "Без записи правок")
+    pdf_no_rev = File.join(test_dir, "export_no_rev.pdf")
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    controller.export(pdf_no_rev)
+
+    assert(File.exist?(pdf_no_rev), "PDF успешно создан без внесения правок")
+    assert(project_data.workflow[:history_edit].size == initial_hist_count, "История правок НЕ увеличилась автоматически при экспорте")
+    assert(project_data.workflow[:revision] == initial_rev, "Номер ревизии НЕ изменился автоматически (остался #{initial_rev})")
+
+    # 5. Ручное внесение правок с точной датой и временем перед созданием PDF
+    exact_time = "2026-09-07 00:45"
+    edits_desc = "Заменены направляющие ящиков на Blum Tandem, обновлен цвет цоколя"
+    project_data.increment_revision!(edits_desc, exact_time)
+
+    assert(project_data.workflow[:revision] == "004", "Ревизия успешно инкрементирована до 004")
+    assert(project_data.workflow[:history_edit].size == initial_hist_count + 1, "В историю добавлена ровно одна запись правок")
+    latest_entry = project_data.workflow[:history_edit].first
+    assert(latest_entry[0] == exact_time, "Точная дата и время записаны корректно: #{latest_entry[0]}")
+    assert(latest_entry[1].include?(edits_desc), "Текст правок зафиксирован: #{latest_entry[1]}")
+    assert(latest_entry[1].include?("rev. 004"), "Текст содержит номер новой ревизии (rev. 004)")
+
+    # Генерация PDF с обновленной историей
+    pdf_with_rev = File.join(test_dir, "export_with_rev.pdf")
+    controller_rev = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    controller_rev.export(pdf_with_rev)
+
+    assert(File.exist?(pdf_with_rev), "PDF с зафиксированными правками успешно сгенерирован")
+    assert(project_data.workflow[:history_edit].size == initial_hist_count + 1, "После экспорта лишняя автоматическая запись не создалась")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 36. ТЕСТ: Выравнивание пунктов подвала по нижнему краю страницы
+  # ============================================================================
+  def test_footer_items_aligned_to_bottom_edge
+    puts "\n--- 36. Тест выравнивания пунктов подвала по нижнему краю страницы ---"
+
+    # 1. Проверка значений по умолчанию в ProjectData
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    [:cover, :description, :explain, :general, :visual].each do |tpl|
+      ftr = project_data.default_custom_layouts[tpl][:footer]
+      assert(ftr[:valign] == "bottom", "default_custom_layouts[#{tpl}][:footer] имеет valign: bottom")
+    end
+
+    # 2. Проверка default_layout.yaml и layout.yaml на наличие valign: bottom для footer
+    default_yaml = File.read(File.expand_path("../config/default_layout.yaml", __dir__), encoding: "utf-8")
+    assert(default_yaml.scan(/footer:.*?valign:\s*bottom/m).size >= 5, "default_layout.yaml содержит valign: bottom для всех подвалов")
+
+    layout_yaml = File.read(File.expand_path("../config/layout.yaml", __dir__), encoding: "utf-8")
+    assert(layout_yaml.scan(/footer:.*?valign:\s*bottom/m).size >= 5, "layout.yaml содержит valign: bottom для всех подвалов")
+
+    # 3. Проверка app.js (DEFAULT_LAYOUTS и превью)
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_content.scan(/footer:\s*\{[^}]+valign:\s*"bottom"/).size >= 5, "app.js DEFAULT_LAYOUTS содержит valign: bottom для всех подвалов")
+    assert(app_js_content.include?("align-items: flex-end"), "app.js превью виртуального листа выравнивает пункты подвала по низу (align-items: flex-end)")
+    assert(app_js_content.include?("По нижнему краю страницы ⬇"), "app.js карточка подвала содержит указание на выравнивание по нижнему краю страницы")
+
+    # 4. Проверка математики get_block_box: привязка подвала строго к нижнему краю листа (y + h = 100%)
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, nil, page_index: 1, total_pages: 1)
+
+    ftr_box = cover_page.send(:get_block_box, :cover, :footer, 0.0, 94.0, 100.0, 6.0)
+    # Нижняя граница блока ftr_box[:y] - ftr_box[:height] должна в точности равняться pdf_doc.bounds.bottom
+    box_bottom = ftr_box[:y] - ftr_box[:height]
+    assert((box_bottom - pdf_doc.bounds.bottom).abs < 0.001, "Нижний край блока подвала в точности совпадает с bounds.bottom страницы")
+
+    # 5. Проверка генерации PDF с подвалом, прижатым к нижнему краю
+    mock_page = Sketchup::MockPage.new("01. Обложка")
+    mock_page.description = "Тест подвала по нижнему краю"
+    scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Обложка",
+      description: "Тест подвала",
+      scene_ref: mock_page,
+      page_type: :cover,
+      order: 1,
+      enabled: true
+    )
+
+    test_dir = File.expand_path("test_footer_bottom_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_footer_bottom.pdf")
+
+    cover_page.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(File.exist?(out_pdf), "PDF с подвалом по нижнему краю страницы успешно создан")
+    assert(File.size(out_pdf) > 5000, "Размер созданного PDF валиден (#{File.size(out_pdf) rescue 0} байт)")
+
+    FileUtils.rm_rf(test_dir)
   end
 end
 

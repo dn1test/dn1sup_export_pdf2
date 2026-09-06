@@ -59,7 +59,8 @@ module DN1Code
           custom = @settings[:custom_layouts] || {}
           page_cfg = custom[pt.to_sym] || custom[pt.to_s] || {}
           page_cfg.key?(:image_4_3) || page_cfg.key?("image_4_3") ||
-            page_cfg.key?(:slot_1) || page_cfg.key?("slot_1")
+            page_cfg.key?(:slot_1) || page_cfg.key?("slot_1") ||
+            page_cfg.key?(:header) || page_cfg.key?("header")
         end
 
         protected
@@ -181,9 +182,15 @@ module DN1Code
             h_pct = 30.0
           end
 
+          # Подвал страницы всегда привязан к нижнему краю листа (y + h = 100.0%)
+          if block_id.to_s == "footer"
+            h_pct = 4.0 if h_pct <= 0.0
+            y_pct = 100.0 - h_pct
+          end
+
           visible = cfg.key?(:visible) ? cfg[:visible] : (cfg.key?("visible") ? cfg["visible"] : true)
           align = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
-          valign = (cfg[:valign] || cfg["valign"] || (block_id == :header || block_id == :footer ? "center" : "top")).to_s.to_sym
+          valign = (cfg[:valign] || cfg["valign"] || (block_id == :header ? "center" : (block_id == :footer ? "bottom" : "top"))).to_s.to_sym
 
           x = bounds.left + (bounds.width * (x_pct / 100.0))
           y = bounds.top - (bounds.height * (y_pct / 100.0))
@@ -203,23 +210,40 @@ module DN1Code
 
         # Полный рендеринг страницы по фиксированной 7-зонной сетке слотов
         def render_modular_page(pt = current_page_type)
-          # 1. Изображение чертежа/модели в пропорциях 4:3 ниже всего текста до краев документа
+          # 1. Изображение чертежа/модели в пропорциях (3:2, 4:3, 16:9) и масштабом (60%-100%) ниже всего текста
           if block_visible?(pt, :image_4_3)
+            img_cfg = get_block_config(pt, :image_4_3) || {}
+            ratio_str = (img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] || "4:3").to_s.strip
+            target_ratio = case ratio_str
+                           when "3:2"  then 3.0 / 2.0
+                           when "16:9" then 16.0 / 9.0
+                           else 4.0 / 3.0 # "4:3"
+                           end
+
+            raw_scale = (img_cfg[:scale_pct] || img_cfg["scale_pct"] || 100).to_f
+            raw_scale = 100.0 if raw_scale <= 0.0 || raw_scale > 100.0
+            scale_factor = raw_scale / 100.0
+
             page_w = bounds.width
             page_h = bounds.height
-            target_ratio = 4.0 / 3.0
-            cur_ratio = page_w / page_h
+
+            # Доступная область под картинку с учетом процента размещения
+            avail_w = page_w * scale_factor
+            avail_h = page_h * scale_factor
+
+            cur_ratio = avail_w / avail_h
             if cur_ratio > target_ratio
-              img_h = page_h
-              img_w = page_h * target_ratio
-              img_x = bounds.left + ((page_w - img_w) / 2.0)
-              img_y = bounds.top
+              img_h = avail_h
+              img_w = avail_h * target_ratio
             else
-              img_w = page_w
-              img_h = page_w / target_ratio
-              img_x = bounds.left
-              img_y = bounds.top - ((page_h - img_h) / 2.0)
+              img_w = avail_w
+              img_h = avail_w / target_ratio
             end
+
+            # Центрирование картинки на странице
+            img_x = bounds.left + ((page_w - img_w) / 2.0)
+            img_y = bounds.top - ((page_h - img_h) / 2.0)
+
             draw_scene_image(img_x, img_y, img_w, img_h)
           end
 
@@ -229,7 +253,7 @@ module DN1Code
             render_modular_header(pt, hdr_box)
           end
 
-          # 3. 4 информационных слота поверх картинки
+          # 3. 4 информационных слота поверх картинки (Средний блок)
           slot_coords = {
             slot_1: [0.0, 0.0, 25.0, 58.0],
             slot_2: [0.0, 58.0, 25.0, 36.0],
@@ -237,7 +261,113 @@ module DN1Code
             slot_4: [75.0, 58.0, 25.0, 36.0]
           }
 
+          s1_vis = block_visible?(pt, :slot_1)
+          s1_cfg = s1_vis ? get_block_config(pt, :slot_1) : nil
+          s1_lines = s1_cfg ? (s1_cfg[:lines] || s1_cfg["lines"]) : nil
+          handled_slots = []
+
+          if s1_vis && s1_cfg && s1_lines.is_a?(Array) && !s1_lines.empty? && (s1_cfg[:content] || s1_cfg["content"] || "info_lines").to_s == "info_lines"
+            handled_slots = [:slot_1, :slot_2, :slot_3, :slot_4]
+            line_aligns = s1_cfg[:line_aligns] || s1_cfg["line_aligns"] || {}
+            line_valigns = s1_cfg[:line_valigns] || s1_cfg["line_valigns"] || {}
+
+            s1_w = (s1_cfg[:w] || s1_cfg["w"] || 25.0).to_f
+            s3_cfg = get_block_config(pt, :slot_3)
+            s3_w = (s3_cfg[:w] || s3_cfg["w"] || 25.0).to_f
+            s3_x = 100.0 - s3_w
+
+            zones = {
+              left_top:     { lines: [], align: "left",  valign: :top,    target_slot: :slot_1 },
+              left_center:  { lines: [], align: "left",  valign: :center, target_slot: :slot_1_center },
+              left_bottom:  { lines: [], align: "left",  valign: :bottom, target_slot: :slot_2 },
+              right_top:    { lines: [], align: "right", valign: :top,    target_slot: :slot_3 },
+              right_center: { lines: [], align: "right", valign: :center, target_slot: :slot_3_center },
+              right_bottom: { lines: [], align: "right", valign: :bottom, target_slot: :slot_4 }
+            }
+
+            s1_lines.each do |k|
+              k_str = k.to_s
+              k_sym = k.to_sym rescue nil
+              side = (line_aligns[k_str] || (k_sym && line_aligns[k_sym]) || s1_cfg[:align] || "left").to_s == "right" ? :right : :left
+              raw_v = (line_valigns[k_str] || (k_sym && line_valigns[k_sym]) || s1_cfg[:valign] || "top").to_s.downcase
+              vpos = case raw_v
+                     when "bottom" then :bottom
+                     when "center", "middle" then :center
+                     else :top
+                     end
+
+              zone_key = "#{side}_#{vpos}".to_sym
+              zones[zone_key][:lines] << k if zones[zone_key]
+            end
+
+            opacity = (s1_cfg[:opacity] || s1_cfg["opacity"] || 0.90).to_f
+
+            # Расчет непересекающихся координат для зон каждого столбца (left/right)
+            col_boxes = {}
+            [:left, :right].each do |side|
+              col_x = (side == :right) ? s3_x : 0.0
+              col_w = (side == :right) ? s3_w : s1_w
+
+              has_top = !zones[:"#{side}_top"][:lines].empty?
+              has_mid = !zones[:"#{side}_center"][:lines].empty?
+              has_bot = !zones[:"#{side}_bottom"][:lines].empty?
+
+              if has_top && has_mid && has_bot
+                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 30.0]
+                col_boxes[:"#{side}_center"] = [col_x, 30.0, col_w, 34.0]
+                col_boxes[:"#{side}_bottom"] = [col_x, 64.0, col_w, 30.0]
+              elsif has_top && has_mid && !has_bot
+                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 36.0]
+                col_boxes[:"#{side}_center"] = [col_x, 36.0, col_w, 58.0]
+              elsif !has_top && has_mid && has_bot
+                col_boxes[:"#{side}_center"] = [col_x, 0.0,  col_w, 58.0]
+                col_boxes[:"#{side}_bottom"] = [col_x, 58.0, col_w, 36.0]
+              elsif !has_top && has_mid && !has_bot
+                col_boxes[:"#{side}_center"] = [col_x, 0.0,  col_w, 94.0]
+              elsif has_top && !has_mid && has_bot
+                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 58.0]
+                col_boxes[:"#{side}_bottom"] = [col_x, 58.0, col_w, 36.0]
+              elsif has_top && !has_mid && !has_bot
+                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 94.0]
+              elsif !has_top && !has_mid && has_bot
+                col_boxes[:"#{side}_bottom"] = [col_x, 0.0,  col_w, 94.0]
+              end
+            end
+
+            zones.each do |zone_key, z_data|
+              q_lines = z_data[:lines]
+              next if q_lines.empty?
+
+              target_slot = z_data[:target_slot]
+              coords = col_boxes[zone_key] || [0.0, 0.0, 25.0, 58.0]
+              bx = bounds.left + (bounds.width * (coords[0] / 100.0))
+              by = bounds.top - (bounds.height * (coords[1] / 100.0))
+              bw = bounds.width * (coords[2] / 100.0)
+              bh = bounds.height * (coords[3] / 100.0)
+
+              slot_box = {
+                x: bx,
+                y: by,
+                width: bw,
+                height: bh,
+                visible: true,
+                align: z_data[:align],
+                valign: z_data[:valign]
+              }
+
+
+              q_cfg = s1_cfg.dup
+              q_cfg[:lines] = q_lines
+              q_cfg[:align] = z_data[:align]
+              q_cfg[:valign] = z_data[:valign]
+
+              render_modular_slot_card(slot_box, "info_lines", q_cfg, opacity, target_slot)
+            end
+          end
+
+          # Отрисовка остальных слотов, если они видимы и не были обработаны
           slot_coords.each do |slot_id, defs|
+            next if handled_slots.include?(slot_id)
             next unless block_visible?(pt, slot_id)
 
             cfg = get_block_config(pt, slot_id)
@@ -263,6 +393,10 @@ module DN1Code
           valign = (cfg[:valign] || cfg["valign"] || "center").to_s.to_sym
           font_size = (cfg[:font_size] || cfg["font_size"] || 11.0).to_f
           lines = cfg[:lines] || cfg["lines"]
+          if lines.nil?
+            lines = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"]
+          end
+          return if lines.is_a?(Array) && lines.empty?
 
           if content == "custom_text"
             txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
@@ -365,12 +499,8 @@ module DN1Code
 
           active_rows = [1, 2, 3, 4, 5].select { |r| grouped_rows[r] && !grouped_rows[r].empty? }
 
-          if active_rows.empty?
-            grouped_rows[1] = [{ key: "furniture_name", text: furn, size: font_size, color: "0F172A" }]
-            grouped_rows[2] = [{ key: "place_address", text: place_addr, size: [font_size - 1.0, 8.0].max, color: "0F172A" }]
-            grouped_rows[3] = [{ key: "customer_or_company", text: cust_comp, size: [font_size - 1.0, 8.0].max, color: "0F172A" }]
-            active_rows = [1, 2, 3]
-          end
+          # Если все пункты отключены или нет данных для вывода — ничего не ставить на странице
+          return if active_rows.empty?
 
           align = :center
 
@@ -454,7 +584,8 @@ module DN1Code
 
         def render_modular_footer(pt, ftr_box)
           cfg = get_block_config(pt, :footer)
-          valign = (cfg[:valign] || cfg["valign"] || "center").to_s.to_sym
+          raw_valign = (cfg[:valign] || cfg["valign"] || "bottom").to_s
+          valign = (raw_valign == "top") ? :top : :bottom
           font_size = (cfg[:font_size] || cfg["font_size"] || 8.5).to_f
 
           @pdf_doc.fill_color "475569"
@@ -516,8 +647,8 @@ module DN1Code
           center_text = center_items.join("   |   ")
           right_text = right_items.join("   |   ")
 
-          y_pos = ftr_box[:y] - 2
-          h_pos = ftr_box[:height] - 4
+          y_pos = ftr_box[:y]
+          h_pos = ftr_box[:height]
           w_total = ftr_box[:width]
 
           # Адаптивный расчет ширины колонок в зависимости от наличия контента
@@ -580,7 +711,13 @@ module DN1Code
           align = :left if !is_right_slot && align == :right
 
           is_bottom_slot = [:slot_2, :slot_4, "slot_2", "slot_4"].include?(slot_id)
-          valign = is_bottom_slot ? :bottom : :top
+          raw_valign = cfg[:valign] || cfg["valign"]
+          valign = if raw_valign && !raw_valign.to_s.empty?
+                     v_sym = raw_valign.to_s.to_sym
+                     [:top, :center, :middle, :bottom].include?(v_sym) ? (v_sym == :middle ? :center : v_sym) : (is_bottom_slot ? :bottom : :top)
+                   else
+                     is_bottom_slot ? :bottom : :top
+                   end
 
           font_size = (cfg[:font_size] || cfg["font_size"] || 8.0).to_f
           title_size = [font_size + 1.5, 22.0].min
@@ -596,6 +733,12 @@ module DN1Code
               txt_box_h = [txt_h + 2.0, in_h].min
               target_top_y = [in_bottom_y + txt_box_h, in_y].min
               @pdf_doc.text_box txt, at: [in_x, target_top_y], width: in_w, height: txt_box_h, align: align, valign: :bottom, size: font_size, overflow: :shrink_to_fit
+            elsif valign == :center
+              txt_h = @pdf_doc.height_of(txt, width: in_w, size: font_size)
+              txt_box_h = [txt_h + 2.0, in_h].min
+              offset = [(in_h - txt_box_h) / 2.0, 0.0].max
+              target_top_y = in_y - offset
+              @pdf_doc.text_box txt, at: [in_x, target_top_y], width: in_w, height: txt_box_h, align: align, valign: :top, size: font_size, overflow: :shrink_to_fit
             else
               @pdf_doc.text_box txt, at: [in_x, in_y], width: in_w, height: in_h, align: align, valign: valign, size: font_size, overflow: :shrink_to_fit
             end
@@ -603,53 +746,86 @@ module DN1Code
           end
 
           items = []
+          line_aligns = cfg[:line_aligns] || cfg["line_aligns"] || {}
+          line_sizes = cfg[:line_font_sizes] || cfg["line_font_sizes"] || {}
+          line_colors = cfg[:line_colors] || cfg["line_colors"] || {}
+
           if lines && lines.is_a?(Array)
             lines.each do |line_key|
               line_text = resolve_info_line(line_key)
-              items << line_text if line_text && !line_text.empty?
+              next if line_text.nil? || line_text.to_s.empty?
+              k_str = line_key.to_s
+              k_sym = line_key.to_sym rescue nil
+
+              it_sz = (line_sizes[k_str] || (k_sym && line_sizes[k_sym]) || font_size).to_f
+              it_sz = font_size if it_sz <= 0.0
+
+              raw_col = (line_colors[k_str] || (k_sym && line_colors[k_sym]) || "334155").to_s.strip
+              it_col = raw_col.sub(/^#/, "")
+              it_col = "334155" if it_col.empty?
+
+              it_align = (line_aligns[k_str] || (k_sym && line_aligns[k_sym]) || align).to_s.to_sym
+              it_align = align unless [:left, :right, :center].include?(it_align)
+
+              items << {
+                key: k_str,
+                text: line_text,
+                size: it_sz,
+                color: it_col,
+                align: it_align
+              }
             end
           else
-            case content_type
-            when "project_card"
-              items = get_default_project_card_lines
-            when "customer_card"
-              items = get_default_customer_card_lines
-            when "workflow_status"
-              items = get_default_workflow_status_lines
-            when "history_table"
-              items = get_default_history_lines
-            when "materials_spec"
-              items = [@info[:materials].to_s.strip.empty? ? "Фасады, корпус, фурнитура..." : @info[:materials].to_s.strip]
-            when "appliances_spec"
-              items = [@info[:appliances].to_s.strip.empty? ? "Встраиваемая техника и приборы..." : @info[:appliances].to_s.strip]
-            when "lighting_spec"
-              items = [@info[:lighting].to_s.strip.empty? ? "LED подсветка и блоки питания..." : @info[:lighting].to_s.strip]
-            when "scene_notes"
-              desc = (@scene_item ? @scene_item.description : nil)
-              items = [(desc && !desc.empty?) ? desc : (@info[:notes].to_s.strip.empty? ? "Габаритные размеры и привязки..." : @info[:notes].to_s.strip)]
+            raw_lines = case content_type
+                        when "project_card"
+                          get_default_project_card_lines
+                        when "customer_card"
+                          get_default_customer_card_lines
+                        when "workflow_status"
+                          get_default_workflow_status_lines
+                        when "history_table"
+                          get_default_history_lines
+                        when "materials_spec"
+                          [@info[:materials].to_s.strip.empty? ? "Фасады, корпус, фурнитура..." : @info[:materials].to_s.strip]
+                        when "appliances_spec"
+                          [@info[:appliances].to_s.strip.empty? ? "Встраиваемая техника и приборы..." : @info[:appliances].to_s.strip]
+                        when "lighting_spec"
+                          [@info[:lighting].to_s.strip.empty? ? "LED подсветка и блоки питания..." : @info[:lighting].to_s.strip]
+                        when "scene_notes"
+                          desc = (@scene_item ? @scene_item.description : nil)
+                          [(desc && !desc.empty?) ? desc : (@info[:notes].to_s.strip.empty? ? "Габаритные размеры и привязки..." : @info[:notes].to_s.strip)]
+                        else
+                          []
+                        end
+            (raw_lines || []).each do |s|
+              items << { text: s, size: font_size, color: "334155", align: align } if s && !s.empty?
             end
           end
 
           return if items.empty?
 
-          @pdf_doc.fill_color "334155"
           Service::FontService.apply_style(@pdf_doc, :small)
 
           item_gap = 6.0
-          item_heights = items.map do |item_text|
-            [@pdf_doc.height_of(item_text, width: in_w, size: font_size) + 1.0, font_size + 2.0].max
+          item_heights = items.map do |it|
+            [@pdf_doc.height_of(it[:text], width: in_w, size: it[:size]) + 1.0, it[:size] + 2.0].max
           end
           total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
 
           cur_y = if valign == :bottom
                     [in_bottom_y + total_items_h, in_y].min
+                  elsif valign == :center
+                    offset = [(in_h - total_items_h) / 2.0, 0.0].max
+                    in_y - offset
                   else
                     in_y
                   end
 
-          items.each_with_index do |item_text, idx|
+          items.each_with_index do |it, idx|
             h = item_heights[idx]
-            @pdf_doc.text_box item_text, at: [in_x, cur_y], width: in_w, height: h, align: align, valign: :top, size: font_size, overflow: :shrink_to_fit
+            @pdf_doc.fill_color it[:color]
+            item_align = it[:align] || align
+            @pdf_doc.text_box it[:text], at: [in_x, cur_y], width: in_w, height: h, align: item_align, valign: :top, size: it[:size], overflow: :shrink_to_fit
             cur_y -= h
 
             if idx < items.size - 1
@@ -657,9 +833,9 @@ module DN1Code
               @pdf_doc.stroke_color "CBD5E1"
               @pdf_doc.line_width 0.5
               line_w = [in_w * 0.75, 120.0].min
-              lx = if align == :right
+              lx = if item_align == :right
                      in_x + in_w - line_w
-                   elsif align == :center
+                   elsif item_align == :center
                      in_x + (in_w - line_w) / 2.0
                    else
                      in_x

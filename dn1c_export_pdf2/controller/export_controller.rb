@@ -99,8 +99,7 @@ module DN1Code
               save_skp_backup
             end
 
-            # Увеличение ревизии и сохранение атрибутов
-            @project_data.increment_revision!("Экспорт PDF (#{File.basename(pdf_path)})")
+            # Сохранение атрибутов и YAML (история правок формируется только пользователем)
             @project_data.save_auto(@model) if @model
 
             progress_block&.call(total_pages, total_pages, "Экспорт успешно завершен!")

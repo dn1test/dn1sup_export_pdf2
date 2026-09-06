@@ -125,10 +125,7 @@ module DN1Code
             project_data = Model::ProjectData.new
             project_data.load_auto(model)
 
-            # Увеличиваем номер ревизии при открытии существующего рабочего файла проекта
-            project_data.increment_revision!("Открытие рабочего файла")
-            project_data.save_auto(model)
-
+            # Историю правок автоматически не создаем при открытии модели
             Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
 
             if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)

@@ -408,52 +408,74 @@ module DN1Code
           default_hdr_sizes = { "furniture_name" => 11.0, "place_address" => 10.0, "customer_or_company" => 10.0, "scene_name" => 11.0, "scene_description" => 9.0 }
           default_hdr_colors = { "furniture_name" => "#005EB0", "place_address" => "#0F172A", "customer_or_company" => "#0F172A", "scene_name" => "#005EB0", "scene_description" => "#475569" }
 
+          default_mid_lines = ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"]
+          default_mid_aligns = {
+            "toc_pages" => "left", "spec_materials" => "left", "spec_appliances" => "left", "general_notes" => "left",
+            "workflow_history" => "left", "workflow_stadia" => "left", "workflow_revision" => "left",
+            "workflow_version" => "left", "workflow_date" => "left", "articul" => "left"
+          }
+          default_mid_valigns = {
+            "toc_pages" => "top", "spec_materials" => "top", "spec_appliances" => "top", "general_notes" => "top",
+            "workflow_history" => "bottom", "workflow_stadia" => "bottom", "workflow_revision" => "bottom",
+            "workflow_version" => "bottom", "workflow_date" => "bottom", "articul" => "bottom"
+          }
+          default_mid_sizes = {
+            "toc_pages" => 8.0, "spec_materials" => 8.0, "spec_appliances" => 8.0, "general_notes" => 8.0,
+            "workflow_history" => 8.0, "workflow_stadia" => 8.0, "workflow_revision" => 8.0,
+            "workflow_version" => 8.0, "workflow_date" => 8.0, "articul" => 8.0
+          }
+          default_mid_colors = {
+            "toc_pages" => "#334155", "spec_materials" => "#334155", "spec_appliances" => "#334155", "general_notes" => "#334155",
+            "workflow_history" => "#334155", "workflow_stadia" => "#334155", "workflow_revision" => "#334155",
+            "workflow_version" => "#334155", "workflow_date" => "#334155", "articul" => "#334155"
+          }
+
           {
             cover: {
               header:      { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               cover_title: { x: 10.0, y: 15.0, w: 80.0, h: 12.0, visible: true, align: "center" },
-              image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport" },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
+              image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "left", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
             },
             description: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport" },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "left", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
             },
             explain: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport" },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
             },
             general: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport" },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
             },
             visual: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport" },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
             }
           }
         end
@@ -1427,6 +1449,10 @@ module DN1Code
                     @pdf_settings[:custom_layouts][page_key][slot_id][:line_font_sizes] ||= { "furniture_name" => 11.0, "place_address" => 10.0, "customer_or_company" => 10.0, "scene_name" => 11.0, "scene_description" => 9.0 }
                     @pdf_settings[:custom_layouts][page_key][slot_id][:line_colors] ||= { "furniture_name" => "#005EB0", "place_address" => "#0F172A", "customer_or_company" => "#0F172A", "scene_name" => "#005EB0", "scene_description" => "#475569" }
                   end
+                  if slot_id.to_s == "image_4_3"
+                    @pdf_settings[:custom_layouts][page_key][slot_id][:aspect_ratio] ||= "4:3"
+                    @pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] = (@pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] || 100).to_i
+                  end
                 end
               end
             end
@@ -1711,7 +1737,7 @@ module DN1Code
         # Увеличивает номер ревизии проекта (+1) и добавляет запись с таймштампом в историю
         # @param description [String] текстовое описание причины создания новой ревизии
         # @return [void]
-        def increment_revision!(description = "Экспорт в PDF")
+        def increment_revision!(description = "Экспорт в PDF", date_str = nil)
           rev_num = (@workflow[:revision].to_i rescue 0)
           rev_num = 1 if rev_num <= 0
           new_rev = rev_num + 1
@@ -1720,12 +1746,14 @@ module DN1Code
           @workflow[:revision]     = new_rev_str
           @project_info[:revision] = new_rev
 
-          now_str = Time.now.strftime("%Y-%m-%d %H:%M")
-          entry_text = "#{description} (rev. #{new_rev_str})"
+          now_str = date_str || Time.now.strftime("%Y-%m-%d %H:%M")
+          clean_desc = description.to_s.strip
+          clean_desc = "Правки" if clean_desc.empty?
+          entry_text = clean_desc.include?("(rev.") ? clean_desc : "#{clean_desc} (rev. #{new_rev_str})"
 
-          @workflow[:last_edit]     = description
-          @project_info[:last_edit] = description
-          @project_info[:edit]      = description
+          @workflow[:last_edit]     = clean_desc
+          @project_info[:last_edit] = clean_desc
+          @project_info[:edit]      = clean_desc
 
           @workflow[:history_edit] ||= []
           @workflow[:history_edit].unshift([now_str, entry_text])

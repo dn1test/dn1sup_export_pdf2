@@ -117,8 +117,7 @@ module DN1Code
               controller.send(:save_skp_backup)
             end
 
-            # 7. Увеличение ревизии и сохранение атрибутов
-            project_data.increment_revision!("Экспорт LayOut PDF (#{File.basename(pdf_path)})")
+            # 7. Сохранение атрибутов и YAML (история правок формируется только пользователем)
             project_data.save_auto(model) if model
 
             progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")

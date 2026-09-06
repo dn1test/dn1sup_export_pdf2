@@ -16,7 +16,30 @@
     lastExportedPdf: ""
   };
 
-  // 7 Standard Layout Zones (matching user diagram)
+  const DEFAULT_MIDDLE_ALIGNS = {
+    toc_pages: "left", spec_materials: "left", spec_appliances: "left", general_notes: "left",
+    workflow_history: "left", workflow_stadia: "left", workflow_revision: "left",
+    workflow_version: "left", workflow_date: "left", articul: "left"
+  };
+
+  const DEFAULT_MIDDLE_VALIGNS = {
+    toc_pages: "top", spec_materials: "top", spec_appliances: "top", general_notes: "top",
+    workflow_history: "bottom", workflow_stadia: "bottom", workflow_revision: "bottom",
+    workflow_version: "bottom", workflow_date: "bottom", articul: "bottom"
+  };
+
+  const DEFAULT_MIDDLE_SIZES = {
+    toc_pages: 8, spec_materials: 8, spec_appliances: 8, general_notes: 8,
+    workflow_history: 8, workflow_stadia: 8, workflow_revision: 8,
+    workflow_version: 8, workflow_date: 8, articul: 8
+  };
+
+  const DEFAULT_MIDDLE_COLORS = {
+    toc_pages: "#334155", spec_materials: "#334155", spec_appliances: "#334155", general_notes: "#334155",
+    workflow_history: "#334155", workflow_stadia: "#334155", workflow_revision: "#334155",
+    workflow_version: "#334155", workflow_date: "#334155", articul: "#334155"
+  };
+
   // 7 Standard Layout Zones (matching user sketch wireframe)
   const FIXED_SLOT_DEFS = [
     {
@@ -25,6 +48,8 @@
       icon: "🖼️",
       slot_class: "slot-image-4-3",
       x: 0.0, y: 0.0, w: 100.0, h: 100.0,
+      aspect_ratio: "4:3",
+      scale_pct: 100,
       is_image: true
     },
     {
@@ -44,7 +69,11 @@
       icon: "⬛",
       slot_class: "slot-1",
       x: 0.0, y: 0.0, w: 25.0, h: 58.0,
-      default_lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"]
+      default_lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
+      default_line_aligns: Object.assign({}, DEFAULT_MIDDLE_ALIGNS),
+      default_line_valigns: Object.assign({}, DEFAULT_MIDDLE_VALIGNS),
+      default_line_font_sizes: Object.assign({}, DEFAULT_MIDDLE_SIZES),
+      default_line_colors: Object.assign({}, DEFAULT_MIDDLE_COLORS)
     },
     {
       id: "slot_3",
@@ -205,66 +234,79 @@
     opacity: 0.95
   };
 
+  const DEFAULT_MIDDLE_SLOT = {
+    visible: true,
+    align: "left",
+    valign: "top",
+    font_size: 8,
+    lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
+    line_aligns: Object.assign({}, DEFAULT_MIDDLE_ALIGNS),
+    line_valigns: Object.assign({}, DEFAULT_MIDDLE_VALIGNS),
+    line_font_sizes: Object.assign({}, DEFAULT_MIDDLE_SIZES),
+    line_colors: Object.assign({}, DEFAULT_MIDDLE_COLORS),
+    opacity: 0.9
+  };
+
   // Default block configurations for each page template
   const DEFAULT_LAYOUTS = {
     cover: {
       name: "Титульный лист (Cover)",
       slots: {
         header:    Object.assign({}, DEFAULT_HEADER_SLOT),
-        image_4_3: { visible: true },
-        slot_1:    { visible: true,  align: "left",   valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
+        image_4_3: { visible: true, aspect_ratio: "4:3", scale_pct: 100 },
+        slot_1:    Object.assign({}, DEFAULT_MIDDLE_SLOT),
         slot_2:    { visible: true,  align: "left",   valign: "bottom", font_size: 8,  lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
         slot_3:    { visible: true,  align: "right",  valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
         slot_4:    { visible: true,  align: "right",  valign: "bottom", font_size: 8,  lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
-        footer:    { visible: true,  align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
+        footer:    { visible: true,  align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
       }
     },
     description: {
       name: "Описание и спецификации (Description)",
       slots: {
         header:    Object.assign({}, DEFAULT_HEADER_SLOT),
-        image_4_3: { visible: true },
-        slot_1:    { visible: true,  align: "left",   valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
+        image_4_3: { visible: true, aspect_ratio: "4:3", scale_pct: 100 },
+        slot_1:    Object.assign({}, DEFAULT_MIDDLE_SLOT),
         slot_2:    { visible: true,  align: "left",   valign: "bottom", font_size: 8,  lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
         slot_3:    { visible: true,  align: "right",  valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
         slot_4:    { visible: true,  align: "right",  valign: "bottom", font_size: 8,  lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
-        footer:    { visible: true,  align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
+        footer:    { visible: true,  align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
       }
     },
     explain: {
       name: "Содержание и ведомость (Explain)",
       slots: {
         header:    Object.assign({}, DEFAULT_HEADER_SLOT),
-        image_4_3: { visible: true },
-        slot_1:    { visible: true,  align: "left",   valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
+        image_4_3: { visible: true, aspect_ratio: "4:3", scale_pct: 100 },
+        slot_1:    Object.assign({}, DEFAULT_MIDDLE_SLOT),
         slot_2:    { visible: false, align: "left",   valign: "bottom", font_size: 8,  lines: [], opacity: 0.9 },
         slot_3:    { visible: true,  align: "right",  valign: "top",    font_size: 8,  lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"], opacity: 0.9 },
         slot_4:    { visible: false, align: "right",  valign: "bottom", font_size: 8,  lines: [], opacity: 0.9 },
-        footer:    { visible: true,  align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
+        footer:    { visible: true,  align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
       }
     },
     general: {
       name: "Общий вид (General)",
       slots: {
         header:    Object.assign({}, DEFAULT_HEADER_SLOT),
-        image_4_3: { visible: true },
-        slot_1:    { visible: false, align: "left",   valign: "top",    font_size: 8,  lines: [], opacity: 0.88 },
+        image_4_3: { visible: true, aspect_ratio: "4:3", scale_pct: 100 },
+        slot_1:    Object.assign({}, DEFAULT_MIDDLE_SLOT, { visible: false, lines: [], opacity: 0.88 }),
         slot_2:    { visible: false, align: "left",   valign: "bottom", font_size: 8,  lines: [], opacity: 0.88 },
         slot_3:    { visible: false, align: "right",  valign: "top",    font_size: 8,  lines: [], opacity: 0.88 },
         slot_4:    { visible: true,  align: "right",  valign: "bottom", font_size: 8,  lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-        footer:    { visible: true,  align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
+        footer:    { visible: true,  align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
       }
     },
     visual: {
       name: "Визуализация (Visual)",
       slots: {
         header:    Object.assign({}, DEFAULT_HEADER_SLOT),
-        image_4_3: { visible: true },
-        slot_1:    { visible: false, align: "left",   valign: "top",    font_size: 8,  lines: [], opacity: 0.88 },
+        image_4_3: { visible: true, aspect_ratio: "4:3", scale_pct: 100 },
+        slot_1:    Object.assign({}, DEFAULT_MIDDLE_SLOT, { visible: false, lines: [], opacity: 0.88 }),
         slot_2:    { visible: false, align: "left",   valign: "bottom", font_size: 8,  lines: [], opacity: 0.88 },
         slot_3:    { visible: false, align: "right",  valign: "top",    font_size: 8,  lines: [], opacity: 0.88 },
         slot_4:    { visible: false, align: "right",  valign: "bottom", font_size: 8,  lines: [], opacity: 0.88 },
-        footer:    { visible: true,  align: "center", valign: "center", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
+        footer:    { visible: true,  align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
       }
     }
   };
@@ -384,7 +426,17 @@
     successModal: document.getElementById("successModal"),
     successPdfPath: document.getElementById("successPdfPath"),
     btnOpenPdfFolder: document.getElementById("btnOpenPdfFolder"),
-    btnCloseSuccessModal: document.getElementById("btnCloseSuccessModal")
+    btnCloseSuccessModal: document.getElementById("btnCloseSuccessModal"),
+
+    // Revision Prompt Modal
+    revisionPromptModal: document.getElementById("revisionPromptModal"),
+    revPromptDateTime: document.getElementById("revPromptDateTime"),
+    revPromptCurrentRev: document.getElementById("revPromptCurrentRev"),
+    revPromptNextRev: document.getElementById("revPromptNextRev"),
+    inputRevisionNote: document.getElementById("inputRevisionNote"),
+    btnConfirmRevisionExport: document.getElementById("btnConfirmRevisionExport"),
+    btnSkipRevisionExport: document.getElementById("btnSkipRevisionExport"),
+    btnCancelExportModal: document.getElementById("btnCancelExportModal")
   };
 
   // SketchUp Bridge Helper
@@ -525,6 +577,7 @@
         const defLineFontSizes = defSlot.line_font_sizes ? Object.assign({}, defSlot.line_font_sizes) : (slotDef.default_line_font_sizes ? Object.assign({}, slotDef.default_line_font_sizes) : null);
         const defLineColors = defSlot.line_colors ? Object.assign({}, defSlot.line_colors) : (slotDef.default_line_colors ? Object.assign({}, slotDef.default_line_colors) : null);
         const defLineAligns = defSlot.line_aligns ? Object.assign({}, defSlot.line_aligns) : (slotDef.default_line_aligns ? Object.assign({}, slotDef.default_line_aligns) : null);
+        const defLineValigns = defSlot.line_valigns ? Object.assign({}, defSlot.line_valigns) : (slotDef.default_line_valigns ? Object.assign({}, slotDef.default_line_valigns) : null);
 
         if (!current) {
           state.pdf_settings.custom_layouts[tplKey][slotDef.id] = {
@@ -533,15 +586,22 @@
             custom_text: defSlot.custom_text || "",
             align: defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left"),
             font_size: defFontSize,
+            aspect_ratio: defSlot.aspect_ratio || slotDef.aspect_ratio || "4:3",
+            scale_pct: defSlot.scale_pct !== undefined ? defSlot.scale_pct : (slotDef.scale_pct !== undefined ? slotDef.scale_pct : 100),
             lines: defLines,
             line_rows: defLineRows,
             line_font_sizes: defLineFontSizes,
             line_colors: defLineColors,
             line_aligns: defLineAligns,
+            line_valigns: defLineValigns,
             opacity: defSlot.opacity !== undefined ? defSlot.opacity : 0.9
           };
         } else {
           if (current.visible === undefined) current.visible = defSlot.visible !== false;
+          if (slotDef.id === "image_4_3") {
+            if (!current.aspect_ratio) current.aspect_ratio = defSlot.aspect_ratio || "4:3";
+            if (current.scale_pct === undefined) current.scale_pct = defSlot.scale_pct !== undefined ? defSlot.scale_pct : 100;
+          }
           if (!current.content || (current.content === "none" && defSlot.content && defSlot.content !== "none" && !current.explicit_none)) {
             current.content = defContent;
           }
@@ -549,9 +609,24 @@
           if (current.font_size === undefined) current.font_size = defFontSize;
           if (!current.lines) current.lines = defLines;
           if (slotDef.id === "header") {
+            const ALLOWED_HDR_KEYS = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"];
+            if (Array.isArray(current.lines)) {
+              const hasAnyAllowed = current.lines.some((k) => ALLOWED_HDR_KEYS.includes(k));
+              if (!hasAnyAllowed && current.lines.length > 0) {
+                current.lines = [...ALLOWED_HDR_KEYS];
+              } else {
+                current.lines = current.lines.filter((k) => ALLOWED_HDR_KEYS.includes(k));
+              }
+            }
             if (!current.line_rows) current.line_rows = defLineRows;
             if (!current.line_font_sizes) current.line_font_sizes = defLineFontSizes;
             if (!current.line_colors) current.line_colors = defLineColors;
+          }
+          if (slotDef.id === "slot_1") {
+            if (!current.line_aligns) current.line_aligns = defLineAligns ? Object.assign({}, defLineAligns) : Object.assign({}, DEFAULT_MIDDLE_ALIGNS);
+            if (!current.line_valigns) current.line_valigns = defLineValigns ? Object.assign({}, defLineValigns) : Object.assign({}, DEFAULT_MIDDLE_VALIGNS);
+            if (!current.line_font_sizes) current.line_font_sizes = defLineFontSizes ? Object.assign({}, defLineFontSizes) : Object.assign({}, DEFAULT_MIDDLE_SIZES);
+            if (!current.line_colors) current.line_colors = defLineColors ? Object.assign({}, defLineColors) : Object.assign({}, DEFAULT_MIDDLE_COLORS);
           }
           if (slotDef.id === "footer" && !current.line_aligns) current.line_aligns = defLineAligns;
           if (current.opacity === undefined) current.opacity = defSlot.opacity !== undefined ? defSlot.opacity : 0.9;
@@ -562,7 +637,7 @@
 
   function getActiveLayoutBlocks() {
     ensureCustomLayouts();
-    const tplKey = layoutState.currentTemplate;
+    const tplKey = layoutState.currentTemplate || "cover";
     const tplDefaults = (DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS.cover).slots || {};
     const customTpl = state.pdf_settings.custom_layouts[tplKey] || {};
 
@@ -575,6 +650,7 @@
       const defaultLineFontSizes = defSlot.line_font_sizes || slotDef.default_line_font_sizes || null;
       const defaultLineColors = defSlot.line_colors || slotDef.default_line_colors || null;
       const defaultLineAligns = defSlot.line_aligns || slotDef.default_line_aligns || null;
+      const defaultLineValigns = defSlot.line_valigns || slotDef.default_line_valigns || null;
 
       let customX = custom.x !== undefined ? parseFloat(custom.x) : (defSlot.x !== undefined ? parseFloat(defSlot.x) : slotDef.x);
       let customY = custom.y !== undefined ? parseFloat(custom.y) : (defSlot.y !== undefined ? parseFloat(defSlot.y) : slotDef.y);
@@ -601,11 +677,14 @@
         custom_text: custom.custom_text !== undefined ? custom.custom_text : (defSlot.custom_text || ""),
         align: custom.align || defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : (slotDef.id === "slot_3" || slotDef.id === "slot_4" ? "right" : "left")),
         font_size: custom.font_size !== undefined ? custom.font_size : (defSlot.font_size !== undefined ? defSlot.font_size : (slotDef.id === "header" ? 11 : (slotDef.id === "footer" ? 8.5 : 8))),
+        aspect_ratio: custom.aspect_ratio || defSlot.aspect_ratio || slotDef.aspect_ratio || "4:3",
+        scale_pct: custom.scale_pct !== undefined ? custom.scale_pct : (defSlot.scale_pct !== undefined ? defSlot.scale_pct : (slotDef.scale_pct !== undefined ? slotDef.scale_pct : 100)),
         lines: custom.lines ? [...custom.lines] : (defSlot.lines ? [...defSlot.lines] : [...defaultLines]),
         line_rows: custom.line_rows ? Object.assign({}, custom.line_rows) : (defaultLineRows ? Object.assign({}, defaultLineRows) : null),
         line_font_sizes: custom.line_font_sizes ? Object.assign({}, custom.line_font_sizes) : (defaultLineFontSizes ? Object.assign({}, defaultLineFontSizes) : null),
         line_colors: custom.line_colors ? Object.assign({}, custom.line_colors) : (defaultLineColors ? Object.assign({}, defaultLineColors) : null),
         line_aligns: custom.line_aligns ? Object.assign({}, custom.line_aligns) : (defaultLineAligns ? Object.assign({}, defaultLineAligns) : null),
+        line_valigns: custom.line_valigns ? Object.assign({}, custom.line_valigns) : (defaultLineValigns ? Object.assign({}, defaultLineValigns) : null),
         opacity: custom.opacity !== undefined ? custom.opacity : (defSlot.opacity !== undefined ? defSlot.opacity : 0.9),
         content_options: slotDef.content_options || null
       };
@@ -617,9 +696,26 @@
     return blocks.find((b) => b.id === blockId) || null;
   }
 
+  function ensureMiddleSlotDefaults(targetTpl) {
+    ensureCustomLayouts();
+    const tplKey = targetTpl || layoutState.currentTemplate || "cover";
+    if (!state.pdf_settings.custom_layouts[tplKey]) {
+      state.pdf_settings.custom_layouts[tplKey] = {};
+    }
+    if (!state.pdf_settings.custom_layouts[tplKey].slot_1) {
+      state.pdf_settings.custom_layouts[tplKey].slot_1 = Object.assign({}, DEFAULT_MIDDLE_SLOT);
+    }
+    const s1 = state.pdf_settings.custom_layouts[tplKey].slot_1;
+    if (!s1.line_aligns) s1.line_aligns = Object.assign({}, DEFAULT_MIDDLE_ALIGNS);
+    if (!s1.line_valigns) s1.line_valigns = Object.assign({}, DEFAULT_MIDDLE_VALIGNS);
+    if (!s1.line_font_sizes) s1.line_font_sizes = Object.assign({}, DEFAULT_MIDDLE_SIZES);
+    if (!s1.line_colors) s1.line_colors = Object.assign({}, DEFAULT_MIDDLE_COLORS);
+    return s1;
+  }
+
   function updateBlockSlot(blockId, updates) {
     ensureCustomLayouts();
-    const tplKey = layoutState.currentTemplate;
+    const tplKey = layoutState.currentTemplate || "cover";
     if (!state.pdf_settings.custom_layouts[tplKey]) {
       state.pdf_settings.custom_layouts[tplKey] = {};
     }
@@ -680,10 +776,12 @@
       if (!blk.visible || blk.content === "none") {
         return `<div class="block-image-placeholder" style="opacity: 0.4;"><span>⚪ Видовой экран отключен</span></div>`;
       }
+      const ratioLabel = blk.aspect_ratio || "4:3";
+      const scaleLabel = blk.scale_pct !== undefined ? blk.scale_pct : 100;
       return `
         <div class="block-image-placeholder">
-          <div class="image-aspect-badge">📐 4:3 РЕНДЕР МОДЕЛИ</div>
-          <div class="image-subnote">Центральный видовой экран сцены SketchUp</div>
+          <div class="image-aspect-badge">📐 ${ratioLabel} РЕНДЕР МОДЕЛИ (${scaleLabel}%)</div>
+          <div class="image-subnote">Видовой экран сцены SketchUp под текстом</div>
         </div>
       `;
     }
@@ -772,11 +870,7 @@
       });
 
       if (renderedLines.length === 0) {
-        renderedLines.push([
-          { text: sampleFurn, size: fontSize, color: "#005EB0" },
-          { text: [sampleRoom, sampleAddr].filter(Boolean).join(" | "), size: Math.max(7, fontSize - 1), color: "#0F172A" },
-          { text: sampleCust, size: Math.max(7, fontSize - 1), color: "#0F172A" }
-        ]);
+        return "";
       }
 
       const linesHtml = renderedLines.map((rowItems, idx) => {
@@ -842,7 +936,7 @@
       }
 
       return `
-        <div style="font-size: ${fontSize}px; color: #64748B; font-stretch: extra-condensed; letter-spacing: -0.025em; display: flex; justify-content: space-between; align-items: center; width: 100%; height: 100%; overflow: hidden; white-space: nowrap; padding: 0 4px; box-sizing: border-box; gap: 8px;">
+        <div style="font-size: ${fontSize}px; color: #64748B; font-stretch: extra-condensed; letter-spacing: -0.025em; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; height: 100%; overflow: hidden; white-space: nowrap; padding: 0 4px; box-sizing: border-box; gap: 8px;">
           <div style="flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${leftItems.join("   |   ")}</div>
           <div style="flex: 1.2; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${centerItems.join("   |   ")}</div>
           <div style="flex: 0.8; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${rightItems.join("   |   ")}</div>
@@ -878,13 +972,17 @@
 
     // Build rendered lines
     let renderedLinesHtml = "";
+    const lineFontSizes = blk.line_font_sizes || {};
+    const lineColors = blk.line_colors || {};
     if (activeLines.length > 0) {
       renderedLinesHtml = activeLines.map((lineKey) => {
         const lineDef = AVAILABLE_INFO_LINES.find((l) => l.key === lineKey);
         if (!lineDef) return "";
         const val = lineDef.getVal(info, wf);
         if (!val && val !== 0) return "";
-        return `<div><b>${lineDef.label}:</b> ${val}</div>`;
+        const itFs = parseFloat(lineFontSizes[lineKey]) || fontSize;
+        const itCol = (lineColors[lineKey] || "#334155").trim();
+        return `<div style="font-size: ${itFs}px; color: ${itCol}; line-height: 1.35;"><b>${lineDef.label}:</b> ${val}</div>`;
       }).filter(Boolean).join("");
     }
 
@@ -912,6 +1010,7 @@
   const HEADER_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 46, 52];
   const BLOCK_FONT_SIZES = [8, 10, 12, 14, 16, 18];
   const HEADER_LINE_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 46, 52];
+  const MIDDLE_LINE_FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16];
   const HEADER_COLOR_PALETTE = [
     { value: "#005EB0", label: "Синий фирменный", dot: "🔵" },
     { value: "#0F172A", label: "Темный графит",   dot: "⚫" },
@@ -1087,6 +1186,26 @@
       `;
     };
 
+    const headerAvailableLines = [
+      { key: "furniture_name", label: "🏷️ Название мебели / Изделие", preview: sampleFurn, row: rowFurn, size: sizeFurn, color: colFurn }, // data-key="furniture_name"
+      { key: "place_address", label: "🚪 Место установки | 📍 Адрес объекта", preview: `${sampleRoom} | ${sampleAddr}`, row: rowPlace, size: sizePlace, color: colPlace }, // data-key="place_address"
+      { key: "customer_or_company", label: "👤 Имя заказчика или 🏢 Компания", preview: sampleCust, row: rowCust, size: sizeCust, color: colCust }, // data-key="customer_or_company"
+      { key: "scene_name", label: "📐 Название Сцены", preview: sampleSceneName, row: rowSceneName, size: sizeSceneName, color: colSceneName }, // data-key="scene_name"
+      { key: "scene_description", label: "📝 Описание Сцены", preview: sampleSceneDesc || 'нет описания', row: rowSceneDesc, size: sizeSceneDesc, color: colSceneDesc } // data-key="scene_description"
+    ];
+
+    const savedHeaderOrder = Array.isArray(header.item_order) ? header.item_order : [];
+    const orderedHeaderLines = [...headerAvailableLines].sort((a, b) => {
+      let idxA = savedHeaderOrder.indexOf(a.key);
+      let idxB = savedHeaderOrder.indexOf(b.key);
+      if (idxA === -1 && idxB === -1) {
+        return (a.row || 0) - (b.row || 0);
+      }
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+
     const cardHeaderHtml = `
       <div class="tpl-card tpl-panel-left ${!isHeaderVis ? 'disabled-card disabled-block' : ''}" id="card_header">
         <div class="tpl-card-header">
@@ -1120,46 +1239,17 @@
               </div>
             </div>
             <div class="tpl-lines-checklist">
-              <div class="tpl-line-item tpl-hdr-line-row">
-                <label class="tpl-hdr-label-wrap">
-                  <input type="checkbox" class="chk-hdr-line" data-key="furniture_name" ${headerLines.includes("furniture_name") ? 'checked' : ''}>
-                  <span class="tpl-line-label">🏷️ Название мебели / Изделие</span>
-                  <span class="tpl-line-preview">(${sampleFurn})</span>
-                </label>
-                ${renderHdrItemControls("furniture_name", rowFurn, sizeFurn, colFurn)}
-              </div>
-              <div class="tpl-line-item tpl-hdr-line-row">
-                <label class="tpl-hdr-label-wrap">
-                  <input type="checkbox" class="chk-hdr-line" data-key="place_address" ${headerLines.includes("place_address") ? 'checked' : ''}>
-                  <span class="tpl-line-label">🚪 Место установки | 📍 Адрес объекта</span>
-                  <span class="tpl-line-preview">(${sampleRoom} | ${sampleAddr})</span>
-                </label>
-                ${renderHdrItemControls("place_address", rowPlace, sizePlace, colPlace)}
-              </div>
-              <div class="tpl-line-item tpl-hdr-line-row">
-                <label class="tpl-hdr-label-wrap">
-                  <input type="checkbox" class="chk-hdr-line" data-key="customer_or_company" ${headerLines.includes("customer_or_company") ? 'checked' : ''}>
-                  <span class="tpl-line-label">👤 Имя заказчика или 🏢 Компания</span>
-                  <span class="tpl-line-preview">(${sampleCust})</span>
-                </label>
-                ${renderHdrItemControls("customer_or_company", rowCust, sizeCust, colCust)}
-              </div>
-              <div class="tpl-line-item tpl-hdr-line-row">
-                <label class="tpl-hdr-label-wrap">
-                  <input type="checkbox" class="chk-hdr-line" data-key="scene_name" ${headerLines.includes("scene_name") ? 'checked' : ''}>
-                  <span class="tpl-line-label">📐 Название Сцены</span>
-                  <span class="tpl-line-preview">(${sampleSceneName})</span>
-                </label>
-                ${renderHdrItemControls("scene_name", rowSceneName, sizeSceneName, colSceneName)}
-              </div>
-              <div class="tpl-line-item tpl-hdr-line-row">
-                <label class="tpl-hdr-label-wrap">
-                  <input type="checkbox" class="chk-hdr-line" data-key="scene_description" ${headerLines.includes("scene_description") ? 'checked' : ''}>
-                  <span class="tpl-line-label">📝 Описание Сцены</span>
-                  <span class="tpl-line-preview">(${sampleSceneDesc || 'нет описания'})</span>
-                </label>
-                ${renderHdrItemControls("scene_description", rowSceneDesc, sizeSceneDesc, colSceneDesc)}
-              </div>
+              ${orderedHeaderLines.map((item) => `
+                <div class="tpl-line-item tpl-hdr-line-row" draggable="true" data-key="${item.key}">
+                  <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
+                  <label class="tpl-hdr-label-wrap">
+                    <input type="checkbox" class="chk-hdr-line" data-key="${item.key}" ${headerLines.includes(item.key) ? 'checked' : ''}>
+                    <span class="tpl-line-label">${item.label}</span>
+                    <span class="tpl-line-preview">(${item.preview})</span>
+                  </label>
+                  ${renderHdrItemControls(item.key, item.row, item.size, item.color)}
+                </div>
+              `).join("")}
             </div>
           </div>
         </div>
@@ -1167,7 +1257,154 @@
     `;
 
     // -------------------------------------------------------------
-    // CARD 2: ПОДВАЛ СТРАНИЦЫ (Footer) - Right Column Row 1
+    // CARD 2: СРЕДНИЙ БЛОК (Middle)
+    // -------------------------------------------------------------
+    const isMiddleVis = slot1.visible !== false;
+    const middleFontSize = slot1.font_size !== undefined ? parseFloat(slot1.font_size) : 8;
+    const middleLines = Array.isArray(slot1.lines) ? slot1.lines : (DEFAULT_LINES_BY_CONTENT.slot_1 || []);
+    const middleLineAligns = slot1.line_aligns || {};
+    const middleLineValigns = slot1.line_valigns || {};
+    const middleLineFontSizes = slot1.line_font_sizes || {};
+    const middleLineColors = slot1.line_colors || {};
+
+    const getMidAlign = (k, def = "left") => {
+      const val = (middleLineAligns[k] || "").trim();
+      return (val === "right" || val === "left") ? val : def;
+    };
+    const getMidValign = (k, def = "top") => {
+      const val = (middleLineValigns[k] || "").trim();
+      return (val === "bottom" || val === "center" || val === "top") ? val : def;
+    };
+    const getMidSize = (k, def = middleFontSize || 8) => {
+      const val = parseFloat(middleLineFontSizes[k]);
+      return (!isNaN(val) && val > 0) ? val : def;
+    };
+    const getMidColor = (k, def = "#334155") => {
+      const val = (middleLineColors[k] || "").trim();
+      return val || def;
+    };
+
+    const middleAvailableLines = [
+      { key: "toc_pages",         label: "📑 Содержание (список страниц)", val: "1. Титул, 2. План" },
+      { key: "spec_materials",    label: "🛠️ Материалы и фурнитура",      val: "МДФ, Blum, эмаль" },
+      { key: "spec_appliances",   label: "🔌 Техника и подсветка",        val: "LED 4000K, Вытяжка" },
+      { key: "general_notes",     label: "📝 Общие пояснения",            val: "Замеры выполнены" },
+      { key: "workflow_history",  label: "📜 История правок",             val: (wf.last_edit || "Корректировка фасадов").trim() },
+      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (info.stadia || "РД").trim() },
+      { key: "workflow_revision", label: "🔢 Ревизия",                   val: (wf.revision || "001").trim() },
+      { key: "workflow_version",  label: "🏷️ Версия",                    val: (wf.version || "01").trim() },
+      { key: "workflow_date",     label: "📅 Дата",                      val: (wf.date_order || new Date().toISOString().slice(0, 10)).trim() },
+      { key: "articul",           label: "🔖 Артикул проекта",           val: (info.articul || "CF#...").trim() }
+    ];
+
+    const renderMiddleItemControls = (key, activeAlign, activeValign, activeSize, activeColor) => {
+      let sizeOptions = "";
+      let matched = false;
+      const roundedSize = Math.round(activeSize);
+      MIDDLE_LINE_FONT_SIZES.forEach((sz) => {
+        const isSel = (roundedSize === sz);
+        if (isSel) matched = true;
+        sizeOptions += `<option value="${sz}" ${isSel ? 'selected' : ''}>${sz} pt</option>`;
+      });
+      if (!matched && activeSize) {
+        sizeOptions += `<option value="${activeSize}" selected>${activeSize} pt</option>`;
+      }
+
+      return `
+        <div class="tpl-middle-item-controls" data-key="${key}">
+          <div class="tpl-btn-group tpl-middle-edge-group" data-key="${key}" title="Край страницы: слева / справа">
+            <button type="button" class="tpl-btn-align tpl-btn-middle-edge ${activeAlign === 'left' ? 'active' : ''}" data-key="${key}" data-align="left" title="По левому краю страницы">⇤</button>
+            <button type="button" class="tpl-btn-align tpl-btn-middle-edge ${activeAlign === 'right' ? 'active' : ''}" data-key="${key}" data-align="right" title="По правому краю страницы">⇥</button>
+          </div>
+          <div class="tpl-btn-group tpl-middle-valign-group" data-key="${key}" title="По высоте: сверху / середина / снизу">
+            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'top' ? 'active' : ''}" data-key="${key}" data-valign="top" title="Сверху">⬆</button>
+            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'center' ? 'active' : ''}" data-key="${key}" data-valign="center" title="По центру (середина)">↕</button>
+            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'bottom' ? 'active' : ''}" data-key="${key}" data-valign="bottom" title="Снизу">⬇</button>
+          </div>
+          <div class="tpl-hdr-param-box tpl-middle-param-size" title="Размер шрифта строки (пт)">
+            <select class="tpl-hdr-select sel-middle-line-size" data-key="${key}">
+              ${sizeOptions}
+            </select>
+          </div>
+          <div class="tpl-hdr-param-box tpl-middle-param-color" title="Цвет текста строки">
+            <input type="color" class="inp-hdr-line-color inp-middle-line-color" data-key="${key}" value="${activeColor || '#334155'}" title="Цвет текста">
+          </div>
+        </div>
+      `;
+    };
+
+    const savedMiddleOrder = Array.isArray(slot1.item_order) ? slot1.item_order : [];
+    const orderedMiddleLines = [...middleAvailableLines].sort((a, b) => {
+      let idxA = savedMiddleOrder.indexOf(a.key);
+      let idxB = savedMiddleOrder.indexOf(b.key);
+      if (idxA === -1 && idxB === -1) return 0;
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+
+    const cardMiddleHtml = `
+      <div class="tpl-card tpl-panel-left ${!isMiddleVis ? 'disabled-card disabled-block' : ''}" id="card_middle" data-slot="slot_1">
+        <div class="tpl-card-header">
+          <div class="tpl-card-title-group">
+            <span class="tpl-card-icon">📋</span>
+            <span class="tpl-card-title">Средний блок</span>
+          </div>
+          <div class="tpl-card-header-actions">
+            <div class="tpl-footer-font-control">
+              <span class="tpl-footer-font-label">Шрифт:</span>
+              <select class="form-control tpl-control-select sel-slot-fontsize" data-slot="slot_1">
+                ${renderFontSizeOptions(middleFontSize, MIDDLE_LINE_FONT_SIZES, 8)}
+              </select>
+            </div>
+            <div style="display: flex; gap: 3px; margin-right: 4px;">
+              <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Все</button>
+              <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Снять</button>
+            </div>
+            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
+              <input type="checkbox" class="chk-slot-visible" data-slot="slot_1" ${isMiddleVis ? 'checked' : ''}>
+              <span>Вкл</span>
+            </label>
+          </div>
+        </div>
+        <div class="tpl-card-body">
+          <div>
+            <div class="tpl-middle-columns-header">
+              <span class="tpl-middle-col-title-lines">Выводимые строки среднего блока:</span>
+              <div class="tpl-middle-col-titles">
+                <span class="tpl-middle-col-title col-edge" title="Выравнивание: по левому / правому краю страницы">⇤ / ⇥</span>
+                <span class="tpl-middle-col-title col-valign" title="По высоте: сверху / середина / снизу">⬆ ↕ ⬇</span>
+                <span class="tpl-middle-col-title col-size" title="Размер шрифта (пт)">Aa</span>
+                <span class="tpl-middle-col-title col-color" title="Цвет текста">🎨</span>
+              </div>
+            </div>
+            <div class="tpl-lines-checklist">
+              ${orderedMiddleLines.map(item => {
+                const align = getMidAlign(item.key, "left");
+                const valign = getMidValign(item.key, "top");
+                const size = getMidSize(item.key, middleFontSize);
+                const color = getMidColor(item.key, "#334155");
+                const isChecked = middleLines.includes(item.key);
+                return `
+                  <div class="tpl-line-item tpl-middle-line-row" draggable="true" data-key="${item.key}">
+                    <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
+                    <label class="tpl-middle-label-wrap">
+                      <input type="checkbox" class="chk-slot-line" data-slot="slot_1" data-key="${item.key}" ${isChecked ? 'checked' : ''}>
+                      <span class="tpl-line-label">${item.label}</span>
+                      ${item.val ? `<span class="tpl-line-preview">(${item.val})</span>` : ''}
+                    </label>
+                    ${renderMiddleItemControls(item.key, align, valign, size, color)}
+                  </div>
+                `;
+              }).join("")}
+            </div>
+          </div>
+        </div>
+      </div>
+    `;
+
+    // -------------------------------------------------------------
+    // CARD 3: ПОДВАЛ СТРАНИЦЫ (Footer)
     // -------------------------------------------------------------
     const footerLines = Array.isArray(footer.lines) ? footer.lines : ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"];
     let effectiveFooterLines = [...footerLines];
@@ -1229,6 +1466,16 @@
       }
     ];
 
+    const savedFooterOrder = Array.isArray(footer.item_order) ? footer.item_order : [];
+    const orderedFooterLines = [...footerItemsDef].sort((a, b) => {
+      let idxA = savedFooterOrder.indexOf(a.key);
+      let idxB = savedFooterOrder.indexOf(b.key);
+      if (idxA === -1 && idxB === -1) return 0;
+      if (idxA === -1) return 1;
+      if (idxB === -1) return -1;
+      return idxA - idxB;
+    });
+
     const cardFooterHtml = `
       <div class="tpl-card tpl-panel-left ${!isFooterVis ? 'disabled-card disabled-block' : ''}" id="card_footer">
         <div class="tpl-card-header">
@@ -1251,16 +1498,17 @@
         </div>
         <div class="tpl-card-body">
           <div>
-            <div class="tpl-ftr-columns-header" style="display: flex; justify-content: space-between; align-items: center; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; padding: 0 4px;">
+            <div class="tpl-ftr-columns-header">
               <span>Выводимые секции подвала:</span>
-              <span style="font-size: 10.5px; color: #64748b; font-weight: 600;">Выравнивание: слева / центр / справа</span>
+              <span style="font-size: 10px; color: #64748b; font-weight: 600;">Выравнивание: слева / центр / справа • По нижнему краю страницы ⬇</span>
             </div>
             <div class="tpl-lines-checklist">
-              ${footerItemsDef.map((item) => {
+              ${orderedFooterLines.map((item) => {
                 const isChecked = effectiveFooterLines.includes(item.key);
                 const curAlign = footerLineAligns[item.key] || defaultFooterAligns[item.key] || "center";
                 return `
-                  <div class="tpl-line-item tpl-ftr-line-row">
+                  <div class="tpl-line-item tpl-ftr-line-row" draggable="true" data-key="${item.key}">
+                    <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
                     <label class="tpl-ftr-label-wrap">
                       <input type="checkbox" class="chk-ftr-line" data-key="${item.key}" ${isChecked ? 'checked' : ''}>
                       <span class="tpl-line-label">${item.icon} ${item.label}</span>
@@ -1283,90 +1531,63 @@
     `;
 
     // -------------------------------------------------------------
-    // FULL TWO-COLUMN ASSEMBLY + TOP & BOTTOM CONTROLS
+    // CARD 4: КАРТИНКА ЧЕРТЕЖА ПОД ТЕКСТ (Drawing Viewport)
     // -------------------------------------------------------------
     const isImageVis = image43.visible !== false;
+    const imageAspectRatio = (image43.aspect_ratio || "4:3").trim();
+    const imageScalePct = parseInt(image43.scale_pct !== undefined ? image43.scale_pct : 100, 10) || 100;
 
-    html += `
-      <!-- TOP CONTROL: Column width from edge (% от края листа) -->
-      <div class="tpl-card tpl-toolbar-card">
-        <div class="tpl-card-body" style="padding: 10px 14px; display: flex; flex-direction: column; gap: 8px;">
-          <div style="display: flex; align-items: center; justify-content: space-between; flex-wrap: wrap; gap: 12px;">
-            
-            <!-- LEFT COLUMN WIDTH (% FROM LEFT EDGE) -->
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="tpl-control-label" style="font-size: 11.5px; font-weight: 700; color: #1e293b;">⬅️ Левая колонка (% от левого края):</span>
-              <input type="number" id="inp_col_width_left" class="form-control tpl-control-input" min="10" max="80" step="1" value="${colWidthLeft}" style="width: 56px; font-weight: 700;">
-              <span style="font-size: 11.5px; font-weight: 600; color: #64748b;">%</span>
-              <input type="range" id="rng_col_width_left" min="10" max="70" step="1" value="${colWidthLeft}" style="width: 80px; cursor: pointer; accent-color: #005eb0;">
-            </div>
-
-            <!-- QUICK PRESETS -->
-            <div style="display: flex; align-items: center; gap: 4px;">
-              <span style="font-size: 10.5px; color: #64748b; font-weight: 600; margin-right: 2px;">Пресеты:</span>
-              <button type="button" class="btn btn-xs btn-secondary btn-col-preset" data-w="25" title="25% от каждого края">25%</button>
-              <button type="button" class="btn btn-xs btn-secondary btn-col-preset" data-w="30" title="30% от каждого края">30%</button>
-              <button type="button" class="btn btn-xs btn-secondary btn-col-preset" data-w="35" title="35% от каждого края">35%</button>
-              <button type="button" class="btn btn-xs btn-secondary btn-col-preset" data-w="40" title="40% от каждого края">40%</button>
-              <button type="button" class="btn btn-xs btn-secondary btn-col-preset" data-w="50" title="50% от края (встык по центру)">50% (встык)</button>
-            </div>
-
-            <!-- RIGHT COLUMN WIDTH (% FROM RIGHT EDGE) -->
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <input type="range" id="rng_col_width_right" min="10" max="70" step="1" value="${colWidthRight}" style="width: 80px; cursor: pointer; accent-color: #005eb0;">
-              <input type="number" id="inp_col_width_right" class="form-control tpl-control-input" min="10" max="80" step="1" value="${colWidthRight}" style="width: 56px; font-weight: 700;">
-              <span style="font-size: 11.5px; font-weight: 600; color: #64748b;">%</span>
-              <span class="tpl-control-label" style="font-size: 11.5px; font-weight: 700; color: #1e293b;">:Правая колонка (% от правого края) ➡️</span>
-            </div>
-
-          </div>
-
-          <div style="display: flex; justify-content: space-between; align-items: center; border-top: 1px dashed var(--border-light); padding-top: 6px; font-size: 11px; color: #64748b;">
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 600; cursor: pointer;">
-              <input type="checkbox" id="chk_sync_col_width" ${colWidthLeft === colWidthRight ? 'checked' : ''}>
-              <span>🔗 Одинаковая ширина (синхронизировать от левого и правого краев)</span>
-            </label>
-            <div>
-              Текст на странице PDF: левые блоки <b>слева</b>, правые <b>справа</b>, нижние — <b>автоматически от низа</b>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      <!-- TWO-COLUMNS MAIN GRID -->
-      <div class="tpl-two-columns-layout">
-        <!-- ROW 1: Header (Left) and Footer (Right) on the same level -->
-        ${cardHeaderHtml}
-        ${cardFooterHtml}
-
-        <!-- ROW 2: Slot 1 (Left Top) and Slot 3 (Right Top) on the same level -->
-        ${renderSlotCardHtml("slot_1", "Левый верхний блок (Слот 1)", "📑", "left", slot1, true, colWidthLeft, info, wf)}
-        ${renderSlotCardHtml("slot_3", "Правый верхний блок (Слот 3)", "📑", "right", slot3, true, colWidthRight, info, wf)}
-
-        <!-- ROW 3: Slot 2 (Left Bottom) and Slot 4 (Right Bottom) on the same level -->
-        ${renderSlotCardHtml("slot_2", "Левый нижний блок (Слот 2)", "📑", "left", slot2, false, colWidthLeft, info, wf)}
-        ${renderSlotCardHtml("slot_4", "Правый нижний блок (Слот 4)", "📑", "right", slot4, false, colWidthRight, info, wf)}
-      </div>
-
-      <!-- BOTTOM: 3D IMAGE & SHEET SETTINGS -->
-      <div class="tpl-card">
+    const cardImageHtml = `
+      <div class="tpl-card tpl-panel-left ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
         <div class="tpl-card-header">
           <div class="tpl-card-title-group">
             <span class="tpl-card-icon">🖼️</span>
-            <span class="tpl-card-title">Фоновое 3D изображение и параметры листа</span>
+            <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D)</span>
+          </div>
+          <div class="tpl-card-header-actions">
+            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
+              <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
+              <span>Вкл</span>
+            </label>
           </div>
         </div>
         <div class="tpl-card-body">
-          <div class="tpl-controls-row">
-            <label class="checkbox-label" style="font-size: 11.5px; font-weight: 700; cursor: pointer;">
-              <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
-              <span>Отображать фоновый 3D чертеж сцены (пропорции 4:3) под текстом</span>
-            </label>
+          <div class="tpl-image-controls-row">
+            <div class="tpl-control-item">
+              <span class="tpl-control-label">Пропорции картинки:</span>
+              <div class="tpl-btn-group" id="grp_image_aspect_ratio">
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '3:2' ? 'active' : ''}" data-ratio="3:2" title="Пропорция 3:2">3:2</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '4:3' ? 'active' : ''}" data-ratio="4:3" title="Пропорция 4:3 (стандарт)">4:3</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '16:9' ? 'active' : ''}" data-ratio="16:9" title="Пропорция 16:9 (широкоформатный)">16:9</button>
+              </div>
+            </div>
+            <div class="tpl-control-item">
+              <span class="tpl-control-label">Размещение на странице:</span>
+              <div class="tpl-btn-group" id="grp_image_scale_pct">
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 60 ? 'active' : ''}" data-scale="60" title="60% от размера листа">60%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 70 ? 'active' : ''}" data-scale="70" title="70% от размера листа">70%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 80 ? 'active' : ''}" data-scale="80" title="80% от размера листа">80%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 90 ? 'active' : ''}" data-scale="90" title="90% от размера листа">90%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 100 ? 'active' : ''}" data-scale="100" title="100% (во весь лист)">100%</button>
+              </div>
+            </div>
           </div>
-          <p style="font-size: 11px; color: #64748b; margin: 0; line-height: 1.4;">
-            Рендер видового экрана SketchUp выводится на заднем плане под всеми информационными блоками листа без обрезки полей.
+          <p class="tpl-image-note">
+            Видовой экран SketchUp выводится под информационными блоками листа с выбранными пропорциями (3:2, 4:3, 16:9) и масштабом размещения на странице (60%–100%).
           </p>
         </div>
+      </div>
+    `;
+
+    // -------------------------------------------------------------
+    // FULL TWO-COLUMN ASSEMBLY REPLACED BY SINGLE COLUMN (Заголовок, Средний, Подвал, Картинка)
+    // -------------------------------------------------------------
+    html = `
+      <div class="tpl-single-column-layout">
+        ${cardHeaderHtml}
+        ${cardMiddleHtml}
+        ${cardFooterHtml}
+        ${cardImageHtml}
       </div>
     `;
 
@@ -1401,14 +1622,14 @@
     // Controls for Left / Right slot
     const widthControlHtml = (slotId === "slot_1" || slotId === "slot_3")
       ? (isRight
-          ? `<div class="tpl-control-item" title="Ширина блока в % от правого края листа"><span style="font-size: 10.5px; color: #64748b;">% от края</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="right" min="10" max="80" step="1" value="${widthPct}" style="width: 46px; height: 24px; font-weight: 700;"><span class="tpl-control-label">:Ширина</span></div>`
-          : `<div class="tpl-control-item" title="Ширина блока в % от левого края листа"><span class="tpl-control-label">Ширина:</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="left" min="10" max="80" step="1" value="${widthPct}" style="width: 46px; height: 24px; font-weight: 700;"><span style="font-size: 10.5px; color: #64748b;">% от края</span></div>`)
+          ? `<div class="tpl-control-item" title="Ширина блока в % от правого края листа"><span style="font-size: 10px; color: #64748b;">% от края</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="right" min="10" max="80" step="1" value="${widthPct}" style="width: 44px; height: 21px;"><span class="tpl-control-label">:Ширина</span></div>`
+          : `<div class="tpl-control-item" title="Ширина блока в % от левого края листа"><span class="tpl-control-label">Ширина:</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="left" min="10" max="80" step="1" value="${widthPct}" style="width: 44px; height: 21px;"><span style="font-size: 10px; color: #64748b;">% от края</span></div>`)
       : "";
 
     const isBottomSlot = (slotId === "slot_2" || slotId === "slot_4");
     const alignBadgeHtml = isRight
-      ? `<span class="badge" style="font-size: 9.5px; background: #f1f5f9; color: #334155; padding: 2px 6px; border-radius: 3px; font-weight: 600;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по правому краю">${isBottomSlot ? 'От низа ⬇ • ' : ''}Текст справа ➡</span>`
-      : `<span class="badge" style="font-size: 9.5px; background: #e0f2fe; color: #0369a1; padding: 2px 6px; border-radius: 3px; font-weight: 600;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по левому краю">⬅ Текст слева${isBottomSlot ? ' • От низа ⬇' : ''}</span>`;
+      ? `<span class="badge" style="font-size: 9px; background: #f1f5f9; color: #334155; padding: 1px 5px; font-weight: 600; border: none;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по правому краю">${isBottomSlot ? 'От низа ⬇ • ' : ''}Текст справа ➡</span>`
+      : `<span class="badge" style="font-size: 9px; background: #e0f2fe; color: #0369a1; padding: 1px 5px; font-weight: 600; border: none;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по левому краю">⬅ Текст слева${isBottomSlot ? ' • От низа ⬇' : ''}</span>`;
 
     return `
       <div class="tpl-card ${panelCls} ${!isVis ? 'disabled-card disabled-block' : ''}" id="block_${slotId}">
@@ -1436,14 +1657,14 @@
               </div>
               ${widthControlHtml}
               ${alignBadgeHtml}
-              <div style="margin-left: auto; display: flex; gap: 4px;">
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9.5px; padding: 1px 6px;">Все</button>
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9.5px; padding: 1px 6px;">Снять</button>
+              <div style="margin-left: auto; display: flex; gap: 3px;">
+                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Все</button>
+                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Снять</button>
               </div>
             ` : `
-              <div style="margin-right: auto; display: flex; gap: 4px;">
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9.5px; padding: 1px 6px;">Все</button>
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9.5px; padding: 1px 6px;">Снять</button>
+              <div style="margin-right: auto; display: flex; gap: 3px;">
+                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Все</button>
+                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Снять</button>
               </div>
               ${alignBadgeHtml}
               ${widthControlHtml}
@@ -1457,7 +1678,7 @@
           </div>
 
           <div>
-            <div style="font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; text-align: ${textAlign};">Выводимые строки блока:</div>
+            <div class="tpl-slot-lines-title" style="text-align: ${textAlign};">Выводимые строки блока:</div>
             <div class="tpl-lines-checklist">
               ${availableList.map(item => `
                 <label class="tpl-line-item">
@@ -1515,7 +1736,7 @@
     const hdrCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-hdr-line");
     hdrCheckboxes.forEach((chk) => {
       chk.addEventListener("change", () => {
-        const checkedKeys = Array.from(hdrCheckboxes)
+        const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-hdr-line"))
           .filter((c) => c.checked)
           .map((c) => c.dataset.key);
         updateBlockSlot("header", { lines: checkedKeys });
@@ -1661,87 +1882,7 @@
       });
     });
 
-    // Column Width (% from edge) Inputs, Sliders, and Presets
-    const syncColInputs = (side, val) => {
-      val = Math.round(val * 10) / 10;
-      if (side === "left" || side === "all") {
-        const inp = document.getElementById("inp_col_width_left");
-        if (inp && parseFloat(inp.value) !== val) inp.value = val;
-        const rng = document.getElementById("rng_col_width_left");
-        if (rng && parseFloat(rng.value) !== val) rng.value = val;
-        const cardInp = els.templateSettingsContainer.querySelector('.inp-slot-col-w[data-side="left"]');
-        if (cardInp && parseFloat(cardInp.value) !== val) cardInp.value = val;
-      }
-      if (side === "right" || side === "all") {
-        const inp = document.getElementById("inp_col_width_right");
-        if (inp && parseFloat(inp.value) !== val) inp.value = val;
-        const rng = document.getElementById("rng_col_width_right");
-        if (rng && parseFloat(rng.value) !== val) rng.value = val;
-        const cardInp = els.templateSettingsContainer.querySelector('.inp-slot-col-w[data-side="right"]');
-        if (cardInp && parseFloat(cardInp.value) !== val) cardInp.value = val;
-      }
-    };
 
-    const handleColWidthChange = (side, val) => {
-      val = Math.max(10, Math.min(80, Math.round(parseFloat(val) * 10) / 10));
-      if (isNaN(val)) return;
-
-      updateColumnWidthFromEdge(side, val);
-      syncColInputs(side, val);
-
-      const chkSync = document.getElementById("chk_sync_col_width");
-      if (chkSync && chkSync.checked) {
-        const otherSide = side === "left" ? "right" : "left";
-        updateColumnWidthFromEdge(otherSide, val);
-        syncColInputs(otherSide, val);
-      }
-      notifyChange();
-    };
-
-    // Left Column Inputs
-    const inpColLeft = document.getElementById("inp_col_width_left");
-    if (inpColLeft) {
-      inpColLeft.addEventListener("input", (e) => handleColWidthChange("left", e.target.value));
-      inpColLeft.addEventListener("change", (e) => handleColWidthChange("left", e.target.value));
-    }
-    const rngColLeft = document.getElementById("rng_col_width_left");
-    if (rngColLeft) {
-      rngColLeft.addEventListener("input", (e) => handleColWidthChange("left", e.target.value));
-      rngColLeft.addEventListener("change", (e) => handleColWidthChange("left", e.target.value));
-    }
-
-    // Right Column Inputs
-    const inpColRight = document.getElementById("inp_col_width_right");
-    if (inpColRight) {
-      inpColRight.addEventListener("input", (e) => handleColWidthChange("right", e.target.value));
-      inpColRight.addEventListener("change", (e) => handleColWidthChange("right", e.target.value));
-    }
-    const rngColRight = document.getElementById("rng_col_width_right");
-    if (rngColRight) {
-      rngColRight.addEventListener("input", (e) => handleColWidthChange("right", e.target.value));
-      rngColRight.addEventListener("change", (e) => handleColWidthChange("right", e.target.value));
-    }
-
-    // Preset Buttons
-    const presetBtns = els.templateSettingsContainer.querySelectorAll(".btn-col-preset");
-    presetBtns.forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const w = parseFloat(btn.dataset.w);
-        if (!isNaN(w)) {
-          updateColumnWidthFromEdge("left", w);
-          updateColumnWidthFromEdge("right", w);
-          syncColInputs("all", w);
-          notifyChange();
-        }
-      });
-    });
-
-    // In-Card Column Width Inputs
-    const cardColInputs = els.templateSettingsContainer.querySelectorAll(".inp-slot-col-w");
-    cardColInputs.forEach((inp) => {
-      inp.addEventListener("input", (e) => handleColWidthChange(e.target.dataset.side, e.target.value));
-      inp.addEventListener("change", (e) => handleColWidthChange(e.target.dataset.side, e.target.value));
-    });
 
     // Slot Visibility Toggles
     const slotVisCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-slot-visible");
@@ -1749,7 +1890,7 @@
       chk.addEventListener("change", (e) => {
         const sId = e.target.dataset.slot;
         updateBlockSlot(sId, { visible: e.target.checked });
-        const blk = document.getElementById(`block_${sId}`);
+        const blk = (sId === "slot_1" ? document.getElementById("card_middle") : null) || document.getElementById(`block_${sId}`) || document.getElementById("card_middle");
         if (blk) {
           blk.classList.toggle("disabled-block", !e.target.checked);
           blk.classList.toggle("disabled-card", !e.target.checked);
@@ -1763,7 +1904,31 @@
     slotFsSelects.forEach((sel) => {
       sel.addEventListener("change", (e) => {
         const sId = e.target.dataset.slot;
-        updateBlockSlot(sId, { font_size: parseFloat(e.target.value) });
+        const newFs = parseFloat(e.target.value);
+        if (sId === "slot_1") {
+          const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+          const s1 = ensureMiddleSlotDefaults(targetTpl);
+          s1.font_size = newFs;
+          if (!s1.line_font_sizes) s1.line_font_sizes = {};
+          const allMidKeys = [
+            "toc_pages", "spec_materials", "spec_appliances", "general_notes",
+            "workflow_history", "workflow_stadia", "workflow_revision",
+            "workflow_version", "workflow_date", "articul"
+          ];
+          allMidKeys.forEach((k) => {
+            s1.line_font_sizes[k] = newFs;
+          });
+          Object.keys(s1.line_font_sizes).forEach((k) => {
+            s1.line_font_sizes[k] = newFs;
+          });
+          const midSelects = els.templateSettingsContainer.querySelectorAll(".sel-middle-line-size");
+          midSelects.forEach((midSel) => {
+            midSel.value = newFs.toString();
+          });
+          updateBlockSlot(sId, { font_size: newFs, line_font_sizes: s1.line_font_sizes });
+        } else {
+          updateBlockSlot(sId, { font_size: newFs });
+        }
         notifyChange();
       });
     });
@@ -1808,6 +1973,120 @@
       });
     });
 
+    // Middle Block Line Edge Alignment (⇤ / ⇥)
+    const midEdgeBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-middle-edge");
+    midEdgeBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = btn.dataset.key;
+        const align = btn.dataset.align;
+        if (!key || !align) return;
+
+        const group = btn.closest(".tpl-middle-edge-group");
+        if (group) {
+          group.querySelectorAll(".tpl-btn-middle-edge").forEach((b) => b.classList.remove("active"));
+        }
+        btn.classList.add("active");
+
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const s1 = ensureMiddleSlotDefaults(targetTpl);
+        s1.line_aligns[key] = align;
+
+        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
+        if (chk && !chk.checked) {
+          chk.checked = true;
+          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
+            .filter((c) => c.checked)
+            .map((c) => c.dataset.key);
+          s1.lines = allSlotLines;
+        }
+        notifyChange();
+      });
+    });
+
+    // Middle Block Line Vertical Placement (⬆ / ↕ / ⬇)
+    const midValignBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-middle-valign");
+    midValignBtns.forEach((btn) => {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const key = btn.dataset.key;
+        const valign = btn.dataset.valign;
+        if (!key || !valign) return;
+
+        const group = btn.closest(".tpl-middle-valign-group");
+        if (group) {
+          group.querySelectorAll(".tpl-btn-middle-valign").forEach((b) => b.classList.remove("active"));
+        }
+        btn.classList.add("active");
+
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const s1 = ensureMiddleSlotDefaults(targetTpl);
+        s1.line_valigns[key] = valign;
+
+        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
+        if (chk && !chk.checked) {
+          chk.checked = true;
+          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
+            .filter((c) => c.checked)
+            .map((c) => c.dataset.key);
+          s1.lines = allSlotLines;
+        }
+        notifyChange();
+      });
+    });
+
+    // Middle Block Line Font Size Selection (Dropdown)
+    const midSizeSelects = els.templateSettingsContainer.querySelectorAll(".sel-middle-line-size");
+    midSizeSelects.forEach((sel) => {
+      sel.addEventListener("change", () => {
+        const key = sel.dataset.key;
+        const sz = parseFloat(sel.value);
+        if (!key || isNaN(sz)) return;
+
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const s1 = ensureMiddleSlotDefaults(targetTpl);
+        s1.line_font_sizes[key] = sz;
+
+        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
+        if (chk && !chk.checked) {
+          chk.checked = true;
+          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
+            .filter((c) => c.checked)
+            .map((c) => c.dataset.key);
+          s1.lines = allSlotLines;
+        }
+        notifyChange();
+      });
+    });
+
+    // Middle Block Line Color Picker (<input type="color">)
+    const midColorInputs = els.templateSettingsContainer.querySelectorAll(".inp-middle-line-color");
+    midColorInputs.forEach((inp) => {
+      const handleColorChange = () => {
+        const key = inp.dataset.key;
+        const col = inp.value;
+        if (!key || !col) return;
+
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const s1 = ensureMiddleSlotDefaults(targetTpl);
+        s1.line_colors[key] = col;
+
+        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
+        if (chk && !chk.checked) {
+          chk.checked = true;
+          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
+            .filter((c) => c.checked)
+            .map((c) => c.dataset.key);
+          s1.lines = allSlotLines;
+        }
+        notifyChange();
+      };
+      inp.addEventListener("input", handleColorChange);
+      inp.addEventListener("change", handleColorChange);
+    });
+
     // Footer Visible Toggle
     const chkFtrVis = document.getElementById("chk_footer_visible");
     if (chkFtrVis) {
@@ -1832,7 +2111,7 @@
     const ftrCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-ftr-line");
     ftrCheckboxes.forEach((chk) => {
       chk.addEventListener("change", () => {
-        const checkedKeys = Array.from(ftrCheckboxes)
+        const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-ftr-line"))
           .filter((c) => c.checked)
           .map((c) => c.dataset.key);
         updateBlockSlot("footer", { lines: checkedKeys });
@@ -1870,7 +2149,7 @@
         const chk = els.templateSettingsContainer.querySelector(`.chk-ftr-line[data-key="${key}"]`);
         if (chk && !chk.checked) {
           chk.checked = true;
-          const checkedKeys = Array.from(ftrCheckboxes)
+          const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-ftr-line"))
             .filter((c) => c.checked)
             .map((c) => c.dataset.key);
           updateBlockSlot("footer", { lines: checkedKeys, line_aligns: currentLineAligns });
@@ -1881,14 +2160,199 @@
       });
     });
 
-    // Image 4:3 Toggle
+    // -------------------------------------------------------------
+    // CARD 4: КАРТИНКА ЧЕРТЕЖА (Видовой экран 3D) EVENT LISTENERS
+    // -------------------------------------------------------------
     const chkImgVis = document.getElementById("chk_image_4_3_visible");
     if (chkImgVis) {
       chkImgVis.addEventListener("change", (e) => {
         updateBlockSlot("image_4_3", { visible: e.target.checked });
+        const card = document.getElementById("card_image");
+        if (card) {
+          card.classList.toggle("disabled-card", !e.target.checked);
+          card.classList.toggle("disabled-block", !e.target.checked);
+        }
         notifyChange();
       });
     }
+
+    const grpRatio = document.getElementById("grp_image_aspect_ratio");
+    if (grpRatio) {
+      grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const ratio = btn.dataset.ratio;
+          updateBlockSlot("image_4_3", { aspect_ratio: ratio });
+          notifyChange();
+        });
+      });
+    }
+
+    const grpScale = document.getElementById("grp_image_scale_pct");
+    if (grpScale) {
+      grpScale.querySelectorAll(".btn-scale-pct").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          grpScale.querySelectorAll(".btn-scale-pct").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const scale = parseInt(btn.dataset.scale, 10) || 100;
+          updateBlockSlot("image_4_3", { scale_pct: scale });
+          notifyChange();
+        });
+      });
+    }
+
+    // =============================================================
+    // DRAG AND DROP REORDERING ДЛЯ ПУНКТОВ БЛОКОВ
+    // =============================================================
+    function setupBlockDragAndDrop(cardElement, rowSelector, onReorder) {
+      if (!cardElement) return;
+      const listContainer = cardElement.querySelector(".tpl-lines-checklist");
+      if (!listContainer) return;
+
+      let draggedItem = null;
+
+      const rows = listContainer.querySelectorAll(rowSelector);
+      rows.forEach((row) => {
+        row.setAttribute("draggable", "true");
+
+        row.addEventListener("mousedown", (e) => {
+          if (e.target.closest(".drag-handle")) {
+            row.setAttribute("draggable", "true");
+            return;
+          }
+          if (e.target.closest("input, select, button, label, .tpl-btn-group, .tpl-hdr-param-box")) {
+            row.setAttribute("draggable", "false");
+          } else {
+            row.setAttribute("draggable", "true");
+          }
+        });
+
+        row.addEventListener("mouseup", () => {
+          row.setAttribute("draggable", "true");
+        });
+
+        row.addEventListener("dragstart", (e) => {
+          draggedItem = row;
+          row.classList.add("dragging");
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("text/plain", row.dataset.key || "");
+        });
+
+        row.addEventListener("dragend", () => {
+          if (draggedItem) {
+            draggedItem.classList.remove("dragging");
+            draggedItem = null;
+          }
+          listContainer.querySelectorAll(rowSelector).forEach((r) => {
+            r.classList.remove("drag-over-top", "drag-over-bottom");
+          });
+        });
+
+        row.addEventListener("dragover", (e) => {
+          e.preventDefault();
+          e.dataTransfer.dropEffect = "move";
+          if (!draggedItem || draggedItem === row) return;
+
+          const rect = row.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            row.classList.add("drag-over-top");
+            row.classList.remove("drag-over-bottom");
+          } else {
+            row.classList.add("drag-over-bottom");
+            row.classList.remove("drag-over-top");
+          }
+        });
+
+        row.addEventListener("dragleave", () => {
+          row.classList.remove("drag-over-top", "drag-over-bottom");
+        });
+
+        row.addEventListener("drop", (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          row.classList.remove("drag-over-top", "drag-over-bottom");
+          if (!draggedItem || draggedItem === row) return;
+
+          const rect = row.getBoundingClientRect();
+          const midY = rect.top + rect.height / 2;
+          if (e.clientY < midY) {
+            listContainer.insertBefore(draggedItem, row);
+          } else {
+            listContainer.insertBefore(draggedItem, row.nextSibling);
+          }
+
+          const newOrder = Array.from(listContainer.querySelectorAll(rowSelector))
+            .map((r) => r.dataset.key)
+            .filter(Boolean);
+
+          if (typeof onReorder === "function") {
+            onReorder(newOrder, listContainer);
+          }
+        });
+      });
+    }
+
+    // 1. Drag and Drop для шапки (Header)
+    const cardHeader = document.getElementById("card_header");
+    setupBlockDragAndDrop(cardHeader, ".tpl-hdr-line-row", (newOrder, container) => {
+      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+      if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
+      if (!state.pdf_settings.custom_layouts[targetTpl]) state.pdf_settings.custom_layouts[targetTpl] = {};
+      if (!state.pdf_settings.custom_layouts[targetTpl].header) state.pdf_settings.custom_layouts[targetTpl].header = {};
+      const hdrConfig = state.pdf_settings.custom_layouts[targetTpl].header;
+      hdrConfig.item_order = newOrder;
+
+      const checkedKeys = new Set(
+        Array.from(container.querySelectorAll(".chk-hdr-line:checked")).map((c) => c.dataset.key)
+      );
+      hdrConfig.lines = newOrder.filter((k) => checkedKeys.has(k));
+
+      const lineRows = Object.assign({}, hdrConfig.line_rows || {});
+      newOrder.forEach((k, idx) => {
+        const rowNum = idx + 1;
+        lineRows[k] = rowNum;
+        const sel = container.querySelector(`.sel-hdr-line-row[data-key="${k}"]`);
+        if (sel) sel.value = rowNum.toString();
+      });
+      hdrConfig.line_rows = lineRows;
+
+      notifyChange();
+    });
+
+    // 2. Drag and Drop для среднего блока (Middle, slot_1)
+    const cardMiddle = document.getElementById("card_middle");
+    setupBlockDragAndDrop(cardMiddle, ".tpl-middle-line-row", (newOrder, container) => {
+      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+      const s1 = ensureMiddleSlotDefaults(targetTpl);
+      s1.item_order = newOrder;
+
+      const checkedKeys = new Set(
+        Array.from(container.querySelectorAll(".chk-slot-line:checked")).map((c) => c.dataset.key)
+      );
+      s1.lines = newOrder.filter((k) => checkedKeys.has(k));
+
+      notifyChange();
+    });
+
+    // 3. Drag and Drop для подвала (Footer)
+    const cardFooter = document.getElementById("card_footer");
+    setupBlockDragAndDrop(cardFooter, ".tpl-ftr-line-row", (newOrder, container) => {
+      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+      if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
+      if (!state.pdf_settings.custom_layouts[targetTpl]) state.pdf_settings.custom_layouts[targetTpl] = {};
+      if (!state.pdf_settings.custom_layouts[targetTpl].footer) state.pdf_settings.custom_layouts[targetTpl].footer = {};
+      const ftrConfig = state.pdf_settings.custom_layouts[targetTpl].footer;
+      ftrConfig.item_order = newOrder;
+
+      const checkedKeys = new Set(
+        Array.from(container.querySelectorAll(".chk-ftr-line:checked")).map((c) => c.dataset.key)
+      );
+      ftrConfig.lines = newOrder.filter((k) => checkedKeys.has(k));
+
+      notifyChange();
+    });
   }
 
   // Alias for backward compatibility with existing render calls
@@ -1947,6 +2411,8 @@
             align: defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left"),
             valign: defSlot.valign || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "top"),
             font_size: defFontSize,
+            aspect_ratio: defSlot.aspect_ratio || "4:3",
+            scale_pct: defSlot.scale_pct !== undefined ? defSlot.scale_pct : 100,
             lines: defLines,
             line_rows: defLineRows,
             line_font_sizes: defLineFontSizes,
@@ -2688,8 +3154,13 @@
         tr.classList.add("active-split-scene");
       }
 
-      // Checkbox Enabled
-      const tdCheck = document.createElement("td");
+      // Checkbox & Number (two rows in one cell)
+      const tdNumCheck = document.createElement("td");
+      tdNumCheck.className = "scene-num-check-cell";
+
+      const numCheckWrap = document.createElement("div");
+      numCheckWrap.className = "scene-num-check-wrap";
+
       const chk = document.createElement("input");
       chk.type = "checkbox";
       chk.checked = scene.enabled !== false;
@@ -2701,23 +3172,30 @@
         updateLayoutUsageBadge();
       });
       chk.addEventListener("click", (e) => e.stopPropagation());
-      tdCheck.appendChild(chk);
 
-      // Index & Drag Handle
-      const tdNum = document.createElement("td");
-      tdNum.style.whiteSpace = "nowrap";
-      tdNum.title = "Перетащите строку мышью для изменения порядка";
+      const numRow = document.createElement("div");
+      numRow.className = "scene-num-row";
+      numRow.title = "Перетащите строку мышью для изменения порядка";
       const dragHandle = document.createElement("span");
       dragHandle.className = "drag-handle";
       dragHandle.textContent = "⠿";
       const rowNum = document.createElement("span");
       rowNum.className = "row-num";
       rowNum.textContent = index + 1;
-      tdNum.appendChild(dragHandle);
-      tdNum.appendChild(rowNum);
+      numRow.appendChild(dragHandle);
+      numRow.appendChild(rowNum);
 
-      // Scene Name (Editable)
-      const tdName = document.createElement("td");
+      numCheckWrap.appendChild(chk);
+      numCheckWrap.appendChild(numRow);
+      tdNumCheck.appendChild(numCheckWrap);
+
+      // Scene Name & Description (two rows in one cell)
+      const tdInfo = document.createElement("td");
+      tdInfo.className = "scene-info-cell";
+
+      const infoWrap = document.createElement("div");
+      infoWrap.className = "scene-info-wrap";
+
       const inputName = document.createElement("input");
       inputName.type = "text";
       inputName.className = "table-input scene-name-input";
@@ -2738,7 +3216,30 @@
         if (e.key === "Enter") inputName.blur();
       });
       inputName.addEventListener("click", (e) => e.stopPropagation());
-      tdName.appendChild(inputName);
+
+      const inputDesc = document.createElement("input");
+      inputDesc.type = "text";
+      inputDesc.className = "table-input scene-desc-input";
+      inputDesc.value = scene.description || "";
+      inputDesc.placeholder = "Описание на листе...";
+      inputDesc.title = "Описание / примечание на листе";
+      inputDesc.addEventListener("input", (e) => {
+        scene.description = e.target.value;
+        renderLayoutCanvas();
+      });
+      inputDesc.addEventListener("change", (e) => {
+        scene.description = e.target.value.trim();
+        e.target.value = scene.description;
+        renderTemplateSettingsList();
+      });
+      inputDesc.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") inputDesc.blur();
+      });
+      inputDesc.addEventListener("click", (e) => e.stopPropagation());
+
+      infoWrap.appendChild(inputName);
+      infoWrap.appendChild(inputDesc);
+      tdInfo.appendChild(infoWrap);
 
       // Page Type Select
       const tdType = document.createElement("td");
@@ -2770,29 +3271,6 @@
       });
       selType.addEventListener("click", (e) => e.stopPropagation());
       tdType.appendChild(selType);
-
-      // Description Input
-      const tdDesc = document.createElement("td");
-      const inputDesc = document.createElement("input");
-      inputDesc.type = "text";
-      inputDesc.className = "table-input";
-      inputDesc.value = scene.description || "";
-      inputDesc.placeholder = "Примечание к виду...";
-      inputDesc.title = "Описание / примечание на листе";
-      inputDesc.addEventListener("input", (e) => {
-        scene.description = e.target.value;
-        renderLayoutCanvas();
-      });
-      inputDesc.addEventListener("change", (e) => {
-        scene.description = e.target.value.trim();
-        e.target.value = scene.description;
-        renderTemplateSettingsList();
-      });
-      inputDesc.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") inputDesc.blur();
-      });
-      inputDesc.addEventListener("click", (e) => e.stopPropagation());
-      tdDesc.appendChild(inputDesc);
 
       // Drag and Drop event listeners for row reordering
       tr.addEventListener("mousedown", (e) => {
@@ -2883,10 +3361,8 @@
         updateLayoutUsageBadge();
       });
 
-      tr.appendChild(tdCheck);
-      tr.appendChild(tdNum);
-      tr.appendChild(tdName);
-      tr.appendChild(tdDesc);
+      tr.appendChild(tdNumCheck);
+      tr.appendChild(tdInfo);
       tr.appendChild(tdType);
 
       els.scenesTableBody.appendChild(tr);
@@ -3280,7 +3756,18 @@
       renderHistoryTable();
     });
 
-    // Start Export
+    // Actual export execution helper
+    function executeExport() {
+      const data = collectFormData();
+      els.progressBarFill.style.width = "0%";
+      els.progressPercent.textContent = "0%";
+      els.progressMessage.textContent = "Инициализация...";
+      els.progressOverlay.classList.remove("hidden");
+
+      callRuby("startExport", JSON.stringify(data));
+    }
+
+    // Start Export: prompt user for revision notes before export
     els.btnStartExport.addEventListener("click", () => {
       const data = collectFormData();
       const enabledScenes = (data.scenes || []).filter((s) => s.enabled && s.page_type !== "skip");
@@ -3289,13 +3776,111 @@
         return;
       }
 
-      els.progressBarFill.style.width = "0%";
-      els.progressPercent.textContent = "0%";
-      els.progressMessage.textContent = "Инициализация...";
-      els.progressOverlay.classList.remove("hidden");
+      // Точная дата и время перед созданием PDF
+      const now = new Date();
+      const y = now.getFullYear();
+      const m = String(now.getMonth() + 1).padStart(2, '0');
+      const d = String(now.getDate()).padStart(2, '0');
+      const hh = String(now.getHours()).padStart(2, '0');
+      const mm = String(now.getMinutes()).padStart(2, '0');
+      const exactTimeStr = `${y}-${m}-${d} ${hh}:${mm}`;
 
-      callRuby("startExport", JSON.stringify(data));
+      const currRevNum = parseInt(els.inputRevision ? els.inputRevision.value : 1, 10) || 1;
+      const nextRevNum = currRevNum + 1;
+      const currRevStr = `r${String(currRevNum).padStart(3, '0')}`;
+      const nextRevStr = `r${String(nextRevNum).padStart(3, '0')}`;
+
+      if (els.revPromptDateTime) {
+        els.revPromptDateTime.textContent = exactTimeStr;
+        els.revPromptDateTime.setAttribute("data-exact", exactTimeStr);
+      }
+      if (els.revPromptCurrentRev) els.revPromptCurrentRev.textContent = currRevStr;
+      if (els.revPromptNextRev) els.revPromptNextRev.textContent = nextRevStr;
+      if (els.inputRevisionNote) {
+        els.inputRevisionNote.value = "";
+      }
+
+      if (els.revisionPromptModal) {
+        els.revisionPromptModal.classList.remove("hidden");
+        setTimeout(() => {
+          if (els.inputRevisionNote) els.inputRevisionNote.focus();
+        }, 50);
+      } else {
+        executeExport();
+      }
     });
+
+    // Revision Prompt Modal: Cancel
+    if (els.btnCancelExportModal) {
+      els.btnCancelExportModal.addEventListener("click", () => {
+        if (els.revisionPromptModal) els.revisionPromptModal.classList.add("hidden");
+      });
+    }
+
+    // Revision Prompt Modal: Export without recording edits
+    if (els.btnSkipRevisionExport) {
+      els.btnSkipRevisionExport.addEventListener("click", () => {
+        if (els.revisionPromptModal) els.revisionPromptModal.classList.add("hidden");
+        executeExport();
+      });
+    }
+
+    // Revision Prompt Modal: Confirm Revision & Export
+    if (els.btnConfirmRevisionExport) {
+      els.btnConfirmRevisionExport.addEventListener("click", () => {
+        const rawNote = (els.inputRevisionNote ? els.inputRevisionNote.value : "").trim();
+        if (!rawNote) {
+          showNotification("Введите описание правок или нажмите «Без записи правок»", "warning");
+          if (els.inputRevisionNote) els.inputRevisionNote.focus();
+          return;
+        }
+
+        const note = rawNote.replace(/\r?\n+/g, "; ");
+        const exactTime = (els.revPromptDateTime && els.revPromptDateTime.getAttribute("data-exact")) || (() => {
+          const now = new Date();
+          const y = now.getFullYear();
+          const m = String(now.getMonth() + 1).padStart(2, '0');
+          const d = String(now.getDate()).padStart(2, '0');
+          const hh = String(now.getHours()).padStart(2, '0');
+          const mm = String(now.getMinutes()).padStart(2, '0');
+          return `${y}-${m}-${d} ${hh}:${mm}`;
+        })();
+
+        const currRevNum = parseInt(els.inputRevision ? els.inputRevision.value : 1, 10) || 1;
+        const nextRevNum = currRevNum + 1;
+        const nextRevStr = String(nextRevNum).padStart(3, '0');
+        const entryText = `${note} (rev. ${nextRevStr})`;
+
+        // Добавляем новую запись в историю проекта
+        state.history.unshift({
+          date: exactTime,
+          text: entryText,
+          description: entryText
+        });
+
+        // Синхронизируем состояние и форму
+        state.workflow.revision = nextRevStr;
+        state.workflow.last_edit = note;
+        if (els.inputRevision) els.inputRevision.value = nextRevStr;
+        if (els.inputLastEdit) els.inputLastEdit.value = note;
+
+        renderHistoryTable();
+
+        if (els.revisionPromptModal) els.revisionPromptModal.classList.add("hidden");
+        executeExport();
+      });
+    }
+
+    if (els.inputRevisionNote) {
+      els.inputRevisionNote.addEventListener("keydown", (e) => {
+        if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+          e.preventDefault();
+          if (els.btnConfirmRevisionExport) els.btnConfirmRevisionExport.click();
+        } else if (e.key === "Escape") {
+          if (els.revisionPromptModal) els.revisionPromptModal.classList.add("hidden");
+        }
+      });
+    }
 
     // Refresh Data (all storages, scenes & YAML)
     if (els.btnRefreshData) {
@@ -3383,11 +3968,9 @@
       els.successPdfPath.textContent = pdfPath;
       els.successModal.classList.remove("hidden");
 
-      // Auto update revision locally from backend
-      if (els.inputRevision) {
-        els.inputRevision.value = (newRevision !== undefined && newRevision !== null)
-          ? newRevision
-          : ((parseInt(els.inputRevision.value, 10) || 1) + 1);
+      // Update revision locally from backend if provided
+      if (els.inputRevision && newRevision !== undefined && newRevision !== null) {
+        els.inputRevision.value = newRevision;
       }
     },
 

@@ -53,89 +53,92 @@
     <main class="app-content">
       <!-- TAB 1: MODULAR PROJECT INFO -->
       <section id="tab-project" class="tab-pane active">
-        <!-- Section 1: Паспорт объекта (Project) -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">🏢</span>
-            <span class="card-header-title">Паспорт объекта (Project)</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="selectTrade">Тип проекта / Назначение *</label>
-              <select id="selectTrade" class="form-control">
-                <option value="0">Бытовой проект (HF# Home Furniture)</option>
-                <option value="1">Коммерческий проект (CF# Commercial Furniture)</option>
-              </select>
+        <!-- Top Row: 2 Columns (1: Паспорт объекта, 2: Карточка заказчика) -->
+        <div class="project-columns-row">
+          <!-- Column 1: Паспорт объекта (Project) -->
+          <div class="settings-card project-col-card">
+            <div class="card-header">
+              <span class="card-header-icon">🏢</span>
+              <span class="card-header-title">Паспорт объекта (Project)</span>
             </div>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="selectTrade">Тип проекта / Назначение *</label>
+                <select id="selectTrade" class="form-control">
+                  <option value="0">Бытовой проект (HF# Home Furniture)</option>
+                  <option value="1">Коммерческий проект (CF# Commercial Furniture)</option>
+                </select>
+              </div>
 
-            <div class="form-group">
-              <label for="inputArticul">Артикул проекта *</label>
-              <div class="input-action-group">
-                <input type="text" id="inputArticul" class="form-control font-mono" placeholder="CF#260905_142650_01">
-                <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул по текущей дате и времени">⚡ Создать</button>
+              <div class="form-group">
+                <label for="inputArticul">Артикул проекта *</label>
+                <div class="input-action-group">
+                  <input type="text" id="inputArticul" class="form-control font-mono" placeholder="CF#260905_142650_01">
+                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул по текущей дате и времени">⚡ Создать</button>
+                </div>
+              </div>
+
+              <div class="form-group" id="companyFieldGroup">
+                <label for="inputCompany">Название компании (для коммерческих)</label>
+                <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
+              </div>
+
+              <div class="form-group">
+                <label for="inputTags">Теги проекта</label>
+                <input type="text" id="inputTags" class="form-control" placeholder="Кухня, МДФ, эмаль, подсветка, премиум">
+              </div>
+
+              <div class="form-group">
+                <label for="inputFurnitureName">Название мебели / Изделие *</label>
+                <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба">
+              </div>
+
+              <div class="form-group">
+                <label for="inputRoomName">Комната / Помещение / Место установки *</label>
+                <input type="text" id="inputRoomName" class="form-control" placeholder="например: Прихожая, Кухня-гостиная">
+              </div>
+
+              <div class="form-group full-width">
+                <label for="inputAddress">Адрес установки объекта</label>
+                <input type="text" id="inputAddress" class="form-control" placeholder="например: г. Москва, ул. Никитская, д. 12, кв. 45">
+              </div>
+
+              <div class="form-group full-width">
+                <label for="inputProjectDescription">Описание проекта / задания</label>
+                <textarea id="inputProjectDescription" class="form-control" rows="2" placeholder="Краткое описание задания и назначения изделия..."></textarea>
               </div>
             </div>
-
-            <div class="form-group" id="companyFieldGroup">
-              <label for="inputCompany">Название компании (для коммерческих)</label>
-              <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
-            </div>
-
-            <div class="form-group">
-              <label for="inputTags">Теги проекта</label>
-              <input type="text" id="inputTags" class="form-control" placeholder="Кухня, МДФ, эмаль, подсветка, премиум">
-            </div>
-
-            <div class="form-group">
-              <label for="inputFurnitureName">Название мебели / Изделие *</label>
-              <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба">
-            </div>
-
-            <div class="form-group">
-              <label for="inputRoomName">Комната / Помещение / Место установки *</label>
-              <input type="text" id="inputRoomName" class="form-control" placeholder="например: Прихожая, Кухня-гостиная">
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputAddress">Адрес установки объекта</label>
-              <input type="text" id="inputAddress" class="form-control" placeholder="например: г. Москва, ул. Никитская, д. 12, кв. 45">
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputProjectDescription">Описание проекта / задания</label>
-              <textarea id="inputProjectDescription" class="form-control" rows="2" placeholder="Краткое описание задания и назначения изделия..."></textarea>
-            </div>
           </div>
-        </div>
 
-        <!-- Section 2: Карточка заказчика (Customer) -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">👤</span>
-            <span class="card-header-title">Карточка заказчика (Customer)</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
-              <div class="input-action-group">
-                <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
-                <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента">⚡ Создать ID</button>
+          <!-- Column 2: Карточка заказчика (Customer) -->
+          <div class="settings-card project-col-card">
+            <div class="card-header">
+              <span class="card-header-icon">👤</span>
+              <span class="card-header-title">Карточка заказчика (Customer)</span>
+            </div>
+            <div class="form-grid">
+              <div class="form-group full-width">
+                <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
+                <div class="input-action-group">
+                  <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
+                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента">⚡ Создать ID</button>
+                </div>
               </div>
-            </div>
 
-            <div class="form-group">
-              <label for="inputCustomer">ФИО / Контактное лицо *</label>
-              <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
-            </div>
+              <div class="form-group full-width">
+                <label for="inputCustomer">ФИО / Контактное лицо *</label>
+                <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
+              </div>
 
-            <div class="form-group">
-              <label for="inputPhone">Номер телефона</label>
-              <input type="text" id="inputPhone" class="form-control" placeholder="+7 (999) 000-00-00">
-            </div>
+              <div class="form-group full-width">
+                <label for="inputPhone">Номер телефона</label>
+                <input type="text" id="inputPhone" class="form-control" placeholder="+7 (999) 000-00-00">
+              </div>
 
-            <div class="form-group">
-              <label for="inputEmail">Электронная почта (Email)</label>
-              <input type="email" id="inputEmail" class="form-control" placeholder="client@example.com">
+              <div class="form-group full-width">
+                <label for="inputEmail">Электронная почта (Email)</label>
+                <input type="email" id="inputEmail" class="form-control" placeholder="client@example.com">
+              </div>
             </div>
           </div>
         </div>
@@ -216,11 +219,14 @@
             <table class="scenes-table" id="scenesTable">
               <thead>
                 <tr>
-                  <th width="32" title="Включить в экспорт">Вкл</th>
-                  <th width="42" title="Перетащите строку мышью для изменения порядка следования">№</th>
-                  <th width="170">Сцена SketchUp</th>
-                  <th>Описание на листе</th>
-                  <th width="160">Шаблон страницы</th>
+                  <th width="38" class="th-num-check" title="Включить в экспорт / порядок">
+                    <div class="th-num-check-wrap">
+                      <span>Вкл</span>
+                      <span>№</span>
+                    </div>
+                  </th>
+                  <th>Сцена / Описание</th>
+                  <th width="145">Шаблон страницы</th>
                 </tr>
               </thead>
               <tbody id="scenesTableBody">
@@ -460,6 +466,46 @@
           <div class="progress-bar-fill" id="progressBarFill" style="width: 0%;"></div>
         </div>
         <span class="progress-percent" id="progressPercent">0%</span>
+      </div>
+    </div>
+
+    <!-- Revision Prompt Modal before PDF Export -->
+    <div id="revisionPromptModal" class="modal-overlay hidden">
+      <div class="modal-card revision-modal-card">
+        <div class="modal-header-with-icon">
+          <div class="modal-badge-icon">📋</div>
+          <div class="modal-header-text">
+            <h3 class="modal-title">Внесение правок в проект</h3>
+            <p class="modal-subtitle">Зафиксируйте выполненные изменения перед созданием PDF</p>
+          </div>
+        </div>
+        
+        <div class="revision-modal-body">
+          <div class="revision-meta-grid">
+            <div class="rev-meta-item">
+              <span class="rev-meta-label">📅 Точная дата и время</span>
+              <span class="rev-meta-value font-mono" id="revPromptDateTime">2026-09-07 00:30</span>
+            </div>
+            <div class="rev-meta-item">
+              <span class="rev-meta-label">🔖 Номер ревизии</span>
+              <span class="rev-meta-value font-mono"><span id="revPromptCurrentRev">r002</span> &rarr; <span class="rev-next-badge" id="revPromptNextRev">r003</span></span>
+            </div>
+          </div>
+
+          <div class="rev-input-wrapper">
+            <label for="inputRevisionNote" class="rev-input-label">Какие правки были сделаны:</label>
+            <textarea id="inputRevisionNote" class="form-control rev-textarea" rows="3" placeholder="Опишите внесенные правки (например: Скорректированы размеры шкафа, изменен цвет фасадов)..."></textarea>
+            <span class="rev-input-hint">Нажмите «Записать и создать PDF» для сохранения в историю проекта с точной датой и временем, или «Без записи правок», если ревизия не изменялась.</span>
+          </div>
+        </div>
+
+        <div class="modal-actions revision-modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelExportModal">Отмена</button>
+          <div class="rev-modal-action-group">
+            <button type="button" class="btn btn-secondary" id="btnSkipRevisionExport" title="Создать PDF без внесения новой записи в историю">Без записи правок</button>
+            <button type="button" class="btn btn-success" id="btnConfirmRevisionExport" title="Записать правки в историю с точным временем и датой и создать PDF">💾 Записать и создать PDF</button>
+          </div>
+        </div>
       </div>
     </div>
 
