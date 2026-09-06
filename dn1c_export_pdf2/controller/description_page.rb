@@ -58,33 +58,22 @@ module DN1Code
         end
 
         def draw_spec_card(x, y, width, height, title, text)
-          # Фоновая плашка
-          @pdf_doc.fill_color "F8FAFC"
-          @pdf_doc.fill_rounded_rectangle [x, y], width, height, 4
-          @pdf_doc.stroke_color "E2E8F0"
-          @pdf_doc.line_width 1
-          @pdf_doc.stroke_rounded_rectangle [x, y], width, height, 4
-
-          # Акцентная вертикальная полоса слева
-          @pdf_doc.fill_color @primary_col
-          @pdf_doc.fill_rounded_rectangle [x, y], 5, height, 2
-
-          # Заголовок блока
+          # Заголовок блока (без цветных плашек и рамок)
           @pdf_doc.fill_color @primary_col
           Service::FontService.apply_style(@pdf_doc, :heading)
-          @pdf_doc.text_box title, at: [x + 14, y - 8], width: width - 24, height: 16, overflow: :shrink_to_fit
+          @pdf_doc.text_box title, at: [x, y], width: width, height: 16, overflow: :shrink_to_fit
 
           # Разделительная линия
           @pdf_doc.stroke_color "CBD5E1"
           @pdf_doc.line_width 0.8
-          @pdf_doc.stroke_horizontal_line x + 14, x + width - 14, at: y - 24
+          @pdf_doc.stroke_horizontal_line x, x + width, at: y - 18
 
           # Текст описания
           @pdf_doc.fill_color "334155"
           Service::FontService.apply_style(@pdf_doc, :body)
-          text_top = y - 30
-          text_max_h = height - 36
-          @pdf_doc.text_box text, at: [x + 14, text_top], width: width - 28, height: text_max_h, overflow: :shrink_to_fit
+          text_top = y - 24
+          text_max_h = height - 28
+          @pdf_doc.text_box text, at: [x, text_top], width: width, height: text_max_h, overflow: :shrink_to_fit
         end
       end
     end

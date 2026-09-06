@@ -1,0 +1,19 @@
+project:
+  articul: "HF#26050418280405"
+  name_product: "Дверки, полки (Шкаф), Люк"
+  name_place: "Мансарда"
+  adress: "Белая Колпь"
+  customer: "Алексей, Мария"
+  status: "Правки"
+  trade: "0"
+  last_edit: "Добавлены замки"
+directories:
+  задание_замеры:
+    path: "!_замер_фото_задание"
+  материалы_фурнитура:
+    display: "grid"
+  техника_подсветка:
+    display: "list"
+api_targets:
+  - "https://list.prodmd.top/api/projects"
+  - "https://backup.prodmd.top/api/projects"

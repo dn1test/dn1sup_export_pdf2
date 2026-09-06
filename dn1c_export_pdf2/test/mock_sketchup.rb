@@ -418,7 +418,8 @@ module Layout
     def export(pdf_path, options = nil)
       FileUtils.mkdir_p(File.dirname(pdf_path))
       # Создаем валидный тестовый PDF
-      pdf = Prawn::Document.new(page_size: "A4", page_layout: :landscape)
+      require "prawn" unless defined?(::Prawn)
+      pdf = ::Prawn::Document.new(page_size: "A4", page_layout: :landscape)
       pdf.text "Mock LayOut API Export"
       pdf.render_file(pdf_path)
       true

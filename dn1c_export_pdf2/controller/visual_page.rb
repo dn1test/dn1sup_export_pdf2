@@ -13,24 +13,17 @@ module DN1Code
           # Компактный стильный заголовок для страницы визуализации
           scene_name = @scene_item ? @scene_item.name : "Визуализация"
           
-          # Фоновая плашка заголовка
-          @pdf_doc.fill_color "F8FAFC"
-          @pdf_doc.fill_rounded_rectangle [hdr_box[:x], hdr_box[:y]], hdr_box[:width], hdr_box[:height], 3
-          @pdf_doc.stroke_color "E2E8F0"
-          @pdf_doc.line_width 0.8
-          @pdf_doc.stroke_rounded_rectangle [hdr_box[:x], hdr_box[:y]], hdr_box[:width], hdr_box[:height], 3
-
           # Название сцены
           @pdf_doc.fill_color @primary_col
           Service::FontService.apply_style(@pdf_doc, :heading)
-          @pdf_doc.text_box scene_name.upcase, at: [hdr_box[:x] + 12, hdr_box[:y] - 6], width: [hdr_box[:width] * 0.5, 100].max, height: [hdr_box[:height] - 8, 14].max, overflow: :shrink_to_fit
+          @pdf_doc.text_box scene_name.upcase, at: [hdr_box[:x], hdr_box[:y]], width: [hdr_box[:width] * 0.5, 100].max, height: [hdr_box[:height], 16].max, overflow: :shrink_to_fit
 
           # Название проекта и артикул справа
           @pdf_doc.fill_color @sec_col
           Service::FontService.apply_style(@pdf_doc, :small)
           right_txt = "#{@info[:name_project]}  |  #{@info[:articul]}"
           right_w = [hdr_box[:width] * 0.45, 150].min
-          @pdf_doc.text_box right_txt, at: [hdr_box[:x] + hdr_box[:width] - right_w - 12, hdr_box[:y] - 7], width: right_w, align: :right, overflow: :shrink_to_fit
+          @pdf_doc.text_box right_txt, at: [hdr_box[:x] + hdr_box[:width] - right_w, hdr_box[:y] - 1], width: right_w, align: :right, overflow: :shrink_to_fit
         end
 
         def render_body

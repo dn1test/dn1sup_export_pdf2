@@ -26,21 +26,15 @@ module DN1Code
           desc_text = @scene_item ? @scene_item.description.to_s.strip : ""
 
           if note_box[:visible] && (!desc_text.empty? || note_box[:height] > 20)
-            @pdf_doc.fill_color "F8FAFC"
-            @pdf_doc.fill_rounded_rectangle [note_box[:x], note_box[:y]], note_box[:width], note_box[:height], 3
-            @pdf_doc.stroke_color "E2E8F0"
-            @pdf_doc.line_width 0.8
-            @pdf_doc.stroke_rounded_rectangle [note_box[:x], note_box[:y]], note_box[:width], note_box[:height], 3
-
             @pdf_doc.fill_color @primary_col
             Service::FontService.apply_style(@pdf_doc, :small)
             lbl_w = [150, note_box[:width] * 0.3].min
-            @pdf_doc.text_box "ПРИМЕЧАНИЕ К ВИДУ:", at: [note_box[:x] + 10, note_box[:y] - 8], width: lbl_w
+            @pdf_doc.text_box "ПРИМЕЧАНИЕ К ВИДУ:", at: [note_box[:x], note_box[:y]], width: lbl_w
 
             @pdf_doc.fill_color "334155"
             Service::FontService.apply_style(@pdf_doc, :body)
             shown_text = desc_text.empty? ? "—" : desc_text
-            @pdf_doc.text_box shown_text, at: [note_box[:x] + lbl_w + 10, note_box[:y] - 8], width: note_box[:width] - lbl_w - 20, height: note_box[:height] - 14, overflow: :shrink_to_fit
+            @pdf_doc.text_box shown_text, at: [note_box[:x] + lbl_w + 10, note_box[:y]], width: note_box[:width] - lbl_w - 10, height: note_box[:height], overflow: :shrink_to_fit
           end
         end
 

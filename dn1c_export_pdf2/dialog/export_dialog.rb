@@ -43,12 +43,12 @@ module DN1Code
             preferences_key: "DN1C_ExportPdf2_Pref",
             scrollable:      true,
             resizable:       true,
-            width:           860,
-            height:          680,
-            left:            150,
-            top:             100,
-            min_width:       650,
-            min_height:      500,
+            width:           980,
+            height:          700,
+            left:            120,
+            top:             80,
+            min_width:       720,
+            min_height:      520,
             style:           UI::HtmlDialog::STYLE_DIALOG
           }
 
@@ -58,6 +58,34 @@ module DN1Code
 
           setup_callbacks(@dialog)
           @dialog.show
+        end
+
+        def self.populate_project_data(project_data, payload)
+          return unless payload.is_a?(Hash)
+
+          if payload[:project].is_a?(Hash)
+            project_data.project.merge!(payload[:project])
+          end
+          if payload[:customer].is_a?(Hash)
+            project_data.customer.merge!(payload[:customer])
+          end
+          if payload[:workflow].is_a?(Hash)
+            project_data.workflow.merge!(payload[:workflow])
+          end
+
+          info_src = payload[:project] || payload[:project_info]
+          project_data.project_info.merge!(info_src) if info_src
+
+          project_data.api_targets = payload[:api_targets] if payload[:api_targets]
+          project_data.directories = payload[:directories] if payload[:directories]
+          project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
+          project_data.history = payload[:history] if payload[:history]
+
+          if payload[:scenes].is_a?(Array)
+            project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
+          end
+
+          project_data.sync_project_fields!
         end
 
         def self.setup_callbacks(dialog)
@@ -75,25 +103,220 @@ module DN1Code
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
 
+          # Генератор артикула по стандарту CF# / HF#
+          dialog.add_action_callback("generateArticul") do |_action_context, params_json|
+            commercial = false
+            index = 1
+            if params_json && !params_json.to_s.empty?
+              begin
+                parsed = JSON.parse(params_json)
+                commercial = parsed["commercial"] == true || parsed["commercial"] == "true" || parsed["commercial"] == 1 || parsed["commercial"] == "1"
+                index = parsed["index"] || 1
+              rescue StandardError
+              end
+            end
+            art = Model::ProjectData.generate_articul(commercial: commercial, index: index)
+            dialog.execute_script("window.app && window.app.onArticulGenerated(#{JSON.generate(art)});")
+          end
+
+          # Генератор идентификатора заказчика (CUST-...)
+          dialog.add_action_callback("generateCustomerId") do |_action_context, name|
+            cid = Model::ProjectData.generate_customer_id(name: name)
+            dialog.execute_script("window.app && window.app.onCustomerIdGenerated(#{JSON.generate(cid)});")
+          end
+
+          # Интерактивный диалог выбора папки проекта в проводнике
+          dialog.add_action_callback("selectDirectory") do |_action_context, row_index|
+            model = Sketchup.active_model
+            default_dir = ""
+            if model && model.respond_to?(:path) && !model.path.to_s.empty?
+              default_dir = File.dirname(model.path)
+            end
+
+            chosen_folder = UI.select_directory(
+              title:     "Выберите рабочую папку проекта",
+              directory: default_dir
+            )
+
+            if chosen_folder && !chosen_folder.to_s.empty?
+              rel_path = chosen_folder
+              if !default_dir.empty?
+                model_dir_norm = File.expand_path(default_dir).tr("\\", "/")
+                chosen_norm    = File.expand_path(chosen_folder).tr("\\", "/")
+                if chosen_norm.start_with?(model_dir_norm + "/")
+                  rel_path = chosen_norm.sub(model_dir_norm + "/", "")
+                elsif chosen_norm == model_dir_norm
+                  rel_path = "./"
+                end
+              end
+
+              idx = row_index.to_i
+              dialog.execute_script("window.app && window.app.onDirectorySelected(#{idx}, #{JSON.generate(rel_path)});")
+            end
+          end
+
+          # Получить список файлов и превью для заданной папки
+          dialog.add_action_callback("getFolderFiles") do |_action_context, params_json|
+            idx = 0
+            folder_raw = ""
+            begin
+              params = if params_json.is_a?(Hash)
+                         params_json
+                       elsif params_json.is_a?(String)
+                         (JSON.parse(params_json.to_s.force_encoding("UTF-8"), symbolize_names: true) rescue {})
+                       else
+                         {}
+                       end
+              idx = (params[:index] || params["index"] || 0).to_i
+              folder_raw = (params[:path] || params["path"] || "").to_s.strip
+              folder_rel = folder_raw.tr("\\", "/")
+
+              model = Sketchup.active_model
+              model_dir = ""
+              if model && model.respond_to?(:path) && !model.path.to_s.empty?
+                model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
+              end
+
+              candidates = []
+              candidates << folder_rel if File.directory?(folder_rel)
+              candidates << File.expand_path(folder_rel) if File.directory?(File.expand_path(folder_rel))
+              if !model_dir.empty?
+                c_model = File.expand_path(File.join(model_dir, folder_rel))
+                candidates << c_model if File.directory?(c_model)
+              end
+              c_pwd = File.expand_path(File.join(Dir.pwd, folder_rel))
+              candidates << c_pwd if File.directory?(c_pwd)
+
+              parent_dir = File.expand_path(File.join(__dir__, "../../.."))
+              c_parent = File.expand_path(File.join(parent_dir, folder_rel))
+              candidates << c_parent if File.directory?(c_parent)
+
+              folder_abs = candidates.find { |p| Dir.exist?(p) }
+              files_list = []
+              exists = !folder_abs.nil?
+
+              if exists
+                require "base64" unless defined?(Base64)
+                entries = begin
+                            Dir.children(folder_abs)
+                          rescue StandardError
+                            Dir.entries(folder_abs).reject { |n| n == "." || n == ".." }
+                          end
+
+                total_b64_bytes = 0
+                max_total_b64 = 4_500_000 # 4.5 MB base64 safety limit per folder to avoid CEF IPC stall
+
+                entries.sort.each do |fname|
+                  next if fname.start_with?(".") || fname.start_with?("~")
+                  f = File.join(folder_abs, fname)
+                  next unless File.file?(f)
+                  ext = File.extname(f).downcase
+                  is_img = %w[.jpg .jpeg .png .webp .bmp .gif].include?(ext)
+                  norm_path = f.tr("\\", "/")
+                  f_size = begin
+                             File.size(f)
+                           rescue StandardError
+                             0
+                           end
+
+                  data_url = nil
+                  if is_img && f_size > 0 && f_size <= 2_000_000 && (total_b64_bytes + f_size) <= max_total_b64
+                    begin
+                      mime = case ext
+                             when ".jpg", ".jpeg" then "image/jpeg"
+                             when ".png"          then "image/png"
+                             when ".webp"         then "image/webp"
+                             when ".gif"          then "image/gif"
+                             when ".bmp"          then "image/bmp"
+                             else "image/jpeg"
+                             end
+                      b64 = Base64.strict_encode64(File.binread(f))
+                      total_b64_bytes += b64.bytesize
+                      data_url = "data:#{mime};base64,#{b64}"
+                    rescue StandardError
+                      data_url = nil
+                    end
+                  end
+
+                  files_list << {
+                    name:     fname,
+                    path:     norm_path,
+                    url:      data_url || ("file:///" + norm_path),
+                    size:     f_size,
+                    ext:      ext.sub(/^\./, "").upcase,
+                    is_image: is_img
+                  }
+
+                  break if files_list.size >= 50 # Limit preview cards to 50 items
+                end
+              end
+
+              resp = {
+                index:     idx,
+                path:      folder_raw,
+                exists:    exists,
+                full_path: folder_abs ? folder_abs.tr("\\", "/") : "",
+                files:     files_list
+              }
+              json_payload = JSON.generate(resp)
+              dialog.execute_script("window.app && window.app.onFolderFilesLoaded(#{json_payload});")
+            rescue StandardError => e
+              puts "[getFolderFiles error]: #{e.message}"
+              fallback = { index: idx || 0, path: folder_raw || "", exists: false, full_path: "", files: [], error: e.message }
+              dialog.execute_script("window.app && window.app.onFolderFilesLoaded(#{JSON.generate(fallback)});") rescue nil
+            end
+          end
+
+          # Открыть папку на диске через проводник
+          dialog.add_action_callback("openDirectoryPath") do |_action_context, folder_raw|
+            begin
+              folder_rel = folder_raw.to_s.strip.tr("\\", "/")
+              model = Sketchup.active_model
+              model_dir = ""
+              if model && model.respond_to?(:path) && !model.path.to_s.empty?
+                model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
+              end
+
+              candidates = []
+              candidates << folder_rel if File.directory?(folder_rel)
+              candidates << File.expand_path(folder_rel) if File.directory?(File.expand_path(folder_rel))
+              if !model_dir.empty?
+                c_model = File.expand_path(File.join(model_dir, folder_rel))
+                candidates << c_model if File.directory?(c_model)
+              end
+              c_pwd = File.expand_path(File.join(Dir.pwd, folder_rel))
+              candidates << c_pwd if File.directory?(c_pwd)
+
+              parent_dir = File.expand_path(File.join(__dir__, "../../.."))
+              c_parent = File.expand_path(File.join(parent_dir, folder_rel))
+              candidates << c_parent if File.directory?(c_parent)
+
+              folder_abs = candidates.find { |p| Dir.exist?(p) }
+
+              if folder_abs && File.exist?(folder_abs)
+                UI.openURL("file:///#{folder_abs.tr('\\', '/')}")
+              else
+                UI.messagebox("Папка не найдена на диске:\n#{folder_raw}")
+              end
+            rescue StandardError => e
+              puts "[openDirectoryPath error]: #{e.message}"
+            end
+          end
+
           # Обновить все данные во всех хранилищах (модель, сцены, YAML)
           dialog.add_action_callback("refreshData") do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
               model = Sketchup.active_model
               project_data = Model::ProjectData.new
-              project_data.project_info.merge!(payload[:project_info]) if payload[:project_info]
-              project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-              project_data.history = payload[:history] if payload[:history]
-
-              if payload[:scenes].is_a?(Array)
-                project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
-              end
+              populate_project_data(project_data, payload)
 
               # Синхронизация сцен из активной модели
               project_data.sync_with_model_scenes(model)
 
-              # Сохранение во все хранилища (библиотека модели + YAML файл)
+              # Сохранение во все хранилища (библиотека модели + YAML файл + edit_history.yaml)
               project_data.save_auto(model)
+              project_data.save_program_settings
 
               yaml_name = project_data.yaml_filename(model)
 
@@ -110,27 +333,26 @@ module DN1Code
             end
           end
 
-          # Сохранение настроек из веб-интерфейса (в библиотеку модели и в YAML файл)
+          # Сохранение настроек из веб-интерфейса (в библиотеку модели, файл проекта и плагин)
           dialog.add_action_callback("saveData") do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
               model = Sketchup.active_model
               project_data = Model::ProjectData.new
-              project_data.project_info.merge!(payload[:project_info]) if payload[:project_info]
-              project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-              project_data.history = payload[:history] if payload[:history]
-
-              if payload[:scenes].is_a?(Array)
-                project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
-              end
+              populate_project_data(project_data, payload)
 
               project_data.sync_with_model_scenes(model)
               project_data.save_auto(model)
+              project_data.save_program_settings
               yaml_name = project_data.yaml_filename(model)
-              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в библиотеке и YAML (#{yaml_name})', 'success');")
+              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения: #{e.message}', 'error');")
             end
+          end
+
+          dialog.add_action_callback("testProbe") do |_action_context, data_json|
+            $test_probe_result = data_json
           end
 
           # Запуск экспорта в PDF
@@ -139,16 +361,11 @@ module DN1Code
               payload = JSON.parse(data_json, symbolize_names: true)
               model = Sketchup.active_model
               project_data = Model::ProjectData.new
-              project_data.project_info.merge!(payload[:project_info]) if payload[:project_info]
-              project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-              project_data.history = payload[:history] if payload[:history]
-
-              if payload[:scenes].is_a?(Array)
-                project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
-              end
+              populate_project_data(project_data, payload)
 
               project_data.sync_with_model_scenes(model)
               project_data.save_auto(model)
+              project_data.save_program_settings
 
               controller = Controller::ExportController.new(project_data, model)
               
@@ -180,12 +397,7 @@ module DN1Code
               begin
                 payload = JSON.parse(data_json, symbolize_names: true)
                 project_data = Model::ProjectData.new
-                project_data.project_info.merge!(payload[:project_info]) if payload[:project_info]
-                project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-                project_data.history = payload[:history] if payload[:history]
-                if payload[:scenes].is_a?(Array)
-                  project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
-                end
+                populate_project_data(project_data, payload)
 
                 project_data.save_to_yaml(save_path)
                 dialog.execute_script("window.app && window.app.showNotification('YAML успешно сохранен', 'success');")

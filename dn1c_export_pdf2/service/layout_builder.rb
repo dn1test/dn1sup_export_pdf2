@@ -59,7 +59,17 @@ module DN1Code
             page_dim = get_page_dimensions(settings)
             page_w = page_dim[:w]
             page_h = page_dim[:h]
-            margin = (settings[:margin] || 15).to_f / 72.0
+            margin = if settings.key?(:margin_mm) && !settings[:margin_mm].nil?
+                       settings[:margin_mm].to_f / 25.4
+                     elsif settings.key?("margin_mm") && !settings["margin_mm"].nil?
+                       settings["margin_mm"].to_f / 25.4
+                     elsif settings.key?(:margin) && !settings[:margin].nil?
+                       settings[:margin].to_f / 72.0
+                     elsif settings.key?("margin") && !settings["margin"].nil?
+                       settings["margin"].to_f / 72.0
+                     else
+                       15.0 / 72.0
+                     end
 
             if doc.respond_to?(:page_info) && doc.page_info
               page_info = doc.page_info
@@ -224,25 +234,34 @@ module DN1Code
           add_model_viewport(doc, page, layer, skp_path, scene_item, vp_bounds, project_data.pdf_settings)
 
           # Правая колонка: Карточка реквизитов и ревизий
+          place = (info[:name_place] || info[:room_name]).to_s.strip
+          product = (info[:name_product] || info[:furniture_name]).to_s.strip
+          customer = (info[:customer] || info[:name_customer]).to_s.strip
+          company = info[:company].to_s.strip
+          last_edit = (info[:last_edit] || info[:edit]).to_s.strip
+
           card_lines = [
             "ДАННЫЕ ПРОЕКТА",
-            "----------------------------------------",
-            "Помещение: #{info[:room_name]}",
-            "Изделие: #{info[:furniture_name]}",
-            "Заказчик: #{info[:name_customer]}",
-            "Контакты: #{[info[:phone], info[:email]].reject { |s| s.to_s.empty? }.join(' | ')}",
-            "Статус: #{info[:status]}",
-            "Ревизия: v#{info[:version]}#r#{info[:revision]}",
-            "Дата: #{Time.now.strftime('%d.%m.%Y')}",
-            "",
-            "ИСТОРИЯ ИЗМЕНЕНИЙ:",
             "----------------------------------------"
           ]
+          card_lines << "Помещение: #{place}" unless place.empty?
+          card_lines << "Изделие: #{product}" unless product.empty?
+          card_lines << "Заказчик: #{customer}" unless customer.empty?
+          card_lines << "Компания: #{company}" unless company.empty?
+          contacts = [info[:phone], info[:email]].map { |s| s.to_s.strip }.reject(&:empty?).join(" | ")
+          card_lines << "Контакты: #{contacts}" unless contacts.empty?
+          card_lines << "Статус: #{info[:status]}"
+          card_lines << "Ревизия: v#{info[:version]}#r#{info[:revision]}"
+          card_lines << "Последняя правка: #{last_edit}" unless last_edit.empty?
+          card_lines << "Дата: #{Time.now.strftime('%d.%m.%Y')}"
+          card_lines << ""
+          card_lines << "ИСТОРИЯ ИЗМЕНЕНИЙ:"
+          card_lines << "----------------------------------------"
 
-          history_items = project_data.history.last(4).reverse
+          history_items = project_data.history.first(4)
           history_items.each do |h|
             date_str = h[:date] || h["date"] || ""
-            desc_str = h[:description] || h["description"] || ""
+            desc_str = h[:text] || h["text"] || h[:description] || h["description"] || ""
             card_lines << "#{date_str}: #{desc_str}"
           end
 
@@ -257,8 +276,10 @@ module DN1Code
         def build_description_page(doc, page, layer, skp_path, scene_item, page_index, total_pages, cl, ct, cw, ch, hh, fh, project_data)
           info = project_data.project_info
 
-          # Верхний колонтитул
-          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, scene_item.name)
+          # Верхний колонтитул из параметров сцены
+          s_name = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:name) && !scene_item.scene_ref.name.to_s.strip.empty?) ? scene_item.scene_ref.name.to_s.strip : scene_item.name.to_s.strip
+          s_desc = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:description) && !scene_item.scene_ref.description.to_s.strip.empty?) ? scene_item.scene_ref.description.to_s.strip : scene_item.description.to_s.strip
+          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, s_name, s_desc)
 
           body_top = ct + hh + 0.1
           body_h   = ch - hh - fh - 0.15
@@ -298,7 +319,10 @@ module DN1Code
         def build_explain_page(doc, page, layer, skp_path, scene_item, page_index, total_pages, cl, ct, cw, ch, hh, fh, project_data)
           info = project_data.project_info
 
-          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, "СОДЕРЖАНИЕ И ПОЯСНИТЕЛЬНАЯ ЗАПИСКА")
+          s_name = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:name) && !scene_item.scene_ref.name.to_s.strip.empty?) ? scene_item.scene_ref.name.to_s.strip : scene_item.name.to_s.strip
+          s_name = "СОДЕРЖАНИЕ И ПОЯСНИТЕЛЬНАЯ ЗАПИСКА" if s_name.empty?
+          s_desc = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:description) && !scene_item.scene_ref.description.to_s.strip.empty?) ? scene_item.scene_ref.description.to_s.strip : scene_item.description.to_s.strip
+          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, s_name, s_desc)
 
           body_top = ct + hh + 0.1
           body_h   = ch - hh - fh - 0.15
@@ -307,8 +331,9 @@ module DN1Code
           right_x = cl + col_w + 0.3
 
           # Левая колонка: Содержание проекта
-          toc_lines = ["СОДЕРЖАНИЕ ПРОЕКТА:", "----------------------------------------"]
-          enabled_scenes = project_data.scenes.select(&:enabled)
+          enabled_scenes = project_data.scenes.select { |s| s.enabled && s.page_type.to_s != "skip" }
+          total_count = total_pages || enabled_scenes.size
+          toc_lines = ["СОДЕРЖАНИЕ ПРОЕКТА (всего страниц: #{total_count}):", "----------------------------------------"]
           enabled_scenes.each_with_index do |sc, idx|
             toc_lines << sprintf("%02d. %s", idx + 1, sc.name)
           end
@@ -337,9 +362,11 @@ module DN1Code
         def build_visual_page(doc, page, layer, skp_path, scene_item, page_index, total_pages, cl, ct, cw, ch, hh, fh, project_data)
           info = project_data.project_info
 
-          # Компактный заголовок
+          # Компактный заголовок из параметров сцены
           compact_h = 0.35
-          draw_standard_header(doc, page, layer, cl, ct, cw, compact_h, info, scene_item.name)
+          s_name = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:name) && !scene_item.scene_ref.name.to_s.strip.empty?) ? scene_item.scene_ref.name.to_s.strip : scene_item.name.to_s.strip
+          s_desc = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:description) && !scene_item.scene_ref.description.to_s.strip.empty?) ? scene_item.scene_ref.description.to_s.strip : scene_item.description.to_s.strip
+          draw_standard_header(doc, page, layer, cl, ct, cw, compact_h, info, s_name, s_desc)
 
           body_top = ct + compact_h + 0.05
           body_h   = ch - compact_h - fh - 0.1
@@ -353,7 +380,9 @@ module DN1Code
         # 5. Общий вид (General)
         def build_general_page(doc, page, layer, skp_path, scene_item, page_index, total_pages, cl, ct, cw, ch, hh, fh, project_data)
           info = project_data.project_info
-          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, scene_item.name)
+          s_name = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:name) && !scene_item.scene_ref.name.to_s.strip.empty?) ? scene_item.scene_ref.name.to_s.strip : scene_item.name.to_s.strip
+          s_desc = (scene_item.respond_to?(:scene_ref) && scene_item.scene_ref && scene_item.scene_ref.respond_to?(:description) && !scene_item.scene_ref.description.to_s.strip.empty?) ? scene_item.scene_ref.description.to_s.strip : scene_item.description.to_s.strip
+          draw_standard_header(doc, page, layer, cl, ct, cw, hh, info, s_name, s_desc)
 
           desc = scene_item.description.to_s.strip
           body_top = ct + hh + 0.08
@@ -449,10 +478,15 @@ module DN1Code
         end
 
         # Отрисовка стандартного верхнего колонтитула
-        def draw_standard_header(doc, page, layer, x, y, w, h, info, scene_title)
-          project_text = "#{info[:name_project]}  |  #{info[:address]}"
+        def draw_standard_header(doc, page, layer, x, y, w, h, info, scene_title, scene_desc = nil)
+          project_text = "#{info[:name_project]}  |  #{info[:address]}".strip
           art_text     = info[:articul].to_s.empty? ? "" : "АРТ: #{info[:articul]}"
-          header_str   = "#{project_text}    #{art_text}\n#{scene_title}"
+          first_line   = [project_text, art_text].reject(&:empty?).join("    ")
+
+          lines = [first_line]
+          lines << scene_title.to_s.strip unless scene_title.to_s.strip.empty?
+          lines << scene_desc.to_s.strip unless scene_desc.to_s.strip.empty?
+          header_str = lines.reject(&:empty?).join("\n")
 
           bounds = create_bounds(x, y, w, h)
           add_text(doc, page, layer, header_str, bounds, 11.0, true)

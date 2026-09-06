@@ -1,5 +1,8 @@
 # frozen_string_literal: true
 
+require_relative "gem_loader"
+require_relative "font_service"
+
 module DN1Code
   module ExportPdf2
     module Service
@@ -9,7 +12,17 @@ module DN1Code
 
           page_size   = pdf_settings[:page_size] || "A4"
           page_layout = (pdf_settings[:page_layout] || :landscape).to_sym
-          margin      = pdf_settings[:margin] || 15
+          margin = if pdf_settings.key?(:margin_mm) && !pdf_settings[:margin_mm].nil?
+                     (pdf_settings[:margin_mm].to_f * 72.0 / 25.4).round(1)
+                   elsif pdf_settings.key?("margin_mm") && !pdf_settings["margin_mm"].nil?
+                     (pdf_settings["margin_mm"].to_f * 72.0 / 25.4).round(1)
+                   elsif pdf_settings.key?(:margin) && !pdf_settings[:margin].nil?
+                     pdf_settings[:margin].to_f
+                   elsif pdf_settings.key?("margin") && !pdf_settings["margin"].nil?
+                     pdf_settings["margin"].to_f
+                   else
+                     15.0
+                   end
 
           project_info = project_data.project_info
 

@@ -1,27 +1,70 @@
 # -------------------------------------------------------------------------------
-# DN1C Export PDF 2 - Default Configuration Template
+# DN1C Export PDF 2 - Default Configuration Template (project_config.yaml)
 # -------------------------------------------------------------------------------
 
-project_info:
-  room_name: "Кухня-гостиная"
-  furniture_name: "Кухонный гарнитур"
-  name_project: "Кухня-гостиная — Кухонный гарнитур"
-  description: "Концептуальный дизайн-проект и спецификации"
-  name_customer: "Имя Заказчика"
+# Несколько адресатов — список ссылок целиком, как при копировании из админ-панели.
+api_targets:
+  - "https://list.prodmd.top/api/projects?token=c2fc6e6bd272b4f9688656a7c4fcf6b9aa13ccdf7da077d53bf56e4afcf29a58"
+  - "http://localhost:3000/api/projects?token=b9fdaae8ca52a355df78d12f9bde54236200d366caf4af9350d8d934d83a9fba"
+
+project:
+  # Артикул проекта: HF#26050610205001 — домашний, CF#26050610205001 — коммерческий
+  articul: "HF#26050418280405"
+  # Название мебели: Шкаф купе, Кухонный гарнитур и подобное
+  name_product: "Дверки, полки (Шкаф), Люк"
+  # Название места установки: Гостиная, Детская, Прихожая;
+  # для коммерческого проекта — название торгового центра или павильона
+  name_place: "Мансарда"
+  # Адрес установки проекта
+  adress: "Белая Колпь"
+  # Имя заказчика
+  customer: "Алексей, Мария"
+  # Имя фирмы или компании — для коммерческих проектов
+  company: ""
+  # Стадия проекта: предварительный, правки, утвержден
+  status: "Правки"
+  # Число, показывающее количество изменений
+  revision: 1
+  # Вариант проекта
+  version: 1
+  # Комментарий к очередной правке проекта
+  last_edit: "Добавлены замки"
+  # Коммерческий проект или домашний: 1 или 0
+  trade: "0"
   phone: "+7 (999) 000-00-00"
   email: "client@example.com"
-  address: "г. Москва, ул. Примерная, д. 1"
-  articul: "PRJ-2026-001"
-  version: 1
-  revision: 1
-  status: "В РАБОТЕ"
   task_description: "Разработка проекта и визуализаций изделия согласно габаритам помещения и техническому заданию."
   task_dimensions: "Монтажные габариты согласно замерному листу."
   task_wishes: "Интеграция встроенной техники и скрытых коммуникаций."
   materials: "Фасады: МДФ эмаль матовая, корпус: ЛДСП Egger 18мм, фурнитура: Blum Legrabox."
-  appliances: "Встраиваемая техника: варочная панель, духовой шкаф, вытяжка, посудомоечная машина."
+  appliances: "Встраиваемая бытовая техника: варочная панель, духовой шкаф, вытяжка, посудомоечная машина."
   lighting: "LED подсветка 3000K CRI>95 в профиле, блок питания 24V с запасом 30%."
   notes: "Монтаж производить после завершения чистовых отделочных работ."
+
+directories:
+  # Замеры Фото Задание
+  задание_замеры:
+    path: "!_замер_фото_задание"
+    title: "Замеры помещения"
+    display: "grid"
+
+  # Инфо заказчика
+  инфо_заказчика:
+    path: "!_инфо_заказчика"
+    title: "Инфо заказчика"
+    display: "grid"
+
+  # Папка с материалами (изображения и текстовые файлы)
+  материалы_фурнитура:
+    path: "!_материалы_фурнитура"
+    title: "Материалы и фурнитура"
+    display: "grid"
+
+  # Техника и подсветка
+  техника_подсветка:
+    path: "!_техника_подсветка"
+    title: "Техника, подсветка"
+    display: "list"
 
 pdf_settings:
   export_engine: "prawn"        # 'prawn' (Prawn PDF) или 'layout' (SketchUp LayOut API)
@@ -30,6 +73,7 @@ pdf_settings:
   page_size: "A4"          # 'A4', 'A3', 'A2', 'LETTER'
   page_layout: "landscape" # 'landscape' или 'portrait'
   margin: 15               # Отступ от края листа (в пунктах)
+  margin_mm: 5             # Отступ от края листа (в миллиметрах)
   image_width: 2400        # Базовая ширина рендера сцены
   scale_factor: 2.0        # Множитель четкости (1.0 - 3.0)
   antialias: true          # Сглаживание линий SketchUp
@@ -40,41 +84,3 @@ pdf_settings:
   primary_color: "005EB0"  # Цвет заголовков и акцентов
   secondary_color: "64748B"# Цвет подзаголовков
   stamp_color: "D32F2F"    # Цвет штампа
-  custom_layouts:
-    cover:
-      cover_accent_bar:   { x: 0.0, y: 0.0, w: 100.0, h: 1.5, visible: true }
-      cover_articul:      { x: 65.0, y: 2.5, w: 35.0, h: 4.0, visible: true, align: "right" }
-      cover_title:        { x: 0.0, y: 3.5, w: 65.0, h: 8.0, visible: true, align: "left" }
-      cover_subtitle:     { x: 0.0, y: 11.5, w: 100.0, h: 5.0, visible: true, align: "left" }
-      cover_divider:      { x: 0.0, y: 16.5, w: 100.0, h: 0.5, visible: true }
-      cover_hero_image:   { x: 0.0, y: 19.0, w: 56.0, h: 76.0, visible: true }
-      cover_project_card: { x: 59.0, y: 19.0, w: 41.0, h: 46.0, visible: true }
-      cover_history_card: { x: 59.0, y: 67.0, w: 41.0, h: 28.0, visible: true }
-      footer:             { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
-    description:
-      desc_header:     { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true }
-      desc_materials:  { x: 0.0, y: 9.0, w: 52.0, h: 20.0, visible: true }
-      desc_appliances: { x: 0.0, y: 31.0, w: 52.0, h: 20.0, visible: true }
-      desc_lighting:   { x: 0.0, y: 53.0, w: 52.0, h: 20.0, visible: true }
-      desc_notes:      { x: 0.0, y: 75.0, w: 52.0, h: 20.0, visible: true }
-      desc_image:      { x: 55.0, y: 9.0, w: 45.0, h: 86.0, visible: true }
-      footer:          { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
-    explain:
-      explain_header: { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true }
-      explain_toc:    { x: 0.0, y: 9.0, w: 48.0, h: 86.0, visible: true }
-      explain_specs:  { x: 52.0, y: 9.0, w: 48.0, h: 35.0, visible: true }
-      explain_image:  { x: 52.0, y: 47.0, w: 48.0, h: 48.0, visible: true }
-      footer:         { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
-    general:
-      general_header: { x: 0.0, y: 0.0, w: 100.0, h: 7.0, visible: true }
-      general_image:  { x: 0.0, y: 9.0, w: 100.0, h: 73.0, visible: true }
-      general_note:   { x: 0.0, y: 84.0, w: 100.0, h: 11.0, visible: true }
-      footer:         { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
-    visual:
-      visual_header: { x: 0.0, y: 0.0, w: 100.0, h: 6.0, visible: true }
-      visual_image:  { x: 0.0, y: 7.0, w: 100.0, h: 88.0, visible: true }
-      footer:        { x: 0.0, y: 96.0, w: 100.0, h: 4.0, visible: true }
-
-history:
-  - date: "2026.08.11"
-    description: "Инициализация проекта и компоновка сцен"

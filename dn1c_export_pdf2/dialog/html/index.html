@@ -4,6 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DN1C Export PDF 2</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="app.css">
 </head>
 <body>
@@ -28,24 +31,18 @@
       <button class="tab-btn active" data-tab="tab-project">
         <span class="tab-icon">📋</span> Данные проекта
       </button>
-      <button class="tab-btn" data-tab="tab-task">
-        <span class="tab-icon">🎯</span> Описание задания
-      </button>
-      <button class="tab-btn" data-tab="tab-spec">
-        <span class="tab-icon">📝</span> Описание и спецификации
-      </button>
       <button class="tab-btn" data-tab="tab-scenes">
-        <span class="tab-icon">🖼️</span> Сцены и страницы
+        <span class="tab-icon">📐</span> Страницы и настройки шаблонов
         <span class="badge" id="sceneCountBadge">0</span>
       </button>
-      <button class="tab-btn" data-tab="tab-layout">
-        <span class="tab-icon">📐</span> Размещение блоков
-      </button>
-      <button class="tab-btn" data-tab="tab-settings">
-        <span class="tab-icon">⚙️</span> Настройки PDF
+      <button class="tab-btn" data-tab="tab-directories">
+        <span class="tab-icon">📁</span> Папки и спецификации
       </button>
       <button class="tab-btn" data-tab="tab-history">
         <span class="tab-icon">📜</span> История изменений
+      </button>
+      <button class="tab-btn tab-btn-settings" data-tab="tab-settings">
+        <span class="tab-icon">⚙️</span> Настройки
       </button>
     </nav>
 
@@ -54,348 +51,269 @@
 
     <!-- Main Content Area -->
     <main class="app-content">
-      <!-- TAB 1: PROJECT INFO -->
+      <!-- TAB 1: MODULAR PROJECT INFO -->
       <section id="tab-project" class="tab-pane active">
-        <!-- Section 1: Помещение и изделие -->
+        <!-- Section 1: Паспорт объекта (Project) -->
         <div class="settings-card">
           <div class="card-header">
-            <span class="card-header-icon">🛋️</span>
-            <span class="card-header-title">Помещение и изделие</span>
+            <span class="card-header-icon">🏢</span>
+            <span class="card-header-title">Паспорт объекта (Project)</span>
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label for="inputRoomName">Комната / Помещение / Место *</label>
-              <input type="text" id="inputRoomName" class="form-control" placeholder="например: Кухня-гостиная">
-            </div>
-
-            <div class="form-group">
-              <label for="inputFurnitureName">Название мебели / Изделие *</label>
-              <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Кухонный гарнитур">
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputAddress">Адрес объекта</label>
-              <input type="text" id="inputAddress" class="form-control" placeholder="г. Москва, ул. Примерная, д. 10">
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 2: О проекте -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">📋</span>
-            <span class="card-header-title">О проекте</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="inputArticul">Артикул / Код проекта</label>
-              <input type="text" id="inputArticul" class="form-control" placeholder="PRJ-2026-001">
-            </div>
-
-            <div class="form-group">
-              <label for="inputStatus">Статус проекта</label>
-              <select id="inputStatus" class="form-control">
-                <option value="В РАБОТЕ">В РАБОТЕ</option>
-                <option value="НА СОГЛАСОВАНИИ">НА СОГЛАСОВАНИИ</option>
-                <option value="УТВЕРЖДЕН">УТВЕРЖДЕН</option>
-                <option value="В ПРОИЗВОДСТВО">В ПРОИЗВОДСТВО</option>
-                <option value="АРХИВ">АРХИВ</option>
+              <label for="selectTrade">Тип проекта / Назначение *</label>
+              <select id="selectTrade" class="form-control">
+                <option value="0">Бытовой проект (HF# Home Furniture)</option>
+                <option value="1">Коммерческий проект (CF# Commercial Furniture)</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="inputVersion">Версия проекта</label>
-              <input type="number" id="inputVersion" class="form-control" min="1" value="1">
+              <label for="inputArticul">Артикул проекта *</label>
+              <div class="input-action-group">
+                <input type="text" id="inputArticul" class="form-control font-mono" placeholder="CF#260905_142650_01">
+                <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул по текущей дате и времени">⚡ Создать</button>
+              </div>
+            </div>
+
+            <div class="form-group" id="companyFieldGroup">
+              <label for="inputCompany">Название компании (для коммерческих)</label>
+              <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
             </div>
 
             <div class="form-group">
-              <label for="inputRevision">Ревизия</label>
-              <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+              <label for="inputTags">Теги проекта</label>
+              <input type="text" id="inputTags" class="form-control" placeholder="Кухня, МДФ, эмаль, подсветка, премиум">
+            </div>
+
+            <div class="form-group">
+              <label for="inputFurnitureName">Название мебели / Изделие *</label>
+              <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба">
+            </div>
+
+            <div class="form-group">
+              <label for="inputRoomName">Комната / Помещение / Место установки *</label>
+              <input type="text" id="inputRoomName" class="form-control" placeholder="например: Прихожая, Кухня-гостиная">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputAddress">Адрес установки объекта</label>
+              <input type="text" id="inputAddress" class="form-control" placeholder="например: г. Москва, ул. Никитская, д. 12, кв. 45">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputProjectDescription">Описание проекта / задания</label>
+              <textarea id="inputProjectDescription" class="form-control" rows="2" placeholder="Краткое описание задания и назначения изделия..."></textarea>
             </div>
           </div>
         </div>
 
-        <!-- Section 3: Данные заказчика -->
+        <!-- Section 2: Карточка заказчика (Customer) -->
         <div class="settings-card">
           <div class="card-header">
             <span class="card-header-icon">👤</span>
-            <span class="card-header-title">Данные заказчика</span>
+            <span class="card-header-title">Карточка заказчика (Customer)</span>
           </div>
           <div class="form-grid">
-            <div class="form-group full-width">
-              <label for="inputCustomer">Заказчик / Клиент</label>
-              <input type="text" id="inputCustomer" class="form-control" placeholder="Иванов И.И.">
+            <div class="form-group">
+              <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
+              <div class="input-action-group">
+                <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
+                <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента">⚡ Создать ID</button>
+              </div>
             </div>
 
             <div class="form-group">
-              <label for="inputPhone">Телефон</label>
+              <label for="inputCustomer">ФИО / Контактное лицо *</label>
+              <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
+            </div>
+
+            <div class="form-group">
+              <label for="inputPhone">Номер телефона</label>
               <input type="text" id="inputPhone" class="form-control" placeholder="+7 (999) 000-00-00">
             </div>
 
             <div class="form-group">
-              <label for="inputEmail">Email</label>
+              <label for="inputEmail">Электронная почта (Email)</label>
               <input type="email" id="inputEmail" class="form-control" placeholder="client@example.com">
             </div>
           </div>
         </div>
-      </section>
 
-      <!-- TAB 2: TASK BRIEF & REQUIREMENTS -->
-      <section id="tab-task" class="tab-pane">
-        <!-- Section 1: Техническое задание -->
+        <!-- Section 3: Ход работы и жизненный цикл (Workflow) -->
         <div class="settings-card">
           <div class="card-header">
-            <span class="card-header-icon">🎯</span>
-            <span class="card-header-title">Техническое задание и цели проекта</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group full-width">
-              <label for="inputTaskDescription">Подробное описание задания и задачи проектирования</label>
-              <textarea id="inputTaskDescription" class="form-control" rows="4" placeholder="Опишите задачу проекта, ключевые функциональные требования, состав комплекта и назначение мебели..."></textarea>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section 2: Особенности помещения и замеры -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">📐</span>
-            <span class="card-header-title">Особенности помещения и условия монтажа</span>
+            <span class="card-header-icon">⏱️</span>
+            <span class="card-header-title">Ход работы и жизненный цикл (Workflow)</span>
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label for="inputTaskDimensions">Габариты и привязка к помещению</label>
-              <textarea id="inputTaskDimensions" class="form-control" rows="4" placeholder="Габаритные размеры ниш, высоты чистового потолка, привязка к стенам и коммуникациям..."></textarea>
+              <label for="inputAuthor">Автор / Ответственный конструктор</label>
+              <input type="text" id="inputAuthor" class="form-control" placeholder="например: Иванов И.И.">
             </div>
 
             <div class="form-group">
-              <label for="inputTaskWishes">Особые условия и ограничения</label>
-              <textarea id="inputTaskWishes" class="form-control" rows="4" placeholder="Ограничения по заносу, пожелания по скрытому монтажу, врезке встроенной техники..."></textarea>
+              <label for="inputPrice">Стоимость проекта (руб. / валюта)</label>
+              <input type="text" id="inputPrice" class="form-control" placeholder="например: 125 000">
+            </div>
+
+            <div class="form-group">
+              <label for="inputStartDate">Дата начала проектирования</label>
+              <input type="date" id="inputStartDate" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="inputEndDate">Планируемая дата сдачи (Дедлайн)</label>
+              <input type="date" id="inputEndDate" class="form-control">
+            </div>
+
+            <div class="form-group">
+              <label for="inputTotalDuration">Общая длительность / Трудозатраты</label>
+              <input type="text" id="inputTotalDuration" class="form-control" placeholder="например: 9 дней / 45 часов">
+            </div>
+
+            <div class="form-group">
+              <label for="inputStatus">Стадия проекта</label>
+              <select id="inputStatus" class="form-control">
+                <option value="Предварительный">Предварительный</option>
+                <option value="Правки">Правки</option>
+                <option value="Утвержден">Утвержден</option>
+                <option value="Оплачен">Оплачен</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="inputVersion">Вариант проекта (version)</label>
+              <input type="number" id="inputVersion" class="form-control" min="1" value="1">
+            </div>
+
+            <div class="form-group">
+              <label for="inputRevision">Количество изменений (revision)</label>
+              <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputLastEdit">Комментарий к очередной правке проекта (last_edit)</label>
+              <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
             </div>
           </div>
         </div>
       </section>
-
-      <!-- TAB 3: SPECIFICATIONS & DESCRIPTION -->
-      <section id="tab-spec" class="tab-pane">
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">📝</span>
-            <span class="card-header-title">Описание проекта и спецификации (для страниц PDF)</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group full-width">
-              <label for="inputMaterials">🛠️ Материалы и фурнитура</label>
-              <textarea id="inputMaterials" class="form-control" rows="3" placeholder="Фасады (материал, цвет, покрытие), корпус, фурнитура (направляющие, петли, подъемники), столешницы..."></textarea>
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputAppliances">🔌 Техника и оборудование</label>
-              <textarea id="inputAppliances" class="form-control" rows="3" placeholder="Встраиваемая бытовая техника: варочная панель, духовой шкаф, вытяжка, посудомоечная машина, холодильник, мойка, смеситель..."></textarea>
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputLighting">💡 Подсветка и электрика</label>
-              <textarea id="inputLighting" class="form-control" rows="3" placeholder="LED-лента, цветовая температура (3000K/4000K), мощность, блоки питания 24V, выключатели, схема подключения..."></textarea>
-            </div>
-
-            <div class="form-group full-width">
-              <label for="inputNotes">📋 Пояснительная записка и технические требования</label>
-              <textarea id="inputNotes" class="form-control" rows="3" placeholder="Технические требования, условия монтажа и эксплуатации, особые указания к проекту..."></textarea>
-            </div>
-          </div>
-        </div>
-      </section>
-
-      <!-- TAB 2: SCENES & PAGES -->
+      <!-- TAB 2: SCENES & BLOCK LAYOUT (SPLIT VIEW) -->
       <section id="tab-scenes" class="tab-pane">
-        <div class="scenes-toolbar">
-          <span class="info-text">Настройте сопоставление сцен SketchUp с шаблонами страниц PDF:</span>
-          <div class="scenes-quick-actions">
-            <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes">Выбрать все</button>
-            <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes">Снять выбор</button>
-            <button class="btn btn-xs btn-secondary" id="btnAutoMapScenes">Авто-шаблоны</button>
+        <!-- Scenes Panel (Left) -->
+        <div class="scenes-panel" id="scenesPanel">
+          <div class="scenes-toolbar">
+            <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
+            <div class="scenes-quick-actions">
+              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены">Все</button>
+              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор">Снять</button>
+              <button class="btn btn-xs btn-secondary" id="btnAutoMapScenes" title="Автоматически сопоставить шаблоны">Авто</button>
+            </div>
           </div>
+
+          <div class="table-container">
+            <table class="scenes-table" id="scenesTable">
+              <thead>
+                <tr>
+                  <th width="32" title="Включить в экспорт">Вкл</th>
+                  <th width="42" title="Перетащите строку мышью для изменения порядка следования">№</th>
+                  <th width="170">Сцена SketchUp</th>
+                  <th>Описание на листе</th>
+                  <th width="160">Шаблон страницы</th>
+                </tr>
+              </thead>
+              <tbody id="scenesTableBody">
+                <!-- Dynamically populated via JS -->
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Split Resizer (Draggable divider between pages and blocks) -->
+        <div class="split-resizer" id="scenesSplitResizer" title="Потяните мышью для изменения ширины (двойной клик — сброс)">
+          <div class="resizer-handle"></div>
+        </div>
+
+        <!-- Template & List Settings Panel (Right) -->
+        <div class="template-settings-panel" id="templateSettingsPanel">
+          <!-- Toolbar -->
+          <div class="template-settings-toolbar">
+            <div class="toolbar-group">
+              <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
+              <select id="selectLayoutTemplate" class="form-control toolbar-select">
+                <option value="cover">🏷️ Титульный лист (Cover)</option>
+                <option value="description">📝 Описание и спецификации (Description)</option>
+                <option value="explain">📋 Содержание и ведомость (Explain)</option>
+                <option value="general">🖼️ Общий вид (General)</option>
+                <option value="visual">👁️ Визуализация (Visual)</option>
+              </select>
+              <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
+              <span class="layout-tpl-usage" id="layoutTplUsageBadge" title="Сцены SketchUp, использующие этот шаблон"></span>
+            </div>
+
+            <div class="toolbar-group">
+              <div class="toolbar-margin-control">
+                <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
+                <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
+                <span class="unit-text">мм</span>
+              </div>
+              <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
+                ↺ Сбросить к стандарту
+              </button>
+            </div>
+          </div>
+
+          <!-- Settings Cards List Container -->
+          <div class="template-settings-scroll" id="templateSettingsContainer">
+            <!-- Dynamically populated via renderTemplateSettingsList() in app.js -->
+          </div>
+        </div>
+        </section>
+
+      <!-- TAB: DIRECTORIES, SPECIFICATIONS & PREVIEWS -->
+      <section id="tab-directories" class="tab-pane">
+        <!-- Section 1: Каталоги и спецификации проекта -->
+        <div class="settings-card">
+          <div class="card-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-header-icon">📁</span>
+              <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
+            </div>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory">+ Добавить папку</button>
+          </div>
+          <p class="field-hint" style="margin-bottom: 14px;">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
+          
+          <div id="directoriesCardsContainer" class="directories-cards-container">
+            <!-- Dynamically populated via JS -->
+          </div>
+        </div>
+      </section>
+
+      <!-- TAB 5: HISTORY -->
+      <section id="tab-history" class="tab-pane">
+        <div class="history-toolbar">
+          <span class="info-text">Журнал изменений проекта (workflow.history_edit):</span>
+          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry">+ Добавить правку</button>
         </div>
 
         <div class="table-container">
-          <table class="scenes-table" id="scenesTable">
+          <table class="history-table" id="historyTable">
             <thead>
               <tr>
-                <th width="40">Вкл</th>
-                <th width="40">№</th>
-                <th>Сцена SketchUp</th>
-                <th width="190">Шаблон страницы</th>
-                <th>Описание на листе</th>
-                <th width="70">Порядок</th>
+                <th width="150">Дата и время</th>
+                <th>Комментарий к правке (text)</th>
+                <th width="60">Удалить</th>
               </tr>
             </thead>
-            <tbody id="scenesTableBody">
+            <tbody id="historyTableBody">
               <!-- Dynamically populated via JS -->
             </tbody>
           </table>
         </div>
       </section>
 
-      <!-- TAB: LAYOUT & BLOCK POSITIONING (WYSIWYG) -->
-      <section id="tab-layout" class="tab-pane">
-        <!-- Toolbar -->
-        <div class="layout-toolbar">
-          <div class="layout-toolbar-group">
-            <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
-            <select id="selectLayoutTemplate" class="form-control toolbar-select">
-              <option value="cover">🏷️ Титульный лист (Cover)</option>
-              <option value="description">📝 Описание и спецификации (Description)</option>
-              <option value="explain">📋 Содержание и ведомость (Explain)</option>
-              <option value="general">🖼️ Общий вид (General)</option>
-              <option value="visual">👁️ Визуализация (Visual)</option>
-            </select>
-            <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
-          </div>
-
-          <div class="layout-toolbar-group">
-            <button class="btn btn-xs btn-secondary active" id="btnToggleSnap" title="Магнитная привязка к сетке (шаг 2%)">
-              🧲 Привязка: <span id="snapStatusText">Вкл</span>
-            </button>
-            <button class="btn btn-xs btn-secondary active" id="btnToggleGuides" title="Отображение направляющих полей и координатной сетки">
-              📏 Сетка: <span id="guidesStatusText">Вкл</span>
-            </button>
-          </div>
-
-          <div class="layout-toolbar-group">
-            <div class="zoom-controls">
-              <button class="btn btn-xs btn-secondary" id="btnZoomOut" title="Уменьшить масштаб">➖</button>
-              <span class="zoom-text" id="zoomLevelText">100%</span>
-              <button class="btn btn-xs btn-secondary" id="btnZoomIn" title="Увеличить масштаб">➕</button>
-              <button class="btn btn-xs btn-secondary" id="btnZoomFit" title="Вписать в окно">Fit</button>
-            </div>
-            <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить расположение блоков текущего шаблона к исходным позициям">
-              ↺ Сбросить макет
-            </button>
-          </div>
-        </div>
-
-        <!-- Layout Workspace -->
-        <div class="layout-workspace">
-          <!-- Canvas Area -->
-          <div class="layout-canvas-container" id="layoutCanvasContainer">
-            <div class="layout-page-sheet landscape" id="layoutPageSheet">
-              <div class="sheet-margins-guide"></div>
-              <div class="sheet-grid-overlay" id="sheetGridOverlay"></div>
-              <div class="layout-blocks-layer" id="layoutBlocksLayer">
-                <!-- Dynamically injected blocks with drag handles and resize markers -->
-              </div>
-            </div>
-          </div>
-
-          <!-- Inspector Sidebar -->
-          <aside class="layout-inspector-panel">
-            <!-- Section 1: Layers / Block List -->
-            <div class="inspector-card">
-              <div class="inspector-card-header">
-                <span class="inspector-header-icon">📑</span>
-                <span class="inspector-header-title">Блоки на странице</span>
-              </div>
-              <div class="inspector-blocks-list" id="inspectorBlocksList">
-                <!-- Dynamically generated block layer items -->
-              </div>
-            </div>
-
-            <!-- Section 2: Selected Block Properties -->
-            <div class="inspector-card" id="selectedBlockCard">
-              <div class="inspector-card-header">
-                <span class="inspector-header-icon">🎯</span>
-                <span class="inspector-header-title" id="inspectorSelectedBlockTitle">Свойства блока</span>
-              </div>
-              
-              <div id="inspectorEmptyState" class="inspector-empty-state">
-                <span>Выберите блок на холсте для настройки</span>
-              </div>
-
-              <div id="inspectorPropertiesForm" class="inspector-props-form hidden">
-                <!-- Quick Alignment Toolbar -->
-                <div class="prop-group">
-                  <span class="prop-label">Выравнивание блока</span>
-                  <div class="align-btn-grid">
-                    <button class="btn btn-xs btn-secondary" id="btnAlignLeft" title="Выровнять по левому краю поля">⫷ Влево</button>
-                    <button class="btn btn-xs btn-secondary" id="btnAlignCenterH" title="Выровнять по горизонтальному центру">⫿ Центр</button>
-                    <button class="btn btn-xs btn-secondary" id="btnAlignRight" title="Выровнять по правому краю поля">⫸ Вправо</button>
-                    <button class="btn btn-xs btn-secondary" id="btnAlignTop" title="Выровнять по верхнему краю поля">⫪ Верх</button>
-                    <button class="btn btn-xs btn-secondary" id="btnAlignCenterV" title="Выровнять по вертикальному центру">⫻ Середина</button>
-                    <button class="btn btn-xs btn-secondary" id="btnAlignBottom" title="Выровнять по нижнему краю поля">⫫ Низ</button>
-                    <button class="btn btn-xs btn-secondary full-span" id="btnAlignFullWidth" title="Растянуть блок на всю ширину поля (100%)">↔ Во всю ширину</button>
-                  </div>
-                </div>
-
-                <!-- Coordinates & Dimensions -->
-                <div class="prop-group">
-                  <span class="prop-label">Координаты и размеры (%)</span>
-                  <div class="coords-grid">
-                    <div class="coord-field">
-                      <label for="inputBlockX">X (слева)</label>
-                      <div class="input-unit-wrap">
-                        <input type="number" id="inputBlockX" class="form-control form-control-xs" min="0" max="100" step="0.5">
-                        <span class="unit-badge">%</span>
-                      </div>
-                    </div>
-                    <div class="coord-field">
-                      <label for="inputBlockY">Y (сверху)</label>
-                      <div class="input-unit-wrap">
-                        <input type="number" id="inputBlockY" class="form-control form-control-xs" min="0" max="100" step="0.5">
-                        <span class="unit-badge">%</span>
-                      </div>
-                    </div>
-                    <div class="coord-field">
-                      <label for="inputBlockW">Ширина (W)</label>
-                      <div class="input-unit-wrap">
-                        <input type="number" id="inputBlockW" class="form-control form-control-xs" min="2" max="100" step="0.5">
-                        <span class="unit-badge">%</span>
-                      </div>
-                    </div>
-                    <div class="coord-field">
-                      <label for="inputBlockH">Высота (H)</label>
-                      <div class="input-unit-wrap">
-                        <input type="number" id="inputBlockH" class="form-control form-control-xs" min="1" max="100" step="0.5">
-                        <span class="unit-badge">%</span>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <!-- Text Alignment & Options -->
-                <div class="prop-group" id="blockTypographyGroup">
-                  <span class="prop-label">Выравнивание текста</span>
-                  <div class="text-align-group">
-                    <button class="btn btn-xs btn-secondary" data-align="left" id="btnTextAlignLeft" title="По левому краю">⬅ Влево</button>
-                    <button class="btn btn-xs btn-secondary" data-align="center" id="btnTextAlignCenter" title="По центру">⏸ Центр</button>
-                    <button class="btn btn-xs btn-secondary" data-align="right" id="btnTextAlignRight" title="По правому краю">➡ Вправо</button>
-                  </div>
-                </div>
-
-                <!-- Visibility Toggle -->
-                <div class="prop-group">
-                  <label class="checkbox-label">
-                    <input type="checkbox" id="chkBlockVisible" checked>
-                    <span>Отображать этот блок в PDF</span>
-                  </label>
-                </div>
-              </div>
-            </div>
-
-            <!-- Quick Help / Tips -->
-            <div class="layout-quick-tips">
-              <div class="tip-header">💡 Быстрые подсказки:</div>
-              <ul class="tip-list">
-                <li>Перетаскивайте блоки мышью по холсту</li>
-                <li>Тяните за маркеры по углам для изменения размера</li>
-                <li>Скрывайте ненужные блоки иконкой 👁️</li>
-              </ul>
-            </div>
-          </aside>
-        </div>
-      </section>
-
-      <!-- TAB 3: PDF SETTINGS -->
+      <!-- TAB 6: SETTINGS -->
       <section id="tab-settings" class="tab-pane">
         <!-- Engine Selection Card -->
         <div class="settings-card" style="margin-bottom: 16px;">
@@ -432,100 +350,102 @@
           </div>
         </div>
 
-        <div class="form-grid">
-          <div class="form-group">
-            <label for="selectPageSize">Формат листа</label>
-            <select id="selectPageSize" class="form-control">
-              <option value="A4">A4 (210 x 297 мм)</option>
-              <option value="A3">A3 (297 x 420 мм)</option>
-              <option value="A2">A2 (420 x 594 мм)</option>
-              <option value="LETTER">US Letter</option>
-            </select>
+        <!-- Page and Document Parameters Card -->
+        <div class="settings-card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <span class="card-header-icon">📄</span>
+            <span class="card-header-title">Параметры страницы и документа</span>
           </div>
-
-          <div class="form-group">
-            <label for="selectPageLayout">Ориентация страницы</label>
-            <select id="selectPageLayout" class="form-control">
-              <option value="landscape">Альбомная (Landscape)</option>
-              <option value="portrait">Книжная (Portrait)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="selectQuality">Качество рендера сцен</label>
-            <select id="selectQuality" class="form-control">
-              <option value="1.0">Черновое (Draft, 1x)</option>
-              <option value="2.0" selected>Стандартное HD (2x, 2400px)</option>
-              <option value="3.0">Максимальное Ultra-HD (3x, 3600px)</option>
-            </select>
-          </div>
-
-          <div class="form-group">
-            <label for="selectStamp">Водяной знак / Штамп</label>
-            <select id="selectStamp" class="form-control">
-              <option value="draft">НЕ УТВЕРЖДЕН (Draft)</option>
-              <option value="approved">В ПРОИЗВОДСТВО (Approved)</option>
-              <option value="custom">Пользовательский текст</option>
-              <option value="none">Без водяного знака</option>
-            </select>
-          </div>
-
-          <div class="form-group full-width" id="customStampGroup" style="display: none;">
-            <label for="inputCustomStamp">Текст пользовательского штампа</label>
-            <input type="text" id="inputCustomStamp" class="form-control" placeholder="например: ПРЕДВАРИТЕЛЬНЫЙ ЭСКИЗ">
-          </div>
-
-          <div class="form-group">
-            <label for="inputPrimaryColor">Цвет акцентов / заголовков</label>
-            <div class="color-picker-wrapper">
-              <input type="color" id="inputPrimaryColor" value="#005EB0">
-              <span class="color-hex" id="primaryColorHex">#005EB0</span>
+          <div class="form-grid">
+            <div class="form-group">
+              <label for="selectPageSize">Формат листа</label>
+              <select id="selectPageSize" class="form-control">
+                <option value="A4">A4 (210 x 297 мм)</option>
+                <option value="A3">A3 (297 x 420 мм)</option>
+                <option value="A2">A2 (420 x 594 мм)</option>
+                <option value="LETTER">US Letter</option>
+              </select>
             </div>
-          </div>
 
-          <div class="form-group">
-            <label for="inputStampColor">Цвет водяного знака</label>
-            <div class="color-picker-wrapper">
-              <input type="color" id="inputStampColor" value="#D32F2F">
-              <span class="color-hex" id="stampColorHex">#D32F2F</span>
+            <div class="form-group">
+              <label for="selectPageLayout">Ориентация страницы</label>
+              <select id="selectPageLayout" class="form-control">
+                <option value="landscape">Альбомная (Landscape)</option>
+                <option value="portrait">Книжная (Portrait)</option>
+              </select>
             </div>
-          </div>
 
-          <div class="form-group full-width">
-            <div class="checkbox-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkSaveBackup" checked>
-                <span>Сохранять резервную копию модели (.skp) с номером ревизии</span>
-              </label>
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkAntialias" checked>
-                <span>Сглаживание линий рендера (Antialiasing)</span>
-              </label>
+            <div class="form-group">
+              <label for="inputPageMargin">Отступ по периметру страницы (мм)</label>
+              <input type="number" id="inputPageMargin" class="form-control" min="0" max="100" step="1" value="5">
+              <span class="field-hint">Поля от края листа (в мм) для всех страниц при экспорте</span>
+            </div>
+
+            <div class="form-group">
+              <label for="selectQuality">Качество рендера сцен</label>
+              <select id="selectQuality" class="form-control">
+                <option value="1.0">Черновое (Draft, 1x)</option>
+                <option value="2.0" selected>Стандартное HD (2x, 2400px)</option>
+                <option value="3.0">Максимальное Ultra-HD (3x, 3600px)</option>
+              </select>
+            </div>
+
+            <div class="form-group">
+              <label for="selectStamp">Водяной знак / Штамп</label>
+              <select id="selectStamp" class="form-control">
+                <option value="draft">НЕ УТВЕРЖДЕН (Draft)</option>
+                <option value="approved">В ПРОИЗВОДСТВО (Approved)</option>
+                <option value="custom">Пользовательский текст</option>
+                <option value="none">Без водяного знака</option>
+              </select>
+            </div>
+
+            <div class="form-group full-width" id="customStampGroup" style="display: none;">
+              <label for="inputCustomStamp">Текст пользовательского штампа</label>
+              <input type="text" id="inputCustomStamp" class="form-control" placeholder="например: ПРЕДВАРИТЕЛЬНЫЙ ЭСКИЗ">
+            </div>
+
+            <div class="form-group">
+              <label for="inputPrimaryColor">Цвет акцентов / заголовков</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="inputPrimaryColor" value="#005EB0">
+                <span class="color-hex" id="primaryColorHex">#005EB0</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="inputStampColor">Цвет водяного знака</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="inputStampColor" value="#D32F2F">
+                <span class="color-hex" id="stampColorHex">#D32F2F</span>
+              </div>
+            </div>
+
+            <div class="form-group full-width">
+              <div class="checkbox-group">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chkSaveBackup" checked>
+                  <span>Сохранять резервную копию модели (.skp) с номером ревизии</span>
+                </label>
+                <label class="checkbox-label">
+                  <input type="checkbox" id="chkAntialias" checked>
+                  <span>Сглаживание линий рендера (Antialiasing)</span>
+                </label>
+              </div>
             </div>
           </div>
         </div>
-      </section>
 
-      <!-- TAB 5: HISTORY -->
-      <section id="tab-history" class="tab-pane">
-        <div class="history-toolbar">
-          <span class="info-text">Журнал изменений и ревизий проекта:</span>
-          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry">+ Добавить запись</button>
-        </div>
-
-        <div class="table-container">
-          <table class="history-table" id="historyTable">
-            <thead>
-              <tr>
-                <th width="130">Дата</th>
-                <th>Описание правок / ревизии</th>
-                <th width="60">Удалить</th>
-              </tr>
-            </thead>
-            <tbody id="historyTableBody">
-              <!-- Dynamically populated via JS -->
-            </tbody>
-          </table>
+        <!-- Section: Адресаты API -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon">🌐</span>
+            <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
+          </div>
+          <p class="field-hint" style="margin-bottom: 12px;">Список адресатов из <code>project_config.yaml</code> для отправки данных проекта:</p>
+          <div id="apiTargetsList" class="api-targets-container">
+            <!-- Dynamically populated via JS -->
+          </div>
         </div>
       </section>
     </main>

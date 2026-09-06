@@ -1,0 +1,764 @@
+---
+layout:
+  cover:
+    header:
+      x: 5.0
+      "y": 0.0
+      w: 90.0
+      h: 30.0
+      visible: true
+      content: header_title
+      align: center
+      valign: center
+      font_size: 12.5
+      lines:
+      - room_name
+      - articul
+      - workflow_status
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11.0
+        place_address: 10.0
+        customer_or_company: 10.0
+        scene_name: 11.0
+        scene_description: 9.0
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      opacity: 0.95
+    cover_title:
+      x: 10.0
+      "y": 15.0
+      w: 80.0
+      h: 12.0
+      visible: true
+      align: center
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      align: left
+      font_size: 8
+      lines: []
+      opacity: 0.9
+    slot_1:
+      x: 0
+      "y": 0
+      w: 25
+      h: 58
+      visible: true
+      content: info_lines
+      align: left
+      valign: top
+      font_size: 11
+      lines:
+      - toc_pages
+      opacity: 0.88
+    slot_2:
+      x: 0
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: info_lines
+      align: left
+      valign: bottom
+      font_size: 8
+      lines:
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    slot_3:
+      x: 75
+      "y": 0
+      w: 25
+      h: 58
+      visible: true
+      content: info_lines
+      align: right
+      valign: top
+      font_size: 11
+      lines:
+      - workflow_history
+      opacity: 0.88
+    slot_4:
+      x: 75
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: info_lines
+      align: right
+      valign: bottom
+      font_size: 8
+      lines:
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    footer:
+      x: 0.0
+      "y": 96.0
+      w: 100.0
+      h: 4.0
+      visible: true
+      content: footer_info
+      align: center
+      valign: center
+      font_size: 8.5
+      lines:
+      - footer_last_edit
+      - footer_ver_rev
+      - footer_articul
+      - footer_date
+      - footer_page_total
+      opacity: 1
+      line_aligns:
+        footer_last_edit: left
+        footer_ver_rev: center
+        footer_articul: center
+        footer_date: center
+        footer_page_total: right
+    cover_accent_bar:
+      x: 0.0
+      "y": 0.0
+      w: 100.0
+      h: 1.5
+      visible: true
+    cover_articul:
+      x: 65.0
+      "y": 2.5
+      w: 35.0
+      h: 4.0
+      visible: true
+      align: right
+    cover_subtitle:
+      x: 5.0
+      "y": 19.0
+      w: 90.0
+      h: 5.0
+      visible: false
+      align: center
+    cover_divider:
+      x: 0.0
+      "y": 16.5
+      w: 100.0
+      h: 0.5
+      visible: true
+    cover_hero_image:
+      x: 0.0
+      "y": 19.0
+      w: 56.0
+      h: 76.0
+      visible: true
+    cover_project_card:
+      x: 59.0
+      "y": 19.0
+      w: 41.0
+      h: 46.0
+      visible: true
+    cover_history_card:
+      x: 59.0
+      "y": 67.0
+      w: 41.0
+      h: 28.0
+      visible: true
+  description:
+    header:
+      x: 25
+      "y": 0.0
+      w: 50
+      h: 30.0
+      visible: true
+      content: header_title
+      align: center
+      valign: center
+      font_size: 11
+      lines:
+      - furniture_name
+      - place_address
+      - customer_or_company
+      - scene_name
+      - scene_description
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      opacity: 0.95
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      align: left
+      font_size: 8
+      lines: []
+      opacity: 0.9
+    slot_1:
+      x: 0.0
+      "y": 10.0
+      w: 28.0
+      h: 40.0
+      visible: true
+      content: project_card
+      align: right
+      valign: top
+      font_size: 9.0
+      lines:
+      - room_name
+      - furniture_name
+      - workflow_price
+      opacity: 0.88
+    slot_2:
+      x: 0
+      "y": 58
+      w: 25
+      h: 36
+      visible: true
+      content: info_lines
+      align: left
+      valign: bottom
+      font_size: 8
+      lines:
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    slot_3:
+      x: 75
+      "y": 0
+      w: 25
+      h: 58
+      visible: true
+      content: info_lines
+      align: right
+      valign: top
+      font_size: 8
+      lines:
+      - toc_pages
+      - spec_materials
+      - spec_appliances
+      - general_notes
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    slot_4:
+      x: 75
+      "y": 58
+      w: 25
+      h: 36
+      visible: true
+      content: info_lines
+      align: right
+      valign: bottom
+      font_size: 8
+      lines:
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    footer:
+      x: 0.0
+      "y": 96.0
+      w: 100.0
+      h: 4.0
+      visible: true
+      content: footer_info
+      align: center
+      valign: center
+      font_size: 8.5
+      lines:
+      - footer_last_edit
+      - footer_ver_rev
+      - footer_articul
+      - footer_date
+      - footer_page_total
+      opacity: 1
+      line_aligns:
+        footer_last_edit: left
+        footer_ver_rev: center
+        footer_articul: center
+        footer_date: center
+        footer_page_total: right
+    desc_header:
+      x: 0.0
+      "y": 0.0
+      w: 100.0
+      h: 7.0
+      visible: true
+    desc_materials:
+      x: 0.0
+      "y": 12.0
+      w: 45.0
+      h: 25.0
+      visible: true
+    desc_appliances:
+      x: 0.0
+      "y": 31.0
+      w: 52.0
+      h: 20.0
+      visible: true
+    desc_lighting:
+      x: 0.0
+      "y": 53.0
+      w: 52.0
+      h: 20.0
+      visible: true
+    desc_notes:
+      x: 0.0
+      "y": 75.0
+      w: 52.0
+      h: 20.0
+      visible: true
+    desc_image:
+      x: 48.0
+      "y": 12.0
+      w: 52.0
+      h: 80.0
+      visible: true
+  explain:
+    header:
+      x: 25
+      "y": 0.0
+      w: 50
+      h: 30.0
+      visible: true
+      content: header_title
+      align: center
+      valign: center
+      font_size: 11
+      lines:
+      - furniture_name
+      - place_address
+      - customer_or_company
+      - scene_name
+      - scene_description
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      opacity: 0.95
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      align: left
+      font_size: 8
+      lines: []
+      opacity: 0.9
+    slot_1:
+      x: 0
+      "y": 0
+      w: 25
+      h: 58
+      visible: true
+      content: info_lines
+      align: left
+      valign: top
+      font_size: 8
+      lines:
+      - toc_pages
+      - spec_materials
+      - spec_appliances
+      - general_notes
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    slot_2:
+      x: 0
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: none
+      align: left
+      valign: bottom
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    slot_3:
+      x: 75
+      "y": 0
+      w: 25
+      h: 58
+      visible: true
+      content: info_lines
+      align: right
+      valign: top
+      font_size: 8
+      lines:
+      - toc_pages
+      - spec_materials
+      - spec_appliances
+      - general_notes
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    slot_4:
+      x: 75
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: none
+      align: right
+      valign: bottom
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    footer:
+      x: 0.0
+      "y": 96.0
+      w: 100.0
+      h: 4.0
+      visible: true
+      content: footer_info
+      align: center
+      valign: center
+      font_size: 8.5
+      lines:
+      - footer_last_edit
+      - footer_ver_rev
+      - footer_articul
+      - footer_date
+      - footer_page_total
+      opacity: 1
+      line_aligns:
+        footer_last_edit: left
+        footer_ver_rev: center
+        footer_articul: center
+        footer_date: center
+        footer_page_total: right
+    explain_header:
+      x: 0.0
+      "y": 0.0
+      w: 100.0
+      h: 7.0
+      visible: true
+    explain_toc:
+      x: 0.0
+      "y": 9.0
+      w: 48.0
+      h: 86.0
+      visible: true
+    explain_specs:
+      x: 52.0
+      "y": 9.0
+      w: 48.0
+      h: 35.0
+      visible: true
+    explain_image:
+      x: 52.0
+      "y": 47.0
+      w: 48.0
+      h: 48.0
+      visible: true
+  general:
+    header:
+      x: 25
+      "y": 0.0
+      w: 50
+      h: 30.0
+      visible: true
+      content: header_title
+      align: center
+      valign: center
+      font_size: 11
+      lines:
+      - furniture_name
+      - place_address
+      - customer_or_company
+      - scene_name
+      - scene_description
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      opacity: 0.95
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      align: left
+      font_size: 8
+      lines: []
+      opacity: 0.9
+    slot_1:
+      x: 0
+      "y": 0
+      w: 25
+      h: 58
+      visible: false
+      content: none
+      align: left
+      valign: top
+      font_size: 14
+      lines: []
+      opacity: 0.88
+    slot_2:
+      x: 0
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: none
+      align: left
+      valign: bottom
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    slot_3:
+      x: 75
+      "y": 0
+      w: 25
+      h: 58
+      visible: false
+      content: none
+      align: right
+      valign: top
+      font_size: 14
+      lines: []
+      opacity: 0.88
+    slot_4:
+      x: 75
+      "y": 58
+      w: 25
+      h: 36
+      visible: true
+      content: info_lines
+      align: right
+      valign: bottom
+      font_size: 8
+      lines:
+      - workflow_history
+      - workflow_stadia
+      opacity: 0.88
+    footer:
+      x: 0.0
+      "y": 96.0
+      w: 100.0
+      h: 4.0
+      visible: true
+      content: footer_info
+      align: center
+      valign: center
+      font_size: 8.5
+      lines:
+      - footer_last_edit
+      - footer_ver_rev
+      - footer_articul
+      - footer_date
+      - footer_page_total
+      opacity: 1
+      line_aligns:
+        footer_last_edit: left
+        footer_ver_rev: center
+        footer_articul: center
+        footer_date: center
+        footer_page_total: right
+    general_header:
+      x: 0.0
+      "y": 0.0
+      w: 100.0
+      h: 7.0
+      visible: true
+    general_image:
+      x: 0.0
+      "y": 9.0
+      w: 100.0
+      h: 73.0
+      visible: true
+    general_note:
+      x: 0.0
+      "y": 84.0
+      w: 100.0
+      h: 11.0
+      visible: true
+  visual:
+    header:
+      x: 25
+      "y": 0.0
+      w: 50
+      h: 30.0
+      visible: true
+      content: header_title
+      align: center
+      valign: center
+      font_size: 11
+      lines:
+      - furniture_name
+      - place_address
+      - customer_or_company
+      - scene_name
+      - scene_description
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      opacity: 0.95
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      align: left
+      font_size: 8
+      lines: []
+      opacity: 0.9
+    slot_1:
+      x: 0
+      "y": 0
+      w: 25
+      h: 58
+      visible: false
+      content: none
+      align: left
+      valign: top
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    slot_2:
+      x: 0
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: none
+      align: left
+      valign: bottom
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    slot_3:
+      x: 75
+      "y": 0
+      w: 25
+      h: 58
+      visible: false
+      content: none
+      align: right
+      valign: top
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    slot_4:
+      x: 75
+      "y": 58
+      w: 25
+      h: 36
+      visible: false
+      content: none
+      align: right
+      valign: bottom
+      font_size: 8
+      lines: []
+      opacity: 0.88
+    footer:
+      x: 0.0
+      "y": 96.0
+      w: 100.0
+      h: 4.0
+      visible: true
+      content: footer_info
+      align: center
+      valign: center
+      font_size: 8.5
+      lines:
+      - footer_last_edit
+      - footer_ver_rev
+      - footer_articul
+      - footer_date
+      - footer_page_total
+      opacity: 1
+      line_aligns:
+        footer_last_edit: left
+        footer_ver_rev: center
+        footer_articul: center
+        footer_date: center
+        footer_page_total: right
+    visual_header:
+      x: 0.0
+      "y": 0.0
+      w: 100.0
+      h: 6.0
+      visible: true
+    visual_image:
+      x: 0.0
+      "y": 7.0
+      w: 100.0
+      h: 88.0
+      visible: true
