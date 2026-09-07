@@ -70,12 +70,82 @@ module Sketchup
   end
 
   class MockView
+    attr_accessor :vpwidth, :vpheight, :drawing_color, :line_width, :line_stipple, :drawn_elements
+
+    def initialize
+      @vpwidth = 1920.0
+      @vpheight = 1080.0
+      @drawing_color = nil
+      @line_width = 1
+      @line_stipple = ""
+      @drawn_elements = []
+    end
+
+    def draw2d(mode, pts)
+      @drawn_elements << { mode: mode, pts: pts, color: @drawing_color }
+    end
+
+    def draw_text(pos, text, options = nil)
+      @drawn_elements << { mode: :text, pos: pos, text: text, options: options }
+    end
+
+    def invalidate
+      true
+    end
+
     def write_image(options = {})
       filename = options[:filename]
       width = options[:width] || 800
       height = options[:height] || 600
       DN1Code::ExportPdf2::Service::RenderService.create_fallback_image(filename, width, height)
       true
+    end
+  end
+
+  class Overlay
+    attr_reader :overlay_id, :name, :description
+    attr_accessor :enabled
+
+    def initialize(overlay_id, name, options = {})
+      @overlay_id = overlay_id
+      @name = name
+      @description = options[:description] || ""
+      @enabled = false
+    end
+
+    def enabled?
+      @enabled == true
+    end
+
+    def draw(view); end
+  end
+
+  class MockOverlaysCollection
+    include Enumerable
+
+    def initialize
+      @overlays = []
+    end
+
+    def add(overlay)
+      @overlays << overlay unless @overlays.include?(overlay)
+      overlay
+    end
+
+    def remove(overlay)
+      @overlays.delete(overlay)
+    end
+
+    def each(&block)
+      @overlays.each(&block)
+    end
+
+    def size
+      @overlays.size
+    end
+
+    def [](idx)
+      @overlays[idx]
     end
   end
 
@@ -97,12 +167,13 @@ module Sketchup
   end
 
   class MockModel
-    attr_accessor :path, :pages, :active_view, :attributes, :observers
+    attr_accessor :path, :pages, :active_view, :attributes, :observers, :overlays
 
     def initialize(path = "U:/Projects/SampleProject/model.skp")
       @path = path
       @pages = MockPages.new
       @active_view = MockView.new
+      @overlays = MockOverlaysCollection.new
       @attributes = {}
       @observers = []
     end
@@ -186,6 +257,35 @@ module Sketchup
   end
 end
 
+module Geom
+  class Point3d
+    attr_accessor :x, :y, :z
+
+    def initialize(x = 0.0, y = 0.0, z = 0.0)
+      @x = x.to_f
+      @y = y.to_f
+      @z = z.to_f
+    end
+
+    def to_a
+      [@x, @y, @z]
+    end
+  end
+
+  class Point2d
+    attr_accessor :x, :y
+
+    def initialize(x = 0.0, y = 0.0)
+      @x = x.to_f
+      @y = y.to_f
+    end
+
+    def to_a
+      [@x, @y]
+    end
+  end
+end
+
 class SketchupExtension
   attr_accessor :name, :description, :version, :copyright, :creator
 
@@ -214,6 +314,7 @@ module UI
     def initialize(name); end
     def add_submenu(name); self; end
     def add_item(name, &block); self; end
+    def set_validation_proc(item = nil, &block); true; end
   end
 
   class Toolbar
@@ -225,7 +326,11 @@ module UI
   class Command
     attr_accessor :tooltip, :status_bar_text, :small_icon, :large_icon
     def initialize(name, &block); end
+    def set_validation_proc(&block); true; end
   end
+
+  MF_CHECKED   = 1 unless defined?(MF_CHECKED)
+  MF_UNCHECKED = 0 unless defined?(MF_UNCHECKED)
 
   class HtmlDialog
     STYLE_DIALOG = 1
@@ -238,6 +343,10 @@ module UI
     def execute_script(code); end
   end
 end
+
+GL_QUADS     = 7 unless defined?(GL_QUADS)
+GL_LINES     = 1 unless defined?(GL_LINES)
+GL_LINE_LOOP = 2 unless defined?(GL_LINE_LOOP)
 
 def file_loaded?(file)
   $LOADED_FEATURES_MOCK ||= []

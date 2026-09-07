@@ -55,10 +55,15 @@ module DN1Code
           total_pages = enabled_scenes.size
           created_temp_files = []
 
+          ratio_info = Service::OverlayService.calculate_target_info(@model) if defined?(Service::OverlayService)
+          target_aspect = ratio_info ? ratio_info[:ratio] : nil
+
           render_opts = {
-            image_width:  settings[:image_width] || 2400,
-            scale_factor: settings[:scale_factor] || 2.0,
-            antialias:    settings.fetch(:antialias, true)
+            image_width:        settings[:image_width] || 2400,
+            scale_factor:       settings[:scale_factor] || 2.0,
+            antialias:          settings.fetch(:antialias, true),
+            aspect_ratio:       target_aspect,
+            image_aspect_ratio: settings[:image_aspect_ratio]
           }
 
           begin
@@ -68,10 +73,19 @@ module DN1Code
 
               ctrl_class = PAGE_CONTROLLERS[scene_item.page_type] || GeneralPage
 
+              scene_tpl_key = (scene_item.page_type || :general).to_sym
+              scene_render_opts = render_opts.dup
+              if defined?(Service::OverlayService)
+                scene_aspect_info = Service::OverlayService.calculate_target_info(@model, { template_key: scene_tpl_key })
+                if scene_aspect_info && scene_aspect_info[:ratio]
+                  scene_render_opts[:aspect_ratio] = scene_aspect_info[:ratio]
+                end
+              end
+
               image_for_page = if scene_item.image_override && File.exist?(scene_item.image_override)
                                  scene_item.image_override
                                else
-                                 temp_img = Service::RenderService.render_scene_temp(@model, scene_item.scene_ref, render_opts)
+                                 temp_img = Service::RenderService.render_scene_temp(@model, scene_item.scene_ref, scene_render_opts)
                                  created_temp_files << temp_img
                                  temp_img
                                end

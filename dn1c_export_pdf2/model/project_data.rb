@@ -53,11 +53,19 @@ module DN1Code
               end
             when :name_project
               super(:name_project, val.to_s)
-            when :product, :name_product, :furniture_name
-              @owner.project[:product] = val.to_s
-              super(:product, val.to_s)
-              super(:name_product, val.to_s)
-              super(:furniture_name, val.to_s)
+            when :product, :name_product, :furniture_name, :product_tags
+              tags_arr = if val.is_a?(Array)
+                           val.map(&:to_s).map(&:strip).reject(&:empty?)
+                         else
+                           val.to_s.split(",").map(&:strip).reject(&:empty?)
+                         end
+              prod_str = val.is_a?(Array) ? tags_arr.join(", ") : val.to_s
+              @owner.project[:product_tags] = tags_arr
+              @owner.project[:product] = prod_str
+              super(:product_tags, tags_arr)
+              super(:product, prod_str)
+              super(:name_product, prod_str)
+              super(:furniture_name, prod_str)
             when :place, :name_place, :room_name
               @owner.project[:place] = val.to_s
               super(:place, val.to_s)
@@ -123,6 +131,10 @@ module DN1Code
             when :status
               @owner.workflow[:status] = val.to_s
               super(:status, val.to_s)
+            when :stadia
+              norm = @owner.normalize_stadia(val)
+              @owner.workflow[:stadia] = norm
+              super(:stadia, norm)
             when :version
               v_int = val.to_i rescue 1
               v_int = 1 if v_int <= 0
@@ -137,6 +149,9 @@ module DN1Code
               @owner.workflow[:last_edit] = val.to_s
               super(:last_edit, val.to_s)
               super(:edit, val.to_s)
+            when :history_edit
+              @owner.workflow[:history_edit] = val
+              super(:history_edit, val)
             when :notes, :materials, :appliances, :lighting, :task_dimensions, :task_wishes
               @owner.project[k_sym] = val if @owner.project.is_a?(Hash)
               super(k_sym, val)
@@ -178,6 +193,17 @@ module DN1Code
         # @return [Array<Hash>, Hash] каталоги проекта и настройки их отображения
         attr_accessor :directories
 
+        # @return [Hash] конфигурация макетов страниц (прокси к @pdf_settings[:custom_layouts])
+        def custom_layouts
+          @pdf_settings ||= {}
+          @pdf_settings[:custom_layouts] ||= default_custom_layouts
+        end
+
+        def custom_layouts=(val)
+          @pdf_settings ||= {}
+          @pdf_settings[:custom_layouts] = val
+        end
+
         # Инициализирует новый экземпляр ProjectData со значениями по умолчанию
         def initialize
           @project      = default_project
@@ -215,6 +241,9 @@ module DN1Code
                     end
               if raw.is_a?(Hash)
                 data = self.class.deep_symbolize_keys(raw)
+                if data[:api_targets].is_a?(Array)
+                  @api_targets = data[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
+                end
                 pdf_cfg = data[:pdf_settings] || data
                 if pdf_cfg.is_a?(Hash)
                   layouts_backup = @pdf_settings ? @pdf_settings[:custom_layouts] : nil
@@ -249,7 +278,8 @@ module DN1Code
           pdf_clean.delete("custom_layouts")
 
           settings_data = {
-            "pdf_settings" => self.class.deep_stringify_keys(pdf_clean)
+            "pdf_settings" => self.class.deep_stringify_keys(pdf_clean),
+            "api_targets"  => (@api_targets || []).map(&:to_s).map(&:strip).reject(&:empty?)
           }
           File.open(PROGRAM_SETTINGS_FILE, "w:utf-8") do |f|
             f.write settings_data.to_yaml
@@ -269,6 +299,7 @@ module DN1Code
         def default_project
           {
             articul:      "",
+            product_tags: [],
             product:      "",
             place:        "",
             adress:       "",
@@ -291,6 +322,57 @@ module DN1Code
           }
         end
 
+        # Возвращает эталонный список стадий проекта (по умолчанию из project.yaml)
+        # @return [Array<Hash>]
+        def default_stadia
+          [
+            { name: "Предварительный проект", status: true },
+            { name: "Правки проекта (история правок)", status: true },
+            { name: "Выбраны материалы и фурнитура", status: true },
+            { name: "Предварительно Утвержден", status: false },
+            { name: "Проверка технологом", status: false },
+            { name: "Утвержден", status: false },
+            { name: "Отправлен в производство", status: false },
+            { name: "Оплачен", status: false }
+          ]
+        end
+
+        # Нормализует список стадий к массиву хэшей [{ name: "...", status: true/false }]
+        # @param val [Object]
+        # @return [Array<Hash>]
+        def normalize_stadia(val)
+          return default_stadia if val.nil?
+
+          if val.is_a?(Array)
+            return default_stadia if val.empty?
+            val.map do |st|
+              if st.is_a?(Hash)
+                nm = (st[:name] || st["name"] || st[:title] || st["title"]).to_s.strip
+                s  = (st[:status] == true || st["status"] == true || st[:status].to_s == "true" || st["status"].to_s == "true")
+                { name: nm, status: s }
+              elsif st.is_a?(Array)
+                if st.size >= 3
+                  { name: st[2].to_s.strip, status: (st[1] == true || st[1].to_s == "true") }
+                elsif st.size == 2
+                  if st[1] == true || st[1] == false || st[1].to_s == "true" || st[1].to_s == "false"
+                    { name: st[0].to_s.strip, status: (st[1] == true || st[1].to_s == "true") }
+                  else
+                    { name: st[1].to_s.strip, status: (st[0] == true || st[0].to_s == "true") }
+                  end
+                else
+                  { name: st[0].to_s.strip, status: false }
+                end
+              else
+                { name: st.to_s.strip, status: false }
+              end
+            end
+          elsif val.is_a?(String) && !val.strip.empty?
+            [{ name: val.strip, status: true }]
+          else
+            default_stadia
+          end
+        end
+
         # Возвращает параметры хода работы над проектом по умолчанию
         # @return [Hash]
         def default_workflow
@@ -303,6 +385,7 @@ module DN1Code
             status:         "Правки",
             version:        "01",
             revision:       "001",
+            stadia:         default_stadia,
             history_edit:   []
           }
         end
@@ -430,54 +513,61 @@ module DN1Code
             "workflow_version" => "#334155", "workflow_date" => "#334155", "articul" => "#334155"
           }
 
+          default_ftr_lines = ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"]
+          default_ftr_aligns = {
+            "footer_last_edit" => "left", "footer_ver_rev" => "center", "footer_articul" => "center",
+            "footer_date" => "center", "footer_page_total" => "right"
+          }
+
           {
             cover: {
-              header:      { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
+              header:      { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 13.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               cover_title: { x: 10.0, y: 15.0, w: 80.0, h: 12.0, visible: true, align: "center" },
               image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "left", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["articul", "workflow_date", "workflow_version", "workflow_revision", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
+              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
+              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
+              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
             },
             description: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
+              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "left", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["spec_materials", "spec_appliances", "general_notes"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
+              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
+              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.5, lines: ["spec_materials", "spec_appliances"], opacity: 0.88 },
+              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
             },
             explain: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
+              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, lines: default_mid_lines.dup, line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["toc_pages", "general_notes", "workflow_history", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"], opacity: 0.88 },
+              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "workflow_history"], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
             },
             general: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
+              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["general_notes", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
             },
             visual: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "center", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
+              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 10.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "left", valign: "top", font_size: 8.0, lines: [], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
+              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_rev_ver_date", "footer_page_total"], opacity: 1.0 }
+              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
             }
           }
+
         end
 
         # Возвращает базовые настройки экспорта PDF по умолчанию
@@ -492,6 +582,14 @@ module DN1Code
             margin:             15,
             margin_mm:          5,
             image_width:        2400,
+            image_aspect_ratio: "page",
+            custom_ratio_w:     16,
+            custom_ratio_h:     9,
+            show_aspect_overlay: false,
+            overlay_border_color:   "#0EA5E9",
+            overlay_border_opacity: 100,
+            overlay_mask_color:     "#0F172A",
+            overlay_mask_opacity:   55,
             scale_factor:       2.0,
             antialias:          true,
             stamp_type:         "draft",
@@ -545,7 +643,21 @@ module DN1Code
           @project_info[:trade]   = is_comm ? "1" : "0"
 
           # --- 2. Изделие и помещение (Product / Place) ---
+          prod_tags = @project[:product_tags] || @project_info[:product_tags]
+          if prod_tags.is_a?(String)
+            prod_tags = prod_tags.split(",").map(&:strip).reject(&:empty?)
+          end
+          prod_tags = [] unless prod_tags.is_a?(Array)
+
           prod = self.class.pick_str(@project[:product], @project_info[:name_product], @project_info[:furniture_name])
+          if prod_tags.empty? && !prod.empty?
+            prod_tags = prod.split(",").map(&:strip).reject(&:empty?)
+          elsif prod.empty? && !prod_tags.empty?
+            prod = prod_tags.join(", ")
+          end
+
+          @project[:product_tags]        = prod_tags
+          @project_info[:product_tags]   = prod_tags
           @project[:product]             = prod
           @project_info[:name_product]   = prod
           @project_info[:furniture_name] = prod
@@ -619,7 +731,17 @@ module DN1Code
           @workflow[:total_duration]     = w_dur
           @project_info[:total_duration] = w_dur
 
-          w_status = self.class.pick_str(@workflow[:status], @project_info[:status], "Предварительный")
+          # Стадии проекта (Stadia)
+          st_raw = @workflow[:stadia] || @project_info[:stadia]
+          norm_stadia = normalize_stadia(st_raw)
+          @workflow[:stadia]     = norm_stadia
+          @project_info[:stadia] = norm_stadia
+
+          w_status = self.class.pick_str(@workflow[:status], @project_info[:status])
+          if w_status.empty?
+            last_done = norm_stadia.reverse.find { |s| s[:status] == true }
+            w_status = last_done ? last_done[:name] : "Предварительный"
+          end
           @workflow[:status]     = w_status
           @project_info[:status] = w_status
 
@@ -726,23 +848,43 @@ module DN1Code
 
           if @workflow[:history_edit].empty? && !@history.empty?
             @workflow[:history_edit] = @history.map do |h|
-              d = h[:date] || h["date"] || ""
-              t = h[:text] || h["text"] || h[:description] || h["description"] || ""
-              [d.to_s, t.to_s]
+              d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
+              t = (h[:edit] || h[:text] || h["edit"] || h["text"] || h[:description] || h["description"] || "").to_s
+              [d, t]
             end
           elsif !@workflow[:history_edit].empty? && @history.empty?
             @history = @workflow[:history_edit].map do |item|
               if item.is_a?(Array)
                 d = item[0].to_s
                 t = item[1].to_s
+                lnk = item[2].to_s
               elsif item.is_a?(Hash)
-                d = (item[:date] || item["date"]).to_s
-                t = (item[:text] || item["text"] || item[:description] || item["description"]).to_s
+                d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
+                t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
+                lnk = (item[:pdf_link] || item["pdf_link"]).to_s
               else
                 d = ""
                 t = item.to_s
+                lnk = ""
               end
-              { date: d, text: t, description: t }
+              { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
+            end
+          else
+            @history = @history.map do |item|
+              if item.is_a?(Array)
+                d = item[0].to_s
+                t = item[1].to_s
+                lnk = item[2].to_s
+              elsif item.is_a?(Hash)
+                d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
+                t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
+                lnk = (item[:pdf_link] || item["pdf_link"]).to_s
+              else
+                d = ""
+                t = item.to_s
+                lnk = ""
+              end
+              { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
             end
           end
         end
@@ -1008,6 +1150,13 @@ module DN1Code
 
           # 2. Сохранение макетов страниц программы плагина
           save_to_layout_yaml(PROGRAM_LAYOUT_FILE)
+
+          # Сохранение в локальный layout.yaml проекта, если он существует рядом с моделью
+          if model.respond_to?(:path) && !model.path.to_s.empty?
+            model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
+            local_layout = File.join(model_dir, "layout.yaml")
+            save_to_layout_yaml(local_layout) if File.exist?(local_layout)
+          end
 
           # 3. Сохранение в библиотеку модели (атрибуты)
           save_to_model(model)
@@ -1445,6 +1594,7 @@ module DN1Code
                   if slot_id.to_s == "header"
                     @pdf_settings[:custom_layouts][page_key][slot_id][:y] = 0.0
                     @pdf_settings[:custom_layouts][page_key][slot_id][:h] = 30.0
+                    @pdf_settings[:custom_layouts][page_key][slot_id][:valign] ||= "top"
                     @pdf_settings[:custom_layouts][page_key][slot_id][:line_rows] ||= { "furniture_name" => 1, "place_address" => 2, "customer_or_company" => 3, "scene_name" => 4, "scene_description" => 5 }
                     @pdf_settings[:custom_layouts][page_key][slot_id][:line_font_sizes] ||= { "furniture_name" => 11.0, "place_address" => 10.0, "customer_or_company" => 10.0, "scene_name" => 11.0, "scene_description" => 9.0 }
                     @pdf_settings[:custom_layouts][page_key][slot_id][:line_colors] ||= { "furniture_name" => "#005EB0", "place_address" => "#0F172A", "customer_or_company" => "#0F172A", "scene_name" => "#005EB0", "scene_description" => "#475569" }
@@ -1452,6 +1602,22 @@ module DN1Code
                   if slot_id.to_s == "image_4_3"
                     @pdf_settings[:custom_layouts][page_key][slot_id][:aspect_ratio] ||= "4:3"
                     @pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] = (@pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] || 100).to_i
+                  end
+                  if slot_id.to_s == "slot_1"
+                    cfg = @pdf_settings[:custom_layouts][page_key][slot_id]
+                    if cfg.is_a?(Hash)
+                      c = (cfg[:content] || cfg["content"]).to_s
+                      lines = cfg[:lines] || cfg["lines"]
+                      if c.empty?
+                        cfg[:content] = "info_lines"
+                      end
+                      if lines.nil?
+                        def_tpl = default_custom_layouts[page_key.to_sym]
+                        def_lines = def_tpl && def_tpl[:slot_1] && def_tpl[:slot_1][:lines]
+                        cfg[:lines] = def_lines ? def_lines.dup : ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"]
+                      end
+                      cfg[:item_gap_mm] = (cfg[:item_gap_mm] || cfg["item_gap_mm"] || cfg[:item_gap] || cfg["item_gap"] || 2.0).to_f
+                    end
                   end
                 end
               end
@@ -1481,6 +1647,19 @@ module DN1Code
                 hdr[:h] = 30.0 if hdr.key?(:h)
                 hdr["h"] = 30.0 if hdr.key?("h")
                 hdr[:h] ||= 30.0
+              end
+              s1 = page_slots[:slot_1] || page_slots["slot_1"]
+              if s1.is_a?(Hash)
+                c = (s1[:content] || s1["content"]).to_s
+                if c.empty? || c == "none"
+                  s1[:content] = "info_lines" if s1.key?(:content)
+                  s1["content"] = "info_lines" if s1.key?("content")
+                  s1[:content] ||= "info_lines"
+                end
+                gap_val = (s1[:item_gap_mm] || s1["item_gap_mm"] || s1[:item_gap] || s1["item_gap"] || 2.0).to_f
+                s1[:item_gap_mm] = gap_val if s1.key?(:item_gap_mm)
+                s1["item_gap_mm"] = gap_val if s1.key?("item_gap_mm")
+                s1[:item_gap_mm] ||= gap_val
               end
             end
           end
@@ -1546,7 +1725,19 @@ module DN1Code
               if has_modular
                 @project.merge!(root[:project]) if root[:project].is_a?(Hash)
                 @customer.merge!(root[:customer]) if root[:customer].is_a?(Hash)
-                @workflow.merge!(root[:workflow]) if root[:workflow].is_a?(Hash)
+                if root[:workflow].is_a?(Hash)
+                  @workflow.merge!(root[:workflow])
+                  unless root[:workflow].key?(:status)
+                    @workflow[:status] = ""
+                    @project_info.delete(:status) if @project_info
+                  end
+                  if root[:workflow][:stadia]
+                    @workflow[:stadia] = normalize_stadia(root[:workflow][:stadia])
+                  end
+                end
+                if root[:project].is_a?(Hash) && root[:project][:product_tags]
+                  @project[:product_tags] = root[:project][:product_tags]
+                end
               else
                 # Старый плоский формат (все данные лежали внутри project или project_info)
                 src = root[:project] || root[:project_info] || {}
@@ -1577,20 +1768,26 @@ module DN1Code
                 end
               end
 
-              # Загрузка истории изменений из YAML (если есть)
-              if root[:workflow].is_a?(Hash) && root[:workflow][:history_edit].is_a?(Array)
-                @workflow[:history_edit] = root[:workflow][:history_edit]
-                @history = []
-                sync_history_entries!
-              elsif root[:history].is_a?(Array) && !root[:history].empty?
-                @history = root[:history].map do |item|
-                  txt = item[:text] || item[:description] || ""
-                  {
-                    date:        item[:date].to_s,
-                    text:        txt.to_s,
-                    description: txt.to_s
-                  }
+              # Загрузка истории изменений из YAML (поддержка root[:history_edit], root[:workflow][:history_edit], root[:history])
+              raw_hist = root[:history_edit] || (root[:workflow].is_a?(Hash) && root[:workflow][:history_edit]) || root[:history]
+              if raw_hist.is_a?(Array) && !raw_hist.empty?
+                @history = raw_hist.map do |item|
+                  if item.is_a?(Array)
+                    d = item[0].to_s
+                    t = item[1].to_s
+                    lnk = item[2].to_s
+                  elsif item.is_a?(Hash)
+                    d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
+                    t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
+                    lnk = (item[:pdf_link] || item["pdf_link"]).to_s
+                  else
+                    d = ""
+                    t = item.to_s
+                    lnk = ""
+                  end
+                  { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
                 end
+                @workflow[:history_edit] = @history.map { |h| [h[:data], h[:edit]] }
                 sync_history_entries!
               end
 
@@ -1672,14 +1869,17 @@ module DN1Code
           # 1. Секция project (Паспорт объекта)
           prj_out = {
             articul:      @project[:articul].to_s,
-            product:      @project[:product].to_s,
+            product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,
             description:  @project[:description].to_s,
-            tags:         @project[:tags] || [],
             commercial:   @project[:commercial] == true
           }
-          if @project[:commercial] && !@project[:name_company].to_s.strip.empty?
+          if !@project[:product].to_s.empty? && (@project[:product_tags].nil? || @project[:product_tags].empty?)
+            prj_out[:product_tags] = @project[:product].to_s.split(",").map(&:strip).reject(&:empty?)
+          end
+          prj_out[:product] = @project[:product].to_s unless @project[:product].to_s.empty?
+          if !@project[:name_company].to_s.strip.empty?
             prj_out[:name_company] = @project[:name_company].to_s.strip
           end
 
@@ -1703,32 +1903,48 @@ module DN1Code
             start_date:     @workflow[:start_date].to_s,
             end_date:       @workflow[:end_date].to_s,
             total_duration: @workflow[:total_duration].to_s,
-            status:         @workflow[:status].to_s,
             version:        @workflow[:version].to_s,
             revision:       @workflow[:revision].to_s,
+            stadia:         normalize_stadia(@workflow[:stadia]),
             history_edit:   @workflow[:history_edit] || []
           }
+          wf_out[:status] = @workflow[:status].to_s unless @workflow[:status].to_s.empty?
 
-          # 4. Секция directories (Массив объектов)
+          # 4. Секция history_edit (Корневая, как в project.yaml)
+          hist_out = (@history || []).map do |h|
+            next unless h.is_a?(Hash)
+            d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
+            t = (h[:edit] || h[:text] || h[:description] || h["edit"] || h["text"] || h["description"] || "").to_s
+            lnk = (h[:pdf_link] || h["pdf_link"] || "").to_s
+            entry = {
+              "data" => d,
+              "edit" => t
+            }
+            entry["pdf_link"] = lnk unless lnk.empty?
+            entry
+          end.compact
+
+          # 5. Секция directories (Массив объектов)
           dirs_out = normalize_directories_to_array(@directories)
 
-          # 5. Сборка итогового документа в чистом строгом порядке
+          # 6. Сборка итогового документа в чистом строгом порядке, соответствующем project.yaml
           data = {
-            project:     prj_out,
-            customer:    cust_out,
-            workflow:    wf_out,
-            directories: dirs_out,
-            scenes:      @scenes.map(&:to_h)
+            project:      prj_out,
+            customer:     cust_out,
+            workflow:     wf_out,
+            history_edit: hist_out,
+            directories:  dirs_out,
+            scenes:       @scenes.map(&:to_h)
           }
-          if @api_targets && !@api_targets.empty?
-            data[:api_targets] = @api_targets
+          if @api_targets.is_a?(Array)
+            data[:api_targets] = @api_targets.map(&:to_s).map(&:strip).reject(&:empty?)
           end
           if include_settings && @pdf_settings && !@pdf_settings.empty?
             data[:pdf_settings] = @pdf_settings
           end
 
           File.open(file_path, "w:utf-8") do |f|
-            f.write data.to_yaml
+            f.write self.class.deep_stringify_keys(data).to_yaml
           end
 
           true
@@ -1736,8 +1952,10 @@ module DN1Code
 
         # Увеличивает номер ревизии проекта (+1) и добавляет запись с таймштампом в историю
         # @param description [String] текстовое описание причины создания новой ревизии
+        # @param date_str [String, nil] пользовательская дата (по умолчанию Time.now)
+        # @param pdf_link [String, nil] имя/ссылка на файл PDF
         # @return [void]
-        def increment_revision!(description = "Экспорт в PDF", date_str = nil)
+        def increment_revision!(description = "Экспорт в PDF", date_str = nil, pdf_link = nil)
           rev_num = (@workflow[:revision].to_i rescue 0)
           rev_num = 1 if rev_num <= 0
           new_rev = rev_num + 1
@@ -1755,13 +1973,25 @@ module DN1Code
           @project_info[:last_edit] = clean_desc
           @project_info[:edit]      = clean_desc
 
+          pdf_link_str = pdf_link.to_s.strip
+          if pdf_link_str.empty?
+            art = @project[:articul].to_s.strip
+            art = "PROJECT" if art.empty?
+            ver = @workflow[:version].to_s.strip
+            ver = "01" if ver.empty?
+            pdf_link_str = "#{art}_v#{ver}_r#{new_rev_str}.pdf"
+          end
+
           @workflow[:history_edit] ||= []
           @workflow[:history_edit].unshift([now_str, entry_text])
 
           new_entry = {
             date:        now_str,
+            data:        now_str,
             text:        entry_text,
-            description: entry_text
+            edit:        entry_text,
+            description: entry_text,
+            pdf_link:    pdf_link_str
           }
           @history.unshift(new_entry)
         end
@@ -1771,24 +2001,25 @@ module DN1Code
         def to_h
           sync_project_fields!
 
-          project_section = {
-            articul:      @project_info[:articul].to_s,
-            name_product: (@project_info[:name_product] || @project_info[:furniture_name]).to_s,
-            name_place:   (@project_info[:name_place] || @project_info[:room_name]).to_s,
-            adress:       (@project_info[:adress] || @project_info[:address]).to_s,
-            customer:     (@project_info[:customer] || @project_info[:name_customer]).to_s,
-            company:      @project_info[:company].to_s,
-            status:       @project_info[:status].to_s,
-            revision:     @project_info[:revision],
-            version:      @project_info[:version],
-            last_edit:    (@project_info[:last_edit] || @project_info[:edit]).to_s,
-            trade:        @project_info[:trade].to_s
-          }
+          hist_out = (@history || []).map do |h|
+            next unless h.is_a?(Hash)
+            d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
+            t = (h[:edit] || h[:text] || h[:description] || h["edit"] || h["text"] || h["description"] || "").to_s
+            lnk = (h[:pdf_link] || h["pdf_link"] || "").to_s
+            {
+              data:     d,
+              date:     d,
+              edit:     t,
+              text:     t,
+              pdf_link: lnk
+            }
+          end.compact
 
           {
             project:      @project,
             customer:     @customer,
             workflow:     @workflow,
+            history_edit: hist_out,
             directories:  @directories,
             scenes:       @scenes.map(&:to_h),
             project_info: @project_info, # Для полной совместимости с существующими генераторами и тестами

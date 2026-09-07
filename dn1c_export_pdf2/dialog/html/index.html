@@ -7,7 +7,7 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css">
+  <link rel="stylesheet" href="app.css?v=20260907_174000">
 </head>
 <body>
   <div class="app-container">
@@ -20,9 +20,15 @@
           <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>
         </div>
       </div>
-      <div class="header-articul" id="headerArticulBlock">
-        <span class="header-articul-label">АРТИКУЛ</span>
-        <span class="header-articul-value empty" id="headerProjectArticul">—</span>
+      <div class="header-status-group">
+        <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
+          <span class="autosave-dot" id="autosaveDot"></span>
+          <span class="autosave-text" id="autosaveText">YAML сохранен</span>
+        </div>
+        <div class="header-articul" id="headerArticulBlock">
+          <span class="header-articul-label">АРТИКУЛ</span>
+          <span class="header-articul-value empty" id="headerProjectArticul">—</span>
+        </div>
       </div>
     </header>
 
@@ -196,6 +202,13 @@
             </div>
 
             <div class="form-group full-width">
+              <label>Стадии проекта (workflow.stadia):</label>
+              <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-grid">
+                <!-- Dynamically populated via JS -->
+              </div>
+            </div>
+
+            <div class="form-group full-width">
               <label for="inputLastEdit">Комментарий к очередной правке проекта (last_edit)</label>
               <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
             </div>
@@ -245,28 +258,33 @@
         <div class="template-settings-panel" id="templateSettingsPanel">
           <!-- Toolbar -->
           <div class="template-settings-toolbar">
-            <div class="toolbar-group">
-              <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
-              <select id="selectLayoutTemplate" class="form-control toolbar-select">
-                <option value="cover">🏷️ Титульный лист (Cover)</option>
-                <option value="description">📝 Описание и спецификации (Description)</option>
-                <option value="explain">📋 Содержание и ведомость (Explain)</option>
-                <option value="general">🖼️ Общий вид (General)</option>
-                <option value="visual">👁️ Визуализация (Visual)</option>
-              </select>
-              <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
-              <span class="layout-tpl-usage" id="layoutTplUsageBadge" title="Сцены SketchUp, использующие этот шаблон"></span>
+            <div class="toolbar-row toolbar-main-row">
+              <div class="toolbar-group">
+                <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
+                <select id="selectLayoutTemplate" class="form-control toolbar-select">
+                  <option value="cover">🏷️ Титульный лист (Cover)</option>
+                  <option value="description">📝 Описание и спецификации (Description)</option>
+                  <option value="explain">📋 Содержание и ведомость (Explain)</option>
+                  <option value="general">🖼️ Общий вид (General)</option>
+                  <option value="visual">👁️ Визуализация (Visual)</option>
+                </select>
+                <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
+              </div>
+
+              <div class="toolbar-group">
+                <div class="toolbar-margin-control">
+                  <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
+                  <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
+                  <span class="unit-text">мм</span>
+                </div>
+                <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
+                  ↺ Сбросить к стандарту
+                </button>
+              </div>
             </div>
 
-            <div class="toolbar-group">
-              <div class="toolbar-margin-control">
-                <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
-                <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
-                <span class="unit-text">мм</span>
-              </div>
-              <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                ↺ Сбросить к стандарту
-              </button>
+            <div class="toolbar-row toolbar-usage-row">
+              <span class="layout-tpl-usage" id="layoutTplUsageBadge" title="Сцены SketchUp, использующие этот шаблон"></span>
             </div>
           </div>
 
@@ -307,9 +325,10 @@
           <table class="history-table" id="historyTable">
             <thead>
               <tr>
-                <th width="150">Дата и время</th>
-                <th>Комментарий к правке (text)</th>
-                <th width="60">Удалить</th>
+                <th width="140">Дата и время (data)</th>
+                <th>Комментарий к правке (edit)</th>
+                <th width="240">Файл PDF (pdf_link)</th>
+                <th width="50">Удалить</th>
               </tr>
             </thead>
             <tbody id="historyTableBody">
@@ -388,6 +407,28 @@
             </div>
 
             <div class="form-group">
+              <label for="selectImageAspect">Пропорции кадра (Aspect Ratio)</label>
+              <select id="selectImageAspect" class="form-control">
+                <option value="page" selected>По формату листа PDF (Auto)</option>
+                <option value="16:9">16:9 (Широкоформатный)</option>
+                <option value="4:3">4:3 (Традиционный)</option>
+                <option value="3:2">3:2 (Фотокадр)</option>
+                <option value="1:1">1:1 (Квадрат)</option>
+                <option value="custom">Пользовательские пропорции (Ш:В)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="customAspectGroup" style="display: none;">
+              <label>Ширина : Высота (кастом)</label>
+              <div class="aspect-custom-inputs" style="display: flex; gap: 8px; align-items: center;">
+                <input type="number" id="inputAspectCustomW" class="form-control" min="0.1" step="0.1" value="16" placeholder="16" style="width: 85px;">
+                <span style="font-weight: 700; color: var(--text-muted); font-size: 14px;">:</span>
+                <input type="number" id="inputAspectCustomH" class="form-control" min="0.1" step="0.1" value="9" placeholder="9" style="width: 85px;">
+              </div>
+            </div>
+
+
+            <div class="form-group">
               <label for="selectQuality">Качество рендера сцен</label>
               <select id="selectQuality" class="form-control">
                 <option value="1.0">Черновое (Draft, 1x)</option>
@@ -427,6 +468,22 @@
               </div>
             </div>
 
+            <div class="form-group">
+              <label for="inputOverlayBorderColor">Цвет рамки оверлея кадра</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="inputOverlayBorderColor" value="#0EA5E9">
+                <span class="color-hex" id="overlayBorderColorHex">#0EA5E9</span>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="inputOverlayMaskColor">Цвет затемнения вне кадра</label>
+              <div class="color-picker-wrapper">
+                <input type="color" id="inputOverlayMaskColor" value="#0F172A">
+                <span class="color-hex" id="overlayMaskColorHex">#0F172A</span>
+              </div>
+            </div>
+
             <div class="form-group full-width">
               <div class="checkbox-group">
                 <label class="checkbox-label">
@@ -444,11 +501,14 @@
 
         <!-- Section: Адресаты API -->
         <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon">🌐</span>
-            <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
+          <div class="card-header" style="justify-content: space-between;">
+            <div style="display: flex; align-items: center; gap: 8px;">
+              <span class="card-header-icon">🌐</span>
+              <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
+            </div>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget">+ Добавить URL</button>
           </div>
-          <p class="field-hint" style="margin-bottom: 12px;">Список адресатов из <code>project_config.yaml</code> для отправки данных проекта:</p>
+          <p class="field-hint" style="margin-bottom: 12px;">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
           <div id="apiTargetsList" class="api-targets-container">
             <!-- Dynamically populated via JS -->
           </div>
@@ -539,6 +599,6 @@
     </footer>
   </div>
 
-  <script src="app.js"></script>
+  <script src="app.js?v=20260907_174000"></script>
 </body>
 </html>

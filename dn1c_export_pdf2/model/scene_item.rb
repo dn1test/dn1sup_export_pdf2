@@ -77,6 +77,22 @@ module DN1Code
           }
         end
 
+        # Позволяет обращаться к свойствам сцены через синтаксис хэша (item[:name])
+        # @param key [Symbol, String] имя свойства
+        # @return [Object, nil]
+        def [](key)
+          case key.to_s.to_sym
+          when :name then @name
+          when :original_name then @original_name
+          when :page_type then @page_type.to_s
+          when :description then @description
+          when :order then @order
+          when :enabled then @enabled
+          when :image_override then @image_override
+          else nil
+          end
+        end
+
         # Восстанавливает экземпляр SceneItem из хэша
         # @param hash [Hash] хэш с сериализованными данными сцены
         # @param scene_ref [Sketchup::Page, nil] нативная сцена SketchUp

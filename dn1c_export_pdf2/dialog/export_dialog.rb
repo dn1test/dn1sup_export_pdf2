@@ -76,10 +76,16 @@ module DN1Code
           info_src = payload[:project] || payload[:project_info]
           project_data.project_info.merge!(info_src) if info_src
 
-          project_data.api_targets = payload[:api_targets] if payload[:api_targets]
+          if payload.key?(:api_targets) && payload[:api_targets].is_a?(Array)
+            project_data.api_targets = payload[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
+          end
           project_data.directories = payload[:directories] if payload[:directories]
           project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-          project_data.history = payload[:history] if payload[:history]
+          if payload[:history_edit] && payload[:history_edit].is_a?(Array)
+            project_data.history = payload[:history_edit]
+          elsif payload[:history]
+            project_data.history = payload[:history]
+          end
 
           if payload[:scenes].is_a?(Array)
             project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
@@ -98,9 +104,53 @@ module DN1Code
 
             project_data = Model::ProjectData.new
             project_data.load_auto(model)
+            if defined?(Service::OverlayService)
+              project_data.pdf_settings[:show_aspect_overlay] = Service::OverlayService.overlay_active?(model)
+            end
 
             json_str = JSON.generate(project_data.to_h)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
+          end
+
+          # Переключение видимости рамки пропорций кадра через Sketchup::Overlay
+          dialog.add_action_callback("toggleAspectOverlay") do |_action_context, enabled_val|
+            puts ">>> [CALLBACK toggleAspectOverlay]: enabled_val=#{enabled_val.inspect}"
+            model = Sketchup.active_model
+            is_on = enabled_val == true || enabled_val.to_s == "true"
+            if defined?(Service::OverlayService)
+              if is_on
+                Service::OverlayService.enable(model)
+              else
+                Service::OverlayService.disable(model)
+              end
+              active = Service::OverlayService.overlay_active?(model)
+              dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{active});")
+            end
+          end
+
+          # Обновление настроек пропорций кадра и перерисовка окна SketchUp
+          dialog.add_action_callback("updateAspectSettings") do |_action_context, params_json|
+            puts ">>> [CALLBACK updateAspectSettings]: params=#{params_json.inspect}"
+            begin
+              params = params_json.is_a?(Hash) ? params_json : (JSON.parse(params_json.to_s, symbolize_names: true) rescue {})
+              model = Sketchup.active_model
+              if defined?(Service::OverlayService)
+                Service::OverlayService.update_settings(params, model)
+                info = Service::OverlayService.calculate_target_info(model)
+                dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(true);")
+                dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});")
+                if defined?(UI) && UI.respond_to?(:start_timer)
+                  UI.start_timer(0.02, false) do
+                    begin
+                      active = Service::OverlayService.overlay_active?(model)
+                      dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{active});")
+                    rescue StandardError
+                    end
+                  end
+                end
+              end
+            rescue StandardError
+            end
           end
 
           # Генератор артикула по стандарту CF# / HF#
@@ -334,22 +384,30 @@ module DN1Code
           end
 
           # Сохранение настроек из веб-интерфейса (в библиотеку модели, файл проекта и плагин)
-          dialog.add_action_callback("saveData") do |_action_context, data_json|
+          save_handler = lambda do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
-              model = Sketchup.active_model
+              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
               project_data = Model::ProjectData.new
               populate_project_data(project_data, payload)
 
-              project_data.sync_with_model_scenes(model)
-              project_data.save_auto(model)
+              project_data.sync_with_model_scenes(model) if model
+              project_data.save_auto(model) if model
               project_data.save_program_settings
-              yaml_name = project_data.yaml_filename(model)
-              dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
+              yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
+              is_silent = payload[:silent] == true || payload[:is_auto_save] == true
+              if is_silent
+                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate(yaml_name)});")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
+              end
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения: #{e.message}', 'error');")
             end
           end
+
+          dialog.add_action_callback("saveData", &save_handler)
+          dialog.add_action_callback("autoSave", &save_handler)
 
           dialog.add_action_callback("testProbe") do |_action_context, data_json|
             $test_probe_result = data_json

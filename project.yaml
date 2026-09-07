@@ -1,0 +1,102 @@
+---
+# Информация о проекте
+project:
+  articul: HF#YYMMDD_HHMMSS
+  product_tags: # Название продукта мебели
+  - Шкаф
+  - Тумба
+  - Зеркало
+  place: Место установки, Название Комнаты или помещения
+  adress: Адрес установки проекта
+  description: Комплексный дизайн-проект интерьера с технической документацией
+  commercial: false
+  name_company: Название компании
+
+# Информация о заказчике
+customer:
+  id: CUST-2609052034
+  name: Имя Заказчика
+  phone: Номер телефона
+  email: Электронная почта
+
+# Жизненный цикл проекта
+workflow:
+  author: Автор проекта
+  price: Задание стоимости проекта
+  start_date: Дата начала пректа
+  end_date: Дата окончания проекта
+  total_duration: Время работы над проектом (Реальное время работы)
+  version: 01
+  revision: 002
+
+  # Показывать списком с чекбоксами
+  stadia:
+  - name: Предварительный проект
+    status: true
+  - name: Правки проекта (история правок)
+    status: true
+  - name: Выбраны материалы и фурнитура
+    status: true
+  - name: Предварительно Утвержден
+    status: false
+  - name: Проверка технологом
+    status: false
+  - name: Утвержден
+    status: false
+  - name: Отправлен в производство
+    status: false
+  - name: Оплачен
+    status: false
+
+# История изменений проекта (дата, описание, файл)
+history_edit:
+- data: 2026-09-05 20:34
+  edit: Экспорт PDF (test_output.pdf) (rev. 002)
+  pdf_link: HF#YYMMDD_HHMMSS_version_revison.pdf
+- data: 2026-09-07 20:37
+  edit: Обновление проекта
+  pdf_link: HF#YYMMDD_HHMMSS_version_revison.pdf
+- data: 2026-09-07 20:38
+  edit: Сохранение проекта
+  pdf_link: HF#YYMMDD_HHMMSS_version_revison.pdf
+- data: 2026-09-07 20:38
+  edit: Сохранение проекта
+  pdf_link: HF#YYMMDD_HHMMSS_version_revison.pdf
+
+# Рабочие папки
+directories:
+- path: Название папки
+  title: Описание папки в UI
+  description: Дополнительное описание папки в UI
+- path: Название папки
+  title: Описание папки в UI
+  description: Дополнительное описание папки в UI
+
+# Настройка сцен
+scenes:
+- name: Обложка
+  page_type: cover
+  description: Титульный лист проекта
+  order: 0
+  enabled: true
+- name: Содержание и материалы
+  page_type: explain
+  description: Пояснительная записка и перечень спецификаций
+  order: 1
+  enabled: true
+- name: Перспективный вид гостиной
+  page_type: visual
+  description: Визуализация интерьера в дневном освещении
+  order: 2
+  enabled: true
+- name: План расстановки мебели
+  page_type: general
+  description: Техническая схема с габаритными размерами
+  order: 3
+  enabled: true
+
+# API Targets для отправки данных проекта в базу данных
+# Это те адреса куда данные проекта будут отправляться по нажатию кнопки "Отправить"
+api_targets:
+- https://list.prodmd.top/api/projects?token=c2fc6e6bd272b4f9688656a7c4fcf6b9aa13ccdf7da077d53bf56e4afcf29a58
+- http://localhost:3000/api/projects?token=b9fdaae8ca52a355df78d12f9bde54236200d366caf4af9350d8d934d83a9fba

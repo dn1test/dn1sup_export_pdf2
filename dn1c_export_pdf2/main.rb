@@ -20,6 +20,7 @@ require_relative "service/render_service"
 require_relative "service/pdf_builder"
 require_relative "service/layout_builder"
 require_relative "service/observer_service"
+require_relative "service/overlay_service"
 
 # Загрузка моделей данных
 require_relative "model/scene_item"
@@ -47,6 +48,13 @@ module DN1Code
     # @return [void]
     def open_export_dialog
       Dialog::ExportDialog.show_dialog
+    end
+
+    # Переключает отображение рамки пропорций кадра через Sketchup::Overlay
+    # @return [Boolean]
+    def toggle_aspect_overlay
+      model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+      Service::OverlayService.toggle(model)
     end
 
     # Выполняет быстрый экспорт активных сцен текущей модели SketchUp
@@ -95,6 +103,14 @@ module DN1Code
         quick_export
       end
 
+      item_overlay = submenu.add_item("Рамка пропорций кадра (Overlay)") do
+        toggle_aspect_overlay
+      end
+      submenu.set_validation_proc(item_overlay) do
+        model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+        Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
+      end
+
       # Создание панели инструментов
       toolbar = UI::Toolbar.new(NAME_EXTENSION)
       ico_dir = File.join(__dir__, "ico")
@@ -114,6 +130,18 @@ module DN1Code
       cmd_quick.small_icon = File.join(ico_dir, "quick_export.svg")
       cmd_quick.large_icon = File.join(ico_dir, "quick_export.svg")
       toolbar.add_item(cmd_quick)
+
+      # Команда 3: Рамка пропорций кадра (Overlay)
+      cmd_overlay = UI::Command.new("Рамка пропорций кадра") { toggle_aspect_overlay }
+      cmd_overlay.tooltip = "Показать/скрыть рамку пропорций кадра (Overlay)"
+      cmd_overlay.status_bar_text = "Отображение границ кадра и пропорций страницы в окне SketchUp"
+      cmd_overlay.small_icon = File.join(ico_dir, "frame_overlay.svg")
+      cmd_overlay.large_icon = File.join(ico_dir, "frame_overlay.svg")
+      cmd_overlay.set_validation_proc do
+        model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+        Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
+      end
+      toolbar.add_item(cmd_overlay)
 
       toolbar.restore
       file_loaded(__FILE__)

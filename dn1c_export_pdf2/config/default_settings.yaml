@@ -75,6 +75,14 @@ pdf_settings:
   margin: 15               # Отступ от края листа (в пунктах)
   margin_mm: 5             # Отступ от края листа (в миллиметрах)
   image_width: 2400        # Базовая ширина рендера сцены
+  image_aspect_ratio: "page" # Пропорции кадра: 'page' (по листу), '16:9', '4:3', '3:2', '1:1', 'custom'
+  custom_ratio_w: 16       # Пользовательская ширина для custom
+  custom_ratio_h: 9        # Пользовательская высота для custom
+  show_aspect_overlay: false # Отображать рамку пропорций через Sketchup::Overlay
+  overlay_border_color: "#0EA5E9" # Цвет рамки кадра (HEX)
+  overlay_border_opacity: 100     # Прозрачность рамки (10-100%)
+  overlay_mask_color: "#0F172A"   # Цвет затемнения вне кадра (HEX)
+  overlay_mask_opacity: 55        # Степень затемнения вне кадра (0-100%)
   scale_factor: 2.0        # Множитель четкости (1.0 - 3.0)
   antialias: true          # Сглаживание линий SketchUp
   stamp_type: "draft"      # 'draft' (НЕ УТВЕРЖДЕН), 'approved' (В ПРОИЗВОДСТВО), 'none'

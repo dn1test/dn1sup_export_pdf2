@@ -190,7 +190,7 @@ module DN1Code
 
           visible = cfg.key?(:visible) ? cfg[:visible] : (cfg.key?("visible") ? cfg["visible"] : true)
           align = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
-          valign = (cfg[:valign] || cfg["valign"] || (block_id == :header ? "center" : (block_id == :footer ? "bottom" : "top"))).to_s.to_sym
+          valign = (cfg[:valign] || cfg["valign"] || (block_id == :footer ? "bottom" : "top")).to_s.to_sym
 
           x = bounds.left + (bounds.width * (x_pct / 100.0))
           y = bounds.top - (bounds.height * (y_pct / 100.0))
@@ -266,14 +266,17 @@ module DN1Code
           s1_lines = s1_cfg ? (s1_cfg[:lines] || s1_cfg["lines"]) : nil
           handled_slots = []
 
-          if s1_vis && s1_cfg && s1_lines.is_a?(Array) && !s1_lines.empty? && (s1_cfg[:content] || s1_cfg["content"] || "info_lines").to_s == "info_lines"
+          s1_content = s1_cfg ? (s1_cfg[:content] || s1_cfg["content"]).to_s : ""
+          is_info_lines = s1_content == "info_lines" || (s1_content != "custom_text" && s1_content != "project_card" && s1_content != "customer_card" && s1_content != "workflow_status" && s1_content != "history_table")
+
+          if s1_vis && s1_cfg && s1_lines.is_a?(Array) && !s1_lines.empty? && is_info_lines
             handled_slots = [:slot_1, :slot_2, :slot_3, :slot_4]
             line_aligns = s1_cfg[:line_aligns] || s1_cfg["line_aligns"] || {}
             line_valigns = s1_cfg[:line_valigns] || s1_cfg["line_valigns"] || {}
 
             s1_w = (s1_cfg[:w] || s1_cfg["w"] || 25.0).to_f
             s3_cfg = get_block_config(pt, :slot_3)
-            s3_w = (s3_cfg[:w] || s3_cfg["w"] || 25.0).to_f
+            s3_w = (s3_cfg && (s3_cfg[:w] || s3_cfg["w"])) ? (s3_cfg[:w] || s3_cfg["w"]).to_f : 25.0
             s3_x = 100.0 - s3_w
 
             zones = {
@@ -357,6 +360,7 @@ module DN1Code
 
 
               q_cfg = s1_cfg.dup
+              q_cfg[:content] = "info_lines"
               q_cfg[:lines] = q_lines
               q_cfg[:align] = z_data[:align]
               q_cfg[:valign] = z_data[:valign]
@@ -371,7 +375,9 @@ module DN1Code
             next unless block_visible?(pt, slot_id)
 
             cfg = get_block_config(pt, slot_id)
-            content = (cfg[:content] || cfg["content"] || "info_lines").to_s
+            lines = cfg[:lines] || cfg["lines"]
+            content = (cfg[:content] || cfg["content"]).to_s
+            content = "info_lines" if (content.empty? || content == "none") && lines.is_a?(Array) && !lines.empty?
             next if content.empty? || content == "none"
 
             slot_box = get_block_box(pt, slot_id, defs[0], defs[1], defs[2], defs[3])
@@ -390,7 +396,7 @@ module DN1Code
           cfg = get_block_config(pt, :header)
           content = (cfg[:content] || cfg["content"] || "header_title").to_s
           align = (cfg[:align] || cfg["align"] || "center").to_s.to_sym
-          valign = (cfg[:valign] || cfg["valign"] || "center").to_s.to_sym
+          valign = (cfg[:valign] || cfg["valign"] || "top").to_s.to_sym
           font_size = (cfg[:font_size] || cfg["font_size"] || 11.0).to_f
           lines = cfg[:lines] || cfg["lines"]
           if lines.nil?
@@ -806,7 +812,14 @@ module DN1Code
 
           Service::FontService.apply_style(@pdf_doc, :small)
 
-          item_gap = 6.0
+          item_gap = if (cfg.key?(:item_gap_mm) && !cfg[:item_gap_mm].nil?) || (cfg.key?("item_gap_mm") && !cfg["item_gap_mm"].nil?)
+                       mm_val = (cfg[:item_gap_mm] || cfg["item_gap_mm"]).to_f
+                       (mm_val * 72.0 / 25.4).round(1)
+                     elsif (cfg.key?(:item_gap) && !cfg[:item_gap].nil?) || (cfg.key?("item_gap") && !cfg["item_gap"].nil?)
+                       (cfg[:item_gap] || cfg["item_gap"]).to_f
+                     else
+                       6.0
+                     end
           item_heights = items.map do |it|
             [@pdf_doc.height_of(it[:text], width: in_w, size: it[:size]) + 1.0, it[:size] + 2.0].max
           end
@@ -883,6 +896,10 @@ module DN1Code
                 if entry.is_a?(Array)
                   date, desc = entry[0].to_s.strip, entry[1].to_s.strip
                   desc.empty? ? date : "#{date} — #{desc}"
+                elsif entry.is_a?(Hash)
+                  d = (entry[:data] || entry[:date] || entry["data"] || entry["date"]).to_s.strip
+                  desc = (entry[:edit] || entry[:text] || entry["edit"] || entry["text"] || entry[:description] || entry["description"]).to_s.strip
+                  desc.empty? ? d : "#{d} — #{desc}"
                 else
                   entry.to_s.strip
                 end
@@ -896,7 +913,12 @@ module DN1Code
             stadia = @workflow[:stadia] || @info[:stadia]
             if stadia.is_a?(Array) && !stadia.empty?
               lines_arr = stadia.map do |st|
-                if st.is_a?(Array)
+                if st.is_a?(Hash)
+                  done = (st[:status] == true || st["status"] == true || st[:status].to_s == "true" || st["status"].to_s == "true")
+                  title = (st[:name] || st["name"] || st[:title] || st["title"]).to_s.strip
+                  mark = done ? "[✓]" : "[ ]"
+                  "#{mark} #{title}"
+                elsif st.is_a?(Array)
                   done = (st[1] == true || st[1] == "true")
                   title = st[2].to_s.strip
                   mark = done ? "[✓]" : "[ ]"
@@ -914,7 +936,15 @@ module DN1Code
             hist = @workflow[:history_edit] || @info[:history_edit]
             last = if hist.is_a?(Array) && !hist.empty?
                      entry = hist.last
-                     entry.is_a?(Array) ? "#{entry[0]} #{entry[1]}" : entry.to_s
+                     if entry.is_a?(Array)
+                       "#{entry[0]} #{entry[1]}"
+                     elsif entry.is_a?(Hash)
+                       d = entry[:data] || entry[:date] || entry["data"] || entry["date"]
+                       t = entry[:edit] || entry[:text] || entry["edit"] || entry["text"]
+                       "#{d} #{t}".strip
+                     else
+                       entry.to_s
+                     end
                    else
                      (@workflow[:last_edit] || @info[:last_edit]).to_s
                    end
@@ -947,37 +977,37 @@ module DN1Code
             d ? "Дата: #{d}" : "Дата: #{Time.now.strftime('%d.%m.%Y')}"
           when "room_name"
             val = (@info[:room_name] || @info[:name_place]).to_s.strip
-            val.empty? ? nil : "Помещение: #{val}"
+            val.empty? ? "Помещение: —" : "Помещение: #{val}"
           when "furniture_name"
             val = (@info[:furniture_name] || @info[:name_product]).to_s.strip
-            val.empty? ? nil : "Изделие: #{val}"
+            val.empty? ? "Изделие: —" : "Изделие: #{val}"
           when "trade_type"
             val = (@info[:trade] == 1 || @info[:trade] == "1") ? "Коммерческий (CF#)" : "Бытовой (HF#)"
             "Тип: #{val}"
           when "articul"
             val = @info[:articul].to_s.strip
-            val.empty? ? nil : "Артикул: #{val}"
+            val.empty? ? "Артикул: —" : "Артикул: #{val}"
           when "address"
             val = (@info[:address] || @info[:adress]).to_s.strip
-            val.empty? ? nil : "Адрес: #{val}"
+            val.empty? ? "Адрес: —" : "Адрес: #{val}"
           when "project_desc"
             val = (@info[:project_description] || @info[:description]).to_s.strip
-            val.empty? ? nil : "Описание: #{val}"
+            val.empty? ? "Описание: —" : "Описание: #{val}"
           when "customer_name"
             val = (@info[:name_customer] || @info[:customer]).to_s.strip
-            val.empty? ? nil : "Заказчик: #{val}"
+            val.empty? ? "Заказчик: —" : "Заказчик: #{val}"
           when "customer_id"
             val = (@info[:customer_id] || @info[:id]).to_s.strip
-            val.empty? ? nil : "ID клиента: #{val}"
+            val.empty? ? "ID клиента: —" : "ID клиента: #{val}"
           when "customer_company"
             val = (@info[:company] || @info[:name_company]).to_s.strip
-            val.empty? ? nil : "Компания: #{val}"
+            val.empty? ? "Компания: —" : "Компания: #{val}"
           when "customer_phone"
             val = @info[:phone].to_s.strip
-            val.empty? ? nil : "Тел: #{val}"
+            val.empty? ? "Тел: —" : "Тел: #{val}"
           when "customer_email"
             val = @info[:email].to_s.strip
-            val.empty? ? nil : "Email: #{val}"
+            val.empty? ? "Email: —" : "Email: #{val}"
           when "scene_name", "name_scene"
             s_name = ""
             if @scene_item
@@ -989,7 +1019,7 @@ module DN1Code
             end
             s_name = (@info[:scene_name] || @info[:name_scene] || "") if s_name.strip.empty?
             s_name = s_name.to_s.strip
-            s_name.empty? ? nil : "Сцена: #{s_name}"
+            s_name.empty? ? "Сцена: —" : "Сцена: #{s_name}"
           when "scene_description", "scene_desc"
             s_desc = ""
             if @scene_item
@@ -1001,10 +1031,10 @@ module DN1Code
             end
             s_desc = (@info[:scene_description] || @info[:scene_desc] || "") if s_desc.strip.empty?
             s_desc = s_desc.to_s.strip
-            s_desc.empty? ? nil : "Описание сцены: #{s_desc}"
+            s_desc.empty? ? "Описание сцены: —" : "Описание сцены: #{s_desc}"
           when "workflow_status"
             val = (@workflow[:status] || @info[:status]).to_s.strip
-            val.empty? ? nil : "Статус: #{val}"
+            val.empty? ? "Статус: —" : "Статус: #{val}"
           when "workflow_version"
             ver = @workflow[:version] || @info[:version] || 1
             "Версия: v#{ver}"
@@ -1014,26 +1044,26 @@ module DN1Code
           when "workflow_dates"
             s = @info[:start_date].to_s.strip
             e = @info[:end_date].to_s.strip
-            (s.empty? && e.empty?) ? nil : "Сроки: #{s.empty? ? '—' : s} → #{e.empty? ? '—' : e}"
+            (s.empty? && e.empty?) ? "Сроки: —" : "Сроки: #{s.empty? ? '—' : s} → #{e.empty? ? '—' : e}"
           when "workflow_duration"
             val = @info[:total_duration].to_s.strip
-            val.empty? ? nil : "Длительность: #{val} дн."
+            val.empty? ? "Длительность: —" : "Длительность: #{val} дн."
           when "workflow_price"
             val = @info[:price].to_s.strip
-            val.empty? ? nil : "Стоимость: #{val} руб."
+            val.empty? ? "Стоимость: —" : "Стоимость: #{val} руб."
           when "workflow_author"
             val = (@workflow[:author] || @info[:author]).to_s.strip
-            val.empty? ? nil : "Автор: #{val}"
+            val.empty? ? "Автор: —" : "Автор: #{val}"
           when "workflow_edit"
             val = (@workflow[:last_edit] || @info[:last_edit]).to_s.strip
-            val.empty? ? nil : "Правка: #{val}"
+            val.empty? ? "Правка: —" : "Правка: #{val}"
           when "spec_materials"
             val = @info[:materials].to_s.strip
             val.empty? ? "Материалы: Фасады МДФ, ЛДСП, Blum..." : "Материалы: #{val}"
           when "spec_appliances"
             app = @info[:appliances].to_s.strip
             lig = @info[:lighting].to_s.strip
-            combined = [app, lig].reject(&:empty?).join("; ")
+            combined = [app, lig].uniq.reject(&:empty?).join("; ")
             combined.empty? ? "Техника и подсветка: Встраиваемая техника, LED 3000K..." : "Техника и подсветка: #{combined}"
           when "spec_lighting"
             val = @info[:lighting].to_s.strip

@@ -75,6 +75,14 @@ class TestRunner
     test_drawing_image_settings_proportions_and_placement
     test_manual_revision_prompt_before_pdf_export_and_no_auto_history
     test_footer_items_aligned_to_bottom_edge
+    test_middle_block_lines_enabled_and_displayed_in_all_templates
+    test_middle_block_item_gap_parameter
+    test_header_default_vertical_alignment_top
+    test_40_template_usage_separate_line
+    test_41_api_targets_addition_and_deletion
+    test_42_safe_frame_overlay_and_aspect_ratios
+    test_43_new_project_yaml_data_structure
+    test_44_template_independence_and_autosave
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -1384,7 +1392,7 @@ class TestRunner
 
     layouts = project_data.pdf_settings[:custom_layouts]
     hdr = layouts[:cover][:header]
-    assert(hdr[:valign] == "center" || hdr[:valign] == :center, "Шапка по умолчанию имеет вертикальное выравнивание center")
+    assert(hdr[:valign] == "top" || hdr[:valign] == :top, "Шапка по умолчанию имеет вертикальное выравнивание top")
     assert(hdr[:align] == "center" || hdr[:align] == :center, "Шапка по умолчанию имеет горизонтальное выравнивание center")
 
     test_dir = File.expand_path("test_header_valign_dir", __dir__)
@@ -2627,6 +2635,784 @@ class TestRunner
 
     FileUtils.rm_rf(test_dir)
   end
+
+  # ============================================================================
+  # 37. ТЕСТ: Отображение информации среднего блока во всех шаблонах
+  # ============================================================================
+  def test_middle_block_lines_enabled_and_displayed_in_all_templates
+    puts "\n--- 37. Тест отображения информации среднего блока во всех шаблонах ---"
+
+    # 1. Проверка значений по умолчанию в ProjectData#default_custom_layouts
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    [:cover, :description, :explain, :general, :visual].each do |tpl|
+      s1 = project_data.default_custom_layouts[tpl][:slot_1]
+      assert(s1[:content] == "info_lines", "default_custom_layouts[#{tpl}][:slot_1] имеет content: info_lines")
+      assert(s1[:lines].is_a?(Array) && !s1[:lines].empty?, "default_custom_layouts[#{tpl}][:slot_1] содержит строки информации по умолчанию")
+    end
+
+    # 2. Проверка default_layout.yaml и layout.yaml
+    default_yaml = File.read(File.expand_path("../config/default_layout.yaml", __dir__), encoding: "utf-8")
+    assert(default_yaml.scan(/slot_1:.*?content:\s*info_lines/m).size >= 5, "default_layout.yaml содержит content: info_lines для slot_1 всех шаблонов")
+
+    layout_yaml = File.read(File.expand_path("../config/layout.yaml", __dir__), encoding: "utf-8")
+    assert(layout_yaml.scan(/slot_1:.*?content:\s*info_lines/m).size >= 5, "layout.yaml содержит content: info_lines для slot_1 всех шаблонов")
+
+    # 3. Проверка app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_content.include?('content: "info_lines"'), "app.js содержит content: info_lines")
+    assert(app_js_content.scan(/DEFAULT_MIDDLE_SLOT\s*=\s*\{[^}]+content:\s*"info_lines"/m).size >= 1, "app.js DEFAULT_MIDDLE_SLOT имеет content: info_lines")
+    assert(app_js_content.scan(/id:\s*"slot_1",\s*label:\s*"ЛЕВЫЙ ВЕРХ",\s*icon:\s*"⬛",\s*slot_class:\s*"slot-1",\s*default_content:\s*"info_lines"/m).size >= 1, "app.js FIXED_SLOT_DEFS содержит default_content: info_lines для slot_1")
+    assert(app_js_content.include?('s1.content = "info_lines";'), "app.js ensureMiddleSlotDefaults гарантирует s1.content = info_lines")
+
+    # 4. Проверка PageBase#resolve_info_line на непустые заглушки для пустых реквизитов
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc)
+    page_ctrl = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, nil, page_index: 1, total_pages: 1)
+
+    assert(page_ctrl.send(:resolve_info_line, "room_name") == "Помещение: —", "resolve_info_line возвращает читаемую заглушку для пустого помещения")
+    assert(page_ctrl.send(:resolve_info_line, "furniture_name") == "Изделие: —", "resolve_info_line возвращает читаемую заглушку для пустого изделия")
+    assert(page_ctrl.send(:resolve_info_line, "articul") == "Артикул: —", "resolve_info_line возвращает читаемую заглушку для пустого артикула")
+    assert(page_ctrl.send(:resolve_info_line, "address") == "Адрес: —", "resolve_info_line возвращает читаемую заглушку для пустого адреса")
+
+    # 5. Проверка фактической отрисовки среднего блока в PDF с включенными параметрами
+    test_dir = File.expand_path("test_middle_block_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    out_pdf = File.join(test_dir, "test_middle_block_render.pdf")
+
+    # Задаем тестовые реквизиты
+    project_data.project_info[:room_name] = "Кухня-гостиная"
+    project_data.project_info[:furniture_name] = "Остров с барной стойкой"
+    project_data.project_info[:articul] = "CF#2026-TEST-MID"
+    project_data.project_info[:materials] = "Фасады Fenix NTM, столешница Granit, фурнитура Blum"
+    project_data.project_info[:appliances] = "Вытяжка Elica, подсветка LED 3000K"
+    project_data.workflow[:status] = "В производстве"
+    project_data.workflow[:stadia] = "РД"
+
+    # Включаем slot_1 на титульном листе со всеми параметрами
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:visible] = true
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:content] = "info_lines"
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:lines] = [
+      "room_name", "furniture_name", "articul", "spec_materials", "spec_appliances", "workflow_stadia"
+    ]
+
+    card_rendered = false
+    page_ctrl.define_singleton_method(:render_modular_slot_card) do |*args|
+      slot_box, content, cfg, opacity, slot_id = args
+      card_rendered = true if content == "info_lines" || (slot_id && slot_id.to_s.start_with?("slot_"))
+      super(*args)
+    end
+
+    page_ctrl.render
+    pdf_doc.render_file(out_pdf)
+
+    assert(card_rendered, "render_modular_slot_card успешно вызвана для карточек среднего блока")
+    assert(File.exist?(out_pdf), "PDF с отрисованным средним блоком успешно создан")
+    assert(File.size(out_pdf) > 8000, "Размер созданного PDF валиден (#{File.size(out_pdf) rescue 0} байт)")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # --- 38. Тест параметра расстояния между пунктами среднего блока на странице ---
+  def test_middle_block_item_gap_parameter
+    puts "\n--- 38. Тест параметра расстояния между пунктами среднего блока на странице ---"
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    layouts = project_data.default_custom_layouts
+
+    # 1. Проверка наличия item_gap_mm в default_custom_layouts для всех 5 шаблонов
+    [:cover, :description, :explain, :general, :visual].each do |tpl|
+      s1 = layouts[tpl][:slot_1]
+      assert(s1.key?(:item_gap_mm) || s1.key?("item_gap_mm"), "default_custom_layouts[#{tpl}][:slot_1] содержит item_gap_mm")
+      val = (s1[:item_gap_mm] || s1["item_gap_mm"]).to_f
+      assert(val == 2.0, "default_custom_layouts[#{tpl}][:slot_1] item_gap_mm по умолчанию равен 2.0 мм")
+    end
+
+    # 2. Проверка наличия item_gap_mm в конфигурационных файлах YAML
+    default_yaml = File.read(File.join(__dir__, "..", "config", "default_layout.yaml"), encoding: "utf-8")
+    layout_yaml = File.read(File.join(__dir__, "..", "config", "layout.yaml"), encoding: "utf-8")
+
+    assert(default_yaml.include?("item_gap_mm:"), "default_layout.yaml содержит item_gap_mm")
+    assert(layout_yaml.include?("item_gap_mm:"), "layout.yaml содержит item_gap_mm")
+
+    # 3. Проверка наличия контрола в app.js и стилей в app.css
+    app_js_content = File.read(File.join(__dir__, "..", "dialog", "html", "app.js"), encoding: "utf-8")
+    app_css_content = File.read(File.join(__dir__, "..", "dialog", "html", "app.css"), encoding: "utf-8")
+
+    assert(app_js_content.include?("inp-slot-itemgap"), "app.js содержит поле ввода .inp-slot-itemgap")
+    assert(app_js_content.include?("item_gap_mm"), "app.js сохраняет и передает item_gap_mm")
+    assert(app_js_content.include?("Расстояние между пунктами на странице"), "app.js содержит подсказку 'Расстояние между пунктами на странице'")
+    assert(app_css_content.include?(".inp-slot-itemgap"), "app.css содержит стили для .inp-slot-itemgap")
+
+    # 4. Проверка динамического расчета item_gap в PageBase
+    test_dir = File.join(__dir__, "test_item_gap_dir")
+    FileUtils.mkdir_p(test_dir)
+    out_pdf_2mm = File.join(test_dir, "export_gap_2mm.pdf")
+    out_pdf_10mm = File.join(test_dir, "export_gap_10mm.pdf")
+
+    pdf_doc_2mm = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, { margin_mm: 5 })
+    page_ctrl_2mm = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc_2mm, project_data, nil, page_index: 1, total_pages: 1)
+
+    captured_gaps = []
+    page_ctrl_2mm.define_singleton_method(:render_modular_slot_card) do |*args|
+      slot_box, content, cfg, opacity, slot_id = args
+      if content == "info_lines"
+        raw_gap = cfg[:item_gap_mm] || cfg["item_gap_mm"]
+        calc_gap = (raw_gap.to_f * 72.0 / 25.4).round(1)
+        captured_gaps << calc_gap
+      end
+      super(*args)
+    end
+
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:item_gap_mm] = 2.0
+    page_ctrl_2mm.render
+    pdf_doc_2mm.render_file(out_pdf_2mm)
+
+    assert(captured_gaps.any? { |g| (g - 5.7).abs < 0.2 }, "item_gap для 2.0 мм рассчитан корректно в pt (~5.7 pt)")
+    assert(File.exist?(out_pdf_2mm), "PDF с расстоянием между пунктами 2 мм успешно создан")
+
+    captured_gaps_10mm = []
+    pdf_doc_10mm = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(project_data, { margin_mm: 5 })
+    page_ctrl_10mm = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc_10mm, project_data, nil, page_index: 1, total_pages: 1)
+
+    page_ctrl_10mm.define_singleton_method(:render_modular_slot_card) do |*args|
+      slot_box, content, cfg, opacity, slot_id = args
+      if content == "info_lines"
+        raw_gap = cfg[:item_gap_mm] || cfg["item_gap_mm"]
+        calc_gap = (raw_gap.to_f * 72.0 / 25.4).round(1)
+        captured_gaps_10mm << calc_gap
+      end
+      super(*args)
+    end
+
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:item_gap_mm] = 10.0
+    page_ctrl_10mm.render
+    pdf_doc_10mm.render_file(out_pdf_10mm)
+
+    assert(captured_gaps_10mm.any? { |g| (g - 28.3).abs < 0.2 }, "item_gap для 10.0 мм рассчитан корректно в pt (~28.3 pt)")
+    assert(File.exist?(out_pdf_10mm), "PDF с расстоянием между пунктами 10 мм успешно создан")
+    assert(File.size(out_pdf_10mm) > 8000, "Размер PDF с отступом 10 мм валиден (#{File.size(out_pdf_10mm) rescue 0} байт)")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 39. ТЕСТ: Выравнивание заголовка по верхней границе страницы по умолчанию
+  # ============================================================================
+  def test_header_default_vertical_alignment_top
+    puts "\n--- 39. Тест выравнивания заголовка по верхней границе страницы (valign: top) ---"
+
+    # 1. Проверка значений по умолчанию в ProjectData#default_custom_layouts для всех 5 шаблонов
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    [:cover, :description, :explain, :general, :visual].each do |tpl|
+      hdr = project_data.default_custom_layouts[tpl][:header]
+      assert(hdr[:valign] == "top", "default_custom_layouts[#{tpl}][:header] имеет valign: top")
+    end
+
+    # 2. Проверка default_layout.yaml и layout.yaml на наличие valign: top для всех заголовков
+    default_yaml = File.read(File.expand_path("../config/default_layout.yaml", __dir__), encoding: "utf-8")
+    assert(default_yaml.scan(/header:.*?valign:\s*top/m).size >= 5, "default_layout.yaml содержит valign: top для всех заголовков")
+
+    layout_yaml = File.read(File.expand_path("../config/layout.yaml", __dir__), encoding: "utf-8")
+    assert(layout_yaml.scan(/header:.*?valign:\s*top/m).size >= 5, "layout.yaml содержит valign: top для всех заголовков")
+
+    # 3. Проверка app.js (DEFAULT_HEADER_SLOT, DEFAULT_LAYOUTS и превью)
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_content.match?(/DEFAULT_HEADER_SLOT\s*=\s*\{[^}]+valign:\s*"top"/), "app.js DEFAULT_HEADER_SLOT содержит valign: top")
+    assert(app_js_content.include?('header.valign || "top"'), "app.js использует top как fallback для header.valign")
+
+    # 4. Проверка отрисовки в PDF: заголовок прижимается к верхней границе bounds.top
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc)
+    cover_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, project_data, nil, page_index: 1, total_pages: 1)
+
+    hdr_box = cover_page.send(:get_block_box, :cover, :header, 0.0, 0.0, 100.0, 30.0)
+    assert((hdr_box[:y] - pdf_doc.bounds.top).abs < 0.001, "Верхний край блока заголовка точно совпадает с bounds.top страницы")
+    assert(hdr_box[:valign] == :top, "hdr_box[:valign] равен :top")
+
+    test_dir = File.expand_path("test_header_top_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    pdf_out = File.join(test_dir, "header_default_top.pdf")
+    cover_page.render
+    pdf_doc.render_file(pdf_out)
+
+    assert(File.exist?(pdf_out), "PDF с заголовком по верхней границе успешно сгенерирован")
+    assert(File.size(pdf_out) > 5000, "Размер созданного PDF валиден (#{File.size(pdf_out)} байт)")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_40_template_usage_separate_line
+    puts "\n--- 40. Тест отображения строки использования шаблона на отдельной строке ---"
+
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_content = File.read(html_path, encoding: "utf-8")
+
+    # 1. Проверка наличия отдельной строки toolbar-usage-row для layoutTplUsageBadge в index.html
+    assert(html_content.include?('class="toolbar-row toolbar-usage-row"'), "index.html содержит отдельную строку .toolbar-usage-row")
+    assert(html_content.include?('id="layoutTplUsageBadge"'), "index.html содержит #layoutTplUsageBadge")
+    assert(html_content.match?(/toolbar-usage-row[^<]*>\s*<span[^>]+id="layoutTplUsageBadge"/m), "layoutTplUsageBadge находится внутри отдельной строки .toolbar-usage-row")
+
+    # 2. Проверка того, что основные элементы управления находятся в .toolbar-main-row
+    assert(html_content.include?('class="toolbar-row toolbar-main-row"'), "index.html содержит основную строку .toolbar-main-row")
+    assert(html_content.match?(/toolbar-main-row.*?selectLayoutTemplate.*?inputLayoutMargin/m), "Селектор шаблона и поля находятся в .toolbar-main-row")
+
+    # 3. Проверка стилей в app.css
+    css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    css_content = File.read(css_path, encoding: "utf-8")
+
+    assert(css_content.include?(".template-settings-toolbar .toolbar-usage-row"), "app.css содержит стили для .toolbar-usage-row")
+    assert(css_content.include?(".layout-tpl-usage"), "app.css содержит стили для .layout-tpl-usage")
+    assert(css_content.include?(".layout-tpl-usage.empty-usage"), "app.css содержит стили для .empty-usage")
+
+    # 4. Проверка логики в app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_content.include?('Используется:'), "app.js обновляет строку использования с префиксом 'Используется:'")
+    assert(app_js_content.include?('Не привязан к сценам'), "app.js обновляет строку при отсутствии привязки")
+    assert(app_js_content.include?('badge.classList.remove("empty-usage")'), "app.js переключает класс empty-usage")
+  end
+
+  def test_41_api_targets_addition_and_deletion
+    puts "\n--- 41. Тест добавления и удаления адресатов веб-интеграции (API TARGETS) ---"
+
+    # 1. Проверка HTML элементов
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_content = File.read(html_path, encoding: "utf-8")
+    assert(html_content.include?('id="btnAddApiTarget"'), "index.html содержит кнопку #btnAddApiTarget")
+    assert(html_content.include?('+ Добавить URL'), "index.html содержит надпись '+ Добавить URL'")
+    assert(html_content.include?('id="apiTargetsList"'), "index.html содержит контейнер #apiTargetsList")
+
+    # 2. Проверка CSS стилей
+    css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    css_content = File.read(css_path, encoding: "utf-8")
+    assert(css_content.include?(".api-target-card"), "app.css содержит стили .api-target-card")
+    assert(css_content.include?(".api-target-badge"), "app.css содержит стили .api-target-badge")
+    assert(css_content.include?(".api-target-input"), "app.css содержит стили .api-target-input")
+    assert(css_content.include?(".empty-targets-placeholder"), "app.css содержит стили .empty-targets-placeholder")
+
+    # 3. Проверка JavaScript логики
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_content = File.read(app_js_path, encoding: "utf-8")
+    assert(app_js_content.include?('btnAddApiTarget: document.getElementById("btnAddApiTarget")'), "app.js регистрирует btnAddApiTarget в els")
+    assert(app_js_content.include?('els.btnAddApiTarget.addEventListener("click"'), "app.js обрабатывает нажатие кнопки добавления адресата")
+    assert(app_js_content.include?('api-target-input'), "app.js создает редактируемые поля ввода .api-target-input")
+    assert(app_js_content.include?('state.api_targets.splice(index, 1)'), "app.js поддерживает удаление адресата по индексу через splice")
+    assert(app_js_content.include?('querySelectorAll(".api-target-input")'), "app.js собирает значения адресатов в collectFormData")
+
+    # 4. Проверка работы с ProjectData и ExportDialog
+    test_dir = File.expand_path("../../test_sandbox_api_targets_#{Time.now.to_i}", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    data = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(data.api_targets.is_a?(Array), "ProjectData инициализирует api_targets как Array")
+    initial_count = data.api_targets.size
+
+    # Добавление нового адресата
+    new_url = "https://custom-api.example.com/v1/projects?token=test12345"
+    data.api_targets << new_url
+    assert(data.api_targets.size == initial_count + 1, "Адресат успешно добавлен в список api_targets")
+    assert(data.api_targets.include?(new_url), "Добавленный URL присутствует в api_targets")
+
+    # Удаление первого адресата
+    deleted_url = data.api_targets.shift
+    assert(data.api_targets.size == initial_count, "Адресат успешно удален из api_targets")
+    assert(!data.api_targets.include?(deleted_url), "Удаленный URL больше не содержится в api_targets")
+
+    # Проверка сохранения и загрузки через YAML
+    test_yaml = File.join(test_dir, "test_api_targets.yaml")
+    saved = data.save_to_yaml(test_yaml)
+    assert(saved && File.exist?(test_yaml), "Данные проекта успешно сохранены в YAML")
+
+    yaml_text = File.read(test_yaml, encoding: "utf-8")
+    assert(yaml_text.include?("custom-api.example.com"), "YAML файл содержит сохраненный новый URL адресата")
+    assert(!yaml_text.include?(deleted_url), "YAML файл не содержит удаленный URL адресата")
+
+    reloaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(reloaded_data.load_from_yaml(test_yaml), "YAML успешно загружен в новый экземпляр ProjectData")
+    assert(data.api_targets == reloaded_data.api_targets, "api_targets после загрузки из YAML полностью совпадают")
+
+    # Проверка работы populate_project_data в ExportDialog
+    payload = {
+      api_targets: [
+        "https://api1.test/hook",
+        "  https://api2.test/hook  ",
+        ""
+      ]
+    }
+    mock_proj = DN1Code::ExportPdf2::Model::ProjectData.new
+    DN1Code::ExportPdf2::Dialog::ExportDialog.populate_project_data(mock_proj, payload)
+    assert(mock_proj.api_targets.size == 2, "populate_project_data корректно отфильтровал пустые строки")
+    assert(mock_proj.api_targets[0] == "https://api1.test/hook", "Первый URL передан без изменений")
+    assert(mock_proj.api_targets[1] == "https://api2.test/hook", "Второй URL очищен от пробелов")
+
+    # Проверка сохранения и загрузки пустых api_targets (полное удаление)
+    mock_proj.api_targets = []
+    empty_yaml = File.join(test_dir, "test_empty_api_targets.yaml")
+    mock_proj.save_to_yaml(empty_yaml)
+    empty_yaml_text = File.read(empty_yaml, encoding: "utf-8")
+    assert(empty_yaml_text.include?("api_targets: []"), "При удалении всех адресатов YAML содержит api_targets: []")
+
+    empty_reload = DN1Code::ExportPdf2::Model::ProjectData.new
+    empty_reload.load_from_yaml(empty_yaml)
+    assert(empty_reload.api_targets == [], "Загрузка пустого списка адресатов возвращает пустой массив")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_42_safe_frame_overlay_and_aspect_ratios
+    puts "\n--- 42. Тест рамки пропорций кадра (Safe Frame Overlay) и настроек ---"
+
+    require_relative "../service/overlay_service"
+    overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
+
+    # 1. Проверка констант оверлея
+    assert(overlay_svc::OVERLAY_ID == "dn1code.export_pdf2.safe_frame_overlay", "ID оверлея равен dn1code.export_pdf2.safe_frame_overlay")
+    assert(overlay_svc::OVERLAY_NAME.include?("Safe Frame"), "Имя оверлея содержит Safe Frame")
+
+    # 2. Проверка расчетов соотношений сторон (calculate_target_info)
+    # A4 Альбомный
+    overlay_svc.update_settings({ image_aspect_ratio: "page", page_size: "A4", page_layout: "landscape", image_width: 2400 })
+    info_a4_l = overlay_svc.calculate_target_info
+    assert((info_a4_l[:ratio] - 1.4142).abs < 0.01, "Соотношение A4 landscape рассчитано верно (~1.414)")
+    assert(info_a4_l[:render_w] == 2400, "Ширина рендера равна 2400")
+    assert(info_a4_l[:render_h] == 1697, "Высота рендера для A4 landscape равна 1697")
+    assert(info_a4_l[:label].include?("A4 Альбомный"), "Метка содержит A4 Альбомный")
+
+    # A4 Книжный
+    overlay_svc.update_settings({ image_aspect_ratio: "page", page_size: "A4", page_layout: "portrait", image_width: 2400 })
+    info_a4_p = overlay_svc.calculate_target_info
+    assert((info_a4_p[:ratio] - 0.7071).abs < 0.01, "Соотношение A4 portrait рассчитано верно (~0.707)")
+    assert(info_a4_p[:render_h] == 3394, "Высота рендера для A4 portrait равна 3394")
+
+    # 16:9
+    overlay_svc.update_settings({ image_aspect_ratio: "16:9", image_width: 2400 })
+    info_16_9 = overlay_svc.calculate_target_info
+    assert((info_16_9[:ratio] - 1.7778).abs < 0.01, "Соотношение 16:9 рассчитано верно (~1.778)")
+    assert(info_16_9[:render_h] == 1350, "Высота рендера для 16:9 равна 1350 (2400 / 1.7778)")
+
+    # 4:3
+    overlay_svc.update_settings({ image_aspect_ratio: "4:3", image_width: 2400 })
+    info_4_3 = overlay_svc.calculate_target_info
+    assert((info_4_3[:ratio] - 1.3333).abs < 0.01, "Соотношение 4:3 рассчитано верно (~1.333)")
+    assert(info_4_3[:render_h] == 1800, "Высота рендера для 4:3 равна 1800")
+
+    # 3:2
+    overlay_svc.update_settings({ image_aspect_ratio: "3:2", image_width: 2400 })
+    info_3_2 = overlay_svc.calculate_target_info
+    assert((info_3_2[:ratio] - 1.5).abs < 0.01, "Соотношение 3:2 рассчитано верно (1.5)")
+    assert(info_3_2[:render_h] == 1600, "Высота рендера для 3:2 равна 1600")
+
+    # 1:1
+    overlay_svc.update_settings({ image_aspect_ratio: "1:1", image_width: 2400 })
+    info_1_1 = overlay_svc.calculate_target_info
+    assert((info_1_1[:ratio] - 1.0).abs < 0.01, "Соотношение 1:1 рассчитано верно (1.0)")
+    assert(info_1_1[:render_h] == 2400, "Высота рендера для 1:1 равна 2400")
+
+    # Пользовательский (custom: 21:9)
+    overlay_svc.update_settings({ image_aspect_ratio: "custom", custom_ratio_w: 21, custom_ratio_h: 9, image_width: 2400 })
+    info_custom = overlay_svc.calculate_target_info
+    assert((info_custom[:ratio] - (21.0 / 9.0)).abs < 0.01, "Кастомное соотношение 21:9 рассчитано верно (~2.333)")
+    assert(info_custom[:render_h] == 1029, "Высота рендера для 21:9 равна 1029")
+
+    # 3. Проверка жизненного цикла оверлея (enable, disable, toggle, active?)
+    mock_model = Sketchup::MockModel.new
+    assert(!overlay_svc.overlay_active?(mock_model), "Изначально оверлей выключен")
+
+    assert(overlay_svc.enable(mock_model) == true, "enable(model) возвращает true")
+    assert(overlay_svc.overlay_active?(mock_model), "Оверлей активен после enable")
+    assert(mock_model.overlays.size == 1, "В коллекцию модели добавлен 1 оверлей")
+    assert(mock_model.overlays[0].overlay_id == overlay_svc::OVERLAY_ID, "Добавленный оверлей имеет правильный ID")
+
+    # Повторный enable не дублирует оверлей
+    overlay_svc.enable(mock_model)
+    assert(mock_model.overlays.size == 1, "Повторный вызов enable не создает дубликатов")
+
+    # toggle переключает в false
+    res_toggle = overlay_svc.toggle(mock_model)
+    assert(res_toggle == false, "toggle переключил оверлей в false")
+    assert(!overlay_svc.overlay_active?(mock_model), "Оверлей неактивен после toggle")
+
+    # toggle переключает обратно в true
+    res_toggle2 = overlay_svc.toggle(mock_model)
+    assert(res_toggle2 == true, "toggle переключил оверлей обратно в true")
+    assert(overlay_svc.overlay_active?(mock_model), "Оверлей активен после второго toggle")
+
+    # disable выключает
+    overlay_svc.disable(mock_model)
+    assert(!overlay_svc.overlay_active?(mock_model), "disable выключил оверлей")
+
+    # 4. Проверка отрисовки оверлея в View
+    ov_inst = overlay_svc.overlay_instance
+    mock_view = mock_model.active_view
+    mock_view.drawn_elements.clear
+    overlay_svc.update_settings({ image_aspect_ratio: "16:9", image_width: 2400 })
+    ov_inst.draw(mock_view)
+
+    assert(mock_view.drawn_elements.size > 0, "Метод draw оверлея выполнил отрисовку графических примитивов")
+    has_loop = mock_view.drawn_elements.any? { |el| el[:mode] == GL_LINE_LOOP }
+    has_lines = mock_view.drawn_elements.any? { |el| el[:mode] == GL_LINES }
+    has_text = mock_view.drawn_elements.any? { |el| el[:mode] == :text }
+    assert(has_loop, "Отрисован контур рамки (GL_LINE_LOOP)")
+    assert(has_lines, "Отрисованы угловые засечки и сетка (GL_LINES)")
+    assert(has_text, "Отрисован информационный бейдж с текстом")
+
+    # 5. Проверка сохранения параметров в ProjectData и YAML
+    proj_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(proj_data.pdf_settings.key?(:image_aspect_ratio), "pdf_settings содержит :image_aspect_ratio")
+    assert(proj_data.pdf_settings.key?(:custom_ratio_w), "pdf_settings содержит :custom_ratio_w")
+    assert(proj_data.pdf_settings.key?(:custom_ratio_h), "pdf_settings содержит :custom_ratio_h")
+    assert(proj_data.pdf_settings.key?(:show_aspect_overlay), "pdf_settings содержит :show_aspect_overlay")
+
+    proj_data.pdf_settings[:image_aspect_ratio] = "16:9"
+    proj_data.pdf_settings[:custom_ratio_w] = 16
+    proj_data.pdf_settings[:custom_ratio_h] = 9
+    proj_data.pdf_settings[:show_aspect_overlay] = true
+
+    tmp_dir = File.join(Dir.tmpdir, "test_overlay_yaml_#{Time.now.to_i}")
+    FileUtils.mkdir_p(tmp_dir)
+    test_yaml = File.join(tmp_dir, "project_config.yaml")
+    proj_data.save_to_yaml(test_yaml)
+
+    yaml_text = File.read(test_yaml, encoding: "utf-8")
+    assert(yaml_text.include?("image_aspect_ratio: '16:9'") || yaml_text.include?("image_aspect_ratio: \"16:9\"") || yaml_text.include?("image_aspect_ratio: 16:9"), "YAML содержит сохраненный image_aspect_ratio: 16:9")
+    assert(yaml_text.include?("show_aspect_overlay: true"), "YAML содержит show_aspect_overlay: true")
+
+    reloaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    reloaded_data.load_from_yaml(test_yaml)
+    assert(reloaded_data.pdf_settings[:image_aspect_ratio] == "16:9", "Загруженный из YAML image_aspect_ratio равен 16:9")
+    assert(reloaded_data.pdf_settings[:show_aspect_overlay] == true, "Загруженный из YAML show_aspect_overlay равен true")
+
+    # 6. Проверка файлов конфигурации плагина
+    def_settings_text = File.read(File.join(__dir__, "../config/default_settings.yaml"), encoding: "utf-8")
+    assert(def_settings_text.include?("image_aspect_ratio:"), "default_settings.yaml содержит image_aspect_ratio")
+    assert(def_settings_text.include?("show_aspect_overlay:"), "default_settings.yaml содержит show_aspect_overlay")
+
+    # 7. Проверка HTML интерфейса диалога
+    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html_text.include?("id=\"selectImageAspect\""), "index.html содержит id=\"selectImageAspect\"")
+    assert(html_text.include?("id=\"customAspectGroup\""), "index.html содержит id=\"customAspectGroup\"")
+    assert(html_text.include?("id=\"inputAspectCustomW\""), "index.html содержит id=\"inputAspectCustomW\"")
+    assert(html_text.include?("id=\"inputAspectCustomH\""), "index.html содержит id=\"inputAspectCustomH\"")
+    assert(!html_text.include?("id=\"chkShowAspectOverlay\""), "index.html больше не содержит id=\"chkShowAspectOverlay\" на странице настроек")
+    assert(!html_text.include?("id=\"aspectOverlayBadge\""), "index.html больше не содержит id=\"aspectOverlayBadge\" на странице настроек")
+
+    # 8. Проверка JS логики
+    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js_text.include?("selectImageAspect"), "app.js содержит selectImageAspect")
+    assert(js_text.include?("chkShowAspectOverlay"), "app.js содержит chkShowAspectOverlay")
+    assert(js_text.include?("function updateAspectUI"), "app.js содержит function updateAspectUI")
+    assert(js_text.include?("syncOverlayState"), "app.js содержит syncOverlayState")
+    assert(js_text.include?("updateAspectInfo"), "app.js содержит updateAspectInfo")
+    assert(js_text.include?("callRuby(\"toggleAspectOverlay\""), "app.js отправляет toggleAspectOverlay в SketchUp")
+
+    # 9. Проверка CSS стилей
+    css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
+    assert(css_text.include?(".aspect-overlay-card"), "app.css содержит стили .aspect-overlay-card")
+    assert(css_text.include?(".aspect-custom-inputs"), "app.css содержит стили .aspect-custom-inputs")
+    assert(css_text.include?("#aspectOverlayBadge"), "app.css содержит стили #aspectOverlayBadge")
+
+    # 10. Проверка регистрации пункта меню и иконки панели инструментов
+    main_text = File.read(File.join(__dir__, "../main.rb"), encoding: "utf-8")
+    assert(main_text.include?("require_relative \"service/overlay_service\""), "main.rb подключает overlay_service")
+    assert(main_text.include?("def toggle_aspect_overlay"), "main.rb содержит метод toggle_aspect_overlay")
+    assert(main_text.include?("Рамка пропорций кадра (Overlay)"), "main.rb содержит пункт меню 'Рамка пропорций кадра (Overlay)'")
+    assert(main_text.include?("frame_overlay.svg"), "main.rb использует иконку frame_overlay.svg")
+
+    icon_path = File.join(__dir__, "../ico/frame_overlay.svg")
+    assert(File.exist?(icon_path), "Файл иконки frame_overlay.svg существует")
+    icon_content = File.read(icon_path, encoding: "utf-8")
+    assert(icon_content.include?("<svg") && icon_content.include?("</svg>"), "frame_overlay.svg является валидным SVG")
+
+    # 11. Проверка размещения включателя рамки в настройке Картинка чертежа и привязки пропорций к блоку шаблона
+    assert(js_text.include?("chk_tpl_aspect_overlay"), "app.js содержит включатель оверлея chk_tpl_aspect_overlay в блоке Картинка чертежа")
+    assert(js_text.include?("tplAspectOverlayBadge"), "app.js содержит бейдж пропорций tplAspectOverlayBadge в блоке Картинка чертежа")
+    assert(js_text.include?("tplAspectOverlayText"), "app.js содержит текстовую метку пропорций tplAspectOverlayText")
+    assert(js_text.include?("syncCurrentTemplateOverlay"), "app.js содержит метод syncCurrentTemplateOverlay")
+    assert(css_text.include?(".tpl-overlay-toggle-label"), "app.css содержит стили для .tpl-overlay-toggle-label")
+    assert(css_text.include?("#tplAspectOverlayBadge"), "app.css содержит стили для #tplAspectOverlayBadge")
+    assert(css_text.include?("#tplAspectOverlayBadge.disabled-overlay"), "app.css содержит стили для неактивного состояния рамки")
+
+    export_dialog_text = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
+    assert(export_dialog_text.include?("syncOverlayState"), "export_dialog.rb синхронизирует состояние оверлея при обновлении настроек")
+
+    # Проверка вычисления пропорций из блока image_4_3 шаблона
+    mock_model_tpl = Sketchup::MockModel.new
+    overlay_svc.update_settings({
+      custom_layouts: {
+        cover: { image_4_3: { aspect_ratio: "3:2" } },
+        visual: { image_4_3: { aspect_ratio: "16:9" } },
+        general: { image_4_3: { aspect_ratio: "1:1" } }
+      }
+    })
+    info_tpl_cover = overlay_svc.calculate_target_info(mock_model_tpl, { template_key: :cover })
+    assert((info_tpl_cover[:ratio] - 1.5).abs < 0.01, "Пропорции cover берутся из блока image_4_3 (3:2 = 1.5)")
+
+    info_tpl_visual = overlay_svc.calculate_target_info(mock_model_tpl, { template_key: :visual })
+    assert((info_tpl_visual[:ratio] - (16.0 / 9.0)).abs < 0.01, "Пропорции visual берутся из блока image_4_3 (16:9)")
+
+    info_tpl_general = overlay_svc.calculate_target_info(mock_model_tpl, { template_key: :general })
+    assert((info_tpl_general[:ratio] - 1.0).abs < 0.01, "Пропорции general берутся из блока image_4_3 (1:1 = 1.0)")
+
+    # Проверка работы с цветами и прозрачностью рамки и затемнения
+    assert(proj_data.pdf_settings.key?(:overlay_border_color), "pdf_settings содержит :overlay_border_color")
+    assert(proj_data.pdf_settings.key?(:overlay_border_opacity), "pdf_settings содержит :overlay_border_opacity")
+    assert(proj_data.pdf_settings.key?(:overlay_mask_color), "pdf_settings содержит :overlay_mask_color")
+    assert(proj_data.pdf_settings.key?(:overlay_mask_opacity), "pdf_settings содержит :overlay_mask_opacity")
+
+    # Тестирование метода parse_color
+    parsed_c1 = overlay_svc.parse_color("#EF4444", 80)
+    if parsed_c1.is_a?(String)
+      assert(parsed_c1.include?("rgba(239,68,68,0.8)"), "parse_color корректно парсит HEX #EF4444 и 80% opacity")
+    else
+      assert(parsed_c1.red == 239 && parsed_c1.green == 68 && parsed_c1.blue == 68 && parsed_c1.alpha == 204, "parse_color возвращает правильный Color RGBA")
+    end
+
+    # Тестирование передачи параметров цвета и прозрачности через update_settings
+    overlay_svc.update_settings({
+      overlay_border_color: "#10B981",
+      overlay_border_opacity: 75,
+      overlay_mask_color: "#1E293B",
+      overlay_mask_opacity: 60
+    }, mock_model_tpl)
+
+    info_colors = overlay_svc.calculate_target_info(mock_model_tpl)
+    assert(info_colors[:border_color] == "#10B981", "calculate_target_info возвращает обновленный border_color")
+    assert(info_colors[:border_opacity] == 75, "calculate_target_info возвращает обновленный border_opacity")
+    assert(info_colors[:mask_color] == "#1E293B", "calculate_target_info возвращает обновленный mask_color")
+    assert(info_colors[:mask_opacity] == 60, "calculate_target_info возвращает обновленный mask_opacity")
+
+    ov_check = overlay_svc.find_model_overlay(mock_model_tpl)
+    assert(ov_check && ov_check.border_color_cache == "#10B981", "Кэш цвета рамки в оверлее обновлен")
+    assert(ov_check && ov_check.border_opacity_cache == 75, "Кэш прозрачности рамки в оверлее обновлен")
+    assert(ov_check && ov_check.mask_color_cache == "#1E293B", "Кэш цвета затемнения в оверлее обновлен")
+    assert(ov_check && ov_check.mask_opacity_cache == 60, "Кэш затемнения в оверлее обновлен")
+
+    # Проверка наличия элементов интерфейса в app.js, app.css и index.html
+    assert(js_text.include?("input_overlay_border_color"), "app.js содержит элемент input_overlay_border_color")
+    assert(js_text.include?("input_overlay_border_opacity"), "app.js содержит элемент input_overlay_border_opacity")
+    assert(js_text.include?("input_overlay_mask_color"), "app.js содержит элемент input_overlay_mask_color")
+    assert(js_text.include?("input_overlay_mask_opacity"), "app.js содержит элемент input_overlay_mask_opacity")
+    assert(css_text.include?(".tpl-overlay-styling-row"), "app.css содержит стили .tpl-overlay-styling-row")
+    assert(html_text.include?("id=\"inputOverlayBorderColor\""), "index.html содержит id=\"inputOverlayBorderColor\" на странице настроек")
+    assert(html_text.include?("id=\"inputOverlayMaskColor\""), "index.html содержит id=\"inputOverlayMaskColor\" на странице настроек")
+
+    FileUtils.rm_rf(tmp_dir)
+  end
+
+  def test_43_new_project_yaml_data_structure
+    puts "\n--- 43. Тест интеграции новой структуры данных из project.yaml ---"
+    require "digest"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    assert(File.exist?(root_project_yaml), "Файл project.yaml существует в корне проекта (#{root_project_yaml})")
+
+    # 1. Фиксация неизменности файла project.yaml (хеш MD5)
+    initial_content = File.binread(root_project_yaml)
+    initial_md5 = Digest::MD5.hexdigest(initial_content)
+
+    # 2. Загрузка данных из project.yaml в ProjectData
+    proj = DN1Code::ExportPdf2::Model::ProjectData.new
+    proj.load_from_yaml(root_project_yaml)
+
+    # 3. Проверка секции project и тегов мебели product_tags
+    assert(proj.project_info[:articul] == "HF#YYMMDD_HHMMSS", "Артикул корректно загружен: HF#YYMMDD_HHMMSS")
+    assert(proj.project_info[:product_tags] == ["Шкаф", "Тумба", "Зеркало"], "product_tags содержит список: ['Шкаф', 'Тумба', 'Зеркало']")
+    assert(proj.project_info[:product] == "Шкаф, Тумба, Зеркало", "Синхронизированное поле product объединяет теги через запятую")
+    assert(proj.project_info[:place].include?("Место установки"), "Место установки проекта загружено")
+    assert(proj.project_info[:adress].include?("Адрес установки"), "Адрес установки проекта загружен")
+    assert(proj.project_info[:name_company] == "Название компании", "Название компании загружено")
+    assert(proj.project_info[:commercial] == false, "Флаг коммерческого проекта: false")
+
+    # 4. Проверка секции customer
+    assert(proj.customer[:id] == "CUST-2609052034", "ID заказчика: CUST-2609052034")
+    assert(proj.customer[:name] == "Имя Заказчика", "Имя заказчика: Имя Заказчика")
+    assert(proj.customer[:phone] == "Номер телефона", "Телефон заказчика загружен")
+    assert(proj.customer[:email] == "Электронная почта", "Email заказчика загружен")
+
+    # 5. Проверка секции workflow и стадий (stadia)
+    assert(proj.workflow[:author] == "Автор проекта", "Автор проекта: Автор проекта")
+    assert(proj.workflow[:version] == "01", "Версия проекта: 01")
+    assert(proj.workflow[:revision] == "002", "Ревизия проекта: 002")
+    assert(proj.workflow[:total_duration].include?("Время работы"), "total_duration загружен")
+
+    stadia = proj.workflow[:stadia]
+    assert(stadia.is_a?(Array) && stadia.size == 8, "Стадии жизненного цикла содержат 8 элементов")
+    assert(stadia[0][:name] == "Предварительный проект" && stadia[0][:status] == true, "Стадия 1: Предварительный проект (выполнена)")
+    assert(stadia[1][:name] == "Правки проекта (история правок)" && stadia[1][:status] == true, "Стадия 2: Правки проекта (выполнена)")
+    assert(stadia[2][:name] == "Выбраны материалы и фурнитура" && stadia[2][:status] == true, "Стадия 3: Выбраны материалы и фурнитура (выполнена)")
+    assert(stadia[3][:name] == "Предварительно Утвержден" && stadia[3][:status] == false, "Стадия 4: Предварительно Утвержден (не выполнена)")
+    assert(stadia[7][:name] == "Оплачен" && stadia[7][:status] == false, "Стадия 8: Оплачен (не выполнена)")
+    assert(proj.workflow[:status] == "Выбраны материалы и фурнитура", "Текущий статус вычисляется как последняя отмеченная стадия")
+
+    # 6. Проверка корневой секции history_edit
+    assert(proj.history.is_a?(Array) && proj.history.size == 4, "История изменений загружена на корневом уровне и содержит 4 записи")
+    first_hist = proj.history[0]
+    assert(first_hist[:data] == "2026-09-05 20:34", "Первая запись истории содержит дату 2026-09-05 20:34")
+    assert(first_hist[:edit].include?("Экспорт PDF"), "Первая запись содержит описание правки 'Экспорт PDF'")
+    assert(first_hist[:pdf_link] == "HF#YYMMDD_HHMMSS_version_revison.pdf", "Первая запись содержит ссылку на PDF: #{first_hist[:pdf_link]}")
+
+    # 7. Проверка секций directories, scenes, api_targets
+    assert(proj.directories.is_a?(Array) && proj.directories.size == 2, "Рабочие папки directories содержат 2 записи")
+    assert(proj.scenes.is_a?(Array) && proj.scenes.size == 4, "Сцены проекта содержат 4 элемента")
+    assert(proj.scenes[0][:name] == "Обложка" && proj.scenes[0][:page_type] == "cover", "Сцена 1: Обложка (cover)")
+    assert(proj.api_targets.is_a?(Array) && proj.api_targets.size == 2, "api_targets содержат 2 адреса")
+    assert(proj.api_targets.any? { |url| url.include?("prodmd.top") }, "api_targets содержит prodmd.top")
+
+    # 8. Проверка сохранения в YAML и совпадения структуры
+    tmp_dir = Dir.mktmpdir("test_yaml_save")
+    tmp_out = File.join(tmp_dir, "saved_project.yaml")
+    proj.save_to_yaml(tmp_out)
+    assert(File.exist?(tmp_out), "Сохраненный файл YAML создан успешно")
+
+    saved_raw = YAML.safe_load(File.read(tmp_out), permitted_classes: [Date, Time, Symbol])
+    assert(saved_raw.key?("project"), "Сохраненный YAML содержит секцию 'project'")
+    assert(saved_raw["project"]["product_tags"] == ["Шкаф", "Тумба", "Зеркало"], "Сохраненный YAML сохраняет 'product_tags'")
+    assert(saved_raw.key?("history_edit"), "Сохраненный YAML содержит корневую секцию 'history_edit'")
+    assert(saved_raw["history_edit"].is_a?(Array) && saved_raw["history_edit"].size == 4, "history_edit сохранен как корневой массив из 4 записей")
+    assert(saved_raw["history_edit"][0].key?("pdf_link"), "Записи history_edit содержат ключ pdf_link")
+    assert(saved_raw["workflow"]["stadia"].is_a?(Array) && saved_raw["workflow"]["stadia"].size == 8, "Стадии сохранены в workflow['stadia']")
+
+    # 9. Проверка повторной загрузки из сохраненного файла (roundtrip)
+    proj2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    proj2.load_from_yaml(tmp_out)
+    assert(proj2.project_info[:product_tags] == ["Шкаф", "Тумба", "Зеркало"], "Повторная загрузка: product_tags совпадают")
+    assert(proj2.workflow[:stadia].size == 8, "Повторная загрузка: stadia содержит 8 этапов")
+    assert(proj2.history.size == 4, "Повторная загрузка: history содержит 4 записи")
+    assert(proj2.history[0][:pdf_link] == "HF#YYMMDD_HHMMSS_version_revison.pdf", "Повторная загрузка: pdf_link сохранен")
+    FileUtils.rm_rf(tmp_dir)
+
+    # 10. Проверка контроллера и рендеринга стадий и истории
+    mock_pdf = Prawn::Document.new(page_size: "A4", page_layout: :landscape)
+    page_base = DN1Code::ExportPdf2::Controller::PageBase.new(mock_pdf, proj, proj.scenes.first)
+    stadia_rendered = page_base.send(:resolve_info_line, "workflow_stadia")
+    assert(stadia_rendered.include?("[✓] Предварительный проект"), "resolve_info_line('workflow_stadia') рендерит [✓] для выполненных стадий")
+    assert(stadia_rendered.include?("[ ] Предварительно Утвержден"), "resolve_info_line('workflow_stadia') рендерит [ ] для невыполненных стадий")
+
+    history_rendered = page_base.send(:resolve_info_line, "workflow_history")
+    assert(history_rendered.include?("2026-09-05 20:34") && history_rendered.include?("Экспорт PDF"), "resolve_info_line('workflow_history') рендерит дату и описание правки")
+
+    # 11. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_44_template_independence_and_autosave
+    puts "\n--- 44. Тест автоматического сохранения в YAML и независимости шаблонов ---"
+    require "digest"
+    require "tmpdir"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_content = File.binread(root_project_yaml)
+    initial_md5 = Digest::MD5.hexdigest(initial_content)
+
+    # 1. Проверка независимости структуры custom_layouts для всех 5 шаблонов
+    proj = DN1Code::ExportPdf2::Model::ProjectData.new
+    templates = [:cover, :description, :explain, :general, :visual]
+
+    templates.each do |tpl|
+      assert(proj.custom_layouts.key?(tpl), "custom_layouts содержит шаблон #{tpl}")
+      assert(proj.custom_layouts[tpl].key?(:image_4_3), "шаблон #{tpl} содержит блок image_4_3")
+      assert(proj.custom_layouts[tpl].key?(:header), "шаблон #{tpl} содержит блок header")
+    end
+
+    # Проверка отсутствия общих ссылок на хэши между шаблонами (Deep isolation)
+    assert(proj.custom_layouts[:cover][:image_4_3].object_id != proj.custom_layouts[:visual][:image_4_3].object_id,
+           "Блоки image_4_3 в cover и visual имеют разные object_id")
+    assert(proj.custom_layouts[:cover][:header][:lines].object_id != proj.custom_layouts[:general][:header][:lines].object_id,
+           "Массивы lines в cover и general имеют разные object_id")
+
+    # 2. Модификация одного шаблона НЕ должна влиять на остальные (Template Independence)
+    proj.custom_layouts[:cover][:image_4_3][:aspect_ratio] = "21:9"
+    proj.custom_layouts[:cover][:image_4_3][:scale_pct] = 77
+    proj.custom_layouts[:cover][:header][:visible] = false
+    proj.custom_layouts[:cover][:header][:line_rows]["furniture_name"] = 99
+    proj.custom_layouts[:cover][:slot_1][:font_size] = 14.5
+    proj.custom_layouts[:cover][:slot_1][:item_gap_mm] = 6.0
+
+    assert(proj.custom_layouts[:visual][:image_4_3][:aspect_ratio] != "21:9",
+           "Изменение aspect_ratio в cover не затронуло visual")
+    assert(proj.custom_layouts[:visual][:image_4_3][:scale_pct] != 77,
+           "Изменение scale_pct в cover не затронуло visual")
+    assert(proj.custom_layouts[:general][:header][:visible] == true,
+           "Скрытие header в cover не скрыло header в general")
+    assert(proj.custom_layouts[:description][:header][:line_rows]["furniture_name"] != 99,
+           "Изменение line_rows в cover не повлияло на description")
+    assert(proj.custom_layouts[:explain][:slot_1][:font_size] != 14.5,
+           "Изменение font_size в cover slot_1 не повлияло на explain")
+    assert(proj.custom_layouts[:explain][:slot_1][:item_gap_mm] != 6.0,
+           "Изменение item_gap_mm в cover slot_1 не повлияло на explain")
+
+    # 3. Проверка сохранения в YAML и повторной загрузки с сохранением изоляции
+    tmp_dir = Dir.mktmpdir("test_autosave_independence")
+    tmp_yaml = File.join(tmp_dir, "autosave_test.yaml")
+    proj.save_to_yaml(tmp_yaml)
+    assert(File.exist?(tmp_yaml), "YAML файл успешно сохранен через save_to_yaml")
+
+    loaded_proj = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded_proj.load_from_yaml(tmp_yaml)
+    assert(loaded_proj.custom_layouts[:cover][:image_4_3][:aspect_ratio] == "21:9",
+           "Загруженный cover сохранил aspect_ratio 21:9")
+    assert(loaded_proj.custom_layouts[:visual][:image_4_3][:aspect_ratio] != "21:9",
+           "Загруженный visual сохранил независимое значение aspect_ratio")
+    assert(loaded_proj.custom_layouts[:general][:header][:visible] == true,
+           "Загруженный general сохранил видимость header: true")
+
+    # 4. Проверка работы метода save_auto с mock-моделью
+    mock_model = Sketchup::MockModel.new
+    mock_model.path = File.join(tmp_dir, "MyModel.skp")
+    loaded_proj.project_info[:name] = "Автосохраненный Проект"
+    loaded_proj.save_auto(mock_model)
+
+    expected_auto_yaml = File.join(tmp_dir, "MyModel.yaml")
+    assert(File.exist?(expected_auto_yaml), "save_auto создал YAML файл рядом со SKP: #{expected_auto_yaml}")
+    content_auto = File.read(expected_auto_yaml, encoding: "utf-8")
+    assert(content_auto.include?("Автосохраненный Проект"), "save_auto сохранил актуальные данные проекта в YAML")
+
+    # 5. Проверка экшена autoSave / saveData с silent: true в export_dialog.rb
+    export_dialog_rb = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
+    assert(export_dialog_rb.include?('dialog.add_action_callback("autoSave"'), "export_dialog.rb регистрирует экшен autoSave")
+    assert(export_dialog_rb.include?("is_silent = payload[:silent] == true || payload[:is_auto_save] == true"),
+           "export_dialog.rb распознает silent и is_auto_save флаги")
+    assert(export_dialog_rb.include?("window.app.onAutoSaved && window.app.onAutoSaved"),
+           "export_dialog.rb вызывает JS callback window.app.onAutoSaved при тихом сохранении")
+
+    # 6. Проверка поддержки автосохранения в app.js
+    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js_text.include?("function triggerAutoSave()"), "app.js содержит функцию triggerAutoSave")
+    assert(js_text.include?("function notifyChange()"), "app.js содержит функцию notifyChange")
+    assert(js_text.include?("function updateAutoSaveIndicator("), "app.js содержит функцию updateAutoSaveIndicator")
+    assert(js_text.include?("onAutoSaved: function"), "app.js содержит обработчик onAutoSaved")
+    assert(js_text.include?("deepClone("), "app.js содержит deepClone для глубокого копирования шаблонов")
+    assert(js_text.include?("autoSaveTimer"), "app.js использует дебаунс-таймер для автосохранения")
+
+    # 7. Проверка изоляции шаблонов в app.js
+    assert(js_text.include?("targetTplKey"), "app.js параметризирует обновление блоков через targetTplKey")
+    assert(js_text.include?("deepClone(defSlot.lines)"), "app.js глубоко клонирует слоты во избежание взаимных ссылок")
+
+    # 8. Проверка наличия индикатора автосохранения в index.html и стилей в app.css
+    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html_text.include?('id="autosaveStatus"'), "index.html содержит элемент #autosaveStatus в шапке")
+    assert(html_text.include?('class="autosave-status"'), "index.html содержит контейнер autosave-status")
+
+    css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
+    assert(css_text.include?(".autosave-status"), "app.css содержит стили для .autosave-status")
+    assert(css_text.include?(".autosave-status.saving"), "app.css содержит стиль для состояния saving")
+    assert(css_text.include?(".autosave-status.saved"), "app.css содержит стиль для состояния saved")
+
+    FileUtils.rm_rf(tmp_dir)
+
+    # 9. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
 end
 
 TestRunner.new.run_all
+

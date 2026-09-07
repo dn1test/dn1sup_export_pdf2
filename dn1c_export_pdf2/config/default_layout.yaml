@@ -2,15 +2,15 @@
 layout:
   cover:
     header:
-      x: 0.0
+      x: 25.0
       "y": 0.0
-      w: 100.0
+      w: 50.0
       h: 30.0
       visible: true
       content: header_title
       align: center
-      valign: center
-      font_size: 11.0
+      valign: top
+      font_size: 13.0
       lines:
       - furniture_name
       - place_address
@@ -36,6 +36,13 @@ layout:
         scene_name: "#005EB0"
         scene_description: "#475569"
       opacity: 0.95
+    cover_title:
+      x: 10.0
+      "y": 15.0
+      w: 80.0
+      h: 12.0
+      visible: true
+      align: center
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -43,7 +50,7 @@ layout:
       h: 82.0
       visible: true
       content: render_viewport
-      aspect_ratio: "4:3"
+      aspect_ratio: '4:3'
       scale_pct: 100
     slot_1:
       x: 0.0
@@ -54,18 +61,15 @@ layout:
       content: info_lines
       align: left
       valign: top
-      font_size: 8.0
+      font_size: 8.5
+      item_gap_mm: 2.0
+      item_gap: 2.0
       lines:
-      - toc_pages
-      - spec_materials
-      - spec_appliances
-      - general_notes
-      - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
       - articul
+      - workflow_date
+      - workflow_version
+      - workflow_revision
+      - workflow_stadia
       line_aligns:
         toc_pages: left
         spec_materials: left
@@ -110,57 +114,43 @@ layout:
         workflow_version: "#334155"
         workflow_date: "#334155"
         articul: "#334155"
-      opacity: 0.9
+      opacity: 0.92
     slot_2:
       x: 0.0
       "y": 58.0
       w: 25.0
       h: 36.0
-      visible: true
-      content: info_lines
+      visible: false
+      content: none
       align: left
       valign: bottom
       font_size: 8.0
-      lines:
-      - workflow_history
-      - workflow_stadia
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     slot_3:
       x: 75.0
       "y": 0.0
       w: 25.0
       h: 58.0
-      visible: true
-      content: info_lines
+      visible: false
+      content: none
       align: right
       valign: top
       font_size: 8.0
-      lines:
-      - toc_pages
-      - spec_materials
-      - spec_appliances
-      - general_notes
-      - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
-      - articul
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     slot_4:
       x: 75.0
       "y": 58.0
       w: 25.0
       h: 36.0
-      visible: true
-      content: info_lines
-      align: left
+      visible: false
+      content: none
+      align: right
       valign: bottom
       font_size: 8.0
-      lines:
-      - workflow_history
-      - workflow_stadia
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     footer:
       x: 0.0
       "y": 94.0
@@ -186,14 +176,14 @@ layout:
       opacity: 1.0
   description:
     header:
-      x: 0.0
+      x: 25.0
       "y": 0.0
-      w: 100.0
+      w: 50.0
       h: 30.0
       visible: true
       content: header_title
       align: center
-      valign: center
+      valign: top
       font_size: 11.0
       lines:
       - furniture_name
@@ -227,7 +217,7 @@ layout:
       h: 82.0
       visible: true
       content: render_viewport
-      aspect_ratio: "4:3"
+      aspect_ratio: '4:3'
       scale_pct: 100
     slot_1:
       x: 0.0
@@ -238,33 +228,70 @@ layout:
       content: info_lines
       align: left
       valign: top
-      font_size: 8.0
+      font_size: 8.5
+      item_gap_mm: 2.0
+      item_gap: 2.0
       lines:
-      - toc_pages
       - spec_materials
       - spec_appliances
       - general_notes
-      - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
-      - articul
-      opacity: 0.9
+      line_aligns:
+        toc_pages: left
+        spec_materials: left
+        spec_appliances: left
+        general_notes: left
+        workflow_history: left
+        workflow_stadia: left
+        workflow_revision: left
+        workflow_version: left
+        workflow_date: left
+        articul: left
+      line_valigns:
+        toc_pages: top
+        spec_materials: top
+        spec_appliances: top
+        general_notes: top
+        workflow_history: bottom
+        workflow_stadia: bottom
+        workflow_revision: bottom
+        workflow_version: bottom
+        workflow_date: bottom
+        articul: bottom
+      line_font_sizes:
+        toc_pages: 8.0
+        spec_materials: 8.0
+        spec_appliances: 8.0
+        general_notes: 8.0
+        workflow_history: 8.0
+        workflow_stadia: 8.0
+        workflow_revision: 8.0
+        workflow_version: 8.0
+        workflow_date: 8.0
+        articul: 8.0
+      line_colors:
+        toc_pages: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
+        general_notes: "#334155"
+        workflow_history: "#334155"
+        workflow_stadia: "#334155"
+        workflow_revision: "#334155"
+        workflow_version: "#334155"
+        workflow_date: "#334155"
+        articul: "#334155"
+      opacity: 0.92
     slot_2:
       x: 0.0
       "y": 58.0
       w: 25.0
       h: 36.0
-      visible: true
-      content: info_lines
+      visible: false
+      content: none
       align: left
       valign: bottom
       font_size: 8.0
-      lines:
-      - workflow_history
-      - workflow_stadia
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     slot_3:
       x: 75.0
       "y": 0.0
@@ -274,33 +301,23 @@ layout:
       content: info_lines
       align: right
       valign: top
-      font_size: 8.0
+      font_size: 8.5
       lines:
-      - toc_pages
       - spec_materials
       - spec_appliances
-      - general_notes
-      - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
-      - articul
-      opacity: 0.9
+      opacity: 0.88
     slot_4:
       x: 75.0
       "y": 58.0
       w: 25.0
       h: 36.0
-      visible: true
-      content: info_lines
-      align: left
+      visible: false
+      content: none
+      align: right
       valign: bottom
       font_size: 8.0
-      lines:
-      - workflow_history
-      - workflow_stadia
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     footer:
       x: 0.0
       "y": 94.0
@@ -326,14 +343,14 @@ layout:
       opacity: 1.0
   explain:
     header:
-      x: 0.0
+      x: 25.0
       "y": 0.0
-      w: 100.0
+      w: 50.0
       h: 30.0
       visible: true
       content: header_title
       align: center
-      valign: center
+      valign: top
       font_size: 11.0
       lines:
       - furniture_name
@@ -367,7 +384,7 @@ layout:
       h: 82.0
       visible: true
       content: render_viewport
-      aspect_ratio: "4:3"
+      aspect_ratio: '4:3'
       scale_pct: 100
     slot_1:
       x: 0.0
@@ -379,18 +396,58 @@ layout:
       align: left
       valign: top
       font_size: 8.0
+      item_gap_mm: 2.0
+      item_gap: 2.0
       lines:
       - toc_pages
-      - spec_materials
-      - spec_appliances
       - general_notes
       - workflow_history
       - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
-      - articul
-      opacity: 0.9
+      line_aligns:
+        toc_pages: left
+        spec_materials: left
+        spec_appliances: left
+        general_notes: left
+        workflow_history: left
+        workflow_stadia: left
+        workflow_revision: left
+        workflow_version: left
+        workflow_date: left
+        articul: left
+      line_valigns:
+        toc_pages: top
+        spec_materials: top
+        spec_appliances: top
+        general_notes: top
+        workflow_history: bottom
+        workflow_stadia: bottom
+        workflow_revision: bottom
+        workflow_version: bottom
+        workflow_date: bottom
+        articul: bottom
+      line_font_sizes:
+        toc_pages: 8.0
+        spec_materials: 8.0
+        spec_appliances: 8.0
+        general_notes: 8.0
+        workflow_history: 8.0
+        workflow_stadia: 8.0
+        workflow_revision: 8.0
+        workflow_version: 8.0
+        workflow_date: 8.0
+        articul: 8.0
+      line_colors:
+        toc_pages: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
+        general_notes: "#334155"
+        workflow_history: "#334155"
+        workflow_stadia: "#334155"
+        workflow_revision: "#334155"
+        workflow_version: "#334155"
+        workflow_date: "#334155"
+        articul: "#334155"
+      opacity: 0.92
     slot_2:
       x: 0.0
       "y": 58.0
@@ -400,7 +457,9 @@ layout:
       content: none
       align: left
       valign: bottom
-      opacity: 0.9
+      font_size: 8.0
+      lines: []
+      opacity: 0.88
     slot_3:
       x: 75.0
       "y": 0.0
@@ -413,16 +472,8 @@ layout:
       font_size: 8.0
       lines:
       - toc_pages
-      - spec_materials
-      - spec_appliances
-      - general_notes
       - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
-      - articul
-      opacity: 0.9
+      opacity: 0.88
     slot_4:
       x: 75.0
       "y": 58.0
@@ -432,7 +483,9 @@ layout:
       content: none
       align: right
       valign: bottom
-      opacity: 0.9
+      font_size: 8.0
+      lines: []
+      opacity: 0.88
     footer:
       x: 0.0
       "y": 94.0
@@ -458,14 +511,14 @@ layout:
       opacity: 1.0
   general:
     header:
-      x: 0.0
+      x: 25.0
       "y": 0.0
-      w: 100.0
+      w: 50.0
       h: 30.0
       visible: true
       content: header_title
       align: center
-      valign: center
+      valign: top
       font_size: 11.0
       lines:
       - furniture_name
@@ -499,7 +552,7 @@ layout:
       h: 82.0
       visible: true
       content: render_viewport
-      aspect_ratio: "4:3"
+      aspect_ratio: '4:3'
       scale_pct: 100
     slot_1:
       x: 0.0
@@ -507,11 +560,60 @@ layout:
       w: 25.0
       h: 58.0
       visible: false
-      content: none
+      content: info_lines
       align: left
       valign: top
       font_size: 8.0
-      opacity: 0.9
+      item_gap_mm: 2.0
+      item_gap: 2.0
+      lines:
+      - general_notes
+      - workflow_stadia
+      line_aligns:
+        toc_pages: left
+        spec_materials: left
+        spec_appliances: left
+        general_notes: left
+        workflow_history: left
+        workflow_stadia: left
+        workflow_revision: left
+        workflow_version: left
+        workflow_date: left
+        articul: left
+      line_valigns:
+        toc_pages: top
+        spec_materials: top
+        spec_appliances: top
+        general_notes: top
+        workflow_history: bottom
+        workflow_stadia: bottom
+        workflow_revision: bottom
+        workflow_version: bottom
+        workflow_date: bottom
+        articul: bottom
+      line_font_sizes:
+        toc_pages: 8.0
+        spec_materials: 8.0
+        spec_appliances: 8.0
+        general_notes: 8.0
+        workflow_history: 8.0
+        workflow_stadia: 8.0
+        workflow_revision: 8.0
+        workflow_version: 8.0
+        workflow_date: 8.0
+        articul: 8.0
+      line_colors:
+        toc_pages: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
+        general_notes: "#334155"
+        workflow_history: "#334155"
+        workflow_stadia: "#334155"
+        workflow_revision: "#334155"
+        workflow_version: "#334155"
+        workflow_date: "#334155"
+        articul: "#334155"
+      opacity: 0.88
     slot_2:
       x: 0.0
       "y": 58.0
@@ -521,7 +623,9 @@ layout:
       content: none
       align: left
       valign: bottom
-      opacity: 0.9
+      font_size: 8.0
+      lines: []
+      opacity: 0.88
     slot_3:
       x: 75.0
       "y": 0.0
@@ -532,7 +636,8 @@ layout:
       align: right
       valign: top
       font_size: 8.0
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     slot_4:
       x: 75.0
       "y": 58.0
@@ -572,15 +677,15 @@ layout:
       opacity: 1.0
   visual:
     header:
-      x: 0.0
+      x: 25.0
       "y": 0.0
-      w: 100.0
+      w: 50.0
       h: 30.0
       visible: true
       content: header_title
       align: center
-      valign: center
-      font_size: 11.0
+      valign: top
+      font_size: 10.0
       lines:
       - furniture_name
       - place_address
@@ -613,7 +718,7 @@ layout:
       h: 82.0
       visible: true
       content: render_viewport
-      aspect_ratio: "4:3"
+      aspect_ratio: '4:3'
       scale_pct: 100
     slot_1:
       x: 0.0
@@ -621,11 +726,59 @@ layout:
       w: 25.0
       h: 58.0
       visible: false
-      content: none
+      content: info_lines
       align: left
       valign: top
       font_size: 8.0
-      opacity: 0.9
+      item_gap_mm: 2.0
+      item_gap: 2.0
+      lines:
+      - workflow_stadia
+      line_aligns:
+        toc_pages: left
+        spec_materials: left
+        spec_appliances: left
+        general_notes: left
+        workflow_history: left
+        workflow_stadia: left
+        workflow_revision: left
+        workflow_version: left
+        workflow_date: left
+        articul: left
+      line_valigns:
+        toc_pages: top
+        spec_materials: top
+        spec_appliances: top
+        general_notes: top
+        workflow_history: bottom
+        workflow_stadia: bottom
+        workflow_revision: bottom
+        workflow_version: bottom
+        workflow_date: bottom
+        articul: bottom
+      line_font_sizes:
+        toc_pages: 8.0
+        spec_materials: 8.0
+        spec_appliances: 8.0
+        general_notes: 8.0
+        workflow_history: 8.0
+        workflow_stadia: 8.0
+        workflow_revision: 8.0
+        workflow_version: 8.0
+        workflow_date: 8.0
+        articul: 8.0
+      line_colors:
+        toc_pages: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
+        general_notes: "#334155"
+        workflow_history: "#334155"
+        workflow_stadia: "#334155"
+        workflow_revision: "#334155"
+        workflow_version: "#334155"
+        workflow_date: "#334155"
+        articul: "#334155"
+      opacity: 0.88
     slot_2:
       x: 0.0
       "y": 58.0
@@ -635,7 +788,9 @@ layout:
       content: none
       align: left
       valign: bottom
-      opacity: 0.9
+      font_size: 8.0
+      lines: []
+      opacity: 0.88
     slot_3:
       x: 75.0
       "y": 0.0
@@ -646,7 +801,8 @@ layout:
       align: right
       valign: top
       font_size: 8.0
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     slot_4:
       x: 75.0
       "y": 58.0
@@ -657,7 +813,8 @@ layout:
       align: right
       valign: bottom
       font_size: 8.0
-      opacity: 0.9
+      lines: []
+      opacity: 0.88
     footer:
       x: 0.0
       "y": 94.0

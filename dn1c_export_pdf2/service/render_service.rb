@@ -18,8 +18,17 @@ module DN1Code
         # @param options [Hash] параметры рендера (:image_width, :image_height, :scale_factor, :antialias, :ratio)
         # @return [String] путь к созданному временному файлу PNG
         def self.render_scene_temp(model, scene, options = {})
-          width        = options[:image_width] || 2400
-          ratio        = options[:ratio] || DEFAULT_ISO_RATIO
+          width = options[:image_width] || 2400
+          ratio = if options[:ratio]
+                    options[:ratio]
+                  elsif options[:aspect_ratio] && options[:aspect_ratio].to_f > 0
+                    1.0 / options[:aspect_ratio].to_f
+                  elsif options[:image_aspect_ratio] && defined?(OverlayService)
+                    info = OverlayService.calculate_target_info(model)
+                    info[:ratio] > 0 ? (1.0 / info[:ratio]) : DEFAULT_ISO_RATIO
+                  else
+                    DEFAULT_ISO_RATIO
+                  end
           height       = options[:image_height] || (width * ratio).round
           scale_factor = options[:scale_factor] || 2.0
           antialias    = options.fetch(:antialias, true)
