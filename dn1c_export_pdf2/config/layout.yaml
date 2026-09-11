@@ -2,9 +2,9 @@
 layout:
   cover:
     header:
-      x: 5.0
+      x: 5
       "y": 0.0
-      w: 90.0
+      w: 90
       h: 30.0
       visible: true
       content: header_title
@@ -12,9 +12,11 @@ layout:
       valign: top
       font_size: 12.5
       lines:
-      - room_name
-      - articul
-      - workflow_status
+      - furniture_name
+      - place_address
+      - customer_or_company
+      - scene_name
+      - scene_description
       line_rows:
         furniture_name: 1
         place_address: 2
@@ -22,11 +24,11 @@ layout:
         scene_name: 4
         scene_description: 5
       line_font_sizes:
-        furniture_name: 11.0
-        place_address: 10.0
-        customer_or_company: 10.0
-        scene_name: 11.0
-        scene_description: 9.0
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
       line_colors:
         furniture_name: "#005EB0"
         place_address: "#0F172A"
@@ -79,55 +81,57 @@ layout:
       - articul
       - dir_specs
       line_aligns:
+        articul: left
+        workflow_date: left
+        workflow_version: left
+        workflow_revision: left
+        workflow_stadia: left
         toc_pages: left
         spec_materials: left
         spec_appliances: left
         general_notes: left
         workflow_history: left
-        workflow_stadia: left
-        workflow_revision: left
-        workflow_version: left
-        workflow_date: left
-        articul: left
       line_valigns:
+        articul: bottom
+        workflow_date: bottom
+        workflow_version: bottom
+        workflow_revision: bottom
+        workflow_stadia: bottom
         toc_pages: top
         spec_materials: top
         spec_appliances: top
         general_notes: top
         workflow_history: bottom
-        workflow_stadia: bottom
-        workflow_revision: bottom
-        workflow_version: bottom
-        workflow_date: bottom
-        articul: bottom
         dir_desc_0: bottom
         dir_desc_1: bottom
         dir_desc_2: bottom
         dir_desc_3: bottom
         dir_specs: bottom
       line_font_sizes:
+        articul: 8
+        workflow_date: 8
+        workflow_version: 8
+        workflow_revision: 8
+        workflow_stadia: 8
         toc_pages: 8
         spec_materials: 8
         spec_appliances: 8
         general_notes: 8
         workflow_history: 8
-        workflow_stadia: 8
-        workflow_revision: 8
-        workflow_version: 8
-        workflow_date: 8
-        articul: 8
       line_colors:
+        articul: "#334155"
+        workflow_date: "#334155"
+        workflow_version: "#334155"
+        workflow_revision: "#334155"
+        workflow_stadia: "#334155"
         toc_pages: "#334155"
         spec_materials: "#334155"
         spec_appliances: "#334155"
         general_notes: "#334155"
         workflow_history: "#334155"
-        workflow_stadia: "#334155"
-        workflow_revision: "#334155"
-        workflow_version: "#334155"
-        workflow_date: "#334155"
-        articul: "#334155"
       opacity: 0.92
+      show_titles: true
+      line_show_titles: {}
     slot_2:
       x: 0
       "y": 58
@@ -187,13 +191,6 @@ layout:
         footer_date: center
         footer_page_total: right
       opacity: 1
-    cover_subtitle:
-      x: 5.0
-      "y": 19.0
-      w: 90.0
-      h: 5.0
-      visible: false
-      align: center
   description:
     header:
       x: 25
@@ -214,21 +211,21 @@ layout:
       line_rows:
         furniture_name: 1
         place_address: 2
-        customer_or_company: 3
         scene_name: 4
         scene_description: 5
+        customer_or_company: 3
       line_font_sizes:
         furniture_name: 11
         place_address: 10
-        customer_or_company: 10
         scene_name: 11
         scene_description: 9
+        customer_or_company: 10
       line_colors:
         furniture_name: "#005EB0"
         place_address: "#0F172A"
-        customer_or_company: "#0F172A"
         scene_name: "#005EB0"
         scene_description: "#475569"
+        customer_or_company: "#0F172A"
       opacity: 0.95
     image_4_3:
       x: 25
@@ -244,26 +241,26 @@ layout:
       lines: []
       opacity: 0.9
     slot_1:
-      x: 0.0
-      "y": 10.0
-      w: 28.0
-      h: 40.0
+      x: 0
+      "y": 10
+      w: 28
+      h: 40
       visible: true
       content: project_card
       align: right
       valign: top
-      font_size: 9.0
+      font_size: 9
       item_gap_mm: 2.0
-      item_gap: 2.0
+      item_gap: 2
       lines:
       - room_name
       - furniture_name
       - workflow_price
       line_aligns:
-        toc_pages: left
         spec_materials: left
         spec_appliances: left
         general_notes: left
+        toc_pages: left
         workflow_history: left
         workflow_stadia: left
         workflow_revision: left
@@ -271,10 +268,10 @@ layout:
         workflow_date: left
         articul: left
       line_valigns:
-        toc_pages: top
         spec_materials: top
         spec_appliances: top
         general_notes: top
+        toc_pages: top
         workflow_history: bottom
         workflow_stadia: bottom
         workflow_revision: bottom
@@ -282,21 +279,21 @@ layout:
         workflow_date: bottom
         articul: bottom
       line_font_sizes:
-        toc_pages: 8.0
-        spec_materials: 8.0
-        spec_appliances: 8.0
-        general_notes: 8.0
-        workflow_history: 8.0
-        workflow_stadia: 8.0
-        workflow_revision: 8.0
-        workflow_version: 8.0
-        workflow_date: 8.0
-        articul: 8.0
+        spec_materials: 8
+        spec_appliances: 8
+        general_notes: 8
+        toc_pages: 8
+        workflow_history: 8
+        workflow_stadia: 8
+        workflow_revision: 8
+        workflow_version: 8
+        workflow_date: 8
+        articul: 8
       line_colors:
-        toc_pages: "#334155"
         spec_materials: "#334155"
         spec_appliances: "#334155"
         general_notes: "#334155"
+        toc_pages: "#334155"
         workflow_history: "#334155"
         workflow_stadia: "#334155"
         workflow_revision: "#334155"
@@ -365,18 +362,6 @@ layout:
         footer_date: center
         footer_page_total: right
       opacity: 1
-    desc_materials:
-      x: 0.0
-      "y": 12.0
-      w: 45.0
-      h: 25.0
-      visible: true
-    desc_image:
-      x: 48.0
-      "y": 12.0
-      w: 52.0
-      h: 80.0
-      visible: true
   explain:
     header:
       x: 25
@@ -396,22 +381,22 @@ layout:
       - scene_description
       line_rows:
         furniture_name: 1
-        place_address: 2
         customer_or_company: 3
         scene_name: 4
         scene_description: 5
+        place_address: 2
       line_font_sizes:
         furniture_name: 11
-        place_address: 10
         customer_or_company: 10
         scene_name: 11
         scene_description: 9
+        place_address: 10
       line_colors:
         furniture_name: "#005EB0"
-        place_address: "#0F172A"
         customer_or_company: "#0F172A"
         scene_name: "#005EB0"
         scene_description: "#475569"
+        place_address: "#0F172A"
       opacity: 0.95
     image_4_3:
       x: 25
@@ -445,44 +430,44 @@ layout:
       - workflow_stadia
       line_aligns:
         toc_pages: left
-        spec_materials: left
-        spec_appliances: left
         general_notes: left
         workflow_history: left
         workflow_stadia: left
+        spec_materials: left
+        spec_appliances: left
         workflow_revision: left
         workflow_version: left
         workflow_date: left
         articul: left
       line_valigns:
         toc_pages: top
-        spec_materials: top
-        spec_appliances: top
         general_notes: top
         workflow_history: bottom
         workflow_stadia: bottom
+        spec_materials: top
+        spec_appliances: top
         workflow_revision: bottom
         workflow_version: bottom
         workflow_date: bottom
         articul: bottom
       line_font_sizes:
         toc_pages: 8
-        spec_materials: 8
-        spec_appliances: 8
         general_notes: 8
         workflow_history: 8
         workflow_stadia: 8
+        spec_materials: 8
+        spec_appliances: 8
         workflow_revision: 8
         workflow_version: 8
         workflow_date: 8
         articul: 8
       line_colors:
         toc_pages: "#334155"
-        spec_materials: "#334155"
-        spec_appliances: "#334155"
         general_notes: "#334155"
         workflow_history: "#334155"
         workflow_stadia: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
         workflow_revision: "#334155"
         workflow_version: "#334155"
         workflow_date: "#334155"
@@ -567,23 +552,23 @@ layout:
       - scene_name
       - scene_description
       line_rows:
+        scene_name: 4
+        scene_description: 5
         furniture_name: 1
         place_address: 2
         customer_or_company: 3
-        scene_name: 4
-        scene_description: 5
       line_font_sizes:
+        scene_name: 11
+        scene_description: 9
         furniture_name: 11
         place_address: 10
         customer_or_company: 10
-        scene_name: 11
-        scene_description: 9
       line_colors:
+        scene_name: "#005EB0"
+        scene_description: "#475569"
         furniture_name: "#005EB0"
         place_address: "#0F172A"
         customer_or_company: "#0F172A"
-        scene_name: "#005EB0"
-        scene_description: "#475569"
       opacity: 0.95
     image_4_3:
       x: 25
@@ -737,23 +722,23 @@ layout:
       - scene_name
       - scene_description
       line_rows:
+        scene_name: 4
+        scene_description: 5
         furniture_name: 1
         place_address: 2
         customer_or_company: 3
-        scene_name: 4
-        scene_description: 5
       line_font_sizes:
+        scene_name: 11
+        scene_description: 9
         furniture_name: 11
         place_address: 10
         customer_or_company: 10
-        scene_name: 11
-        scene_description: 9
       line_colors:
+        scene_name: "#005EB0"
+        scene_description: "#475569"
         furniture_name: "#005EB0"
         place_address: "#0F172A"
         customer_or_company: "#0F172A"
-        scene_name: "#005EB0"
-        scene_description: "#475569"
       opacity: 0.95
     image_4_3:
       x: 25
@@ -880,9 +865,185 @@ layout:
       - footer_date
       - footer_page_total
       line_aligns:
+        footer_ver_rev: center
+        footer_page_total: right
+        footer_last_edit: left
+        footer_articul: center
+        footer_date: center
+      opacity: 1
+  blank:
+    image_4_3:
+      visible: true
+      content: render_viewport
+      custom_text: ''
+      align: left
+      valign: top
+      font_size: 8
+      aspect_ratio: '3:2'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+      line_colors:
+      line_aligns:
+      line_valigns:
+      opacity: 0.9
+    header:
+      visible: false
+      content: none
+      custom_text: ''
+      align: center
+      valign: top
+      font_size: 11
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+        furniture_name: 1
+        place_address: 2
+        customer_or_company: 3
+        scene_name: 4
+        scene_description: 5
+      line_font_sizes:
+        furniture_name: 11
+        place_address: 10
+        customer_or_company: 10
+        scene_name: 11
+        scene_description: 9
+      line_colors:
+        furniture_name: "#005EB0"
+        place_address: "#0F172A"
+        customer_or_company: "#0F172A"
+        scene_name: "#005EB0"
+        scene_description: "#475569"
+      line_aligns:
+      line_valigns:
+      opacity: 0
+      h: 30.0
+      "y": 0.0
+    slot_1:
+      visible: false
+      content: info_lines
+      custom_text: ''
+      align: left
+      valign: top
+      font_size: 8
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+        toc_pages: 8
+        spec_materials: 8
+        spec_appliances: 8
+        general_notes: 8
+        workflow_history: 8
+        workflow_stadia: 8
+        workflow_revision: 8
+        workflow_version: 8
+        workflow_date: 8
+        articul: 8
+      line_colors:
+        toc_pages: "#334155"
+        spec_materials: "#334155"
+        spec_appliances: "#334155"
+        general_notes: "#334155"
+        workflow_history: "#334155"
+        workflow_stadia: "#334155"
+        workflow_revision: "#334155"
+        workflow_version: "#334155"
+        workflow_date: "#334155"
+        articul: "#334155"
+      line_aligns:
+        toc_pages: left
+        spec_materials: left
+        spec_appliances: left
+        general_notes: left
+        workflow_history: left
+        workflow_stadia: left
+        workflow_revision: left
+        workflow_version: left
+        workflow_date: left
+        articul: left
+      line_valigns:
+        toc_pages: top
+        spec_materials: top
+        spec_appliances: top
+        general_notes: top
+        workflow_history: bottom
+        workflow_stadia: bottom
+        workflow_revision: bottom
+        workflow_version: bottom
+        workflow_date: bottom
+        articul: bottom
+      opacity: 0
+      item_gap_mm: 2.0
+    slot_3:
+      visible: false
+      content: none
+      custom_text: ''
+      align: right
+      valign: top
+      font_size: 8
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+      line_colors:
+      line_aligns:
+      line_valigns:
+      opacity: 0
+    slot_2:
+      visible: false
+      content: none
+      custom_text: ''
+      align: left
+      valign: bottom
+      font_size: 8
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+      line_colors:
+      line_aligns:
+      line_valigns:
+      opacity: 0
+    slot_4:
+      visible: false
+      content: none
+      custom_text: ''
+      align: right
+      valign: bottom
+      font_size: 8
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+      line_colors:
+      line_aligns:
+      line_valigns:
+      opacity: 0
+    footer:
+      visible: false
+      content: none
+      custom_text: ''
+      align: center
+      valign: bottom
+      font_size: 8.5
+      aspect_ratio: '4:3'
+      scale_pct: 100
+      lines: []
+      line_rows:
+      line_font_sizes:
+      line_colors:
+      line_aligns:
         footer_last_edit: left
         footer_ver_rev: center
         footer_articul: center
         footer_date: center
         footer_page_total: right
-      opacity: 1
+      line_valigns:
+      opacity: 0

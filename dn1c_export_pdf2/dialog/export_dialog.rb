@@ -119,7 +119,13 @@ module DN1Code
             is_on = enabled_val == true || enabled_val.to_s == "true"
             if defined?(Service::OverlayService)
               if is_on
-                Service::OverlayService.enable(model)
+                info = Service::OverlayService.calculate_target_info(model)
+                if info[:visible] == false
+                  Service::OverlayService.disable(model)
+                  is_on = false
+                else
+                  Service::OverlayService.enable(model)
+                end
               else
                 Service::OverlayService.disable(model)
               end
@@ -319,6 +325,119 @@ module DN1Code
             end
           end
 
+          # Получить быстрые мини-превью (thumbnails) для сцен модели SketchUp
+          dialog.add_action_callback("getSceneThumbnails") do |_action_context|
+            begin
+              model = Sketchup.active_model
+              thumbs = {}
+              if model && model.respond_to?(:pages) && model.pages.count > 0 && model.respond_to?(:active_view) && model.active_view
+                require "base64" unless defined?(Base64)
+                cur_page = model.pages.selected_page rescue nil
+                orig_tt = nil
+                if model.respond_to?(:options) && model.options["PageOptions"]
+                  orig_tt = model.options["PageOptions"]["TransitionTime"] rescue nil
+                  model.options["PageOptions"]["TransitionTime"] = 0 rescue nil
+                end
+
+                ro = model.respond_to?(:rendering_options) ? model.rendering_options : nil
+                orig_dims = ro ? (ro["DisplayDims"] rescue nil) : nil
+                orig_text = ro ? (ro["DisplayText"] rescue nil) : nil
+                orig_axes = ro ? (ro["DisplaySketchAxes"] rescue nil) : nil
+                orig_guides = ro ? (ro["HideConstructionGeometry"] rescue nil) : nil
+                orig_sec_planes = ro ? (ro["DisplaySectionPlanes"] rescue nil) : nil
+
+                begin
+                  model.pages.each_with_index do |p, i|
+                    p_name = p.respond_to?(:name) ? p.name : p.to_s
+                    if model.pages.respond_to?(:selected_page=)
+                      model.pages.selected_page = p rescue nil
+                    end
+
+                    # Отключаем размеры, текстовые метки, оси и направляющие, чтобы они не перекрывали мини-эскиз
+                    if ro
+                      ro["DisplayDims"] = false rescue nil
+                      ro["DisplayText"] = false rescue nil
+                      ro["DisplaySketchAxes"] = false rescue nil
+                      ro["HideConstructionGeometry"] = true rescue nil
+                      ro["DisplaySectionPlanes"] = false rescue nil
+                    end
+
+                    tmp = File.join(Dir.tmpdir, "dn1c_scene_thumb_#{i}_#{Time.now.to_i}.jpg").tr("\\", "/")
+                    model.active_view.write_image(filename: tmp, width: 360, height: 240, antialias: false) rescue nil
+                    if File.exist?(tmp)
+                      b64 = Base64.strict_encode64(File.binread(tmp)) rescue nil
+                      thumbs[p_name] = "data:image/jpeg;base64,#{b64}" if b64
+                      File.delete(tmp) rescue nil
+                    end
+                  end
+                ensure
+                  if ro
+                    ro["DisplayDims"] = orig_dims unless orig_dims.nil? rescue nil
+                    ro["DisplayText"] = orig_text unless orig_text.nil? rescue nil
+                    ro["DisplaySketchAxes"] = orig_axes unless orig_axes.nil? rescue nil
+                    ro["HideConstructionGeometry"] = orig_guides unless orig_guides.nil? rescue nil
+                    ro["DisplaySectionPlanes"] = orig_sec_planes unless orig_sec_planes.nil? rescue nil
+                  end
+                  if cur_page && model.pages.respond_to?(:selected_page=)
+                    model.pages.selected_page = cur_page rescue nil
+                  end
+                  if orig_tt && model.respond_to?(:options) && model.options["PageOptions"]
+                    model.options["PageOptions"]["TransitionTime"] = orig_tt rescue nil
+                  end
+                end
+              end
+              dialog.execute_script("window.app && window.app.onSceneThumbnailsLoaded && window.app.onSceneThumbnailsLoaded(#{JSON.generate(thumbs)});")
+            rescue StandardError => e
+              puts "[getSceneThumbnails error]: #{e.message}"
+            end
+          end
+
+          # Переключить активную сцену в SketchUp по выбору из веб-интерфейса
+          dialog.add_action_callback("selectScene") do |_action_context, param_json|
+            begin
+              model = Sketchup.active_model
+              next unless model && model.respond_to?(:pages) && model.pages.count > 0
+
+              params = if param_json.is_a?(Hash)
+                         param_json
+                       elsif param_json.is_a?(String)
+                         (JSON.parse(param_json.to_s.force_encoding("UTF-8"), symbolize_names: true) rescue { name: param_json.to_s })
+                       else
+                         { index: param_json.to_i }
+                       end
+
+              orig_name = (params[:original_name] || params["original_name"]).to_s.strip
+              cur_name  = (params[:name] || params["name"]).to_s.strip
+              idx       = params[:index] || params["index"]
+
+              page = nil
+              page = model.pages[orig_name] unless orig_name.empty?
+              page = model.pages[cur_name] if page.nil? && !cur_name.empty?
+              if page.nil? && !idx.nil?
+                idx_i = idx.to_i
+                page = model.pages[idx_i] if idx_i >= 0 && idx_i < model.pages.count
+              end
+
+              if page && model.pages.respond_to?(:selected_page=)
+                model.pages.selected_page = page
+
+                # Если активен Overlay безопасной рамки кадра, обновляем его под пропорции выбранной сцены
+                if defined?(Service::OverlayService)
+                  info = Service::OverlayService.calculate_target_info(model)
+                  if info[:visible] == false
+                    Service::OverlayService.disable(model)
+                    dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(false);") rescue nil
+                  elsif Service::OverlayService.overlay_active?(model)
+                    Service::OverlayService.refresh(model)
+                    dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});") rescue nil
+                  end
+                end
+              end
+            rescue StandardError => e
+              puts "[selectScene error]: #{e.message}"
+            end
+          end
+
           # Открыть папку на диске через проводник
           dialog.add_action_callback("openDirectoryPath") do |_action_context, folder_raw|
             begin
@@ -416,6 +535,11 @@ module DN1Code
               # Сохранение в библиотеку модели (атрибуты)
               project_data.save_to_model(model) if model
 
+              # Сохраняем макеты страниц в layout.yaml расширения
+              if project_data.custom_layouts && !project_data.custom_layouts.empty?
+                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
+              end
+
               yaml_path = nil
               if model && model.respond_to?(:path) && !model.path.to_s.empty?
                 yaml_path = project_data.yaml_path_for_model(model)
@@ -451,6 +575,11 @@ module DN1Code
               project_data.sync_with_model_scenes(model) if model
               project_data.save_to_model(model) if model
 
+              # Сохраняем макеты страниц в layout.yaml расширения
+              if project_data.custom_layouts && !project_data.custom_layouts.empty?
+                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
+              end
+
               if model
                 dialog.execute_script("window.app && window.app.showNotification('Данные проекта записаны в модель SketchUp (сохраните файл Ctrl+S)', 'success');")
               else
@@ -462,15 +591,20 @@ module DN1Code
           end
 
           # Сохранение настроек из веб-интерфейса.
-          # Автосейв (is_auto_save/silent) пишет только в библиотеку модели (атрибуты SketchUp),
-          # YAML и файлы конфигурации обновляются при явных действиях:
-          # кнопка "Обновить" (refreshData), экспорт PDF, сохранение .skp, exportYaml.
+          # Автосейв (is_auto_save/silent) пишет в библиотеку модели (атрибуты SketchUp)
+          # и всегда актуализирует шаблоны страниц в layout.yaml.
+          # Файлы проекта YAML обновляются при явных действиях.
           save_handler = lambda do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
               model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
               project_data = Model::ProjectData.new
               populate_project_data(project_data, payload)
+
+              # Всегда сохраняем актуальную конфигурацию шаблонов в layout.yaml
+              if project_data.custom_layouts && !project_data.custom_layouts.empty?
+                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
+              end
 
               is_auto = payload[:silent] == true || payload[:is_auto_save] == true
 
@@ -479,13 +613,21 @@ module DN1Code
                   project_data.sync_with_model_scenes(model)
                   project_data.save_to_model(model)
                 end
-                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в модель SketchUp")});")
+                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в модель и шаблоны")});")
               else
                 project_data.sync_with_model_scenes(model) if model
                 project_data.save_auto(model) if model
                 project_data.save_program_settings
                 yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
                 dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
+              end
+
+              if defined?(Service::OverlayService) && model
+                info = Service::OverlayService.calculate_target_info(model)
+                if info[:visible] == false && Service::OverlayService.overlay_active?(model)
+                  Service::OverlayService.disable(model)
+                  dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(false);") rescue nil
+                end
               end
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения: #{e.message}', 'error');")

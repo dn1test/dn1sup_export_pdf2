@@ -18,7 +18,7 @@ module DN1Code
 
         # Класс оверлея SketchUp 2023+ (с безопасным наследованием для тестов и старых версий)
         class SafeFrameOverlay < (defined?(Sketchup::Overlay) ? Sketchup::Overlay : Object)
-          attr_accessor :ratio_cache, :label_cache, :width_cache, :height_cache
+          attr_accessor :ratio_cache, :label_cache, :width_cache, :height_cache, :visible_cache
           attr_accessor :border_color_cache, :border_opacity_cache, :mask_color_cache, :mask_opacity_cache
 
           def initialize
@@ -29,6 +29,7 @@ module DN1Code
             @label_cache          = "4:3"
             @width_cache          = 2400
             @height_cache         = 1800
+            @visible_cache        = true
             @border_color_cache   = "#0EA5E9"
             @border_opacity_cache = 100
             @mask_color_cache     = "#0F172A"
@@ -53,12 +54,13 @@ module DN1Code
               target_w     = @width_cache
               target_h     = @height_cache
 
-              if target_ratio.nil? || target_ratio <= 0.001
+              if target_ratio.nil? || target_ratio <= 0.001 || @visible_cache.nil?
                 ratio_info   = OverlayService.calculate_target_info(model)
                 target_ratio = ratio_info[:ratio]
                 target_label = ratio_info[:label]
                 target_w     = ratio_info[:render_w]
                 target_h     = ratio_info[:render_h]
+                @visible_cache        = ratio_info[:visible]
                 @ratio_cache          = target_ratio
                 @label_cache          = target_label
                 @width_cache          = target_w
@@ -69,6 +71,7 @@ module DN1Code
                 @mask_opacity_cache   = ratio_info[:mask_opacity]
               end
 
+              return if @visible_cache == false
               return if target_ratio.nil? || target_ratio <= 0.001
 
               vp_ratio = vp_w / vp_h
@@ -237,7 +240,8 @@ module DN1Code
             yaml_file = Model::ProjectData.find_yaml_path_for_model(model)
             if yaml_file && File.exist?(yaml_file)
               pdata.load_from_yaml(yaml_file)
-            elsif model.respond_to?(:get_attribute)
+            end
+            if model.respond_to?(:get_attribute)
               pdata.load_from_model(model)
             end
           end
@@ -247,8 +251,6 @@ module DN1Code
           base_settings.merge!(@current_settings) if @current_settings
           settings = override_settings ? base_settings.merge(override_settings) : base_settings
           settings ||= {}
-
-          custom_layouts = settings[:custom_layouts] || settings["custom_layouts"] || (pdata ? pdata.pdf_settings[:custom_layouts] : nil) || {}
 
           # Определение активного шаблона (template_key)
           tpl_key = settings[:template_key] || settings["template_key"]
@@ -263,9 +265,38 @@ module DN1Code
           end
           tpl_key = (tpl_key || :cover).to_sym
 
-          # Извлекаем параметры блока картинки (image_4_3) из шаблона
-          tpl_cfg = custom_layouts[tpl_key] || custom_layouts[tpl_key.to_s] || {}
-          img_cfg = tpl_cfg[:image_4_3] || tpl_cfg["image_4_3"] || {}
+          # Извлекаем параметры блока картинки (image_4_3) из шаблона с корректным слиянием уровней
+          pdata_layouts    = (pdata.respond_to?(:custom_layouts) ? pdata.custom_layouts : nil) || (pdata ? pdata.pdf_settings[:custom_layouts] : nil) || {}
+          session_layouts  = @current_settings ? (@current_settings[:custom_layouts] || @current_settings["custom_layouts"] || {}) : {}
+          override_layouts = override_settings ? (override_settings[:custom_layouts] || override_settings["custom_layouts"] || {}) : {}
+
+          pdata_tpl    = pdata_layouts[tpl_key] || pdata_layouts[tpl_key.to_s] || {}
+          session_tpl  = session_layouts[tpl_key] || session_layouts[tpl_key.to_s] || {}
+          override_tpl = override_layouts[tpl_key] || override_layouts[tpl_key.to_s] || {}
+
+          pdata_img    = pdata_tpl[:image_4_3] || pdata_tpl["image_4_3"] || {}
+          session_img  = session_tpl[:image_4_3] || session_tpl["image_4_3"] || {}
+          override_img = override_tpl[:image_4_3] || override_tpl["image_4_3"] || {}
+
+          tpl_cfg = pdata_tpl.merge(session_tpl).merge(override_tpl)
+          img_cfg = pdata_img.merge(session_img).merge(override_img)
+
+          # Проверка видимости блока видового экрана (image_4_3)
+          img_visible = if tpl_key.to_s == "blank"
+                          false
+                        elsif img_cfg.key?(:visible)
+                          v = img_cfg[:visible]
+                          v != false && v.to_s != "false" && v != 0 && v.to_s != "0"
+                        elsif img_cfg.key?("visible")
+                          v = img_cfg["visible"]
+                          v != false && v.to_s != "false" && v != 0 && v.to_s != "0"
+                        else
+                          true
+                        end
+          if override_settings && (override_settings.key?(:visible) || override_settings.key?("visible"))
+            v = override_settings[:visible].nil? ? override_settings["visible"] : override_settings[:visible]
+            img_visible = (v != false && v.to_s != "false" && v != 0 && v.to_s != "0")
+          end
 
           valid_modes = %w[page 16:9 4:3 3:2 1:1 custom].freeze
 
@@ -378,7 +409,9 @@ module DN1Code
             border_color:   border_color_val,
             border_opacity: border_opacity_val,
             mask_color:     mask_color_val,
-            mask_opacity:   mask_opacity_val
+            mask_opacity:   mask_opacity_val,
+            visible:        img_visible,
+            image_visible:  img_visible
           }
         end
 
@@ -442,11 +475,15 @@ module DN1Code
         # @param model [Sketchup::Model, nil]
         # @return [Boolean]
         def self.overlay_active?(model = nil)
-          ov = find_model_overlay(model)
+          m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
+          ov = find_model_overlay(m)
           return false unless ov && ov.respond_to?(:enabled?)
 
           begin
-            ov.enabled?
+            return false unless ov.enabled?
+            info = calculate_target_info(m)
+            return false if info[:visible] == false
+            true
           rescue StandardError
             false
           end
@@ -459,6 +496,7 @@ module DN1Code
           m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
           return false unless m && m.respond_to?(:overlays)
 
+          info = calculate_target_info(m)
           ov = find_model_overlay(m)
           unless ov
             ov = overlay_instance
@@ -466,7 +504,7 @@ module DN1Code
           end
           @active_overlay = ov
 
-          info = calculate_target_info(m)
+          ov.visible_cache        = info[:visible]
           ov.ratio_cache          = info[:ratio]
           ov.label_cache          = info[:label]
           ov.width_cache          = info[:render_w]
@@ -475,6 +513,11 @@ module DN1Code
           ov.border_opacity_cache = info[:border_opacity]
           ov.mask_color_cache     = info[:mask_color]
           ov.mask_opacity_cache   = info[:mask_opacity]
+
+          if info[:visible] == false
+            disable(m)
+            return false
+          end
 
           begin
             ov.enabled = true if ov.respond_to?(:enabled=)
@@ -492,12 +535,40 @@ module DN1Code
           return false unless m && m.respond_to?(:overlays)
 
           ov = find_model_overlay(m) || overlay_instance
+          ov.visible_cache = false if ov.respond_to?(:visible_cache=)
           begin
             ov.enabled = false if ov.respond_to?(:enabled=)
           rescue StandardError
           end
           invalidate_view(m)
           true
+        end
+
+        # Обновляет параметры рамки и видимость под активную сцену/шаблон
+        # @param model [Sketchup::Model, nil]
+        # @return [Hash] целевые параметры кадра
+        def self.refresh(model = nil)
+          m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
+          info = calculate_target_info(m)
+          ov = find_model_overlay(m) || overlay_instance
+          if ov
+            ov.visible_cache        = info[:visible]
+            ov.ratio_cache          = info[:ratio]
+            ov.label_cache          = info[:label]
+            ov.width_cache          = info[:render_w]
+            ov.height_cache         = info[:render_h]
+            ov.border_color_cache   = info[:border_color]
+            ov.border_opacity_cache = info[:border_opacity]
+            ov.mask_color_cache     = info[:mask_color]
+            ov.mask_opacity_cache   = info[:mask_opacity]
+          end
+
+          if info[:visible] == false
+            disable(m)
+          else
+            invalidate_view(m)
+          end
+          info
         end
 
         # Переключает отображение рамки пропорций кадра
@@ -546,6 +617,7 @@ module DN1Code
             m.overlays.add(ov) if m && m.respond_to?(:overlays)
           end
           if ov
+            ov.visible_cache        = info[:visible]
             ov.ratio_cache          = info[:ratio]
             ov.label_cache          = info[:label]
             ov.width_cache          = info[:render_w]
@@ -554,6 +626,11 @@ module DN1Code
             ov.border_opacity_cache = info[:border_opacity]
             ov.mask_color_cache     = info[:mask_color]
             ov.mask_opacity_cache   = info[:mask_opacity]
+            if info[:visible] == false
+              ov.enabled = false if ov.respond_to?(:enabled=)
+              invalidate_view(m)
+              return
+            end
             ov.enabled = true if ov.respond_to?(:enabled=)
           end
           invalidate_view(m)
@@ -600,6 +677,7 @@ module DN1Code
           info = calculate_target_info(m, pdata ? pdata.pdf_settings : nil)
           ov = find_model_overlay(m) || overlay_instance
           if ov
+            ov.visible_cache        = info[:visible]
             ov.ratio_cache          = info[:ratio]
             ov.label_cache          = info[:label]
             ov.width_cache          = info[:render_w]
@@ -611,10 +689,11 @@ module DN1Code
           end
 
           is_active = overlay_active?(m)
-          should_show = pdata && pdata.pdf_settings && pdata.pdf_settings[:show_aspect_overlay]
+          should_show = pdata && pdata.pdf_settings && pdata.pdf_settings[:show_aspect_overlay] && info[:visible] != false
           if should_show
             enable(m)
-          elsif is_active
+          elsif is_active || info[:visible] == false
+            disable(m) if is_active
             invalidate_view(m)
           end
         end

@@ -11,7 +11,7 @@ pdf_settings:
   image_aspect_ratio: '4:3'
   custom_ratio_w: 16
   custom_ratio_h: 9
-  show_aspect_overlay: true
+  show_aspect_overlay: false
   overlay_border_color: "#0ea5e9"
   overlay_border_opacity: 100
   overlay_mask_color: "#0f172a"

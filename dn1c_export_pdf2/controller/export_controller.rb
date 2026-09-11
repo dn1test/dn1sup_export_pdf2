@@ -6,6 +6,7 @@ require_relative "description_page"
 require_relative "explain_page"
 require_relative "visual_page"
 require_relative "general_page"
+require_relative "blank_page"
 require_relative "../service/layout_builder"
 require_relative "../service/gem_loader"
 
@@ -18,7 +19,8 @@ module DN1Code
           description: DescriptionPage,
           explain:     ExplainPage,
           visual:      VisualPage,
-          general:     GeneralPage
+          general:     GeneralPage,
+          blank:       BlankPage
         }.freeze
 
         attr_reader :project_data, :model

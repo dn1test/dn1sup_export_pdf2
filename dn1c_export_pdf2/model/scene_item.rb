@@ -7,7 +7,7 @@ module DN1Code
       # Содержит имя сцены, тип шаблона страницы, порядок следования, примечания и статус включения в документ.
       class SceneItem
         # Поддерживаемые типы страниц в документе
-        PAGE_TYPES = %i[cover description explain visual general].freeze
+        PAGE_TYPES = %i[cover description explain visual general blank].freeze
 
         # @return [Sketchup::Page, nil] ссылка на нативный объект сцены SketchUp
         attr_accessor :scene_ref
@@ -59,6 +59,8 @@ module DN1Code
             :description
           when /визуал|visual|рендер|render|перспектив/i
             :visual
+          when /чист|пуст|blank|empty/i
+            :blank
           else
             :general
           end

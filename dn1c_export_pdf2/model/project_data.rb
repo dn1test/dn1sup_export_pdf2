@@ -1435,6 +1435,30 @@ module DN1Code
             rescue StandardError; end
           end
 
+          raw_layouts = model.get_attribute(ATTR_DICT, "custom_layouts", nil)
+          if raw_layouts
+            begin
+              parsed_layouts = JSON.parse(raw_layouts, symbolize_names: true)
+              if parsed_layouts.is_a?(Hash)
+                @pdf_settings[:custom_layouts] ||= default_custom_layouts
+                parsed_layouts.each do |page_key, blocks|
+                  @pdf_settings[:custom_layouts][page_key] ||= {}
+                  if blocks.is_a?(Hash)
+                    blocks.each do |slot_id, slot_cfg|
+                      if slot_cfg.is_a?(Hash)
+                        @pdf_settings[:custom_layouts][page_key][slot_id] ||= {}
+                        @pdf_settings[:custom_layouts][page_key][slot_id].merge!(slot_cfg)
+                      else
+                        @pdf_settings[:custom_layouts][page_key][slot_id] = slot_cfg
+                      end
+                    end
+                  end
+                end
+                has_data = true
+              end
+            rescue StandardError; end
+          end
+
           raw_targets = model.get_attribute(ATTR_DICT, "api_targets", nil)
           if raw_targets
             begin
@@ -1500,10 +1524,12 @@ module DN1Code
           model.set_attribute(ATTR_DICT, "customer", JSON.generate(@customer))
           model.set_attribute(ATTR_DICT, "workflow", JSON.generate(@workflow))
           model.set_attribute(ATTR_DICT, "project_info", JSON.generate(@project_info))
-          # Шаблоны страниц (custom_layouts) в .skp не сохраняются —
-          # они хранятся только в YAML конфигурации (layout.yaml плагина / проекта)
+          # Шаблоны страниц (custom_layouts) сохраняются в layout.yaml и дублируются в модель
           pdf_settings_clean = (@pdf_settings || {}).reject { |k, _| k.to_s == "custom_layouts" }
           model.set_attribute(ATTR_DICT, "pdf_settings", JSON.generate(pdf_settings_clean))
+          if @pdf_settings && @pdf_settings[:custom_layouts]
+            model.set_attribute(ATTR_DICT, "custom_layouts", JSON.generate(self.class.deep_stringify_keys(@pdf_settings[:custom_layouts])))
+          end
           model.set_attribute(ATTR_DICT, "api_targets", JSON.generate(@api_targets))
           model.set_attribute(ATTR_DICT, "directories", JSON.generate(@directories))
           model.set_attribute(ATTR_DICT, "history", JSON.generate(@history))

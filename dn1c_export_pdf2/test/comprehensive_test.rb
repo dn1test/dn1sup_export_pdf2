@@ -87,6 +87,12 @@ class TestRunner
     test_template_block_item_multiline_and_title_toggle
     test_separate_project_pages_and_template_settings_tabs
     test_custom_template_management_and_rendering
+    test_scenes_table_mini_preview_column
+    test_blank_page_template
+    test_gui_scene_selection_switches_sketchup_page
+    test_template_settings_persistence
+    test_template_blocks_visibility_persistence
+    test_overlay_disabled_when_viewport_disabled
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -3808,6 +3814,344 @@ class TestRunner
     FileUtils.rm_rf(test_dir)
 
     # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_scenes_table_mini_preview_column
+    puts "\n--- 49. Тест колонки мини-превью страниц в таблице сцен GUI ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+    dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
+
+    html_content = File.read(html_path, encoding: "UTF-8")
+    js_content = File.read(js_path, encoding: "UTF-8")
+    css_content = File.read(css_path, encoding: "UTF-8")
+    dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
+
+    # 1. Проверка колонки превью в index.html
+    assert(html_content.include?('class="th-preview"'), "index.html содержит заголовок колонки th-preview")
+    assert(html_content.include?('Превью'), "index.html содержит текст 'Превью' в шапке таблицы сцен")
+
+    # 2. Проверка стилей в app.css
+    assert(css_content.include?('.th-preview'), "app.css содержит стили для .th-preview")
+    assert(css_content.include?('.scene-preview-cell'), "app.css содержит стили для .scene-preview-cell")
+    assert(css_content.include?('.scene-mini-preview-wrap'), "app.css содержит стили для .scene-mini-preview-wrap")
+    assert(css_content.include?('.scene-mini-sheet'), "app.css содержит стили для .scene-mini-sheet")
+    assert(css_content.include?('aspect-ratio: 3 / 2') || css_content.include?('96px'), "app.css задает пропорции 3:2 и увеличенный размер (96x64px) мини-эскиза")
+    assert(css_content.include?('.mini-sheet-img'), "app.css содержит стили для чистого изображения .mini-sheet-img")
+    assert(css_content.include?('.mini-sheet-placeholder'), "app.css содержит стили для нейтрального плейсхолдера .mini-sheet-placeholder")
+
+    # 3. Проверка генерации и логики превью в app.js
+    assert(js_content.include?('function createMiniPagePreview(scene, index)'), "app.js содержит функцию createMiniPagePreview")
+    assert(js_content.include?('scene-preview-cell'), "app.js создает ячейку scene-preview-cell в строке таблицы сцен")
+    assert(js_content.include?('mini-sheet-img'), "app.js выводит только чистое изображение mini-sheet-img")
+    assert(js_content.include?('updateSceneTablePreviews'), "app.js содержит функцию updateSceneTablePreviews для обновления превью")
+    assert(js_content.include?('requestSceneThumbnails'), "app.js содержит функцию requestSceneThumbnails для запроса превью")
+    assert(js_content.include?('onSceneThumbnailsLoaded'), "app.js содержит обработчик onSceneThumbnailsLoaded в window.app")
+    assert(js_content.include?('Нажмите для перехода к этому виду в SketchUp'), "app.js подсказка миниатюры указывает переход к виду в SketchUp")
+    assert(js_content.include?('btnEditTpl.addEventListener("click"') && js_content.include?('switchToTab("tab-templates")'), "app.js переход в настройки шаблона выполняется по кнопке шестеренки")
+
+    # 4. Проверка обработчика getSceneThumbnails в export_dialog.rb
+    assert(dialog_rb_content.include?('add_action_callback("getSceneThumbnails")'), "export_dialog.rb содержит экшн-коллбэк getSceneThumbnails")
+    assert(dialog_rb_content.include?('DisplayDims') && dialog_rb_content.include?('DisplayText'), "export_dialog.rb отключает отображение размеров и текстовых меток при снятии эскизов")
+    assert(dialog_rb_content.include?('360') && dialog_rb_content.include?('240'), "export_dialog.rb генерирует эскизы в пропорциях 3:2 (360x240)")
+
+    # 5. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_blank_page_template
+    puts "\n--- 50. Тест встроенного шаблона 'Без шаблона (Blank)' для чистой страницы ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    html_content = File.read(html_path, encoding: "UTF-8")
+    js_content = File.read(js_path, encoding: "UTF-8")
+
+    # 1. Проверка Ruby моделей и контроллеров
+    assert(DN1Code::ExportPdf2::Model::SceneItem::PAGE_TYPES.include?(:blank), "SceneItem::PAGE_TYPES содержит :blank")
+    sc_blank = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Чистая страница 3D")
+    assert(sc_blank.page_type == :blank, "SceneItem автоматически распознает 'Чистая страница' как :blank")
+
+    assert(defined?(DN1Code::ExportPdf2::Controller::BlankPage), "Контроллер BlankPage объявлен")
+    assert(DN1Code::ExportPdf2::Controller::BlankPage < DN1Code::ExportPdf2::Controller::PageBase, "BlankPage наследуется от PageBase")
+    assert(DN1Code::ExportPdf2::Controller::ExportController::PAGE_CONTROLLERS[:blank] == DN1Code::ExportPdf2::Controller::BlankPage, "PAGE_CONTROLLERS сопоставляет :blank с BlankPage")
+
+    # 2. Проверка JavaScript и HTML определений шаблона
+    assert(js_content.include?('key: "blank"') && js_content.include?('Без шаблона'), "app.js getAllTemplates содержит шаблон blank")
+    assert(js_content.include?('blank: {') && js_content.include?('Без шаблона (Blank)'), "app.js DEFAULT_LAYOUTS содержит конфигурацию blank")
+    assert(html_content.include?('value="blank"'), "index.html selectNewTemplateBase содержит вариант blank")
+
+    # 3. Тест генерации PDF чистой страницы через BlankPage
+    test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    test_project_data.pdf_settings[:stamp_type] = "draft"
+    blank_scene = DN1Code::ExportPdf2::Model::SceneItem.new(name: "05. Чистый эскиз", page_type: :blank)
+    test_project_data.scenes = [blank_scene]
+
+    test_dir = File.expand_path("test_blank_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    pdf_out = File.join(test_dir, "blank_page_test.pdf")
+
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: [14.17, 14.17, 14.17, 14.17])
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc)
+    blank_page = DN1Code::ExportPdf2::Controller::BlankPage.new(pdf_doc, test_project_data, blank_scene, page_index: 1, total_pages: 1)
+    blank_page.render
+    pdf_doc.render_file(pdf_out)
+
+    assert(File.exist?(pdf_out) && File.size(pdf_out) > 500, "PDF документ с чистой страницей Blank успешно создан")
+    FileUtils.rm_rf(test_dir)
+
+    # 4. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_gui_scene_selection_switches_sketchup_page
+    puts "\n--- 51. Тест переключения страниц в SketchUp при выборе в GUI ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+    dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
+
+    js_content = File.read(js_path, encoding: "UTF-8")
+    css_content = File.read(css_path, encoding: "UTF-8")
+    dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
+
+    # 1. Проверка экшн-коллбэка selectScene в export_dialog.rb
+    assert(dialog_rb_content.include?('add_action_callback("selectScene")'), "export_dialog.rb содержит экшн-коллбэк selectScene")
+    assert(dialog_rb_content.include?('selected_page = page'), "export_dialog.rb переключает страницу через model.pages.selected_page = page")
+    assert(dialog_rb_content.include?('OverlayService.refresh') || dialog_rb_content.include?('calculate_target_info'), "export_dialog.rb обновляет безопасную рамку кадра при смене сцены")
+
+    # 2. Проверка моста JavaScript и обработчиков выбора страниц в app.js
+    assert(js_content.include?('function switchToSketchupScene(scene, index)'), "app.js содержит функцию switchToSketchupScene")
+    assert(js_content.include?('callRuby("selectScene"'), "app.js вызывает selectScene через Ruby-мост")
+    assert(js_content.include?('function highlightActiveSceneRow(index)'), "app.js содержит функцию highlightActiveSceneRow")
+    assert(js_content.include?('selected-scene-row'), "app.js устанавливает класс selected-scene-row для активной строки")
+
+    # 3. Проверка стилей подсветки активной строки в app.css
+    assert(css_content.include?('.selected-scene-row'), "app.css содержит стили для .selected-scene-row")
+
+    # 4. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_template_settings_persistence
+    puts "\n--- 52. Тест сохранения настроек шаблонов при выборе параметров в GUI ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
+    model_rb_path = File.expand_path(File.join(__dir__, "..", "model", "project_data.rb"))
+
+    js_content = File.read(js_path, encoding: "UTF-8")
+    dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
+    model_rb_content = File.read(model_rb_path, encoding: "UTF-8")
+
+    # 1. Проверка сохранения layout.yaml в экшн-коллбэках export_dialog.rb
+    assert(dialog_rb_content.include?("save_to_layout_yaml"), "export_dialog.rb сохраняет шаблоны в layout.yaml")
+    assert(dialog_rb_content.include?("save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)"), "export_dialog.rb сохраняет шаблоны в PROGRAM_LAYOUT_FILE")
+
+    # 2. Проверка дублирования custom_layouts в атрибутах модели в project_data.rb
+    assert(model_rb_content.include?('model.set_attribute(ATTR_DICT, "custom_layouts"'), "ProjectData#save_to_model сохраняет custom_layouts в атрибуты модели")
+    assert(model_rb_content.include?('raw_layouts = model.get_attribute(ATTR_DICT, "custom_layouts"'), "ProjectData#load_from_model восстанавливает custom_layouts из атрибутов модели")
+
+    # 3. Проверка мгновенного сброса автосохранения flushAutoSave в app.js
+    assert(js_content.include?("function flushAutoSave()"), "app.js содержит функцию flushAutoSave")
+    assert(js_content.include?("beforeunload"), "app.js сбрасывает автосохранение по событию beforeunload")
+    assert(js_content.include?("flushAutoSave();"), "app.js сбрасывает автосохранение при смене вкладок")
+
+    # 4. Проверка записи обновлений среднего блока в updateBlockSlot
+    assert(js_content.include?('updateBlockSlot("slot_1", { line_aligns:'), "app.js обновляет выравнивание строк среднего блока через updateBlockSlot")
+    assert(js_content.include?('updateBlockSlot("slot_1", { line_font_sizes:'), "app.js обновляет шрифт строк среднего блока через updateBlockSlot")
+    assert(js_content.include?('updateBlockSlot("slot_1", { line_colors:'), "app.js обновляет цвет строк среднего блока через updateBlockSlot")
+
+    # 5. Практический тест сохранения и восстановления custom_layouts в модели SketchUp
+    fake_model = Sketchup::MockModel.new("U:/Projects/Test/TemplateTest.skp")
+    pdata1 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata1.custom_layouts[:cover][:header][:visible] = false
+    pdata1.custom_layouts[:cover][:slot_1][:font_size] = 16.5
+    pdata1.save_to_model(fake_model)
+
+    pdata2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata2.load_from_model(fake_model)
+    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из модели выключенный заголовок")
+    assert(pdata2.custom_layouts[:cover][:slot_1][:font_size] == 16.5, "ProjectData восстанавливает из модели кастомный размер шрифта")
+
+    # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_template_blocks_visibility_persistence
+    puts "\n--- 53. Тест сохранения и применения включения/выключения блоков в шаблонах ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка наличия вспомогательной функции и обработчиков в app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js.include?("function isSlotVisible"), "app.js содержит функцию isSlotVisible для безопасной проверки видимости")
+    assert(app_js.include?('id="chk_middle_visible"'), "app.js содержит ID chk_middle_visible для чекбокса среднего блока")
+    assert(app_js.include?('updateBlockSlot("header", { visible: isVis }, targetTpl);') || app_js.include?('visible: isVis'), "app.js передает булево значение visible в updateBlockSlot")
+
+    # 2. Проверка методов block_visible? в PageBase и LayoutBuilder
+    pbase_mock_cfg = {
+      header: { visible: false },
+      slot_1: { visible: "false" },
+      footer: { visible: 0 },
+      image_4_3: { visible: true }
+    }
+    mock_pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    mock_pdata.custom_layouts[:test_tpl] = pbase_mock_cfg
+
+    fake_doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(mock_pdata, mock_pdata.pdf_settings)
+    fake_scene = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Test Scene", page_type: :test_tpl)
+    page_base = DN1Code::ExportPdf2::Controller::PageBase.new(fake_doc, mock_pdata, fake_scene)
+
+    assert(page_base.send(:block_visible?, :test_tpl, :header) == false, "PageBase#block_visible? распознает visible: false")
+    assert(page_base.send(:block_visible?, :test_tpl, :slot_1) == false, "PageBase#block_visible? распознает строковый 'false'")
+    assert(page_base.send(:block_visible?, :test_tpl, :footer) == false, "PageBase#block_visible? распознает числовой 0")
+    assert(page_base.send(:block_visible?, :test_tpl, :image_4_3) == true, "PageBase#block_visible? распознает visible: true")
+
+    # 3. Проверка get_block_config с alias-маппингом
+    assert(page_base.send(:get_block_config, :test_tpl, :general_header) == { visible: false }, "PageBase#get_block_config поддерживает алиас :general_header -> :header")
+    assert(page_base.send(:get_block_config, :test_tpl, :visual_image) == { visible: true }, "PageBase#get_block_config поддерживает алиас :visual_image -> :image_4_3")
+
+    # 4. Проверка сохранения и восстановления всех 4 блоков в модели SketchUp
+    fake_model = Sketchup::MockModel.new("U:/Projects/Test/BlockVisTest.skp")
+    pdata1 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata1.custom_layouts[:cover][:header][:visible] = false
+    pdata1.custom_layouts[:cover][:slot_1][:visible] = false
+    pdata1.custom_layouts[:cover][:footer][:visible] = false
+    pdata1.custom_layouts[:cover][:image_4_3][:visible] = false
+    pdata1.save_to_model(fake_model)
+
+    pdata2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata2.load_from_model(fake_model)
+    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из модели выключенный header")
+    assert(pdata2.custom_layouts[:cover][:slot_1][:visible] == false, "ProjectData восстанавливает из модели выключенный slot_1")
+    assert(pdata2.custom_layouts[:cover][:footer][:visible] == false, "ProjectData восстанавливает из модели выключенный footer")
+    assert(pdata2.custom_layouts[:cover][:image_4_3][:visible] == false, "ProjectData восстанавливает из модели выключенный image_4_3")
+
+    # 5. Проверка сохранения в layout.yaml и обратной загрузки
+    tmp_dir = Dir.mktmpdir("test_layout_vis")
+    tmp_layout = File.join(tmp_dir, "layout_vis_test.yaml")
+    pdata1.save_to_layout_yaml(tmp_layout)
+    assert(File.exist?(tmp_layout), "Файл layout_vis_test.yaml успешно создан")
+
+    pdata3 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata3.load_from_layout_yaml(tmp_layout)
+    assert(pdata3.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный header")
+    assert(pdata3.custom_layouts[:cover][:slot_1][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный slot_1")
+    assert(pdata3.custom_layouts[:cover][:footer][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный footer")
+    assert(pdata3.custom_layouts[:cover][:image_4_3][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный image_4_3")
+
+    # 6. Генерация PDF со скрытыми блоками без ошибок
+    pdf_out = File.join(tmp_dir, "hidden_blocks.pdf")
+    pdata1.pdf_settings[:output_path] = pdf_out
+    doc = DN1Code::ExportPdf2::Service::PdfBuilder.create_document(pdata1, pdata1.pdf_settings)
+    scene_item = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Обложка без блоков", page_type: :cover, enabled: true)
+    controller = DN1Code::ExportPdf2::Controller::CoverPage.new(doc, pdata1, scene_item, page_index: 1, total_pages: 1)
+    controller.render
+    doc.render_file(pdf_out)
+    assert(File.exist?(pdf_out) && File.size(pdf_out) > 1000, "CoverPage успешно отрисован со всеми выключенными блоками")
+
+    # 7. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_overlay_disabled_when_viewport_disabled
+    puts "\n--- 54. Тест автоматического выключения рамки Overlay при выключенном видовом экране ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
+
+    # 1. calculate_target_info возвращает visible: false, если блок image_4_3 выключен
+    info_enabled = overlay_svc.calculate_target_info(nil, {
+      template_key: :cover,
+      custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "4:3" } } }
+    })
+    assert(info_enabled[:visible] == true, "calculate_target_info возвращает visible: true для включенного видового экрана")
+
+    info_disabled = overlay_svc.calculate_target_info(nil, {
+      template_key: :cover,
+      custom_layouts: { cover: { image_4_3: { visible: false, aspect_ratio: "4:3" } } }
+    })
+    assert(info_disabled[:visible] == false, "calculate_target_info возвращает visible: false для выключенного видового экрана")
+
+    info_blank = overlay_svc.calculate_target_info(nil, { template_key: :blank })
+    assert(info_blank[:visible] == false, "calculate_target_info возвращает visible: false для шаблона :blank")
+
+    # 2. OverlayService.enable(model) не включает рамку, если видовой экран выключен
+    mock_model = Sketchup::MockModel.new
+    pdata_disabled = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_disabled.custom_layouts[:cover][:image_4_3][:visible] = false
+    pdata_disabled.save_to_model(mock_model)
+
+    assert(!overlay_svc.overlay_active?(mock_model), "Изначально оверлей не активен")
+    res_enable = overlay_svc.enable(mock_model)
+    assert(res_enable == false, "enable возвращает false, если видовой экран выключен в шаблоне")
+    assert(!overlay_svc.overlay_active?(mock_model), "overlay_active? возвращает false, когда видовой экран выключен")
+
+    # 3. SafeFrameOverlay#draw не рисует рамку при выключенном видовом экране
+    ov_inst = overlay_svc.overlay_instance
+    ov_inst.visible_cache = false
+    mock_view = mock_model.active_view
+    mock_view.drawn_elements.clear
+    ov_inst.draw(mock_view)
+    assert(mock_view.drawn_elements.empty?, "SafeFrameOverlay#draw ничего не рисует при visible_cache == false")
+
+    # 4. OverlayService.refresh автоматически выключает оверлей при переключении на сцену без видового экрана
+    pdata_enabled = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_enabled.custom_layouts[:cover][:image_4_3][:visible] = true
+    pdata_enabled.save_to_model(mock_model)
+    assert(overlay_svc.enable(mock_model) == true, "enable включает оверлей при активном видовом экране")
+    assert(overlay_svc.overlay_active?(mock_model) == true, "overlay_active? возвращает true")
+
+    # Теперь переключаем сцену на выключенный шаблон и вызываем refresh
+    pdata_disabled.save_to_model(mock_model)
+    overlay_svc.refresh(mock_model)
+    assert(!overlay_svc.overlay_active?(mock_model), "refresh автоматически выключил оверлей для сцены со скрытым видовым экраном")
+
+    # 5. Проверка JavaScript логики в app.js
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_content = File.read(js_path, encoding: "UTF-8")
+    assert(js_content.include?('const isOverlayOn = isImageVis && Boolean'), "app.js учитывает isImageVis при отображении чекбокса рамки")
+    assert(js_content.include?('${!isImageVis ? \'disabled\' : \'\'}'), "app.js блокирует чекбокс рамки, если видовой экран выключен")
+    assert(js_content.include?('callRuby("toggleAspectOverlay", false)'), "app.js отключает оверлей в SketchUp при снятии галки видового экрана")
+
+    # 6. Проверка Ruby коллбэков в export_dialog.rb
+    dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
+    dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
+    assert(dialog_rb_content.include?('if info[:visible] == false') && dialog_rb_content.include?('Service::OverlayService.disable(model)'), "export_dialog.rb гарантированно отключает оверлей при info[:visible] == false")
+
+    # 7. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")

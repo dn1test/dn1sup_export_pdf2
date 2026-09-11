@@ -1668,7 +1668,7 @@ body.is-resizing * {
 }
 
 .scenes-table th {
-  padding: 5px 6px;
+  padding: 6px 8px;
   vertical-align: middle;
   background-color: #ffffff;
   border-bottom: 1px solid #cbd5e1;
@@ -1680,52 +1680,58 @@ body.is-resizing * {
 .th-check,
 .scenes-table th.th-check {
   text-align: center;
-  padding: 5px 3px !important;
+  padding: 6px 4px !important;
+  vertical-align: middle;
 }
 
 .th-order,
 .scenes-table th.th-order {
   text-align: center;
-  padding: 5px 3px !important;
+  padding: 6px 4px !important;
+  vertical-align: middle;
 }
 
-.th-num-check {
+.th-preview,
+.scenes-table th.th-preview {
   text-align: center;
-  padding: 4px 3px !important;
-}
-
-.th-num-check-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 1px;
-  line-height: 1;
-  font-size: 10px;
+  padding: 6px 6px !important;
+  vertical-align: middle;
 }
 
 .scenes-table td {
-  padding: 3px 5px;
-  vertical-align: middle;
+  padding: 4px 6px;
+  vertical-align: middle !important;
   border: none;
   background-color: #ffffff;
 }
 
+.scenes-table tbody tr {
+  border-bottom: 1px solid #f1f5f9;
+  height: 72px;
+}
+
+.scenes-table tbody tr td {
+  vertical-align: middle !important;
+}
+
 .scenes-table .scene-check-cell {
   text-align: center;
-  padding: 3px 3px !important;
+  padding: 4px 4px !important;
+  vertical-align: middle !important;
 }
 
 .scenes-table .scene-check-cell input[type="checkbox"] {
-  margin: 0;
+  margin: 0 auto;
   cursor: pointer;
   accent-color: #005eb0;
+  display: inline-block;
   vertical-align: middle;
 }
 
 .scenes-table .scene-num-cell {
   text-align: center;
-  padding: 3px 3px !important;
+  padding: 4px 4px !important;
+  vertical-align: middle !important;
   cursor: grab;
   user-select: none;
 }
@@ -1734,41 +1740,129 @@ body.is-resizing * {
   cursor: grabbing;
 }
 
-.scenes-table .scene-num-check-cell {
-  text-align: center;
-  padding: 3px 3px !important;
-}
-
-.scene-num-check-wrap {
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  gap: 2px;
-}
-
-.scene-num-check-wrap input[type="checkbox"] {
-  margin: 0;
-  cursor: pointer;
-  accent-color: #005eb0;
-}
-
-.scene-num-row {
+.scenes-table .scene-num-row {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   line-height: 1;
   white-space: nowrap;
+  vertical-align: middle;
+}
+
+.th-preview,
+.scenes-table th.th-preview,
+.scenes-table td.scene-preview-cell {
+  width: 108px;
+  min-width: 108px;
+  max-width: 108px;
+  text-align: center;
+  vertical-align: middle !important;
+  box-sizing: border-box;
+}
+
+.scenes-table .scene-preview-cell {
+  padding: 4px 6px !important;
+  vertical-align: middle !important;
+}
+
+.scene-mini-preview-wrap {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  margin: 0 auto;
+  line-height: 0;
+  vertical-align: middle;
+}
+
+.scene-mini-sheet {
+  position: relative;
+  width: 96px;
+  height: 64px;
+  aspect-ratio: 3 / 2;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f8fafc;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+  cursor: pointer;
+  overflow: hidden;
+  box-sizing: border-box;
+  transition: transform 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+  user-select: none;
+  margin: 0 auto;
+  line-height: normal;
+  vertical-align: middle;
+}
+
+.scene-mini-sheet:hover {
+  transform: scale(1.06);
+  border-color: #94a3b8;
+  box-shadow: 0 3px 10px rgba(0, 0, 0, 0.16);
+  z-index: 3;
+}
+
+.scenes-table tbody tr.active-split-scene .scene-mini-sheet {
+  border-color: #64748b;
+  box-shadow: 0 0 0 1.5px #64748b;
+}
+
+.scenes-table tbody tr.selected-scene-row,
+.scenes-table tbody tr.selected-scene-row td {
+  background-color: #f0f7ff !important;
+}
+
+.scenes-table tbody tr.selected-scene-row .scene-mini-sheet {
+  border-color: #005eb0 !important;
+  box-shadow: 0 0 0 2px rgba(0, 94, 176, 0.4) !important;
+}
+
+.scene-mini-sheet .mini-sheet-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.scene-mini-sheet .mini-sheet-placeholder {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background-color: #f1f5f9;
+  color: #94a3b8;
+}
+
+.scene-mini-sheet .mini-sheet-placeholder-icon {
+  font-size: 16px;
+  opacity: 0.7;
 }
 
 .scenes-table .scene-info-cell {
-  padding: 3px 5px !important;
+  padding: 4px 6px !important;
+  vertical-align: middle !important;
 }
 
 .scene-info-wrap {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  justify-content: center;
+  gap: 3px;
+  width: 100%;
+}
+
+.scenes-table .scene-type-cell {
+  padding: 4px 6px !important;
+  vertical-align: middle !important;
+  width: 220px;
+}
+
+.scene-template-cell-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   width: 100%;
 }
 

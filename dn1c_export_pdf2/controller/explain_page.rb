@@ -50,10 +50,11 @@ module DN1Code
               @pdf_doc.text_box sc.name, at: [toc_box[:x] + 30, item_y], width: [toc_box[:width] - 140, 60].max, height: 16, overflow: :shrink_to_fit
 
               # Тип страницы
-              type_label = case sc.page_type
+              type_label = case sc.page_type.to_sym
                            when :cover then "Титульный лист"
                            when :explain then "Пояснения"
                            when :visual then "Визуализация"
+                           when :blank then "Без шаблона"
                            else "Общий вид"
                            end
 

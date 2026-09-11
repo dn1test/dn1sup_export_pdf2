@@ -55,6 +55,7 @@ module DN1Code
           when "ExplainPage" then :explain
           when "GeneralPage" then :general
           when "VisualPage" then :visual
+          when "BlankPage" then :blank
           else
             :cover
           end
@@ -80,6 +81,8 @@ module DN1Code
 
         # Отрисовка стандартного штампа/водяного знака
         def render_stamp
+          return if current_page_type == :blank
+
           stamp_type = @settings[:stamp_type].to_s
           return if stamp_type == "none" || stamp_type.empty?
 
@@ -161,16 +164,38 @@ module DN1Code
           blk_str = block_id.to_s
 
           page_cfg = custom[pt_sym] || custom[pt_str] || {}
-          page_cfg[blk_sym] || page_cfg[blk_str] || {}
+          res = page_cfg[blk_sym] || page_cfg[blk_str]
+          return res if res.is_a?(Hash) && !res.empty?
+
+          canonical_id = case blk_sym
+                         when :general_header, :visual_header, :cover_header, :desc_header, :explain_header
+                           :header
+                         when :visual_image, :cover_image, :general_image, :hero_image
+                           :image_4_3
+                         when :general_notes, :desc_notes, :explain_notes, :middle_block
+                           :slot_1
+                         when :general_footer, :visual_footer, :cover_footer, :desc_footer, :explain_footer
+                           :footer
+                         else
+                           nil
+                         end
+
+          if canonical_id
+            page_cfg[canonical_id] || page_cfg[canonical_id.to_s] || (res.is_a?(Hash) ? res : {})
+          else
+            res.is_a?(Hash) ? res : {}
+          end
         end
 
         # Проверка видимости блока
         def block_visible?(page_type, block_id)
           cfg = get_block_config(page_type, block_id)
-          return true if cfg.empty?
-          return false if cfg[:visible] == false || cfg["visible"] == false
+          return true if cfg.nil? || cfg.empty?
 
-          true
+          val = cfg.key?(:visible) ? cfg[:visible] : cfg["visible"]
+          return true if val.nil?
+
+          !(val == false || val.to_s.strip.downcase == "false" || val.to_s.strip == "0")
         end
 
         # Расчет абсолютных координат блока в точках Prawn [x, y, width, height]
@@ -194,7 +219,8 @@ module DN1Code
             y_pct = 100.0 - h_pct
           end
 
-          visible = cfg.key?(:visible) ? cfg[:visible] : (cfg.key?("visible") ? cfg["visible"] : true)
+          raw_vis = cfg.key?(:visible) ? cfg[:visible] : cfg["visible"]
+          visible = raw_vis.nil? ? true : !(raw_vis == false || raw_vis.to_s.strip.downcase == "false" || raw_vis.to_s.strip == "0")
           align = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
           valign = (cfg[:valign] || cfg["valign"] || (block_id.to_s == "footer" ? "bottom" : "top")).to_s.to_sym
 

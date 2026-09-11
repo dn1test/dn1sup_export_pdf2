@@ -236,10 +236,12 @@ module DN1Code
 
         def block_visible?(page_cfg, block_id)
           cfg = page_cfg[block_id] || page_cfg[block_id.to_s] || {}
-          return true if cfg.empty?
-          return false if cfg[:visible] == false || cfg["visible"] == false
+          return true if cfg.nil? || cfg.empty?
 
-          true
+          val = cfg.key?(:visible) ? cfg[:visible] : cfg["visible"]
+          return true if val.nil?
+
+          !(val == false || val.to_s.strip.downcase == "false" || val.to_s.strip == "0")
         end
 
         # Расчет абсолютных координат блока в пунктах (зеркало PageBase#get_block_box).
@@ -264,7 +266,8 @@ module DN1Code
             y_pct = 100.0 - h_pct
           end
 
-          visible = cfg.key?(:visible) ? cfg[:visible] : (cfg.key?("visible") ? cfg["visible"] : true)
+          raw_vis = cfg.key?(:visible) ? cfg[:visible] : cfg["visible"]
+          visible = raw_vis.nil? ? true : !(raw_vis == false || raw_vis.to_s.strip.downcase == "false" || raw_vis.to_s.strip == "0")
           align   = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
           valign  = (cfg[:valign] || cfg["valign"] || (block_id.to_s == "footer" ? "bottom" : "top")).to_s.to_sym
 

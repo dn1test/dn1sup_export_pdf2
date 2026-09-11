@@ -495,6 +495,18 @@
         slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0.88 },
         footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_ver_rev", "footer_page_total"], line_aligns: { footer_ver_rev: "left", footer_page_total: "right" }, opacity: 1.0 }
       }
+    },
+    blank: {
+      name: "Без шаблона (Blank)",
+      slots: {
+        header: { visible: false, content: "none", valign: "top", font_size: 11, lines: [], opacity: 0 },
+        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "16:9", scale_pct: 100 },
+        slot_1: { visible: false, content: "none", align: "left", valign: "top", font_size: 8, lines: [], opacity: 0 },
+        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0 },
+        slot_3: { visible: false, content: "none", align: "right", valign: "top", font_size: 8, lines: [], opacity: 0 },
+        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0 },
+        footer: { visible: false, content: "none", align: "center", valign: "bottom", font_size: 8.5, lines: [], opacity: 0 }
+      }
     }
   };
 
@@ -704,6 +716,7 @@
     const tabPanes = document.querySelectorAll(".tab-pane");
     tabs.forEach((tab) => {
       tab.addEventListener("click", () => {
+        flushAutoSave();
         tabs.forEach((t) => t.classList.remove("active"));
         tabPanes.forEach((p) => p.classList.remove("active"));
 
@@ -731,6 +744,7 @@
   }
 
   function switchToTab(tabId) {
+    flushAutoSave();
     const tabs = document.querySelectorAll(".tab-btn");
     const tabPanes = document.querySelectorAll(".tab-pane");
     const appContent = document.querySelector(".app-content");
@@ -835,33 +849,48 @@
     }
   }
 
+  function flushAutoSave() {
+    if (autoSaveTimer) {
+      clearTimeout(autoSaveTimer);
+      autoSaveTimer = null;
+    }
+    try {
+      if (typeof collectFormData === "function") {
+        const formData = collectFormData();
+        const payload = Object.assign({}, formData, {
+          is_auto_save: true,
+          silent: true
+        });
+        callRuby("saveData", JSON.stringify(payload));
+      }
+    } catch (err) {
+      console.error("flushAutoSave error:", err);
+      updateAutoSaveIndicator("error", "Ошибка автосохранения");
+    }
+  }
+
   function triggerAutoSave() {
     updateAutoSaveIndicator("saving", "Сохранение...");
     clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
-      try {
-        if (typeof collectFormData === "function") {
-          const formData = collectFormData();
-          const payload = Object.assign({}, formData, {
-            is_auto_save: true,
-            silent: true
-          });
-          callRuby("saveData", JSON.stringify(payload));
-        }
-      } catch (err) {
-        console.error("AutoSave error:", err);
-        updateAutoSaveIndicator("error", "Ошибка автосохранения");
-      }
-    }, 2000);
+      flushAutoSave();
+    }, 400);
   }
 
-  // Notify and keep changes in memory (persisted via debounced autoSave to model attributes;
-  // layout.yaml is written only on PDF export or .skp save)
+  // Notify and keep changes in memory (persisted via debounced autoSave to model attributes and layout.yaml)
   function notifyChange() {
     try {
       if (typeof markDirty === "function") markDirty();
     } catch (err) {}
     triggerAutoSave();
+  }
+
+  function isSlotVisible(slotObj, defaultVal = true) {
+    if (!slotObj) return defaultVal;
+    const v = slotObj.visible;
+    if (v === false || v === "false" || v === 0 || v === "0") return false;
+    if (v === true || v === "true" || v === 1 || v === "1") return true;
+    return defaultVal;
   }
 
   // -----------------------------------------------------------------------------
@@ -905,7 +934,7 @@
 
         if (!current) {
           state.pdf_settings.custom_layouts[tplKey][slotDef.id] = {
-            visible: defSlot.visible !== false,
+            visible: isSlotVisible(defSlot),
             content: defContent,
             custom_text: defSlot.custom_text || "",
             align: defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left"),
@@ -922,7 +951,11 @@
             opacity: defSlot.opacity !== undefined ? defSlot.opacity : 0.9
           };
         } else {
-          if (current.visible === undefined) current.visible = defSlot.visible !== false;
+          if (current.visible === undefined || current.visible === null) {
+            current.visible = defSlot.visible !== false;
+          } else {
+            current.visible = isSlotVisible(current);
+          }
           if (slotDef.id === "image_4_3") {
             if (!current.aspect_ratio) current.aspect_ratio = defSlot.aspect_ratio || "4:3";
             if (current.scale_pct === undefined) current.scale_pct = defSlot.scale_pct !== undefined ? defSlot.scale_pct : 100;
@@ -944,24 +977,26 @@
               }
             }
             if (!current.valign) current.valign = defSlot.valign || "top";
-            if (!current.line_rows) current.line_rows = defLineRows;
-            if (!current.line_font_sizes) current.line_font_sizes = defLineFontSizes;
-            if (!current.line_colors) current.line_colors = defLineColors;
+            current.line_rows = Object.assign({}, defLineRows, current.line_rows || {});
+            current.line_font_sizes = Object.assign({}, defLineFontSizes, current.line_font_sizes || {});
+            current.line_colors = Object.assign({}, defLineColors, current.line_colors || {});
           }
           if (slotDef.id === "slot_1") {
             if (!current.content) current.content = defSlot.content || "info_lines";
             if (!current.lines) {
               current.lines = defSlot.lines ? deepClone(defSlot.lines) : deepClone(DEFAULT_MIDDLE_SLOT.lines);
             }
-            if (!current.line_aligns) current.line_aligns = defLineAligns ? deepClone(defLineAligns) : deepClone(DEFAULT_MIDDLE_ALIGNS);
-            if (!current.line_valigns) current.line_valigns = defLineValigns ? deepClone(defLineValigns) : deepClone(DEFAULT_MIDDLE_VALIGNS);
-            if (!current.line_font_sizes) current.line_font_sizes = defLineFontSizes ? deepClone(defLineFontSizes) : deepClone(DEFAULT_MIDDLE_SIZES);
-            if (!current.line_colors) current.line_colors = defLineColors ? deepClone(defLineColors) : deepClone(DEFAULT_MIDDLE_COLORS);
+            current.line_aligns = Object.assign({}, defLineAligns || DEFAULT_MIDDLE_ALIGNS, current.line_aligns || {});
+            current.line_valigns = Object.assign({}, defLineValigns || DEFAULT_MIDDLE_VALIGNS, current.line_valigns || {});
+            current.line_font_sizes = Object.assign({}, defLineFontSizes || DEFAULT_MIDDLE_SIZES, current.line_font_sizes || {});
+            current.line_colors = Object.assign({}, defLineColors || DEFAULT_MIDDLE_COLORS, current.line_colors || {});
             if (current.item_gap_mm === undefined && current.item_gap === undefined) {
               current.item_gap_mm = defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : 2;
             }
           }
-          if (slotDef.id === "footer" && !current.line_aligns) current.line_aligns = deepClone(defLineAligns);
+          if (slotDef.id === "footer") {
+            current.line_aligns = Object.assign({}, defLineAligns || {}, current.line_aligns || {});
+          }
           if (current.opacity === undefined) current.opacity = defSlot.opacity !== undefined ? defSlot.opacity : 0.9;
         }
       });
@@ -977,7 +1012,8 @@
       { key: "description", name: "Описание и спецификации (Description)", icon: "📝", isDefault: true },
       { key: "explain", name: "Содержание и ведомость (Explain)", icon: "📋", isDefault: true },
       { key: "general", name: "Общий вид (General)", icon: "🖼️", isDefault: true },
-      { key: "visual", name: "Визуализация (Visual)", icon: "👁️", isDefault: true }
+      { key: "visual", name: "Визуализация (Visual)", icon: "👁️", isDefault: true },
+      { key: "blank", name: "Без шаблона (Blank)", icon: "⬜", isDefault: true }
     ];
 
     const result = [...builtins];
@@ -1003,10 +1039,18 @@
 
   function getTemplateDef(tplKey) {
     if (DEFAULT_LAYOUTS[tplKey]) {
+      const iconMap = {
+        cover: "🏷️",
+        description: "📝",
+        explain: "📋",
+        general: "🖼️",
+        visual: "👁️",
+        blank: "⬜"
+      };
       return {
         key: tplKey,
         name: DEFAULT_LAYOUTS[tplKey].name,
-        icon: tplKey === "cover" ? "🏷️" : (tplKey === "description" ? "📝" : (tplKey === "explain" ? "📋" : (tplKey === "general" ? "🖼️" : "👁️"))),
+        icon: iconMap[tplKey] || "📄",
         isDefault: true,
         slots: DEFAULT_LAYOUTS[tplKey].slots || {}
       };
@@ -1115,8 +1159,20 @@
   let templatePendingRename = null;
 
   function selectTemplate(tplKey) {
+    flushAutoSave();
     layoutState.currentTemplate = tplKey;
     const tplDef = getTemplateDef(tplKey);
+
+    // Если в выбранном шаблоне выключен видовой экран, выключаем оверлей
+    const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
+    const tplCfg = customLayouts[tplKey] || {};
+    const imgCfg = tplCfg.image_4_3 || {};
+    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
+    if (!isVis) {
+      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
+      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
+      callRuby("toggleAspectOverlay", false);
+    }
 
     if (els.currentTemplateTitle) {
       els.currentTemplateTitle.textContent = `${tplDef.icon || "📄"} ${tplDef.name}`;
@@ -1747,6 +1803,23 @@
     const tplCfg = customLayouts[tplKey] || {};
     const imgCfg = tplCfg.image_4_3 || {};
 
+    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
+    if (!isVis) {
+      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
+      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
+      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
+      if (chkTpl) {
+        chkTpl.checked = false;
+        chkTpl.disabled = true;
+      }
+      const tplBadge = document.getElementById("tplAspectOverlayBadge");
+      if (tplBadge) tplBadge.classList.add("disabled-overlay");
+      if (isUserAction) {
+        callRuby("toggleAspectOverlay", false);
+      }
+      return;
+    }
+
     const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
     let ratio = overrideRatio || imgCfg.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
     ratio = String(ratio).trim();
@@ -1902,7 +1975,7 @@
 
     const headerFontSize = header.font_size !== undefined ? parseFloat(header.font_size) : 11;
     const headerValign = header.valign || "top";
-    const isHeaderVis = header.visible !== false;
+    const isHeaderVis = isSlotVisible(header);
 
     const sampleFurn = (info.furniture_name || "Шкаф, Тумба").trim();
     const sampleRoom = (info.room_name || "Прихожая").trim();
@@ -2025,7 +2098,7 @@
     // -------------------------------------------------------------
     // CARD 2: СРЕДНИЙ БЛОК (Middle)
     // -------------------------------------------------------------
-    const isMiddleVis = slot1.visible !== false;
+    const isMiddleVis = isSlotVisible(slot1);
     const isTitlesVis = slot1.show_titles !== false;
     const middleFontSize = slot1.font_size !== undefined ? parseFloat(slot1.font_size) : 8;
     const middleItemGap = slot1.item_gap_mm !== undefined ? parseFloat(slot1.item_gap_mm) : (slot1.item_gap !== undefined ? parseFloat(slot1.item_gap) : 2);
@@ -2166,7 +2239,7 @@
               <span>Заголовок</span>
             </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
-              <input type="checkbox" class="chk-slot-visible" data-slot="slot_1" ${isMiddleVis ? 'checked' : ''}>
+              <input type="checkbox" id="chk_middle_visible" class="chk-slot-visible" data-slot="slot_1" ${isMiddleVis ? 'checked' : ''}>
               <span>Вкл</span>
             </label>
           </div>
@@ -2229,7 +2302,7 @@
     const footerLineAligns = Object.assign({}, defaultFooterAligns, footer.line_aligns || {});
 
     const footerFontSize = footer.font_size !== undefined ? parseFloat(footer.font_size) : 8.5;
-    const isFooterVis = footer.visible !== false;
+    const isFooterVis = isSlotVisible(footer);
 
     const sampleRev = String(wf.revision || info.revision || "001").trim();
     const sampleVer = String(wf.version || info.version || "01").trim();
@@ -2337,13 +2410,13 @@
     // -------------------------------------------------------------
     // CARD 4: КАРТИНКА ЧЕРТЕЖА ПОД ТЕКСТ (Drawing Viewport)
     // -------------------------------------------------------------
-    const isImageVis = image43.visible !== false;
+    const isImageVis = isSlotVisible(image43);
     const VALID_TPL_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
     let rawTplRatio = (image43.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
     const imageAspectRatio = VALID_TPL_ASPECTS.includes(rawTplRatio) ? rawTplRatio : "4:3";
     const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
     const imageScalePct = parseInt(image43.scale_pct !== undefined ? image43.scale_pct : 100, 10) || 100;
-    const isOverlayOn = Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
+    const isOverlayOn = isImageVis && Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
     const rawBorderColor = (state.pdf_settings && state.pdf_settings.overlay_border_color) || "#0EA5E9";
     const overlayBorderColor = rawBorderColor.startsWith("#") ? rawBorderColor : `#${rawBorderColor}`;
     const overlayBorderOpacity = state.pdf_settings && state.pdf_settings.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
@@ -2388,7 +2461,7 @@
               </div>
             </div>
             <label class="checkbox-label tpl-overlay-toggle-label ${isOverlayOn ? '' : 'disabled-overlay'}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin-left: auto;">
-              <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} style="cursor: pointer; margin: 0;">
+              <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="cursor: pointer; margin: 0;">
               <span id="tplAspectOverlayText">📐 РАМКА: ${displayAspect}</span>
             </label>
           </div>
@@ -2557,9 +2630,14 @@
     const chkHdrVis = document.getElementById("chk_header_visible");
     if (chkHdrVis) {
       chkHdrVis.addEventListener("change", (e) => {
-        updateBlockSlot("header", { visible: e.target.checked }, tplKey);
+        const isVis = Boolean(e.target.checked);
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        updateBlockSlot("header", { visible: isVis }, targetTpl);
         const card = document.getElementById("card_header");
-        if (card) card.classList.toggle("disabled-card", !e.target.checked);
+        if (card) {
+          card.classList.toggle("disabled-card", !isVis);
+          card.classList.toggle("disabled-block", !isVis);
+        }
         notifyChange();
       });
     }
@@ -2736,16 +2814,22 @@
     const slotVisCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-slot-visible");
     slotVisCheckboxes.forEach((chk) => {
       chk.addEventListener("change", (e) => {
-        const sId = e.target.dataset.slot;
-        const updates = { visible: e.target.checked };
-        if (e.target.checked && (sId === "slot_1" || sId === "slot_2" || sId === "slot_3" || sId === "slot_4")) {
+        const sId = e.target.dataset.slot || "slot_1";
+        const isVis = Boolean(e.target.checked);
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const updates = { visible: isVis };
+        if (isVis && (sId === "slot_1" || sId === "slot_2" || sId === "slot_3" || sId === "slot_4")) {
           updates.content = "info_lines";
         }
-        updateBlockSlot(sId, updates, tplKey);
+        if (sId === "slot_1") {
+          const s1 = ensureMiddleSlotDefaults(targetTpl);
+          s1.visible = isVis;
+        }
+        updateBlockSlot(sId, updates, targetTpl);
         const blk = (sId === "slot_1" ? document.getElementById("card_middle") : null) || document.getElementById(`block_${sId}`) || document.getElementById("card_middle");
         if (blk) {
-          blk.classList.toggle("disabled-block", !e.target.checked);
-          blk.classList.toggle("disabled-card", !e.target.checked);
+          blk.classList.toggle("disabled-block", !isVis);
+          blk.classList.toggle("disabled-card", !isVis);
         }
         notifyChange();
       });
@@ -2883,8 +2967,8 @@
             .map((c) => c.dataset.key);
           s1.lines = allSlotLines;
           s1.content = "info_lines";
-          s1.visible = true;
         }
+        updateBlockSlot("slot_1", { line_aligns: s1.line_aligns, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
         notifyChange();
       });
     });
@@ -2917,8 +3001,8 @@
             .map((c) => c.dataset.key);
           s1.lines = allSlotLines;
           s1.content = "info_lines";
-          s1.visible = true;
         }
+        updateBlockSlot("slot_1", { line_valigns: s1.line_valigns, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
         notifyChange();
       });
     });
@@ -2943,8 +3027,8 @@
             .map((c) => c.dataset.key);
           s1.lines = allSlotLines;
           s1.content = "info_lines";
-          s1.visible = true;
         }
+        updateBlockSlot("slot_1", { line_font_sizes: s1.line_font_sizes, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
         notifyChange();
       });
     });
@@ -2969,8 +3053,8 @@
             .map((c) => c.dataset.key);
           s1.lines = allSlotLines;
           s1.content = "info_lines";
-          s1.visible = true;
         }
+        updateBlockSlot("slot_1", { line_colors: s1.line_colors, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
         notifyChange();
       };
       inp.addEventListener("input", handleColorChange);
@@ -2995,9 +3079,14 @@
     const chkFtrVis = document.getElementById("chk_footer_visible");
     if (chkFtrVis) {
       chkFtrVis.addEventListener("change", (e) => {
-        updateBlockSlot("footer", { visible: e.target.checked }, tplKey);
+        const isVis = Boolean(e.target.checked);
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        updateBlockSlot("footer", { visible: isVis }, targetTpl);
         const card = document.getElementById("card_footer");
-        if (card) card.classList.toggle("disabled-card", !e.target.checked);
+        if (card) {
+          card.classList.toggle("disabled-card", !isVis);
+          card.classList.toggle("disabled-block", !isVis);
+        }
         notifyChange();
       });
     }
@@ -3070,6 +3159,14 @@
     const chkTplOverlay = document.getElementById("chk_tpl_aspect_overlay");
     if (chkTplOverlay) {
       chkTplOverlay.addEventListener("change", (e) => {
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
+        const tplCfg = customLayouts[targetTpl] || {};
+        const imgCfg = tplCfg.image_4_3 || {};
+        if (!isSlotVisible(imgCfg, true) || targetTpl === "blank") {
+          e.target.checked = false;
+          return;
+        }
         const isChecked = e.target.checked;
         if (!state.pdf_settings) state.pdf_settings = {};
         state.pdf_settings.show_aspect_overlay = isChecked;
@@ -3090,11 +3187,35 @@
     const chkImgVis = document.getElementById("chk_image_4_3_visible");
     if (chkImgVis) {
       chkImgVis.addEventListener("change", (e) => {
-        updateBlockSlot("image_4_3", { visible: e.target.checked }, tplKey);
+        const isVis = Boolean(e.target.checked);
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        updateBlockSlot("image_4_3", { visible: isVis }, targetTpl);
         const card = document.getElementById("card_image");
         if (card) {
-          card.classList.toggle("disabled-card", !e.target.checked);
-          card.classList.toggle("disabled-block", !e.target.checked);
+          card.classList.toggle("disabled-card", !isVis);
+          card.classList.toggle("disabled-block", !isVis);
+        }
+        const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
+        const tplBadge = document.getElementById("tplAspectOverlayBadge");
+        if (!isVis) {
+          if (chkTpl) {
+            chkTpl.checked = false;
+            chkTpl.disabled = true;
+          }
+          if (tplBadge) {
+            tplBadge.classList.add("disabled-overlay");
+          }
+          if (state.pdf_settings) {
+            state.pdf_settings.show_aspect_overlay = false;
+          }
+          if (els.chkShowAspectOverlay) {
+            els.chkShowAspectOverlay.checked = false;
+          }
+          callRuby("toggleAspectOverlay", false);
+        } else {
+          if (chkTpl) {
+            chkTpl.disabled = false;
+          }
         }
         notifyChange();
       });
@@ -4613,6 +4734,120 @@
     }
   }
 
+  // Cache for scene thumbnails from SketchUp: map of scene name / original_name -> base64 dataURL
+  const sceneThumbnails = {};
+  let requestedSceneThumbnails = false;
+
+  function requestSceneThumbnails() {
+    requestedSceneThumbnails = true;
+    callRuby("getSceneThumbnails");
+  }
+
+  // Switch active scene in SketchUp interface
+  function switchToSketchupScene(scene, index) {
+    if (!scene) return;
+    const payload = JSON.stringify({
+      index: index !== undefined ? index : 0,
+      name: scene.name || "",
+      original_name: scene.original_name || ""
+    });
+    callRuby("selectScene", payload);
+
+    // Если в шаблоне выбранной сцены выключен видовой экран, выключаем оверлей в GUI
+    const tplKey = scene.page_type || "cover";
+    const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
+    const tplCfg = customLayouts[tplKey] || {};
+    const imgCfg = tplCfg.image_4_3 || {};
+    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
+    if (!isVis) {
+      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
+      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
+      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
+      if (chkTpl) {
+        chkTpl.checked = false;
+        chkTpl.disabled = true;
+      }
+      const tplBadge = document.getElementById("tplAspectOverlayBadge");
+      if (tplBadge) tplBadge.classList.add("disabled-overlay");
+    }
+  }
+
+  // Highlight active scene row in table
+  function highlightActiveSceneRow(index) {
+    if (!els.scenesTableBody) return;
+    const rows = els.scenesTableBody.querySelectorAll("tr");
+    rows.forEach((row, idx) => {
+      if (idx === index) {
+        row.classList.add("selected-scene-row");
+      } else {
+        row.classList.remove("selected-scene-row");
+      }
+    });
+  }
+
+  // Create mini page preview element for a scene (3:2 clean image, no blue lines)
+  function createMiniPagePreview(scene, index) {
+    const tplKey = scene.page_type || "cover";
+    const tplDefObj = getTemplateDef(tplKey);
+    const tplIcon = tplDefObj.icon || "📄";
+    const tplName = tplDefObj.name || tplKey;
+
+    const wrap = document.createElement("div");
+    wrap.className = "scene-mini-preview-wrap";
+
+    const thumbBox = document.createElement("div");
+    thumbBox.className = "scene-mini-sheet";
+    thumbBox.dataset.index = index;
+    thumbBox.dataset.template = tplKey;
+    thumbBox.title = `Сцена ${index + 1}: ${scene.name || "Сцена"}\nНажмите для перехода к этому виду в SketchUp`;
+
+    // Check if thumbnail exists
+    const sceneKey = scene.name || scene.original_name || "";
+    const thumbUrl = scene.thumbnail || sceneThumbnails[sceneKey] || sceneThumbnails[scene.original_name] || sceneThumbnails[index];
+
+    if (thumbUrl) {
+      const img = document.createElement("img");
+      img.src = thumbUrl;
+      img.alt = scene.name || "Preview";
+      img.className = "mini-sheet-img";
+      thumbBox.appendChild(img);
+    } else {
+      const placeholder = document.createElement("div");
+      placeholder.className = "mini-sheet-placeholder";
+      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon">🖼️</span>`;
+      thumbBox.appendChild(placeholder);
+    }
+
+    // Click on thumbnail switches scene in SketchUp (stays on current tab)
+    thumbBox.addEventListener("click", (e) => {
+      e.stopPropagation();
+      layoutState.selectedSceneIndex = index;
+      selectTemplate(scene.page_type || "cover");
+      highlightActiveSceneRow(index);
+      switchToSketchupScene(scene, index);
+    });
+
+    wrap.appendChild(thumbBox);
+    return wrap;
+  }
+
+  // Update existing scene preview sheets in table without re-rendering inputs
+  function updateSceneTablePreviews() {
+    if (!els.scenesTableBody) return;
+    const rows = els.scenesTableBody.querySelectorAll("tr");
+    rows.forEach((row) => {
+      const idx = parseInt(row.dataset.index, 10);
+      const scene = (state.scenes || [])[idx];
+      if (scene) {
+        const cell = row.querySelector(".scene-preview-cell");
+        if (cell) {
+          cell.innerHTML = "";
+          cell.appendChild(createMiniPagePreview(scene, idx));
+        }
+      }
+    });
+  }
+
   // Render Scenes Table
   function renderScenesTable() {
     els.scenesTableBody.innerHTML = "";
@@ -4626,6 +4861,9 @@
 
       if (scene.page_type === layoutState.currentTemplate) {
         tr.classList.add("active-split-scene");
+      }
+      if (layoutState.selectedSceneIndex === index) {
+        tr.classList.add("selected-scene-row");
       }
 
       // 1. Checkbox (Вкл)
@@ -4664,6 +4902,11 @@
       numRow.appendChild(rowNum);
       tdNum.appendChild(numRow);
 
+      // 3. Mini Preview of Page (Мини превью страницы)
+      const tdPreview = document.createElement("td");
+      tdPreview.className = "scene-preview-cell";
+      tdPreview.appendChild(createMiniPagePreview(scene, index));
+
       // Scene Name & Description (two rows in one cell)
       const tdInfo = document.createElement("td");
       tdInfo.className = "scene-info-cell";
@@ -4677,6 +4920,11 @@
       inputName.value = scene.name || "";
       inputName.placeholder = "Название сцены...";
       inputName.title = "Редактировать название сцены";
+      inputName.addEventListener("focus", () => {
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+      });
       inputName.addEventListener("input", (e) => {
         scene.name = e.target.value;
         renderLayoutCanvas();
@@ -4699,6 +4947,11 @@
       inputDesc.value = scene.description || "";
       inputDesc.placeholder = "Описание на листе...";
       inputDesc.title = "Описание / примечание на листе";
+      inputDesc.addEventListener("focus", () => {
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+      });
       inputDesc.addEventListener("input", (e) => {
         scene.description = e.target.value;
         renderLayoutCanvas();
@@ -4720,6 +4973,7 @@
 
       // Page Type Select
       const tdType = document.createElement("td");
+      tdType.className = "scene-type-cell";
       const typeWrap = document.createElement("div");
       typeWrap.className = "scene-template-cell-wrap";
 
@@ -4740,11 +4994,24 @@
         opt.selected = true;
         selType.appendChild(opt);
       }
+      selType.addEventListener("focus", () => {
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+      });
       selType.addEventListener("change", (e) => {
         scene.page_type = e.target.value;
+        layoutState.selectedSceneIndex = index;
         updateSceneBadge();
         selectTemplate(e.target.value);
         updateLayoutUsageBadge();
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+        const prevCell = tr.querySelector(".scene-preview-cell");
+        if (prevCell) {
+          prevCell.innerHTML = "";
+          prevCell.appendChild(createMiniPagePreview(scene, index));
+        }
         notifyChange();
       });
       selType.addEventListener("click", (e) => e.stopPropagation());
@@ -4758,6 +5025,8 @@
         e.stopPropagation();
         layoutState.selectedSceneIndex = index;
         selectTemplate(scene.page_type || "cover");
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
         switchToTab("tab-templates");
       });
 
@@ -4843,16 +5112,19 @@
         }
       });
 
-      // Click on row to focus template
+      // Click on row to focus template and switch SketchUp scene
       tr.addEventListener("click", () => {
         const tpl = scene.page_type || "cover";
         layoutState.selectedSceneIndex = index;
         selectTemplate(tpl);
         updateLayoutUsageBadge();
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
       });
 
       tr.appendChild(tdCheck);
       tr.appendChild(tdNum);
+      tr.appendChild(tdPreview);
       tr.appendChild(tdInfo);
       tr.appendChild(tdType);
 
@@ -4860,6 +5132,11 @@
     });
 
     updateLayoutUsageBadge();
+
+    // Trigger thumbnail generation from SketchUp if not done yet
+    if (!requestedSceneThumbnails && window.sketchup && typeof window.sketchup.getSceneThumbnails === "function") {
+      requestSceneThumbnails();
+    }
   }
 
   // Render Stadia Checkboxes
@@ -5361,6 +5638,7 @@
     if (els.selectPageLayout) {
       els.selectPageLayout.addEventListener("change", () => {
         renderLayoutCanvas(true);
+        renderScenesTable();
         updateAspectUI(true);
       });
     }
@@ -5480,6 +5758,8 @@
           s.page_type = "description";
         } else if (lower.includes("визуал") || lower.includes("visual") || lower.includes("рендер") || lower.includes("render")) {
           s.page_type = "visual";
+        } else if (lower.includes("чист") || lower.includes("blank") || lower.includes("пуст")) {
+          s.page_type = "blank";
         } else {
           s.page_type = "general";
         }
@@ -5707,6 +5987,10 @@
         el.addEventListener("change", () => notifyChange());
       }
     });
+
+    // Flush any pending auto-save on window close or navigation
+    window.addEventListener("beforeunload", () => flushAutoSave());
+    window.addEventListener("unload", () => flushAutoSave());
   }
 
   // Public API exposed on window.app for Ruby calls
@@ -5848,6 +6132,13 @@
 
     onAutoSaved: function (yamlName) {
       updateAutoSaveIndicator("saved", yamlName ? `Сохранено (${yamlName})` : "Сохранено");
+    },
+
+    onSceneThumbnailsLoaded: function (thumbs) {
+      if (thumbs && typeof thumbs === "object") {
+        Object.assign(sceneThumbnails, thumbs);
+        updateSceneTablePreviews();
+      }
     },
 
     syncCurrentTemplateOverlay: syncCurrentTemplateOverlay
