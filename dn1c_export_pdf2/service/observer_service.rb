@@ -23,7 +23,7 @@ module DN1Code
 
           def onOpenModel(model)
             ObserverService.attach_model_observer(model)
-            # Сбрасываем кэш сессии для только что открытой модели, чтобы гарантировать инкремент
+            # Сбрасываем кэш сессии для только что открытой модели, чтобы повторная обработка не блокировалась
             if model && model.respond_to?(:path) && !model.path.to_s.empty?
               clean_p = model.path.to_s.tr("\\", "/").downcase
               ObserverService.session_opened_models.delete(clean_p)
@@ -109,7 +109,8 @@ module DN1Code
             @attached_models[model_id] = true
           end
 
-          # Обработка открытия модели: загрузка настроек, автоматическое увеличение номера ревизии (+1) и синхронизация
+          # Обработка открытия модели: загрузка настроек проекта и синхронизация данных.
+          # Параметр force позволяет принудительно повторить обработку для уже открытой в сессии модели.
           def handle_model_opened(model, force = false)
             return unless model
 

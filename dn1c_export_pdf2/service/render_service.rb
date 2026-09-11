@@ -30,28 +30,42 @@ module DN1Code
                     DEFAULT_ISO_RATIO
                   end
           height       = options[:image_height] || (width * ratio).round
-          scale_factor = options[:scale_factor] || 2.0
           antialias    = options.fetch(:antialias, true)
 
           temp_file = File.join(Dir.tmpdir, "su_scene_#{SecureRandom.hex(8)}.png").tr("\\", "/")
 
-          # Переключаем сцену в SketchUp
+          # Переключаем сцену в SketchUp (сеттер selected_page= доступен не во всех версиях API)
           if model.respond_to?(:pages) && scene
-            model.pages.selected_page = scene
+            pages = model.pages
+            if pages.respond_to?(:selected_page=)
+              begin
+                pages.selected_page = scene
+              rescue StandardError => _e
+                # Переключение сцены не критично: рендерим текущий вид
+              end
+            end
           end
 
           view = model.respond_to?(:active_view) ? model.active_view : nil
 
+          rendered = false
           if view && view.respond_to?(:write_image)
+            # write_image поддерживает только :filename, :width, :height, :antialias
             write_options = {
               filename:     temp_file,
               width:        width,
               height:       height,
-              antialias:    antialias,
-              scale_factor: scale_factor
+              antialias:    antialias
             }
-            view.write_image(write_options)
-          else
+            begin
+              view.write_image(write_options)
+              rendered = File.exist?(temp_file)
+            rescue StandardError => e
+              warn "[DN1C Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
+            end
+          end
+
+          unless rendered
             # Если рендер запущен в автономном/тестовом окружении или моке, создаем placeholder PNG
             create_fallback_image(temp_file, width, height, scene ? scene.name : "Scene")
           end

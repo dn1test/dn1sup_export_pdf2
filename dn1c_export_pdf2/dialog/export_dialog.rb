@@ -383,7 +383,86 @@ module DN1Code
             end
           end
 
-          # Сохранение настроек из веб-интерфейса (в библиотеку модели, файл проекта и плагин)
+          # Сохранение данных проекта в YAML рядом с .skp и в атрибуты модели (без файлов настроек плагина)
+          dialog.add_action_callback("saveProjectYaml") do |_action_context, data_json|
+            begin
+              payload = JSON.parse(data_json, symbolize_names: true)
+              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+              project_data = Model::ProjectData.new
+              populate_project_data(project_data, payload)
+              project_data.sync_with_model_scenes(model) if model
+
+              # Определяем прежний артикульный YAML из атрибутов модели (до обновления).
+              # Удалять можно только файл, названный по старому артикулу: общие файлы
+              # (project_config.yaml, <модель>.yaml и найденные эвристикой) не трогаем
+              old_articul_yamls = []
+              if model && model.respond_to?(:get_attribute) && model.respond_to?(:path) && !model.path.to_s.empty?
+                raw_info = model.get_attribute(Model::ProjectData::ATTR_DICT, "project_info", nil) rescue nil
+                if raw_info
+                  begin
+                    old_art = JSON.parse(raw_info, symbolize_names: true)[:articul].to_s.strip
+                    unless old_art.empty?
+                      dir = File.dirname(model.path.to_s.tr("\\", "/"))
+                      old_articul_yamls << File.join(dir, "#{Model::ProjectData.sanitize_filename(old_art)}.yaml")
+                      old_articul_yamls << File.join(dir, "#{Model::ProjectData.sanitize_filename(old_art)}.yml")
+                    end
+                  rescue StandardError
+                  end
+                end
+              end
+
+              # Сохранение в библиотеку модели (атрибуты)
+              project_data.save_to_model(model) if model
+
+              yaml_path = nil
+              if model && model.respond_to?(:path) && !model.path.to_s.empty?
+                yaml_path = project_data.yaml_path_for_model(model)
+                if yaml_path
+                  project_data.save_to_yaml(yaml_path, include_settings: false)
+                  target_norm = File.expand_path(yaml_path).tr("\\", "/").downcase
+                  old_articul_yamls.uniq.each do |old_yaml|
+                    next unless File.exist?(old_yaml)
+
+                    old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
+                    File.delete(old_yaml) rescue nil if old_norm != target_norm
+                  end
+                end
+              end
+
+              yaml_name = yaml_path ? File.basename(yaml_path) : project_data.yaml_filename(model)
+              dialog.execute_script("window.app && window.app.showNotification('Данные проекта сохранены в #{yaml_name} и в модель SketchUp', 'success');")
+              if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
+                Sketchup.status_text = "DN1C Export PDF: Данные проекта сохранены (#{yaml_name})"
+              end
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения YAML: #{e.message}', 'error');")
+            end
+          end
+
+          # Сохранение данных проекта только в атрибуты модели (.skp файл не перезаписывается)
+          dialog.add_action_callback("saveProjectToSkp") do |_action_context, data_json|
+            begin
+              payload = JSON.parse(data_json, symbolize_names: true)
+              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+              project_data = Model::ProjectData.new
+              populate_project_data(project_data, payload)
+              project_data.sync_with_model_scenes(model) if model
+              project_data.save_to_model(model) if model
+
+              if model
+                dialog.execute_script("window.app && window.app.showNotification('Данные проекта записаны в модель SketchUp (сохраните файл Ctrl+S)', 'success');")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Нет активной модели SketchUp', 'error');")
+              end
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка записи в модель: #{e.message}', 'error');")
+            end
+          end
+
+          # Сохранение настроек из веб-интерфейса.
+          # Автосейв (is_auto_save/silent) пишет только в библиотеку модели (атрибуты SketchUp),
+          # YAML и файлы конфигурации обновляются при явных действиях:
+          # кнопка "Обновить" (refreshData), экспорт PDF, сохранение .skp, exportYaml.
           save_handler = lambda do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
@@ -391,14 +470,19 @@ module DN1Code
               project_data = Model::ProjectData.new
               populate_project_data(project_data, payload)
 
-              project_data.sync_with_model_scenes(model) if model
-              project_data.save_auto(model) if model
-              project_data.save_program_settings
-              yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
-              is_silent = payload[:silent] == true || payload[:is_auto_save] == true
-              if is_silent
-                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate(yaml_name)});")
+              is_auto = payload[:silent] == true || payload[:is_auto_save] == true
+
+              if is_auto
+                if model
+                  project_data.sync_with_model_scenes(model)
+                  project_data.save_to_model(model)
+                end
+                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в модель SketchUp")});")
               else
+                project_data.sync_with_model_scenes(model) if model
+                project_data.save_auto(model) if model
+                project_data.save_program_settings
+                yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
                 dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
               end
             rescue StandardError => e
@@ -415,36 +499,47 @@ module DN1Code
 
           # Запуск экспорта в PDF
           dialog.add_action_callback("startExport") do |_action_context, data_json|
-            begin
-              payload = JSON.parse(data_json, symbolize_names: true)
-              model = Sketchup.active_model
-              project_data = Model::ProjectData.new
-              populate_project_data(project_data, payload)
+            # Экспорт выполняется отложенно через таймер: колбэк CEF завершается сразу,
+            # диалог не блокируется и прогресс-бар перерисовывается в реальном времени
+            run_export = lambda do
+              begin
+                payload = JSON.parse(data_json, symbolize_names: true)
+                model = Sketchup.active_model
+                project_data = Model::ProjectData.new
+                populate_project_data(project_data, payload)
 
-              project_data.sync_with_model_scenes(model)
-              project_data.save_auto(model)
-              project_data.save_program_settings
+                project_data.sync_with_model_scenes(model)
+                project_data.save_auto(model)
+                project_data.save_program_settings
 
-              controller = Controller::ExportController.new(project_data, model)
-              
-              pdf_file = controller.export do |curr, total, msg|
-                percent = (curr.to_f / total * 100).round
-                dialog.execute_script("window.app && window.app.updateProgress(#{percent}, #{JSON.generate(msg)});")
+                controller = Controller::ExportController.new(project_data, model)
+
+                pdf_file = controller.export do |curr, total, msg|
+                  percent = (curr.to_f / total * 100).round
+                  dialog.execute_script("window.app && window.app.updateProgress(#{percent}, #{JSON.generate(msg)});")
+                end
+
+                escaped_path = JSON.generate(pdf_file)
+                new_rev = project_data.project_info[:revision] || 1
+                dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev});")
+              rescue StandardError => e
+                dialog.execute_script("window.app && window.app.onExportError(#{JSON.generate(e.message)});")
               end
+            end
 
-              escaped_path = JSON.generate(pdf_file)
-              new_rev = project_data.project_info[:revision] || 1
-              dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev});")
-            rescue StandardError => e
-              dialog.execute_script("window.app && window.app.onExportError(#{JSON.generate(e.message)});")
+            if defined?(UI) && UI.respond_to?(:start_timer)
+              UI.start_timer(0.01, false) { run_export.call }
+            else
+              # Резерв для окружений без таймера (автономные тесты)
+              run_export.call
             end
           end
 
           # Открыть папку с PDF
           dialog.add_action_callback("openFolder") do |_action_context, file_path|
             if file_path && File.exist?(file_path)
-              folder = File.dirname(file_path)
-              UI.openURL("file:///#{folder}")
+              folder = File.dirname(file_path.to_s.tr("\\", "/"))
+              UI.openURL("file:///" + folder)
             end
           end
 

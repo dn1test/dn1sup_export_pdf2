@@ -573,6 +573,8 @@
 
     // Global Actions
     btnRefreshData: document.getElementById("btnRefreshData"),
+    btnSaveYaml: document.getElementById("btnSaveYaml"),
+    btnSaveSkp: document.getElementById("btnSaveSkp"),
     btnStartExport: document.getElementById("btnStartExport"),
     btnImportYaml: document.getElementById("btnImportYaml"),
     btnExportYaml: document.getElementById("btnExportYaml"),
@@ -747,17 +749,15 @@
         console.error("AutoSave error:", err);
         updateAutoSaveIndicator("error", "Ошибка автосохранения");
       }
-    }, 400);
+    }, 2000);
   }
 
-  // Notify and auto-save layout and project data
+  // Notify and keep changes in memory (persisted via debounced autoSave to model attributes;
+  // layout.yaml is written only on PDF export or .skp save)
   function notifyChange() {
     try {
       if (typeof markDirty === "function") markDirty();
     } catch (err) {}
-    if (window.bridge && typeof bridge.saveLayout === "function") {
-      bridge.saveLayout(JSON.stringify(state.pdf_settings?.custom_layouts));
-    }
     triggerAutoSave();
   }
 
@@ -1582,10 +1582,10 @@
       { key: "general_notes",     label: "📝 Общие пояснения",            val: (info.project_description || info.description || info.notes || "Замеры выполнены по факту").trim() },
       { key: "workflow_history",  label: "📜 История правок",             val: (wf.last_edit || info.last_edit || "Корректировка фасадов").trim() },
       { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(wf.stadia) ? wf.stadia.map(st => Array.isArray(st) ? st[2] : String(st)).join(", ") : String(wf.stadia || wf.status || info.status || "РД")).trim() },
-      { key: "workflow_revision", label: "🔢 Ревизия",                   val: (wf.revision || info.revision || "001").trim() },
-      { key: "workflow_version",  label: "🏷️ Версия",                    val: (wf.version || info.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: (wf.date_order || info.date || new Date().toISOString().slice(0, 10)).trim() },
-      { key: "articul",           label: "🔖 Артикул проекта",           val: (info.articul || "CF#...").trim() }
+      { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || info.revision || "001").trim() },
+      { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || info.version || "01").trim() },
+      { key: "workflow_date",     label: "📅 Дата",                      val: String(wf.date_order || info.date || new Date().toISOString().slice(0, 10)).trim() },
+      { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
     ];
 
     const renderMiddleItemControls = (key, activeAlign, activeValign, activeSize, activeColor) => {
@@ -1723,11 +1723,11 @@
     const footerFontSize = footer.font_size !== undefined ? parseFloat(footer.font_size) : 8.5;
     const isFooterVis = footer.visible !== false;
 
-    const sampleRev = (wf.revision || info.revision || "001").trim();
-    const sampleVer = (wf.version || info.version || "01").trim();
-    const sampleArt = (info.articul || "CF#...").trim();
-    const sampleDate = (wf.last_edit_date || info.date || new Date().toLocaleDateString()).trim();
-    const sampleLastEdit = (wf.last_edit || "Корректировка фасадов").trim();
+    const sampleRev = String(wf.revision || info.revision || "001").trim();
+    const sampleVer = String(wf.version || info.version || "01").trim();
+    const sampleArt = String(info.articul || "CF#...").trim();
+    const sampleDate = String(wf.last_edit_date || info.date || new Date().toLocaleDateString()).trim();
+    const sampleLastEdit = String(wf.last_edit || "Корректировка фасадов").trim();
 
     const footerItemsDef = [
       {
@@ -1951,12 +1951,12 @@
       { key: "spec_materials",    label: "🛠️ Материалы и Фурнитура",      val: "МДФ, Blum, эмаль" },
       { key: "spec_appliances",   label: "🔌 Техника и подсветка",        val: "LED 4000K, Вытяжка" },
       { key: "general_notes",     label: "📝 Общие пояснения",            val: "Замеры выполнены" },
-      { key: "workflow_history",  label: "📜 История правок",             val: (wf.last_edit || "Корректировка фасадов").trim() },
-      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (info.stadia || "РД").trim() },
-      { key: "workflow_revision", label: "🔢 Ревизия",                   val: (wf.revision || "001").trim() },
-      { key: "workflow_version",  label: "🏷️ Версия",                    val: (wf.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: (wf.date_order || new Date().toISOString().slice(0, 10)).trim() },
-      { key: "articul",           label: "🔖 Артикул проекта",           val: (info.articul || "CF#...").trim() }
+      { key: "workflow_history",  label: "📜 История правок",             val: String(wf.last_edit || "Корректировка фасадов").trim() },
+      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(info.stadia) ? info.stadia.map(st => (st && st.name) ? st.name : String(st)).join(", ") : String(info.stadia || "РД")).trim() },
+      { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || "001").trim() },
+      { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || "01").trim() },
+      { key: "workflow_date",     label: "📅 Дата",                      val: String(wf.date_order || new Date().toISOString().slice(0, 10)).trim() },
+      { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
     ];
 
     const availableList = isFullList ? fullAvailableLines : fullAvailableLines.filter(l => ["workflow_history", "workflow_stadia", "articul", "workflow_date"].includes(l.key));
@@ -2838,9 +2838,6 @@
         if (!state.pdf_settings) state.pdf_settings = {};
         state.pdf_settings.margin_mm = val;
         state.pdf_settings.margin = Math.round(((val * 72.0) / 25.4) * 10) / 10;
-        if (window.bridge && typeof bridge.saveSettings === "function") {
-          bridge.saveSettings(JSON.stringify(state.pdf_settings));
-        }
         notifyChange();
       });
     }
@@ -4193,8 +4190,8 @@
       end_date: endDateVal,
       total_duration: totalDurationVal,
       status: statusVal,
-      version: verVal,
-      revision: revVal,
+      version: String(verVal),
+      revision: String(revVal),
       stadia: state.workflow?.stadia || [],
       history_edit: historyEditPairs
     };
@@ -4215,8 +4212,8 @@
       customer:         custVal,
       company:          compVal,
       status:           statusVal,
-      revision:         revVal,
-      version:          verVal,
+      revision:         String(revVal),
+      version:          String(verVal),
       last_edit:        lastEditVal,
       trade:            tradeVal,
       tags:             tagsVal,
@@ -4718,6 +4715,22 @@
         } else if (e.key === "Escape") {
           if (els.revisionPromptModal) els.revisionPromptModal.classList.add("hidden");
         }
+      });
+    }
+
+    // Save project data to YAML next to .skp (+ model attributes)
+    if (els.btnSaveYaml) {
+      els.btnSaveYaml.addEventListener("click", () => {
+        const data = collectFormData();
+        callRuby("saveProjectYaml", JSON.stringify(data));
+      });
+    }
+
+    // Save project data to SketchUp model attributes only
+    if (els.btnSaveSkp) {
+      els.btnSaveSkp.addEventListener("click", () => {
+        const data = collectFormData();
+        callRuby("saveProjectToSkp", JSON.stringify(data));
       });
     }
 

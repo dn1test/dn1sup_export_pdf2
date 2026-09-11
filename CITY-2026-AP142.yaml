@@ -1,0 +1,97 @@
+---
+project:
+  articul: CITY-2026-AP142
+  product_tags: []
+  place: ''
+  adress: г. Москва, Пресненская наб., д. 8, башня 'Город Столиц', кв. 142
+  description: Комплексный дизайн-проект интерьера с технической документацией
+  commercial: false
+customer:
+  id: CUST-2609101944
+  name: Петров Александр Сергеевич
+  phone: "+7 (916) 123-45-67"
+  email: petrov.alex@example.com
+workflow:
+  author: ''
+  price: ''
+  start_date: ''
+  end_date: ''
+  total_duration: ''
+  version: '01'
+  revision: '001'
+  stadia:
+  - name: Предварительный проект
+    status: true
+  - name: Правки проекта (история правок)
+    status: true
+  - name: Выбраны материалы и фурнитура
+    status: true
+  - name: Предварительно Утвержден
+    status: false
+  - name: Проверка технологом
+    status: false
+  - name: Утвержден
+    status: false
+  - name: Отправлен в производство
+    status: false
+  - name: Оплачен
+    status: false
+  history_edit:
+  - - 2026.08.01
+    - Инициализация эскизного проекта
+  - - 2026.08.05
+    - Согласование планировочных решений
+  - - 2026.08.11
+    - Корректировка фасадов кухни и спецификаций
+  status: Правки
+history_edit:
+- data: 2026.08.01
+  edit: Инициализация эскизного проекта
+- data: 2026.08.05
+  edit: Согласование планировочных решений
+- data: 2026.08.11
+  edit: Корректировка фасадов кухни и спецификаций
+directories:
+- path: "!_замер_фото_задание"
+  title: Замеры помещения
+  description: Дополнительное описание
+  display: grid
+- path: "!_инфо_заказчика"
+  title: Инфо заказчика
+  description: Дополнительное описание
+  display: grid
+- path: "!_материалы_фурнитура"
+  title: Материалы и фурнитура
+  description: Дополнительное описание
+  display: grid
+- path: "!_техника_подсветка"
+  title: Техника, подсветка
+  description: Дополнительное описание
+  display: list
+scenes:
+- name: 01. Обложка
+  original_name: 01. Обложка
+  page_type: cover
+  description: Титульный лист проекта
+  order: 0
+  enabled: true
+- name: 02. Содержание и материалы
+  original_name: 02. Содержание и материалы
+  page_type: explain
+  description: Пояснительная записка и перечень спецификаций
+  order: 1
+  enabled: true
+- name: 03. Перспективный вид гостиной
+  original_name: 03. Перспективный вид гостиной
+  page_type: visual
+  description: Визуализация интерьера в дневном освещении
+  order: 2
+  enabled: true
+- name: 04. План расстановки мебели
+  original_name: 04. План расстановки мебели
+  page_type: general
+  description: Техническая схема с габаритными размерами
+  order: 3
+  enabled: true
+api_targets:
+- http://localhost:3000/api/projects?token=5fe8434a495f928c83e80b115c8d53455356b7e0132c352a8d202c4f68e07b33

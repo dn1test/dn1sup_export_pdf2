@@ -40,7 +40,7 @@ module DN1Code
                   "Gem.install('prawn')"
             
             if defined?(UI) && UI.respond_to?(:messagebox)
-              UI.messagebox(msg, MB_OK)
+              UI.messagebox(msg, defined?(MB_OK) ? MB_OK : 0)
             else
               warn msg
             end

@@ -267,10 +267,20 @@ module DN1Code
           tpl_cfg = custom_layouts[tpl_key] || custom_layouts[tpl_key.to_s] || {}
           img_cfg = tpl_cfg[:image_4_3] || tpl_cfg["image_4_3"] || {}
 
-          # Приоритет пропорций: переданный явно aspect_ratio -> блок image_4_3 шаблона -> глобальный image_aspect_ratio
-          aspect_mode = settings[:aspect_ratio] || settings["aspect_ratio"] ||
-                        img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] ||
-                        settings[:image_aspect_ratio] || settings["image_aspect_ratio"] || "4:3"
+          # Приоритет пропорций:
+          # 1. Явный aspect_ratio (переданный извне / живой выбор из редактора шаблона)
+          # 2. Явный выбор пользователя в GUI (image_aspect_ratio != "page")
+          # 3. Блок image_4_3 текущего шаблона
+          # 4. Сохраненный глобальный image_aspect_ratio ("page" = по формату листа)
+          gui_aspect = settings[:image_aspect_ratio] || settings["image_aspect_ratio"]
+          gui_explicit = gui_aspect && !gui_aspect.to_s.strip.empty? && gui_aspect.to_s.strip != "page"
+          aspect_mode = if gui_explicit
+                          settings[:aspect_ratio] || settings["aspect_ratio"] || gui_aspect
+                        else
+                          settings[:aspect_ratio] || settings["aspect_ratio"] ||
+                            img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] ||
+                            gui_aspect || "4:3"
+                        end
           aspect_mode = aspect_mode.to_s.strip
 
           page_size   = (settings[:page_size] || settings["page_size"] || (pdata ? pdata.pdf_settings[:page_size] : nil) || "A4").to_s.upcase
@@ -497,12 +507,6 @@ module DN1Code
             enable(model)
             true
           end
-        end
-
-        # Создает новый экземпляр оверлея безопасным способом
-        # @return [SafeFrameOverlay]
-        def self.overlay_instance
-          SafeFrameOverlay.new
         end
 
         # Обновляет параметры кадра и принудительно перерисовывает активный вид

@@ -1079,7 +1079,46 @@ class TestRunner
     assert(dlg_data.directories.first[:description] == "Тестовое описание", "ExportDialog сохранил directories.description")
 
     # Проверка загрузки и сохранения объединенных спецификаций в directories
-    city_yaml_path = File.expand_path(File.join(__dir__, "../../CITY-2026-AP142.yaml"))
+    # (изолированный fixture вместо мутирующего sample-файла в корне репозитория)
+    city_yaml_path = File.join(test_dir, "dirs_spec_fixture.yaml")
+    File.write(city_yaml_path, <<~YAML, encoding: "utf-8")
+      ---
+      project:
+        articul: DIRS-SPEC-001
+        product_tags: []
+        place: ''
+        adress: г. Тест, Тестовая ул., д. 1
+        description: Тестовый проект для проверки синхронизации спецификаций
+        commercial: false
+      customer:
+        id: CUST-TEST-001
+        name: Тест Тестович
+        phone: ''
+        email: ''
+      workflow:
+        version: '01'
+        revision: '001'
+        stadia: []
+        history_edit: []
+      directories:
+      - path: "!_замер_фото_задание"
+        title: Замеры помещения
+        description: Замеры выполнены лазерным дальномером, высота потолков 2.7м
+        display: grid
+      - path: "!_инфо_заказчика"
+        title: Инфо заказчика
+        description: Дополнительное описание
+        display: grid
+      - path: "!_материалы_фурнитура"
+        title: Материалы и фурнитура
+        description: "Фасады: МДФ эмаль RAL 9003, корпус: ЛДСП Egger, фурнитура: Blum Legrabox"
+        display: grid
+      - path: "!_техника_подсветка"
+        title: Техника, подсветка
+        description: "Встраиваемая техника, LED подсветка 3000K CRI>95, блок питания 24V"
+        display: list
+      scenes: []
+    YAML
     if File.exist?(city_yaml_path)
       city_data = DN1Code::ExportPdf2::Model::ProjectData.new
       city_data.load_from_yaml(city_yaml_path)
@@ -2289,6 +2328,10 @@ class TestRunner
     # Отключаем все пункты в заголовке
     project_data.pdf_settings[:custom_layouts][:cover][:header][:lines] = []
 
+    # Слот включаем явно: текущий layout.yaml прячет slot_1 у обложки,
+    # а тест проверяет именно отсутствие строк заголовка, а не пустоту листа
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:visible] = true
+
     test_dir = File.expand_path("test_header_empty_lines_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
     pdf_out = File.join(test_dir, "header_empty.pdf")
@@ -2765,6 +2808,7 @@ class TestRunner
       super(*args)
     end
 
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:visible] = true
     project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:item_gap_mm] = 2.0
     page_ctrl_2mm.render
     pdf_doc_2mm.render_file(out_pdf_2mm)
@@ -2786,6 +2830,7 @@ class TestRunner
       super(*args)
     end
 
+    project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:visible] = true
     project_data.pdf_settings[:custom_layouts][:cover][:slot_1][:item_gap_mm] = 10.0
     page_ctrl_10mm.render
     pdf_doc_10mm.render_file(out_pdf_10mm)
@@ -3098,8 +3143,8 @@ class TestRunner
     assert(html_text.include?("id=\"customAspectGroup\""), "index.html содержит id=\"customAspectGroup\"")
     assert(html_text.include?("id=\"inputAspectCustomW\""), "index.html содержит id=\"inputAspectCustomW\"")
     assert(html_text.include?("id=\"inputAspectCustomH\""), "index.html содержит id=\"inputAspectCustomH\"")
-    assert(!html_text.include?("id=\"chkShowAspectOverlay\""), "index.html больше не содержит id=\"chkShowAspectOverlay\" на странице настроек")
-    assert(!html_text.include?("id=\"aspectOverlayBadge\""), "index.html больше не содержит id=\"aspectOverlayBadge\" на странице настроек")
+    assert(html_text.include?("id=\"chkShowAspectOverlay\""), "index.html содержит переключатель Overlay id=\"chkShowAspectOverlay\"")
+    assert(html_text.include?("id=\"aspectOverlayBadge\""), "index.html содержит бейдж пропорций id=\"aspectOverlayBadge\"")
 
     # 8. Проверка JS логики
     js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
@@ -3121,7 +3166,16 @@ class TestRunner
     assert(main_text.include?("require_relative \"service/overlay_service\""), "main.rb подключает overlay_service")
     assert(main_text.include?("def toggle_aspect_overlay"), "main.rb содержит метод toggle_aspect_overlay")
     assert(main_text.include?("Рамка пропорций кадра (Overlay)"), "main.rb содержит пункт меню 'Рамка пропорций кадра (Overlay)'")
-    assert(main_text.include?("frame_overlay.svg"), "main.rb использует иконку frame_overlay.svg")
+    assert(main_text.include?("frame_overlay"), "main.rb использует иконку frame_overlay")
+    assert(main_text.include?("icon_path.call(\"frame_overlay\")"), "main.rb привязывает иконку через icon_path.call")
+
+    # UI::Command требует растровые PNG-иконки (16px и 24px); SVG остается запасным вариантом
+    png_small = File.join(__dir__, "../ico/frame_overlay.png")
+    png_large = File.join(__dir__, "../ico/frame_overlay_large.png")
+    assert(File.exist?(png_small), "Файл иконки frame_overlay.png (16px) существует")
+    assert(File.exist?(png_large), "Файл иконки frame_overlay_large.png (24px) существует")
+    png_header = File.binread(png_small, 8)
+    assert(png_header.byteslice(1, 3) == "PNG", "frame_overlay.png является валидным PNG")
 
     icon_path = File.join(__dir__, "../ico/frame_overlay.svg")
     assert(File.exist?(icon_path), "Файл иконки frame_overlay.svg существует")
@@ -3141,6 +3195,9 @@ class TestRunner
     assert(export_dialog_text.include?("syncOverlayState"), "export_dialog.rb синхронизирует состояние оверлея при обновлении настроек")
 
     # Проверка вычисления пропорций из блока image_4_3 шаблона
+    # Сбрасываем глобальный выбор пропорций ("page" = Auto), чтобы действовали
+    # пропорции блока image_4_3 конкретного шаблона (приоритет при Auto)
+    overlay_svc.update_settings({ image_aspect_ratio: "page" })
     mock_model_tpl = Sketchup::MockModel.new
     overlay_svc.update_settings({
       custom_layouts: {
@@ -3237,7 +3294,7 @@ class TestRunner
     # 5. Проверка секции workflow и стадий (stadia)
     assert(proj.workflow[:author] == "Автор проекта", "Автор проекта: Автор проекта")
     assert(proj.workflow[:version] == "01", "Версия проекта: 01")
-    assert(proj.workflow[:revision] == "002", "Ревизия проекта: 002")
+    assert(proj.workflow[:revision] == "001", "Ревизия проекта: 001")
     assert(proj.workflow[:total_duration].include?("Время работы"), "total_duration загружен")
 
     stadia = proj.workflow[:stadia]
@@ -3249,12 +3306,15 @@ class TestRunner
     assert(stadia[7][:name] == "Оплачен" && stadia[7][:status] == false, "Стадия 8: Оплачен (не выполнена)")
     assert(proj.workflow[:status] == "Выбраны материалы и фурнитура", "Текущий статус вычисляется как последняя отмеченная стадия")
 
-    # 6. Проверка корневой секции history_edit
+    # 6. Проверка корневой секции history_edit (канонический порядок в памяти: новые сверху)
     assert(proj.history.is_a?(Array) && proj.history.size == 4, "История изменений загружена на корневом уровне и содержит 4 записи")
     first_hist = proj.history[0]
-    assert(first_hist[:data] == "2026-09-05 20:34", "Первая запись истории содержит дату 2026-09-05 20:34")
-    assert(first_hist[:edit].include?("Экспорт PDF"), "Первая запись содержит описание правки 'Экспорт PDF'")
+    assert(first_hist[:data] == "2026-09-07 20:38", "Первая запись истории (новейшая) содержит дату 2026-09-07 20:38")
+    assert(first_hist[:edit].include?("Сохранение проекта"), "Первая запись содержит описание свежей правки 'Сохранение проекта'")
     assert(first_hist[:pdf_link] == "HF#YYMMDD_HHMMSS_version_revison.pdf", "Первая запись содержит ссылку на PDF: #{first_hist[:pdf_link]}")
+    last_hist = proj.history[-1]
+    assert(last_hist[:data] == "2026-09-05 20:34", "Последняя запись истории (старейшая) содержит дату 2026-09-05 20:34")
+    assert(last_hist[:edit].include?("Экспорт PDF"), "Последняя запись содержит описание правки 'Экспорт PDF'")
 
     # 7. Проверка секций directories, scenes, api_targets
     assert(proj.directories.is_a?(Array) && proj.directories.size == 2, "Рабочие папки directories содержат 2 записи")
@@ -3377,7 +3437,7 @@ class TestRunner
     # 5. Проверка экшена autoSave / saveData с silent: true в export_dialog.rb
     export_dialog_rb = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
     assert(export_dialog_rb.include?('dialog.add_action_callback("autoSave"'), "export_dialog.rb регистрирует экшен autoSave")
-    assert(export_dialog_rb.include?("is_silent = payload[:silent] == true || payload[:is_auto_save] == true"),
+    assert(export_dialog_rb.include?("is_auto = payload[:silent] == true || payload[:is_auto_save] == true"),
            "export_dialog.rb распознает silent и is_auto_save флаги")
     assert(export_dialog_rb.include?("window.app.onAutoSaved && window.app.onAutoSaved"),
            "export_dialog.rb вызывает JS callback window.app.onAutoSaved при тихом сохранении")

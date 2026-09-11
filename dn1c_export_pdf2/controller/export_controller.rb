@@ -67,6 +67,7 @@ module DN1Code
           }
 
           begin
+            aspect_cache = {}
             enabled_scenes.each_with_index do |scene_item, idx|
               page_index = idx + 1
               progress_block&.call(page_index, total_pages, "Рендеринг сцены #{page_index}/#{total_pages}: #{scene_item.name}")
@@ -76,7 +77,12 @@ module DN1Code
               scene_tpl_key = (scene_item.page_type || :general).to_sym
               scene_render_opts = render_opts.dup
               if defined?(Service::OverlayService)
-                scene_aspect_info = Service::OverlayService.calculate_target_info(@model, { template_key: scene_tpl_key })
+                # Кэшируем расчет пропорций по типу шаблона (избегаем чтения YAML на каждой сцене)
+                scene_aspect_info = aspect_cache[scene_tpl_key]
+                unless scene_aspect_info
+                  scene_aspect_info = Service::OverlayService.calculate_target_info(@model, { template_key: scene_tpl_key })
+                  aspect_cache[scene_tpl_key] = scene_aspect_info
+                end
                 if scene_aspect_info && scene_aspect_info[:ratio]
                   scene_render_opts[:aspect_ratio] = scene_aspect_info[:ratio]
                 end
@@ -118,9 +124,9 @@ module DN1Code
 
             progress_block&.call(total_pages, total_pages, "Экспорт успешно завершен!")
 
-            # Открытие PDF файла
+            # Открытие PDF файла (openURL требует URL-схему file:///)
             if settings[:auto_open_pdf] && defined?(UI) && UI.respond_to?(:openURL)
-              UI.openURL(pdf_path)
+              UI.openURL("file:///" + pdf_path.to_s.tr("\\", "/"))
             end
 
             pdf_path
@@ -154,7 +160,7 @@ module DN1Code
           model_base  = File.basename(model_path, ".skp")
           variant_rev = sprintf("v%02d_r%03d", @project_data.project_info[:version] || 1, @project_data.project_info[:revision] || 1)
 
-          backup_dir  = File.join(model_dir, model_base, "_backup")
+          backup_dir  = File.join(model_dir, "#{model_base}_backup")
           FileUtils.mkdir_p(backup_dir)
           backup_path = File.join(backup_dir, "#{model_base}_#{variant_rev}.skp")
 

@@ -1,7 +1,7 @@
 ---
 pdf_settings:
   export_engine: prawn
-  layout_render_mode: vector
+  layout_render_mode: raster
   save_layout_file: true
   page_size: A3
   page_layout: landscape
@@ -13,13 +13,13 @@ pdf_settings:
   custom_ratio_h: 9
   show_aspect_overlay: true
   overlay_border_color: "#0ea5e9"
-  overlay_border_opacity: 30
+  overlay_border_opacity: 25
   overlay_mask_color: "#0f172a"
-  overlay_mask_opacity: 15
+  overlay_mask_opacity: 20
   scale_factor: 2
   antialias: true
   stamp_type: none
-  stamp_custom: КОНФИДЕНЦИАЛЬНО
+  stamp_custom: НЕ УТВЕРЖДЕН
   auto_open_pdf: true
   save_skp_backup: true
   primary_color: 005eb0

@@ -63,7 +63,7 @@ module DN1Code
     def quick_export
       model = Sketchup.active_model
       unless model
-        UI.messagebox("Нет активной модели SketchUp!", MB_OK)
+        UI.messagebox("Нет активной модели SketchUp!", defined?(MB_OK) ? MB_OK : 0)
         return
       end
 
@@ -72,7 +72,7 @@ module DN1Code
 
       enabled = project_data.scenes.select { |s| s.enabled && s.page_type != :skip }
       if enabled.empty?
-        UI.messagebox("В модели не найдено активных сцен для экспорта. Откройте диалог для настройки сцен.", MB_OK)
+        UI.messagebox("В модели не найдено активных сцен для экспорта. Откройте диалог для настройки сцен.", defined?(MB_OK) ? MB_OK : 0)
         open_export_dialog
         return
       end
@@ -115,28 +115,34 @@ module DN1Code
       toolbar = UI::Toolbar.new(NAME_EXTENSION)
       ico_dir = File.join(__dir__, "ico")
 
+      # UI::Command требует растровые PNG-иконки (16px малая, 24px большая);
+      # SVG оставлен как запасной вариант на случай отсутствия PNG
+      icon_path = lambda do |base|
+        small_png = File.join(ico_dir, "#{base}.png")
+        large_png = File.join(ico_dir, "#{base}_large.png")
+        [File.exist?(small_png) ? small_png : File.join(ico_dir, "#{base}.svg"),
+         File.exist?(large_png) ? large_png : File.join(ico_dir, "#{base}.svg")]
+      end
+
       # Команда 1: Открыть диалог экспорта
       cmd_dialog = UI::Command.new("Экспорт сцен в PDF") { open_export_dialog }
       cmd_dialog.tooltip = "Открыть панель экспорта сцен в PDF"
       cmd_dialog.status_bar_text = "Настройка метаданных, сцен и создание многостраничного PDF документа"
-      cmd_dialog.small_icon = File.join(ico_dir, "export_dialog.svg")
-      cmd_dialog.large_icon = File.join(ico_dir, "export_dialog.svg")
+      cmd_dialog.small_icon, cmd_dialog.large_icon = icon_path.call("export_dialog")
       toolbar.add_item(cmd_dialog)
 
       # Команда 2: Быстрый экспорт
       cmd_quick = UI::Command.new("Быстрый экспорт PDF") { quick_export }
       cmd_quick.tooltip = "Быстрый экспорт PDF с текущими настройками"
       cmd_quick.status_bar_text = "Мгновенное создание PDF из активных сцен модели"
-      cmd_quick.small_icon = File.join(ico_dir, "quick_export.svg")
-      cmd_quick.large_icon = File.join(ico_dir, "quick_export.svg")
+      cmd_quick.small_icon, cmd_quick.large_icon = icon_path.call("quick_export")
       toolbar.add_item(cmd_quick)
 
       # Команда 3: Рамка пропорций кадра (Overlay)
       cmd_overlay = UI::Command.new("Рамка пропорций кадра") { toggle_aspect_overlay }
       cmd_overlay.tooltip = "Показать/скрыть рамку пропорций кадра (Overlay)"
       cmd_overlay.status_bar_text = "Отображение границ кадра и пропорций страницы в окне SketchUp"
-      cmd_overlay.small_icon = File.join(ico_dir, "frame_overlay.svg")
-      cmd_overlay.large_icon = File.join(ico_dir, "frame_overlay.svg")
+      cmd_overlay.small_icon, cmd_overlay.large_icon = icon_path.call("frame_overlay")
       cmd_overlay.set_validation_proc do
         model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
         Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED

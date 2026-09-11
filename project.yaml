@@ -27,7 +27,7 @@ workflow:
   end_date: Дата окончания проекта
   total_duration: Время работы над проектом (Реальное время работы)
   version: 01
-  revision: 002
+  revision: 001
 
   # Показывать списком с чекбоксами
   stadia:

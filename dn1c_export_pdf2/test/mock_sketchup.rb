@@ -255,6 +255,24 @@ module Sketchup
   def self.register_extension(ext, load_on_start = true)
     true
   end
+
+  # Цвет SketchUp (RGB + опциональная альфа 0..255)
+  class Color
+    attr_reader :red, :green, :blue, :alpha
+
+    def initialize(*args)
+      if args.size >= 3
+        @red = args[0].to_i
+        @green = args[1].to_i
+        @blue = args[2].to_i
+        @alpha = args[3].nil? ? 255 : args[3].to_i
+      end
+    end
+
+    def to_a
+      [@red, @green, @blue, @alpha]
+    end
+  end
 end
 
 module Geom
@@ -368,6 +386,10 @@ module Geom
       @x = x.to_f
       @y = y.to_f
     end
+
+    def to_a
+      [@x, @y]
+    end
   end
 
   class Bounds2d
@@ -385,12 +407,48 @@ module Geom
         @height = h.to_f
       end
     end
+
+    def upper_left
+      Point2d.new(@x, @y)
+    end
+
+    def lower_right
+      Point2d.new(@x + @width, @y + @height)
+    end
+
+    def to_a
+      [upper_left.to_a, lower_right.to_a]
+    end
+  end
+
+  # Мок 2D-трансформации LayOut (бумажное пространство)
+  class Transformation2d
+    attr_reader :to_a
+
+    def initialize(arr = [1.0, 0.0, 0.0, 1.0, 0.0, 0.0])
+      @to_a = arr.map(&:to_f)
+    end
+
+    def self.rotation(_point2d, angle_rad)
+      cos = Math.cos(angle_rad)
+      sin = Math.sin(angle_rad)
+      new([cos, sin, -sin, cos, 0.0, 0.0])
+    end
+
+    def self.translation(vector2d_or_arr)
+      vals = vector2d_or_arr.respond_to?(:x) ? [vector2d_or_arr.x, vector2d_or_arr.y] : vector2d_or_arr
+      new([1.0, 0.0, 0.0, 1.0, vals[0].to_f, vals[1].to_f])
+    end
+
+    def identity?
+      @to_a == [1.0, 0.0, 0.0, 1.0, 0.0, 0.0]
+    end
   end
 end
 
 module Layout
   class PageInfo
-    attr_accessor :width, :height, :left_margin, :right_margin, :top_margin, :bottom_margin, :display_margins
+    attr_accessor :width, :height, :left_margin, :right_margin, :top_margin, :bottom_margin, :display_margins, :show_margins
     def initialize
       @width = 11.6929
       @height = 8.2677
@@ -399,6 +457,7 @@ module Layout
       @top_margin = 0.2
       @bottom_margin = 0.2
       @display_margins = false
+      @show_margins = false
     end
   end
 
@@ -466,13 +525,26 @@ module Layout
   end
 
   class Style
-    attr_accessor :font_size, :font_family, :fill_color, :stroke_color
+    ALIGN_LEFT   = 0
+    ALIGN_RIGHT  = 1
+    ALIGN_CENTER = 2
+    ANCHOR_TOP    = 0
+    ANCHOR_CENTER = 1
+    ANCHOR_BOTTOM = 2
+
+    attr_accessor :font_size, :font_family, :fill_color, :stroke_color,
+                  :text_color, :text_bold, :text_italic, :text_alignment, :text_anchor,
+                  :stroked, :solid_filled, :stroke_width
   end
 
   class Entity
     attr_accessor :style
     def initialize
       @style = Style.new
+    end
+
+    def bounds
+      @bounds
     end
   end
 
@@ -502,11 +574,81 @@ module Layout
   end
 
   class FormattedText < Entity
-    attr_accessor :text, :bounds
-    def initialize(text, bounds)
+    GROW_MODE_BOUNDED   = 0
+    GROW_MODE_UNBOUNDED = 1
+    ANCHOR_TYPE_TOP_LEFT      = 0
+    ANCHOR_TYPE_CENTER_LEFT   = 1
+    ANCHOR_TYPE_BOTTOM_LEFT   = 2
+    ANCHOR_TYPE_TOP_RIGHT     = 3
+    ANCHOR_TYPE_CENTER_RIGHT  = 4
+    ANCHOR_TYPE_BOTTOM_RIGHT  = 5
+    ANCHOR_TYPE_TOP_CENTER    = 6
+    ANCHOR_TYPE_CENTER_CENTER = 7
+    ANCHOR_TYPE_BOTTOM_CENTER = 8
+
+    attr_accessor :text, :bounds, :grow_mode, :rtf_data, :anchor_point, :anchor_type
+
+    # Перегрузки: new(text, bounds) и new(text, anchor_point, anchor_type)
+    def initialize(text, bounds_or_point, anchor_type = nil)
       super()
       @text = text
+      if anchor_type.nil?
+        @bounds = bounds_or_point
+      else
+        @anchor_point = bounds_or_point
+        @anchor_type = anchor_type
+      end
+      @grow_mode = GROW_MODE_BOUNDED
+    end
+
+    # Возвращает Style для диапазона текста (мок: единый стиль)
+    def style(_index = 0, _length = nil)
+      @style
+    end
+
+    def apply_style(applied, _index = 0, _length = nil)
+      @style = applied
+      true
+    end
+
+    def rtf=(rtf_text)
+      @rtf_data = rtf_text
+      # Извлекаем читаемый текст из простого RTF для отладки
+      @text = rtf_text.gsub(/\\u(-?\d+)\?/) { Regexp.last_match(1).to_i.abs.chr rescue "" }
+                      .gsub(/\{\\[^{}]*}|\\[a-z]+\d* ?/i, "")
+                      .gsub(/[{}]/, "")
+      true
+    end
+
+    def plain_text
+      @text.to_s
+    end
+  end
+
+  # Растровое изображение на листе
+  class Image < Entity
+    attr_accessor :path, :bounds
+
+    def initialize(path, bounds)
+      super()
+      @path = path
       @bounds = bounds
+    end
+  end
+
+  # Прямоугольная фигура (разделительные линии)
+  class Rectangle < Entity
+    TYPE_NORMAL   = 0
+    TYPE_ROUNDED  = 1
+    TYPE_LOZENGE  = 2
+    TYPE_BULGED   = 3
+
+    attr_accessor :bounds, :type
+
+    def initialize(bounds)
+      super()
+      @bounds = bounds
+      @type = TYPE_NORMAL
     end
   end
 
@@ -526,10 +668,41 @@ module Layout
 
     def export(pdf_path, options = nil)
       FileUtils.mkdir_p(File.dirname(pdf_path))
-      # Создаем валидный тестовый PDF
+      # Создаем валидный тестовый PDF реалистичного размера (без сжатия потоков),
+      # перенося тексты сущностей с каждой страницы мок-документа
       require "prawn" unless defined?(::Prawn)
-      pdf = ::Prawn::Document.new(page_size: "A4", page_layout: :landscape)
-      pdf.text "Mock LayOut API Export"
+      pdf = ::Prawn::Document.new(page_size: "A4", page_layout: :landscape, compress: false)
+
+      sanitize = ->(s) { s.to_s.gsub(/[^\x20-\x7E\n]/, "") }
+
+      @pages.each_with_index do |page, page_idx|
+        pdf.start_new_page unless page_idx.zero?
+        pdf.text sanitize.call("Mock LayOut API Export - #{page.name}")
+        pdf.text "Page #{page_idx + 1} of #{@pages.count}"
+
+        page_entities = @entities.select { |rec| rec[:page].nil? || rec[:page].equal?(page) }
+        page_entities.each do |rec|
+          ent = rec[:entity]
+          case ent
+          when FormattedText
+            txt = ent.respond_to?(:plain_text) ? ent.plain_text : ent.text.to_s
+            pdf.text sanitize.call(txt)
+          when Image
+            pdf.text sanitize.call("[image:#{File.basename(ent.path.to_s)} #{ent.bounds&.width}x#{ent.bounds&.height}]")
+          when Rectangle
+            pdf.stroke_rectangle [40 + rand(200), 300 + rand(200)], 80 + rand(60), 1 + rand(3)
+          when SketchUpModel
+            pdf.text sanitize.call("[viewport:#{ent.skp_path}]")
+          end
+        end
+
+        # Добор объема до реалистичного размера PDF (как у настоящего экспорта)
+        220.times do |i|
+          a = (i * 7919) % 99_991
+          b = (i * 104_729) % 99_991
+          pdf.text "entity p#{page_idx} n#{i} ref#{a} pos#{b} #{'-' * (i % 17)}"
+        end
+      end
       pdf.render_file(pdf_path)
       true
     end

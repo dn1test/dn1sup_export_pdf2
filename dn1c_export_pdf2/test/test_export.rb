@@ -16,8 +16,13 @@ if defined?(Sketchup) && Sketchup.respond_to?(:version) && Sketchup.active_model
   # Внутри реального SketchUp используем текущую активную модель
   test_model = Sketchup.active_model
 else
-  # Вне SketchUp используем мок-модель
-  test_model = Sketchup::MockModel.new("U:/dn1code/su_plugs_app/dn1c_export_pdf2/sample_model.skp")
+  # Вне SketchUp используем мок-модель во ВРЕМЕННОЙ папке: экспорт вызывает save_auto,
+  # который пишет YAML рядом с .skp — путь в корне репозитория загрязнял бы рабочую копию
+  require "tmpdir"
+  require "fileutils"
+  test_work_dir = File.join(Dir.tmpdir, "dn1c_test_export_#{Time.now.strftime('%Y%m%d_%H%M%S')}")
+  FileUtils.mkdir_p(test_work_dir)
+  test_model = Sketchup::MockModel.new(File.join(test_work_dir, "sample_model.skp"))
   scenes = [
     Sketchup::MockPage.new("01. Обложка", "Титульный лист проекта"),
     Sketchup::MockPage.new("02. Содержание и материалы", "Пояснительная записка и перечень спецификаций"),

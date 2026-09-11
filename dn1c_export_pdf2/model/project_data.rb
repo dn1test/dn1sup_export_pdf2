@@ -393,18 +393,22 @@ module DN1Code
         # Генерирует артикул проекта по шаблону: CF#ГГММДД_ЧЧММСС_НОМЕР или HF#...
         # @param commercial [Boolean] true для коммерческого (CF#), false для бытового (HF#)
         # @param suffix [String] суффикс/номер (по умолчанию "01")
+        # @param index [Object] алиас суффикса (используется веб-интерфейсом)
         # @param time [Time] метка времени
         # @return [String]
-        def self.generate_articul(commercial: false, suffix: "01", time: Time.now)
+        def self.generate_articul(commercial: false, suffix: "01", index: nil, time: Time.now)
           prefix = commercial ? "CF#" : "HF#"
           ts = time.strftime("%y%m%d_%H%M%S")
-          "#{prefix}#{ts}_#{suffix}"
+          suffix_str = index.nil? ? suffix.to_s : index.to_s
+          suffix_str = "01" if suffix_str.strip.empty?
+          "#{prefix}#{ts}_#{suffix_str}"
         end
 
         # Генерирует автоматический номер/ID заказчика
+        # @param name [String, nil] имя заказчика (принимается для совместимости с веб-интерфейсом)
         # @param time [Time] метка времени
         # @return [String]
-        def self.generate_customer_id(time: Time.now)
+        def self.generate_customer_id(name: nil, time: Time.now)
           "CUST-#{time.strftime('%y%m%d%H%M')}"
         end
 
@@ -887,6 +891,35 @@ module DN1Code
               { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
             end
           end
+
+          # Канонический порядок записей истории: новые сверху (newest-first)
+          normalize_history_order!
+        end
+
+        # Нормализует порядок записей истории к каноническому "новые сверху".
+        # Если массив хронологический (старые сверху, даты возрастают) — разворачивает его.
+        # Записи без дат или с убывающими датами остаются в исходном порядке (уже newest-first).
+        # @return [void]
+        def normalize_history_order!
+          reorder = lambda do |arr, date_of|
+            return arr if arr.nil? || arr.size < 2
+
+            d_first = date_of.call(arr.first).to_s
+            d_last  = date_of.call(arr.last).to_s
+            (!d_first.empty? && !d_last.empty? && d_first < d_last) ? arr.reverse : arr
+          end
+
+          @history = reorder.call(@history, lambda do |h|
+            h.is_a?(Hash) ? (h[:date] || h["date"] || h[:data] || h["data"]) : ""
+          end)
+          @workflow[:history_edit] = reorder.call(@workflow[:history_edit], lambda do |e|
+            if e.is_a?(Array)
+              e[0]
+            elsif e.is_a?(Hash)
+              (e[:data] || e["data"] || e[:date] || e["date"])
+            end
+          end)
+          nil
         end
 
         # Нормализует каталоги directories
@@ -1031,37 +1064,6 @@ module DN1Code
           hist_yaml
         end
 
-        # Находит путь к файлу макетов страниц (layout.yaml / layout_config.yaml)
-        # @param dir [String] путь к директории
-        # @return [String, nil] путь к файлу layout.yaml
-        def self.find_layout_path(dir)
-          return nil unless dir && Dir.exist?(dir)
-
-          candidates = [
-            "layout.yaml", "layout.yml",
-            "layout_config.yaml", "layout_config.yml",
-            "layouts.yaml", "layouts.yml"
-          ]
-
-          candidates.each do |fn|
-            path = File.join(dir, fn)
-            return path if File.exist?(path)
-          end
-
-          File.join(dir, "layout.yaml")
-        end
-
-        # Возвращает путь к файлу макетов страниц рядом с файлом модели SketchUp
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [String, nil] путь к файлу layout.yaml или nil
-        def self.find_layout_path_for_model(model)
-          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
-
-          clean_path = model.path.to_s.tr("\\", "/")
-          dir = File.dirname(clean_path)
-          find_layout_path(dir)
-        end
-
         # Возвращает целевое имя YAML файла для текущего экземпляра проекта
         # @param model [Sketchup::Model, nil] модель SketchUp
         # @return [String] имя файла YAML
@@ -1117,15 +1119,14 @@ module DN1Code
               load_from_edit_history(hist_file, @project_info[:articul])
             end
 
-            # 4. Если в папке проекта есть явный локальный layout.yaml (проектное переопределение), применяем его
-            local_layout = File.join(dir, "layout.yaml")
-            if File.exist?(local_layout)
-              load_from_layout_yaml(local_layout)
-            end
+            # Шаблоны страниц НЕ читаются из папки проекта:
+            # единый источник — layout.yaml внутри расширения (общий для всех .skp)
           end
 
-          # Синхронизируем прочитанные данные в библиотеку модели
-          save_to_model(model) if model && loaded_from
+          # Запись атрибутов модели при загрузке НЕ выполняется: открытие .skp не должно
+          # помечать модель измененной (диалог "Сохранить изменения?" без правок пользователя).
+          # Данные попадают в библиотеку модели при сохранении .skp (handle_pre_save /
+          # handle_post_save) и при экспорте PDF (save_auto).
 
           # Синхронизация списка сцен из модели
           sync_with_model_scenes(model) if model
@@ -1145,18 +1146,29 @@ module DN1Code
 
           sync_project_fields!
 
-          # 1. Находим текущий существующий YAML файл до обновления атрибутов модели
-          old_yaml = self.class.find_yaml_path_for_model(model)
-
-          # 2. Сохранение макетов страниц программы плагина
-          save_to_layout_yaml(PROGRAM_LAYOUT_FILE)
-
-          # Сохранение в локальный layout.yaml проекта, если он существует рядом с моделью
-          if model.respond_to?(:path) && !model.path.to_s.empty?
-            model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
-            local_layout = File.join(model_dir, "layout.yaml")
-            save_to_layout_yaml(local_layout) if File.exist?(local_layout)
+          # 1. Артикул, сохраненный в атрибутах модели ДО обновления.
+          # Удалять при переименовании можно только YAML, названный по прежнему артикулу:
+          # общие файлы (project_config.yaml, <имя модели>.yaml, найденные эвристикой)
+          # трогать нельзя — это шаблоны и данные других проектов
+          old_articul_yamls = []
+          if model.respond_to?(:get_attribute) && model.respond_to?(:path) && !model.path.to_s.empty?
+            raw_info = model.get_attribute(ATTR_DICT, "project_info", nil) rescue nil
+            if raw_info
+              begin
+                old_art = JSON.parse(raw_info, symbolize_names: true)[:articul].to_s.strip
+                unless old_art.empty?
+                  dir = File.dirname(model.path.to_s.tr("\\", "/"))
+                  old_articul_yamls << File.join(dir, "#{self.class.sanitize_filename(old_art)}.yaml")
+                  old_articul_yamls << File.join(dir, "#{self.class.sanitize_filename(old_art)}.yml")
+                end
+              rescue StandardError
+                # Игнорируем поврежденные атрибуты — удаление не выполняем
+              end
+            end
           end
+
+          # 2. Сохранение макетов страниц — только в YAML расширения (общий для всех .skp)
+          save_to_layout_yaml(PROGRAM_LAYOUT_FILE)
 
           # 3. Сохранение в библиотеку модели (атрибуты)
           save_to_model(model)
@@ -1166,14 +1178,14 @@ module DN1Code
             target_yaml = yaml_path_for_model(model)
             if target_yaml
               if save_to_yaml(target_yaml, include_settings: false)
-                # Если имя YAML файла изменилось (например, при смене или очистке артикула),
-                # удаляем старый YAML файл во избежание дубликатов
-                if old_yaml && File.exist?(old_yaml)
+                # Если YAML переименован (смена или очистка артикула), удаляем
+                # прежний артикульный YAML во избежание дубликатов
+                target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
+                old_articul_yamls.uniq.each do |old_yaml|
+                  next unless File.exist?(old_yaml)
+
                   old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
-                  target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
-                  if old_norm != target_norm
-                    File.delete(old_yaml) rescue nil
-                  end
+                  File.delete(old_yaml) rescue nil if old_norm != target_norm
                 end
               end
             end
@@ -1322,6 +1334,9 @@ module DN1Code
           if raw_settings
             begin
               parsed = JSON.parse(raw_settings, symbolize_names: true)
+              # Шаблоны страниц из .skp игнорируются (источник — layout.yaml),
+              # зачистка на случай старых моделей, где они сохранялись в атрибутах
+              parsed.delete(:custom_layouts)
               @pdf_settings.merge!(parsed)
               has_data = true
             rescue StandardError; end
@@ -1392,7 +1407,10 @@ module DN1Code
           model.set_attribute(ATTR_DICT, "customer", JSON.generate(@customer))
           model.set_attribute(ATTR_DICT, "workflow", JSON.generate(@workflow))
           model.set_attribute(ATTR_DICT, "project_info", JSON.generate(@project_info))
-          model.set_attribute(ATTR_DICT, "pdf_settings", JSON.generate(@pdf_settings))
+          # Шаблоны страниц (custom_layouts) в .skp не сохраняются —
+          # они хранятся только в YAML конфигурации (layout.yaml плагина / проекта)
+          pdf_settings_clean = (@pdf_settings || {}).reject { |k, _| k.to_s == "custom_layouts" }
+          model.set_attribute(ATTR_DICT, "pdf_settings", JSON.generate(pdf_settings_clean))
           model.set_attribute(ATTR_DICT, "api_targets", JSON.generate(@api_targets))
           model.set_attribute(ATTR_DICT, "directories", JSON.generate(@directories))
           model.set_attribute(ATTR_DICT, "history", JSON.generate(@history))
@@ -1490,6 +1508,9 @@ module DN1Code
                 description: txt
               }
             end
+
+            # Канонический порядок истории: новые сверху (хронологические файлы разворачиваются)
+            normalize_history_order!
 
             # Синхронизируем последнюю правку с последним элементом истории
             if !@history.empty?
@@ -1808,11 +1829,8 @@ module DN1Code
                 load_from_edit_history(hist_file, @project[:articul])
               end
 
-              # Если в проекте есть явный локальный layout.yaml (переопределение макета проекта), применяем его
-              local_layout = File.join(dir, "layout.yaml")
-              if File.exist?(local_layout)
-                load_from_layout_yaml(local_layout)
-              end
+              # Шаблоны страниц не читаются из папки проекта —
+              # единый источник: layout.yaml внутри расширения
 
               return true
             end
@@ -1844,12 +1862,8 @@ module DN1Code
               @pdf_settings.merge!(docs[3])
             end
 
-            # Проверяем локальный файл макета для варианта 2
-            dir = File.dirname(file_path)
-            local_layout = File.join(dir, "layout.yaml")
-            if File.exist?(local_layout)
-              load_from_layout_yaml(local_layout)
-            end
+            # Шаблоны страниц не читаются из папки проекта —
+            # единый источник: layout.yaml внутри расширения
 
             true
           rescue StandardError => e
@@ -1897,6 +1911,8 @@ module DN1Code
           cust_out[:company] = @customer[:company].to_s unless @customer[:company].to_s.strip.empty?
 
           # 3. Секция workflow (Процесс и версионность)
+          # history_edit пишется на диск в хронологическом порядке (старые сверху);
+          # в памяти канонический порядок — новые сверху (см. normalize_history_order!)
           wf_out = {
             author:         @workflow[:author].to_s,
             price:          @workflow[:price].to_s.empty? ? "" : @workflow[:price],
@@ -1906,12 +1922,12 @@ module DN1Code
             version:        @workflow[:version].to_s,
             revision:       @workflow[:revision].to_s,
             stadia:         normalize_stadia(@workflow[:stadia]),
-            history_edit:   @workflow[:history_edit] || []
+            history_edit:   (@workflow[:history_edit] || []).reverse
           }
           wf_out[:status] = @workflow[:status].to_s unless @workflow[:status].to_s.empty?
 
-          # 4. Секция history_edit (Корневая, как в project.yaml)
-          hist_out = (@history || []).map do |h|
+          # 4. Секция history_edit (Корневая, как в project.yaml, хронологический порядок)
+          hist_out = (@history || []).reverse.map do |h|
             next unless h.is_a?(Hash)
             d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
             t = (h[:edit] || h[:text] || h[:description] || h["edit"] || h["text"] || h["description"] || "").to_s
