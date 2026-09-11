@@ -54,7 +54,9 @@ module DN1Code
     # @return [Boolean]
     def toggle_aspect_overlay
       model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
-      Service::OverlayService.toggle(model)
+      new_state = Service::OverlayService.toggle(model)
+      Model::ProjectData.save_default_frame_settings(show_aspect_overlay: new_state) if defined?(Model::ProjectData)
+      new_state
     end
 
     # Выполняет быстрый экспорт активных сцен текущей модели SketchUp

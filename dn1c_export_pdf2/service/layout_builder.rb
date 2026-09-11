@@ -933,12 +933,23 @@ module DN1Code
           line_colors = cfg[:line_colors] || cfg["line_colors"] || {}
 
           if lines && lines.is_a?(Array)
-            lines.each do |line_key|
-              line_text = InfoLineResolver.resolve(rctx, line_key)
-              next if line_text.nil? || line_text.to_s.empty?
+            line_show_titles = cfg[:line_show_titles] || cfg["line_show_titles"] || {}
+            block_show_titles = cfg[:show_titles] != false && cfg["show_titles"] != false && cfg[:show_titles] != "false" && cfg["show_titles"] != "false"
 
+            lines.each do |line_key|
               k_str = line_key.to_s
               k_sym = line_key.to_sym rescue nil
+
+              show_title = if line_show_titles.key?(k_str)
+                             line_show_titles[k_str] != false && line_show_titles[k_str] != "false"
+                           elsif k_sym && line_show_titles.key?(k_sym)
+                             line_show_titles[k_sym] != false && line_show_titles[k_sym] != "false"
+                           else
+                             block_show_titles
+                           end
+
+              line_text = InfoLineResolver.resolve_formatted(rctx, line_key, show_title: show_title)
+              next if line_text.nil? || line_text.to_s.empty?
 
               it_sz = (line_sizes[k_str] || (k_sym && line_sizes[k_sym]) || font_size).to_f
               it_sz = font_size if it_sz <= 0.0

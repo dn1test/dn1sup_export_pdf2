@@ -45,6 +45,10 @@ module DN1Code
 
         # Определение типа текущей страницы
         def current_page_type
+          if @scene_item && @scene_item.page_type && !@scene_item.page_type.to_s.strip.empty?
+            return @scene_item.page_type.to_sym
+          end
+
           case self.class.name.split("::").last
           when "CoverPage" then :cover
           when "DescriptionPage" then :description
@@ -52,7 +56,7 @@ module DN1Code
           when "GeneralPage" then :general
           when "VisualPage" then :visual
           else
-            (@scene_item ? @scene_item.page_type.to_sym : :cover) rescue :cover
+            :cover
           end
         end
 
@@ -759,11 +763,24 @@ module DN1Code
           line_colors = cfg[:line_colors] || cfg["line_colors"] || {}
 
           if lines && lines.is_a?(Array)
+            line_show_titles = cfg[:line_show_titles] || cfg["line_show_titles"] || {}
+            block_show_titles = cfg[:show_titles] != false && cfg["show_titles"] != false && cfg[:show_titles] != "false" && cfg["show_titles"] != "false"
+
             lines.each do |line_key|
-              line_text = resolve_info_line(line_key)
-              next if line_text.nil? || line_text.to_s.empty?
               k_str = line_key.to_s
               k_sym = line_key.to_sym rescue nil
+
+              show_title = if line_show_titles.key?(k_str)
+                             line_show_titles[k_str] != false && line_show_titles[k_str] != "false"
+                           elsif k_sym && line_show_titles.key?(k_sym)
+                             line_show_titles[k_sym] != false && line_show_titles[k_sym] != "false"
+                           else
+                             block_show_titles
+                           end
+
+              title_part, desc_part = Service::InfoLineResolver.resolve_parts(resolver_context, line_key)
+              line_text = Service::InfoLineResolver.resolve_formatted(resolver_context, line_key, show_title: show_title)
+              next if line_text.nil? || line_text.to_s.empty?
 
               it_sz = (line_sizes[k_str] || (k_sym && line_sizes[k_sym]) || font_size).to_f
               it_sz = font_size if it_sz <= 0.0
@@ -775,9 +792,12 @@ module DN1Code
               it_align = (line_aligns[k_str] || (k_sym && line_aligns[k_sym]) || align).to_s.to_sym
               it_align = align unless [:left, :right, :center].include?(it_align)
 
+              has_title = show_title && title_part && !title_part.to_s.strip.empty?
               items << {
                 key: k_str,
                 text: line_text,
+                title: has_title ? title_part.to_s.strip : nil,
+                desc: (has_title && desc_part && !desc_part.to_s.strip.empty?) ? desc_part.to_s.strip : line_text,
                 size: it_sz,
                 color: it_col,
                 align: it_align
@@ -838,9 +858,17 @@ module DN1Code
 
           items.each_with_index do |it, idx|
             h = item_heights[idx]
-            @pdf_doc.fill_color it[:color]
             item_align = it[:align] || align
-            @pdf_doc.text_box it[:text], at: [in_x, cur_y], width: in_w, height: h, align: item_align, valign: :top, size: it[:size], overflow: :shrink_to_fit
+            if it[:title] && !it[:title].empty?
+              fragments = [
+                { text: "#{it[:title]}\n", styles: [:bold], size: it[:size], color: it[:color] },
+                { text: it[:desc].to_s, styles: [], size: it[:size], color: it[:color] }
+              ]
+              @pdf_doc.formatted_text_box fragments, at: [in_x, cur_y], width: in_w, height: h, align: item_align, valign: :top, overflow: :shrink_to_fit
+            else
+              @pdf_doc.fill_color it[:color]
+              @pdf_doc.text_box it[:text], at: [in_x, cur_y], width: in_w, height: h, align: item_align, valign: :top, size: it[:size], overflow: :shrink_to_fit
+            end
             cur_y -= h
 
             if idx < items.size - 1

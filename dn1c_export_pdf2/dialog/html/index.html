@@ -38,8 +38,11 @@
         <span class="tab-icon">📋</span> Данные проекта
       </button>
       <button class="tab-btn" data-tab="tab-scenes">
-        <span class="tab-icon">📐</span> Страницы и настройки шаблонов
+        <span class="tab-icon">📄</span> Страницы проекта
         <span class="badge" id="sceneCountBadge">0</span>
+      </button>
+      <button class="tab-btn" data-tab="tab-templates">
+        <span class="tab-icon">📐</span> Настройка шаблонов
       </button>
       <button class="tab-btn" data-tab="tab-directories">
         <span class="tab-icon">📁</span> Папки и спецификации
@@ -69,18 +72,19 @@
             </div>
             <div class="form-grid">
               <div class="form-group">
-                <label for="selectTrade">Тип проекта / Назначение *</label>
-                <select id="selectTrade" class="form-control">
-                  <option value="0">Бытовой проект (HF# Home Furniture)</option>
-                  <option value="1">Коммерческий проект (CF# Commercial Furniture)</option>
-                </select>
+                <label>Тип проекта / Назначение *</label>
+                <div class="segmented-control" id="tradeToggleGroup">
+                  <button type="button" class="segmented-btn active" data-value="0" id="btnTradeHF">🏠 Бытовой (HF#)</button>
+                  <button type="button" class="segmented-btn" data-value="1" id="btnTradeCF">🏢 Коммерческий (CF#)</button>
+                </div>
               </div>
 
               <div class="form-group">
                 <label for="inputArticul">Артикул проекта *</label>
-                <div class="input-action-group">
+                <div class="input-action-group articul-action-group">
                   <input type="text" id="inputArticul" class="form-control font-mono" placeholder="CF#260905_142650_01">
-                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул по текущей дате и времени">⚡ Создать</button>
+                  <input type="text" id="inputArticulSuffix" class="form-control articul-suffix-input font-mono" placeholder="01" value="01" title="Суффикс / дополнительное обозначение (например: 01, Кухня)">
+                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул с суффиксом">⚡ Создать</button>
                 </div>
               </div>
 
@@ -89,14 +93,9 @@
                 <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
               </div>
 
-              <div class="form-group">
-                <label for="inputTags">Теги проекта</label>
-                <input type="text" id="inputTags" class="form-control" placeholder="Кухня, МДФ, эмаль, подсветка, премиум">
-              </div>
-
-              <div class="form-group">
-                <label for="inputFurnitureName">Название мебели / Изделие *</label>
-                <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба">
+              <div class="form-group full-width">
+                <label for="inputFurnitureName">Изделие / Теги мебели (product_tags) *</label>
+                <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба, Зеркало">
               </div>
 
               <div class="form-group">
@@ -150,74 +149,75 @@
         </div>
 
         <!-- Section 3: Ход работы и жизненный цикл (Workflow) -->
-        <div class="settings-card">
+        <div class="settings-card workflow-card">
           <div class="card-header">
             <span class="card-header-icon">⏱️</span>
             <span class="card-header-title">Ход работы и жизненный цикл (Workflow)</span>
           </div>
-          <div class="form-grid">
-            <div class="form-group">
-              <label for="inputAuthor">Автор / Ответственный конструктор</label>
-              <input type="text" id="inputAuthor" class="form-control" placeholder="например: Иванов И.И.">
-            </div>
+          <div class="workflow-split-layout">
+            <!-- Левая колонка: параметры жизненного цикла -->
+            <div class="workflow-left-col">
+              <div class="form-grid workflow-grid">
+                <div class="form-group">
+                  <label for="inputAuthor">Автор / Ответственный конструктор</label>
+                  <input type="text" id="inputAuthor" class="form-control" placeholder="например: Иванов И.И.">
+                </div>
 
-            <div class="form-group">
-              <label for="inputPrice">Стоимость проекта (руб. / валюта)</label>
-              <input type="text" id="inputPrice" class="form-control" placeholder="например: 125 000">
-            </div>
+                <div class="form-group">
+                  <label for="inputPrice">Стоимость проекта (руб. / валюта)</label>
+                  <input type="text" id="inputPrice" class="form-control" placeholder="например: 125 000">
+                </div>
 
-            <div class="form-group">
-              <label for="inputStartDate">Дата начала проектирования</label>
-              <input type="date" id="inputStartDate" class="form-control">
-            </div>
+                <div class="form-group">
+                  <label for="inputStartDate">Дата начала проектирования</label>
+                  <input type="date" id="inputStartDate" class="form-control">
+                </div>
 
-            <div class="form-group">
-              <label for="inputEndDate">Планируемая дата сдачи (Дедлайн)</label>
-              <input type="date" id="inputEndDate" class="form-control">
-            </div>
+                <div class="form-group">
+                  <label for="inputEndDate">Планируемая дата сдачи (Дедлайн)</label>
+                  <input type="date" id="inputEndDate" class="form-control">
+                </div>
 
-            <div class="form-group">
-              <label for="inputTotalDuration">Общая длительность / Трудозатраты</label>
-              <input type="text" id="inputTotalDuration" class="form-control" placeholder="например: 9 дней / 45 часов">
-            </div>
+                <div class="form-group">
+                  <label for="inputTotalDuration">Общая длительность / Трудозатраты</label>
+                  <input type="text" id="inputTotalDuration" class="form-control" placeholder="например: 9 дней / 45 часов">
+                </div>
 
-            <div class="form-group">
-              <label for="inputStatus">Стадия проекта</label>
-              <select id="inputStatus" class="form-control">
-                <option value="Предварительный">Предварительный</option>
-                <option value="Правки">Правки</option>
-                <option value="Утвержден">Утвержден</option>
-                <option value="Оплачен">Оплачен</option>
-              </select>
-            </div>
+                <div class="form-group">
+                  <label for="inputVersion">Вариант проекта (version)</label>
+                  <input type="number" id="inputVersion" class="form-control" min="1" value="1">
+                </div>
 
-            <div class="form-group">
-              <label for="inputVersion">Вариант проекта (version)</label>
-              <input type="number" id="inputVersion" class="form-control" min="1" value="1">
-            </div>
+                <div class="form-group">
+                  <label for="inputRevision">Количество изменений (revision)</label>
+                  <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+                </div>
 
-            <div class="form-group">
-              <label for="inputRevision">Количество изменений (revision)</label>
-              <input type="number" id="inputRevision" class="form-control" min="1" value="1">
-            </div>
-
-            <div class="form-group full-width">
-              <label>Стадии проекта (workflow.stadia):</label>
-              <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-grid">
-                <!-- Dynamically populated via JS -->
+                <div class="form-group full-width">
+                  <label for="inputLastEdit">Комментарий к очередной правке проекта (last_edit)</label>
+                  <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
+                </div>
               </div>
             </div>
 
-            <div class="form-group full-width">
-              <label for="inputLastEdit">Комментарий к очередной правке проекта (last_edit)</label>
-              <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
+            <!-- Правая колонка: чекбоксы стадий проекта -->
+            <div class="workflow-right-col">
+              <div class="workflow-stadia-panel">
+                <div class="workflow-stadia-header">
+                  <span class="workflow-stadia-icon">📋</span>
+                  <span class="workflow-stadia-title">Стадии проекта (workflow.stadia):</span>
+                </div>
+                <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-vertical">
+                  <!-- Dynamically populated via JS -->
+                </div>
+              </div>
             </div>
           </div>
         </div>
       </section>
-      <!-- TAB 2: SCENES & BLOCK LAYOUT (SPLIT VIEW) -->
+      <!-- TAB 2: PROJECT PAGES / SCENES -->
       <section id="tab-scenes" class="tab-pane">
-        <!-- Scenes Panel (Left) -->
+        <!-- Scenes Panel -->
         <div class="scenes-panel" id="scenesPanel">
           <div class="scenes-toolbar">
             <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
@@ -232,14 +232,10 @@
             <table class="scenes-table" id="scenesTable">
               <thead>
                 <tr>
-                  <th width="38" class="th-num-check" title="Включить в экспорт / порядок">
-                    <div class="th-num-check-wrap">
-                      <span>Вкл</span>
-                      <span>№</span>
-                    </div>
-                  </th>
+                  <th width="34" class="th-check" title="Включить в экспорт">Вкл</th>
+                  <th width="44" class="th-order" title="Перетащите строку мышью для изменения порядка следования">№</th>
                   <th>Сцена / Описание</th>
-                  <th width="145">Шаблон страницы</th>
+                  <th width="220">Шаблон страницы</th>
                 </tr>
               </thead>
               <tbody id="scenesTableBody">
@@ -248,26 +244,48 @@
             </table>
           </div>
         </div>
+      </section>
 
-        <!-- Split Resizer (Draggable divider between pages and blocks) -->
-        <div class="split-resizer" id="scenesSplitResizer" title="Потяните мышью для изменения ширины (двойной клик — сброс)">
-          <div class="resizer-handle"></div>
-        </div>
+      <!-- TAB 3: TEMPLATE SETTINGS -->
+      <section id="tab-templates" class="tab-pane">
+        <!-- Templates Sidebar (Left) -->
+        <aside class="templates-sidebar" id="templatesSidebar">
+          <div class="templates-sidebar-header">
+            <div class="sidebar-title-group">
+              <span class="sidebar-title-icon">📐</span>
+              <span class="sidebar-title-text">Шаблоны страниц</span>
+            </div>
+            <div class="sidebar-header-actions">
+              <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
+                + Новый
+              </button>
+              <button type="button" class="btn btn-xs btn-danger-outline btn-delete-template-sb" id="btnDeleteTemplateSidebar" title="Удалить выбранный пользовательский шаблон" style="display: none;">
+                🗑️
+              </button>
+            </div>
+          </div>
+          <div class="templates-list" id="templatesList">
+            <!-- Dynamically populated via renderTemplatesList() in app.js -->
+          </div>
+        </aside>
 
         <!-- Template & List Settings Panel (Right) -->
         <div class="template-settings-panel" id="templateSettingsPanel">
           <!-- Toolbar -->
           <div class="template-settings-toolbar">
             <div class="toolbar-row toolbar-main-row">
-              <div class="toolbar-group">
-                <label for="selectLayoutTemplate" class="toolbar-label">Шаблон страницы:</label>
-                <select id="selectLayoutTemplate" class="form-control toolbar-select">
+              <div class="toolbar-group template-header-info">
+                <span class="current-template-title" id="currentTemplateTitle">🏷️ Титульный лист (Cover)</span>
+                <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
                   <option value="cover">🏷️ Титульный лист (Cover)</option>
                   <option value="description">📝 Описание и спецификации (Description)</option>
                   <option value="explain">📋 Содержание и ведомость (Explain)</option>
                   <option value="general">🖼️ Общий вид (General)</option>
                   <option value="visual">👁️ Визуализация (Visual)</option>
                 </select>
+                <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
+                  ✏️ Переименовать
+                </button>
                 <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
               </div>
 
@@ -278,7 +296,10 @@
                   <span class="unit-text">мм</span>
                 </div>
                 <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                  ↺ Сбросить к стандарту
+                  ↺ Сбросить
+                </button>
+                <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
+                  🗑️ Удалить шаблон
                 </button>
               </div>
             </div>
@@ -293,7 +314,7 @@
             <!-- Dynamically populated via renderTemplateSettingsList() in app.js -->
           </div>
         </div>
-        </section>
+      </section>
 
       <!-- TAB: DIRECTORIES, SPECIFICATIONS & PREVIEWS -->
       <section id="tab-directories" class="tab-pane">
@@ -409,9 +430,9 @@
             <div class="form-group">
               <label for="selectImageAspect">Пропорции кадра (Aspect Ratio)</label>
               <select id="selectImageAspect" class="form-control">
-                <option value="page" selected>По формату листа PDF (Auto)</option>
+                <option value="page">По формату листа PDF (Auto)</option>
                 <option value="16:9">16:9 (Широкоформатный)</option>
-                <option value="4:3">4:3 (Традиционный)</option>
+                <option value="4:3" selected>4:3 (Традиционный)</option>
                 <option value="3:2">3:2 (Фотокадр)</option>
                 <option value="1:1">1:1 (Квадрат)</option>
                 <option value="custom">Пользовательские пропорции (Ш:В)</option>
@@ -587,6 +608,79 @@
         <div class="modal-actions">
           <button class="btn btn-secondary" id="btnOpenPdfFolder">📂 Открыть папку</button>
           <button class="btn btn-primary" id="btnCloseSuccessModal">Готово</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- New Template Creation Modal -->
+    <div id="newTemplateModal" class="modal-overlay hidden">
+      <div class="modal-card modal-form-card">
+        <div class="modal-header-row">
+          <span class="modal-card-icon">✨</span>
+          <h3 style="margin: 0; font-size: 15px;">Создание нового шаблона страницы</h3>
+        </div>
+        <p class="field-hint" style="margin: 8px 0 14px 0;">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
+        
+        <div class="form-group" style="margin-bottom: 12px;">
+          <label for="inputNewTemplateName" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Название шаблона *</label>
+          <input type="text" id="inputNewTemplateName" class="form-control" placeholder="Например: План расстановки мебели" style="width: 100%; box-sizing: border-box;">
+        </div>
+
+        <div class="form-group" style="margin-bottom: 18px;">
+          <label for="selectNewTemplateBase" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Базовая структура / основа *</label>
+          <select id="selectNewTemplateBase" class="form-control" style="width: 100%; box-sizing: border-box;">
+            <option value="general" selected>🖼️ Общий вид (General) — универсальный чертеж / вид</option>
+            <option value="visual">👁️ Визуализация (Visual) — широкоформатный видовой экран</option>
+            <option value="description">📝 Описание и спецификации (Description) — со спецификациями</option>
+            <option value="explain">📋 Содержание и ведомость (Explain) — с ведомостью страниц</option>
+            <option value="cover">🏷️ Титульный лист (Cover) — крупный титульный лист</option>
+          </select>
+        </div>
+
+        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate">Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate">Создать шаблон</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Delete Template Confirmation Modal -->
+    <div id="deleteTemplateModal" class="modal-overlay hidden">
+      <div class="modal-card modal-form-card">
+        <div class="modal-header-row" style="color: #dc2626;">
+          <span class="modal-card-icon">🗑️</span>
+          <h3 style="margin: 0; font-size: 15px;">Удаление шаблона страницы</h3>
+        </div>
+        <p id="deleteTemplateMsg" style="margin: 12px 0 8px 0; font-size: 13px; font-weight: 500; color: #1e293b;">
+          Вы действительно хотите удалить выбранный шаблон?
+        </p>
+        <div class="field-hint" style="margin-bottom: 16px; background-color: #fef2f2; border: 1px solid #fecaca; padding: 8px 10px; border-radius: 4px; color: #991b1b;">
+          ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на стандартный шаблон «Общий вид (General)».
+        </div>
+        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate">Отмена</button>
+          <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate">Удалить шаблон</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rename Template Modal -->
+    <div id="renameTemplateModal" class="modal-overlay hidden">
+      <div class="modal-card modal-form-card">
+        <div class="modal-header-row">
+          <span class="modal-card-icon">✏️</span>
+          <h3 style="margin: 0; font-size: 15px;">Переименование шаблона страницы</h3>
+        </div>
+        <p class="field-hint" style="margin: 8px 0 14px 0;">Укажите новое название для этого шаблона страницы:</p>
+        
+        <div class="form-group" style="margin-bottom: 18px;">
+          <label for="inputRenameTemplateName" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Название шаблона *</label>
+          <input type="text" id="inputRenameTemplateName" class="form-control" style="width: 100%; box-sizing: border-box;">
+        </div>
+
+        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate">Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate">Сохранить</button>
         </div>
       </div>
     </div>

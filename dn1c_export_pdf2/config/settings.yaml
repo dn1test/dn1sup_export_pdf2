@@ -1,6 +1,6 @@
 ---
 pdf_settings:
-  export_engine: prawn
+  export_engine: layout
   layout_render_mode: raster
   save_layout_file: true
   page_size: A3
@@ -8,14 +8,14 @@ pdf_settings:
   margin: 14.2
   margin_mm: 5
   image_width: 2400
-  image_aspect_ratio: page
+  image_aspect_ratio: '4:3'
   custom_ratio_w: 16
   custom_ratio_h: 9
   show_aspect_overlay: true
   overlay_border_color: "#0ea5e9"
-  overlay_border_opacity: 25
+  overlay_border_opacity: 100
   overlay_mask_color: "#0f172a"
-  overlay_mask_opacity: 20
+  overlay_mask_opacity: 55
   scale_factor: 2
   antialias: true
   stamp_type: none

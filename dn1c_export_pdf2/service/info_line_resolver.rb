@@ -287,8 +287,221 @@ module DN1Code
             "Дата: #{Time.now.strftime('%d.%m.%Y')}"
           when "system_page"
             "Лист #{page_index} из #{total_pages}"
+          when /^dir_desc_(\d+)$/
+            idx = Regexp.last_match(1).to_i
+            dirs = nil
+            if project_data.respond_to?(:directories) && project_data.directories
+              dirs = project_data.directories
+            elsif context[:directories]
+              dirs = context[:directories]
+            end
+            if dirs.is_a?(Array) && dirs[idx]
+              d = dirs[idx]
+              t = (d[:title] || d["title"]).to_s.strip
+              desc = (d[:description] || d["description"]).to_s.strip
+              t = "Раздел ##{idx + 1}" if t.empty?
+              desc.empty? ? "#{t}: —" : "#{t}: #{desc}"
+            else
+              nil
+            end
+          when "dir_specs", "directories_spec"
+            dirs = nil
+            if project_data.respond_to?(:directories) && project_data.directories
+              dirs = project_data.directories
+            elsif context[:directories]
+              dirs = context[:directories]
+            end
+            if dirs.is_a?(Array) && !dirs.empty?
+              lines_arr = dirs.map.with_index do |d, i|
+                t = (d[:title] || d["title"]).to_s.strip
+                desc = (d[:description] || d["description"]).to_s.strip
+                next if desc.empty? && t.empty?
+                t = "Раздел ##{i + 1}" if t.empty?
+                desc.empty? ? "#{t}: —" : "#{t}: #{desc}"
+              end.compact
+              lines_arr.empty? ? "Спецификации папок: —" : lines_arr.join("\n")
+            else
+              nil
+            end
           else
             nil
+          end
+        end
+
+        # Возвращает пару [заголовок, описание/значение] для строкового ключа
+        def resolve_parts(context, key)
+          project_data = context[:project_data]
+          info         = context[:info] || context[:project_info] || (project_data.respond_to?(:info) ? project_data.info : {}) || {}
+          workflow     = context[:workflow] || (project_data.respond_to?(:workflow) ? project_data.workflow : {}) || {}
+          scene_item   = context[:scene_item]
+
+          k_str = key.to_s
+          case k_str
+          when "spec_materials"
+            val = (info[:materials] || info["materials"]).to_s.strip
+            val = "Фасады МДФ, ЛДСП, Blum..." if val.empty?
+            ["Материалы и фурнитура", val]
+          when "spec_appliances"
+            app = (info[:appliances] || info["appliances"]).to_s.strip
+            lig = (info[:lighting] || info["lighting"]).to_s.strip
+            combined = [app, lig].uniq.reject(&:empty?).join("; ")
+            combined = "Встраиваемая техника, LED 3000K..." if combined.empty?
+            ["Техника и подсветка", combined]
+          when "spec_lighting"
+            val = (info[:lighting] || info["lighting"]).to_s.strip
+            val = "LED 3000K 24V..." if val.empty?
+            ["Подсветка", val]
+          when "general_notes"
+            val = (info[:project_description] || info["project_description"] || info[:description] || info["description"] || info[:notes] || info["notes"]).to_s.strip
+            val = "Замеры выполнены по факту" if val.empty?
+            ["Общие пояснения", val]
+          when "scene_notes"
+            desc = (scene_item ? scene_item.description : nil)
+            val = (desc && !desc.empty?) ? desc : (info[:notes] || info["notes"]).to_s.strip
+            val = "Габаритные размеры..." if val.empty?
+            ["Примечание", val]
+          when /^dir_desc_(\d+)$/
+            idx = Regexp.last_match(1).to_i
+            dirs = nil
+            if project_data.respond_to?(:directories) && project_data.directories
+              dirs = project_data.directories
+            elsif context[:directories]
+              dirs = context[:directories]
+            end
+            if dirs.is_a?(Array) && dirs[idx]
+              d = dirs[idx]
+              t = (d[:title] || d["title"]).to_s.strip
+              desc = (d[:description] || d["description"]).to_s.strip
+              t = "Раздел ##{idx + 1}" if t.empty?
+              [t, desc.empty? ? "—" : desc]
+            else
+              nil
+            end
+          when "dir_specs", "directories_spec"
+            dirs = nil
+            if project_data.respond_to?(:directories) && project_data.directories
+              dirs = project_data.directories
+            elsif context[:directories]
+              dirs = context[:directories]
+            end
+            if dirs.is_a?(Array) && !dirs.empty?
+              lines_arr = dirs.map.with_index do |d, i|
+                t = (d[:title] || d["title"]).to_s.strip
+                desc = (d[:description] || d["description"]).to_s.strip
+                next if desc.empty? && t.empty?
+                t = "Раздел ##{i + 1}" if t.empty?
+                desc.empty? ? t : "#{t}: #{desc}"
+              end.compact
+              ["Спецификации папок", lines_arr.empty? ? "—" : lines_arr.join("\n")]
+            else
+              nil
+            end
+          when "workflow_history", "history_table"
+            hist = workflow[:history_edit] || info[:history_edit]
+            if hist.is_a?(Array) && !hist.empty?
+              lines_arr = hist.map do |entry|
+                if entry.is_a?(Array)
+                  date, desc = entry[0].to_s.strip, entry[1].to_s.strip
+                  desc.empty? ? date : "#{date} — #{desc}"
+                elsif entry.is_a?(Hash)
+                  d = (entry[:data] || entry[:date] || entry["data"] || entry["date"]).to_s.strip
+                  desc = (entry[:edit] || entry[:text] || entry["edit"] || entry["text"] || entry[:description] || entry["description"]).to_s.strip
+                  desc.empty? ? d : "#{d} — #{desc}"
+                else
+                  entry.to_s.strip
+                end
+              end.reject(&:empty?)
+              ["История правок", lines_arr.empty? ? "нет записей" : lines_arr.join("\n")]
+            else
+              val = (workflow[:last_edit] || info[:last_edit]).to_s.strip
+              ["История правок", val.empty? ? "—" : val]
+            end
+          when "workflow_stadia"
+            stadia = workflow[:stadia] || info[:stadia]
+            if stadia.is_a?(Array) && !stadia.empty?
+              lines_arr = stadia.map do |st|
+                if st.is_a?(Hash)
+                  done = (st[:status] == true || st["status"] == true || st[:status].to_s == "true" || st["status"].to_s == "true")
+                  title = (st[:name] || st["name"] || st[:title] || st["title"]).to_s.strip
+                  mark = done ? "[✓]" : "[ ]"
+                  "#{mark} #{title}"
+                elsif st.is_a?(Array)
+                  done = (st[1] == true || st[1] == "true")
+                  title = st[2].to_s.strip
+                  mark = done ? "[✓]" : "[ ]"
+                  "#{mark} #{title}"
+                else
+                  st.to_s.strip
+                end
+              end.reject(&:empty?)
+              ["Стадия проекта", lines_arr.empty? ? "В работе" : lines_arr.join("\n")]
+            else
+              st = (workflow[:status] || info[:status]).to_s.strip
+              ["Стадия проекта", st.empty? ? "Предварительный проект" : st]
+            end
+          when "workflow_revision"
+            val = (workflow[:revision] || info[:revision]).to_s.strip
+            ["Ревизия", val.empty? ? "001" : val]
+          when "workflow_version"
+            val = (workflow[:version] || info[:version]).to_s.strip
+            ["Версия", val.empty? ? "01" : val]
+          when "workflow_date"
+            val = (workflow[:date_order] || info[:date]).to_s.strip
+            val = Time.now.strftime("%d.%m.%Y") if val.empty?
+            ["Дата", val]
+          when "toc_pages", "toc"
+            raw = resolve(context, key)
+            if raw && raw.include?(":\n")
+              parts = raw.split(":\n", 2)
+              [parts[0], parts[1]]
+            elsif raw && raw.include?(": ")
+              parts = raw.split(": ", 2)
+              [parts[0], parts[1]]
+            else
+              ["Содержание", raw]
+            end
+          when "room_name"
+            val = (info[:room_name] || info[:name_place]).to_s.strip
+            ["Помещение", val.empty? ? "—" : val]
+          when "furniture_name"
+            val = (info[:furniture_name] || info[:name_product]).to_s.strip
+            ["Изделие", val.empty? ? "—" : val]
+          when "articul"
+            val = info[:articul].to_s.strip
+            ["Артикул", val.empty? ? "—" : val]
+          when "address"
+            val = (info[:address] || info[:adress]).to_s.strip
+            ["Адрес", val.empty? ? "—" : val]
+          when "customer_name"
+            val = (info[:name_customer] || info[:customer]).to_s.strip
+            ["Заказчик", val.empty? ? "—" : val]
+          else
+            raw = resolve(context, key)
+            return nil if raw.nil? || raw.to_s.empty?
+            if raw.include?(":\n")
+              parts = raw.split(":\n", 2)
+              [parts[0], parts[1]]
+            elsif raw.include?(": ")
+              parts = raw.split(": ", 2)
+              [parts[0], parts[1]]
+            else
+              [nil, raw]
+            end
+          end
+        end
+
+        # Разрешает ключ с учетом настроек показа заголовка на отдельной строке
+        def resolve_formatted(context, key, show_title: true)
+          parts = resolve_parts(context, key)
+          if parts
+            title, desc = parts
+            if show_title && title && !title.to_s.strip.empty?
+              desc && !desc.to_s.strip.empty? ? "#{title}\n#{desc}" : title
+            else
+              desc.to_s
+            end
+          else
+            resolve(context, key)
           end
         end
 

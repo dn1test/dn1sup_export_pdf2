@@ -83,6 +83,10 @@ class TestRunner
     test_42_safe_frame_overlay_and_aspect_ratios
     test_43_new_project_yaml_data_structure
     test_44_template_independence_and_autosave
+    test_directory_descriptions_in_template_middle_list
+    test_template_block_item_multiline_and_title_toggle
+    test_separate_project_pages_and_template_settings_tabs
+    test_custom_template_management_and_rendering
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -1934,35 +1938,38 @@ class TestRunner
   end
 
   def test_scenes_table_two_row_layout
-    puts "\n--- 27. Тест двухстрочного отображения названия сцены и описания в таблице сцен ---"
+    puts "\n--- 27. Тест разделения колонок галочек и перемещения и двухстрочного названия/описания сцен ---"
     index_html_path = File.expand_path("../dialog/html/index.html", __dir__)
     index_html_content = File.read(index_html_path, encoding: "utf-8")
 
     # 1. Проверка структуры thead в index.html
     assert(index_html_content.include?("<th>Сцена / Описание</th>"), "index.html содержит объединенный заголовок 'Сцена / Описание'")
     assert(!index_html_content.include?("<th>Описание на листе</th>"), "index.html больше не содержит отдельную колонку 'Описание на листе'")
-    assert(index_html_content.include?("th-num-check-wrap"), "index.html содержит объединенную шапку Вкл и № в две строки")
+    assert(index_html_content.include?("th-check"), "index.html содержит отдельную колонку для галочек 'Вкл'")
+    assert(index_html_content.include?("th-order"), "index.html содержит отдельную колонку для порядка и перемещения '№'")
 
     app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
     app_js_content = File.read(app_js_path, encoding: "utf-8")
 
     # 2. Проверка генерации строки таблицы в app.js
-    assert(app_js_content.include?("scene-num-check-cell"), "app.js содержит ячейку scene-num-check-cell")
-    assert(app_js_content.include?("scene-num-check-wrap"), "app.js содержит обертку scene-num-check-wrap")
+    assert(app_js_content.include?("scene-check-cell"), "app.js содержит отдельную ячейку scene-check-cell для галочки")
+    assert(app_js_content.include?("scene-num-cell"), "app.js содержит отдельную ячейку scene-num-cell для перемещения и номера")
     assert(app_js_content.include?("scene-num-row"), "app.js содержит строку номера с ручкой drag-handle")
     assert(app_js_content.include?("scene-info-cell"), "app.js содержит ячейку scene-info-cell")
     assert(app_js_content.include?("scene-info-wrap"), "app.js содержит обертку scene-info-wrap")
     assert(app_js_content.include?("scene-name-input"), "app.js содержит поле ввода названия сцены (scene-name-input)")
     assert(app_js_content.include?("scene-desc-input"), "app.js содержит поле ввода описания сцены (scene-desc-input)")
     assert(app_js_content.include?("tdInfo.appendChild(infoWrap)"), "app.js помещает оба поля в единую ячейку tdInfo")
-    assert(app_js_content.include?("tr.appendChild(tdNumCheck)"), "app.js добавляет ячейку чекбокса и номера в tr")
+    assert(app_js_content.include?("tr.appendChild(tdCheck)"), "app.js добавляет ячейку чекбокса в tr")
+    assert(app_js_content.include?("tr.appendChild(tdNum)"), "app.js добавляет ячейку номера и перемещения в tr")
 
     # 3. Проверка стилей в app.css
     app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
     app_css_content = File.read(app_css_path, encoding: "utf-8")
-    assert(app_css_content.include?(".th-num-check"), "app.css содержит стиль .th-num-check")
-    assert(app_css_content.include?(".scene-num-check-cell"), "app.css содержит стиль .scene-num-check-cell")
-    assert(app_css_content.include?(".scene-num-check-wrap"), "app.css содержит стиль .scene-num-check-wrap")
+    assert(app_css_content.include?(".th-check"), "app.css содержит стиль .th-check")
+    assert(app_css_content.include?(".th-order"), "app.css содержит стиль .th-order")
+    assert(app_css_content.include?(".scene-check-cell"), "app.css содержит стиль .scene-check-cell")
+    assert(app_css_content.include?(".scene-num-cell"), "app.css содержит стиль .scene-num-cell")
     assert(app_css_content.include?(".scene-num-row"), "app.css содержит стиль .scene-num-row")
     assert(app_css_content.include?(".scene-info-wrap"), "app.css содержит стиль .scene-info-wrap")
     assert(app_css_content.include?(".scene-desc-input"), "app.css содержит стиль .scene-desc-input")
@@ -3106,6 +3113,49 @@ class TestRunner
     assert(has_lines, "Отрисованы угловые засечки и сетка (GL_LINES)")
     assert(has_text, "Отрисован информационный бейдж с текстом")
 
+    text_el = mock_view.drawn_elements.find { |el| el[:mode] == :text }
+    assert(text_el[:pos].x > mock_view.vpwidth / 2.0, "Бейдж оверлея расположен в правой половине кадра")
+    assert(text_el[:pos].y > mock_view.vpheight / 2.0, "Бейдж оверлея расположен в нижней половине кадра (нижний правый угол)")
+
+    # Проверка дефолтных настроек и открытия файлов
+    empty_dir = File.join(Dir.tmpdir, "test_open_frame_empty_#{Time.now.to_i}_#{rand(10000)}")
+    FileUtils.mkdir_p(empty_dir)
+    mock_model_empty = Sketchup::MockModel.new
+    mock_model_empty.path = File.join(empty_dir, "empty_model.skp")
+    pdata_empty = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_empty.load_auto(mock_model_empty)
+    assert(pdata_empty.pdf_settings[:image_aspect_ratio] == "4:3", "При открытии файла без сохраненных настроек устанавливается 4:3")
+
+    saved_dir = File.join(Dir.tmpdir, "test_open_frame_saved_#{Time.now.to_i}_#{rand(10000)}")
+    FileUtils.mkdir_p(saved_dir)
+    mock_model_saved = Sketchup::MockModel.new
+    mock_model_saved.path = File.join(saved_dir, "saved_model.skp")
+    mock_model_saved.set_attribute(DN1Code::ExportPdf2::Model::ProjectData::ATTR_DICT, "pdf_settings", JSON.generate({ image_aspect_ratio: "16:9" }))
+    pdata_saved = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_saved.load_auto(mock_model_saved)
+    assert(pdata_saved.pdf_settings[:image_aspect_ratio] == "16:9", "При открытии файла с сохраненным 16:9 сохраняется 16:9")
+
+    overlay_svc.on_model_opened(mock_model_empty, pdata_empty)
+    assert((overlay_svc.overlay_instance.ratio_cache - (4.0 / 3.0)).abs < 0.01, "on_model_opened устанавливает кэш пропорций 4:3 для модели без настроек")
+
+    overlay_svc.on_model_opened(mock_model_saved, pdata_saved)
+    assert((overlay_svc.overlay_instance.ratio_cache - (16.0 / 9.0)).abs < 0.01, "on_model_opened устанавливает кэш пропорций 16:9 для сохраненной модели")
+
+    # Проверка сохранения в настройки по умолчанию
+    res_save_def = DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "16:9", show_aspect_overlay: true })
+    assert(res_save_def == true, "save_default_frame_settings завершился успешно")
+    cfg_text = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8")
+    assert(cfg_text.include?("image_aspect_ratio: '16:9'") || cfg_text.include?("image_aspect_ratio: \"16:9\"") || cfg_text.include?("image_aspect_ratio: 16:9"), "settings.yaml содержит обновленный image_aspect_ratio")
+    DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "4:3" })
+
+    # Проверка игнорирования недопустимых пропорций кадра, которых нет в настройках
+    DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "21:9" })
+    cfg_text_after_invalid = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8")
+    assert(!cfg_text_after_invalid.include?("21:9"), "save_default_frame_settings не сохраняет недопустимые пропорции 21:9 в settings.yaml")
+
+    info_invalid = overlay_svc.calculate_target_info(nil, { image_aspect_ratio: "21:9" })
+    assert((info_invalid[:ratio] - (4.0 / 3.0)).abs < 0.01, "calculate_target_info нормализует неизвестные пропорции 21:9 к 4:3")
+
     # 5. Проверка сохранения параметров в ProjectData и YAML
     proj_data = DN1Code::ExportPdf2::Model::ProjectData.new
     assert(proj_data.pdf_settings.key?(:image_aspect_ratio), "pdf_settings содержит :image_aspect_ratio")
@@ -3427,7 +3477,12 @@ class TestRunner
     mock_model = Sketchup::MockModel.new
     mock_model.path = File.join(tmp_dir, "MyModel.skp")
     loaded_proj.project_info[:name] = "Автосохраненный Проект"
-    loaded_proj.save_auto(mock_model)
+    layout_backup = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE, encoding: "utf-8") rescue nil
+    begin
+      loaded_proj.save_auto(mock_model)
+    ensure
+      File.write(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE, layout_backup, encoding: "utf-8") if layout_backup
+    end
 
     expected_auto_yaml = File.join(tmp_dir, "MyModel.yaml")
     assert(File.exist?(expected_auto_yaml), "save_auto создал YAML файл рядом со SKP: #{expected_auto_yaml}")
@@ -3468,6 +3523,291 @@ class TestRunner
     FileUtils.rm_rf(tmp_dir)
 
     # 9. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_directory_descriptions_in_template_middle_list
+    puts "\n--- 45. Тест попадания описаний блоков папок в средний список шаблонов ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка InfoLineResolver для dir_desc_0, dir_desc_1 и dir_specs
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.directories = [
+      { path: "!_фасады_мдф", title: "Фасады МДФ", description: "Эмаль шелковисто-матовая RAL 7047" },
+      { path: "!_столешница", title: "Столешница", description: "Кварцевый агломерат 20мм Calacatta" }
+    ]
+
+    ctx = { project_data: project_data, info: {}, workflow: {}, page_index: 1, total_pages: 3 }
+
+    desc_0 = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve(ctx, "dir_desc_0")
+    assert(desc_0 && desc_0.include?("Фасады МДФ") && desc_0.include?("RAL 7047"),
+           "InfoLineResolver корректно разрешает dir_desc_0: #{desc_0}")
+
+    desc_1 = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve(ctx, "dir_desc_1")
+    assert(desc_1 && desc_1.include?("Столешница") && desc_1.include?("Calacatta"),
+           "InfoLineResolver корректно разрешает dir_desc_1: #{desc_1}")
+
+    specs_all = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve(ctx, "dir_specs")
+    assert(specs_all && specs_all.include?("Фасады МДФ") && specs_all.include?("Столешница"),
+           "InfoLineResolver корректно объединяет все папки через dir_specs")
+
+    # 2. Проверка JS кода на наличие интеграции со средним списком
+    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js_text.include?("syncDirectoriesSpecifications()"),
+           "app.js содержит вызов syncDirectoriesSpecifications")
+    assert(js_text.include?("function syncDirectoriesSpecifications()"),
+           "app.js содержит функцию syncDirectoriesSpecifications")
+    assert(js_text.include?("function getInfoLineDef(key)"),
+           "app.js содержит функцию getInfoLineDef для динамических строк")
+    assert(js_text.include?("dir_desc_"),
+           "app.js поддерживает динамические ключи dir_desc_ для блоков папок")
+    assert(js_text.include?("middleAvailableLines.push"),
+           "app.js динамически добавляет блоки папок в middleAvailableLines")
+
+    # 3. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # ============================================================================
+  # 46. ТЕСТ: Заголовки пунктов шаблонов на отдельной строке, описание на следующей, галка заголовок
+  # ============================================================================
+  def test_template_block_item_multiline_and_title_toggle
+    puts "\n--- 46. Тест заголовков пунктов шаблонов на отдельной строке и галки заголовок ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_content = File.binread(root_project_yaml)
+    initial_md5 = Digest::MD5.hexdigest(initial_content)
+
+    # 1. Проверка InfoLineResolver#resolve_parts и resolve_formatted
+    ctx = {
+      project_info: {
+        materials: "Фасады МДФ, фурнитура Blum",
+        appliances: "Встраиваемая вытяжка Bosch"
+      },
+      workflow: {
+        last_edit: "2026-09-11: Изменение размеров полок"
+      }
+    }
+
+    # С включенным заголовком: заголовок на отдельной строке, описание на следующей (\n)
+    formatted_with_title = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve_formatted(ctx, "spec_materials", show_title: true)
+    assert(formatted_with_title.include?("\n"), "resolve_formatted с show_title: true разделяет заголовок и описание переносом строки")
+    parts = formatted_with_title.split("\n", 2)
+    assert(parts[0] == "Материалы и фурнитура", "Первая строка содержит точный заголовок пункта: #{parts[0]}")
+    assert(parts[1] == "Фасады МДФ, фурнитура Blum", "Вторая строка содержит описание пункта: #{parts[1]}")
+
+    # С выключенным заголовком: только описание без заголовка
+    formatted_without_title = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve_formatted(ctx, "spec_materials", show_title: false)
+    assert(!formatted_without_title.include?("Материалы и фурнитура"), "resolve_formatted с show_title: false не содержит заголовок")
+    assert(formatted_without_title == "Фасады МДФ, фурнитура Blum", "resolve_formatted с show_title: false возвращает только описание")
+
+    # Проверка resolve_parts
+    title_part, desc_part = DN1Code::ExportPdf2::Service::InfoLineResolver.resolve_parts(ctx, "workflow_history")
+    assert(title_part == "История правок", "resolve_parts возвращает точный заголовок для workflow_history")
+    assert(desc_part == "2026-09-11: Изменение размеров полок", "resolve_parts возвращает точное описание для workflow_history")
+
+    # 2. Проверка разметки и элементов в app.js (чистый GUI и галка Заголовок в шапке карточки 2)
+    app_js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(app_js_text.include?("chk-slot-show-titles"), "app.js содержит чекбокс 'Заголовок' на уровне блока шаблона (chk-slot-show-titles)")
+    assert(app_js_text.include?("show_titles"), "app.js поддерживает параметр show_titles")
+    assert(app_js_text.include?("tpl-line-label"), "app.js сохраняет аккуратный однострочный список пунктов в GUI (tpl-line-label)")
+    assert(app_js_text.include?("tpl-middle-label-wrap"), "app.js использует обертку метки среднего блока (tpl-middle-label-wrap)")
+
+    # 3. Проверка стилей в app.css
+    app_css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
+    assert(app_css_text.include?(".tpl-chk-titles-label"), "app.css содержит стиль для .tpl-chk-titles-label")
+    assert(app_css_text.include?(".tpl-middle-label-wrap"), "app.css содержит стиль для .tpl-middle-label-wrap")
+
+    # 4. Проверка интеграции в PageBase и LayoutBuilder для страниц проекта
+    page_base_text = File.read(File.join(__dir__, "../controller/page_base.rb"), encoding: "utf-8")
+    assert(page_base_text.include?("resolve_formatted"), "PageBase вызывает resolve_formatted с параметром show_title")
+    assert(page_base_text.include?("resolve_parts"), "PageBase извлекает title_part и desc_part через resolve_parts")
+    assert(page_base_text.include?("formatted_text_box"), "PageBase выводит заголовок на первой строке жирным, а описание на следующей")
+
+    layout_builder_text = File.read(File.join(__dir__, "../service/layout_builder.rb"), encoding: "utf-8")
+    assert(layout_builder_text.include?("resolve_formatted"), "LayoutBuilder вызывает resolve_formatted с параметром show_title")
+
+    # 5. Тестирование генерации страниц проекта в PDF с включенными и выключенными заголовками
+    test_dir = File.expand_path("test_titles_page_render_dir", __dir__)
+    FileUtils.rm_rf(test_dir)
+    FileUtils.mkdir_p(test_dir)
+
+    test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    test_project_data.project_info[:materials] = "Фасады МДФ, фурнитура Blum"
+    test_project_data.project_info[:appliances] = "Встраиваемая духовка Electrolux"
+    test_project_data.project_info[:notes] = "Точки подключения выведены по проекту"
+
+    # Рендеринг с включенными заголовками (show_titles: true)
+    layouts = test_project_data.pdf_settings[:custom_layouts]
+    layouts[:cover][:slot_1][:lines] = ["spec_materials", "spec_appliances", "general_notes"]
+    layouts[:cover][:slot_1][:show_titles] = true
+
+    pdf_doc_with_titles = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc_with_titles)
+    page_with_titles = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc_with_titles, test_project_data, nil, page_index: 1, total_pages: 1)
+    page_with_titles.render
+
+    pdf_out_with_titles = File.join(test_dir, "page_with_titles.pdf")
+    pdf_doc_with_titles.render_file(pdf_out_with_titles)
+    assert(File.exist?(pdf_out_with_titles), "PDF страница с включенными заголовками успешно сгенерирована")
+    assert(File.size(pdf_out_with_titles) > 5000, "Размер PDF страницы с заголовками валиден (#{File.size(pdf_out_with_titles)} байт)")
+
+    # Рендеринг с выключенными заголовками (show_titles: false)
+    layouts[:cover][:slot_1][:show_titles] = false
+    pdf_doc_no_titles = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: 15)
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc_no_titles)
+    page_no_titles = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc_no_titles, test_project_data, nil, page_index: 1, total_pages: 1)
+    page_no_titles.render
+
+    pdf_out_no_titles = File.join(test_dir, "page_no_titles.pdf")
+    pdf_doc_no_titles.render_file(pdf_out_no_titles)
+    assert(File.exist?(pdf_out_no_titles), "PDF страница с выключенными заголовками успешно сгенерирована")
+    assert(File.size(pdf_out_no_titles) > 5000, "Размер PDF страницы без заголовков валиден (#{File.size(pdf_out_no_titles)} байт)")
+
+    FileUtils.rm_rf(test_dir)
+
+    # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_separate_project_pages_and_template_settings_tabs
+    puts "\n--- 47. Тест разделения настройки шаблонов и страниц проекта на отдельные вкладки GUI ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+
+    html_content = File.read(html_path, encoding: "UTF-8")
+    js_content = File.read(js_path, encoding: "UTF-8")
+    css_content = File.read(css_path, encoding: "UTF-8")
+
+    # 1. Проверка навигационных кнопок в index.html
+    assert(html_content.include?('data-tab="tab-scenes"'), "index.html содержит кнопку вкладки tab-scenes")
+    assert(html_content.include?('Страницы проекта'), "index.html содержит заголовок 'Страницы проекта'")
+    assert(html_content.include?('data-tab="tab-templates"'), "index.html содержит отдельную кнопку вкладки tab-templates")
+    assert(html_content.include?('Настройка шаблонов'), "index.html содержит заголовок 'Настройка шаблонов'")
+
+    # 2. Проверка раздельных секций в index.html
+    assert(html_content.include?('<section id="tab-scenes" class="tab-pane">'), "index.html содержит секцию #tab-scenes")
+    assert(html_content.include?('<section id="tab-templates" class="tab-pane">'), "index.html содержит секцию #tab-templates")
+    assert(html_content.include?('id="scenesTable"'), "index.html содержит таблицу сцен scenesTable")
+    assert(html_content.include?('id="templateSettingsContainer"'), "index.html содержит контейнер templateSettingsContainer")
+
+    # 3. Проверка логики переключения в app.js
+    assert(js_content.include?('tab.dataset.tab === "tab-templates"'), "app.js обрабатывает переключение на tab-templates")
+    assert(js_content.include?('function switchToTab(tabId)'), "app.js содержит функцию switchToTab")
+    assert(js_content.include?('btn-goto-template'), "app.js содержит кнопку быстрого перехода к шаблону btn-goto-template")
+    assert(js_content.include?('scene-template-cell-wrap'), "app.js использует обертку для ячейки шаблона scene-template-cell-wrap")
+
+    # 4. Проверка стилей в app.css
+    assert(css_content.include?('#tab-templates'), "app.css содержит правила для #tab-templates")
+    assert(css_content.include?('.scenes-panel'), "app.css содержит правила для .scenes-panel")
+    assert(css_content.include?('.btn-goto-template'), "app.css содержит стили для .btn-goto-template")
+
+    # 5. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_custom_template_management_and_rendering
+    puts "\n--- 48. Тест списка шаблонов слева, создания новых шаблонов и их рендеринга ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+
+    html_content = File.read(html_path, encoding: "UTF-8")
+    js_content = File.read(js_path, encoding: "UTF-8")
+    css_content = File.read(css_path, encoding: "UTF-8")
+
+    # 1. Проверка HTML-разметки сайдбара и модальных окон
+    assert(html_content.include?('id="templatesSidebar"'), "index.html содержит боковую панель templatesSidebar")
+    assert(html_content.include?('id="templatesList"'), "index.html содержит контейнер списка шаблонов templatesList")
+    assert(html_content.include?('id="btnCreateTemplate"'), "index.html содержит кнопку создания шаблона btnCreateTemplate")
+    assert(html_content.include?('id="btnDeleteTemplateSidebar"'), "index.html содержит кнопку удаления в сайдбаре btnDeleteTemplateSidebar")
+    assert(html_content.include?('id="currentTemplateTitle"'), "index.html содержит заголовок выбранного шаблона currentTemplateTitle")
+    assert(html_content.include?('id="btnRenameCurrentTemplate"'), "index.html содержит кнопку переименования btnRenameCurrentTemplate")
+    assert(html_content.include?('id="btnDeleteCurrentTemplate"'), "index.html содержит кнопку удаления btnDeleteCurrentTemplate")
+    assert(html_content.include?('id="newTemplateModal"'), "index.html содержит модальное окно newTemplateModal")
+    assert(html_content.include?('id="deleteTemplateModal"'), "index.html содержит модальное окно подтверждения удаления deleteTemplateModal")
+    assert(html_content.include?('id="renameTemplateModal"'), "index.html содержит модальное окно переименования renameTemplateModal")
+    assert(html_content.include?('id="btnConfirmDeleteTemplate"'), "index.html содержит кнопку подтверждения удаления btnConfirmDeleteTemplate")
+    assert(html_content.include?('id="inputNewTemplateName"'), "index.html содержит поле ввода имени нового шаблона inputNewTemplateName")
+    assert(html_content.include?('id="selectNewTemplateBase"'), "index.html содержит выбор базового шаблона selectNewTemplateBase")
+    assert(html_content.include?('id="btnConfirmNewTemplate"'), "index.html содержит кнопку подтверждения btnConfirmNewTemplate")
+
+    # 2. Проверка CSS-стилей
+    assert(css_content.include?('.templates-sidebar'), "app.css содержит стили .templates-sidebar")
+    assert(css_content.include?('.templates-list'), "app.css содержит стили .templates-list")
+    assert(css_content.include?('.template-list-item'), "app.css содержит стили .template-list-item")
+    assert(css_content.include?('.template-list-item.active'), "app.css содержит активное состояние .template-list-item.active")
+    assert(css_content.include?('.btn-danger-outline'), "app.css содержит стили для кнопки удаления .btn-danger-outline")
+    assert(css_content.include?('.sidebar-header-actions'), "app.css содержит стили для блока кнопок в шапке сайдбара .sidebar-header-actions")
+
+    # 3. Проверка JS функций управления шаблонами
+    assert(js_content.include?('function getAllTemplates()'), "app.js содержит getAllTemplates")
+    assert(js_content.include?('function getTemplateDef('), "app.js содержит getTemplateDef")
+    assert(js_content.include?('function renderTemplatesList()'), "app.js содержит renderTemplatesList")
+    assert(js_content.include?('function selectTemplate('), "app.js содержит selectTemplate")
+    assert(js_content.include?('function syncTemplateDropdowns()'), "app.js содержит syncTemplateDropdowns")
+    assert(js_content.include?('function createCustomTemplate('), "app.js содержит createCustomTemplate")
+    assert(js_content.include?('function deleteCustomTemplate('), "app.js содержит deleteCustomTemplate")
+    assert(js_content.include?('function openDeleteTemplateModal('), "app.js содержит openDeleteTemplateModal")
+    assert(js_content.include?('function confirmDeleteTemplate()'), "app.js содержит confirmDeleteTemplate")
+    assert(js_content.include?('function openRenameTemplateModal('), "app.js содержит openRenameTemplateModal")
+    assert(js_content.include?('function confirmRenameTemplate()'), "app.js содержит confirmRenameTemplate")
+
+    # 4. Проверка Ruby бэкенда: PageBase#current_page_type для кастомного шаблона
+    test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    custom_scene = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "Кастомная сцена",
+      description: "Тест кастомного шаблона",
+      page_type: "custom_spec"
+    )
+
+    pdf_doc = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: [14.17, 14.17, 14.17, 14.17])
+    page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc, test_project_data, custom_scene, page_index: 1, total_pages: 1)
+    resolved_type = page.send(:current_page_type)
+    assert(resolved_type == :custom_spec, "PageBase#current_page_type корректно возвращает :custom_spec из scene_item.page_type")
+
+    # 5. Рендеринг кастомного шаблона с кастомной разметкой в custom_layouts
+    test_dir = File.join(__dir__, "tmp_custom_tpl_test")
+    FileUtils.mkdir_p(test_dir)
+    test_project_data.pdf_settings[:custom_layouts] = {
+      custom_spec: {
+        header: { visible: true, content: "header", custom_text: "КАСТОМНЫЙ ШАБЛОН СПЕЦИФИКАЦИИ" },
+        slot_1: { visible: true, content: "specifications", lines: ["materials", "appliances"] },
+        footer: { visible: true, content: "footer", custom_text: "Лист 1 из 1" }
+      }
+    }
+    test_project_data.project_info[:materials] = "Фасады МДФ"
+    test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
+
+    pdf_doc_render = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: [14.17, 14.17, 14.17, 14.17])
+    DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc_render)
+    render_page = DN1Code::ExportPdf2::Controller::CoverPage.new(pdf_doc_render, test_project_data, custom_scene, page_index: 1, total_pages: 1)
+    render_page.render
+
+    pdf_file = File.join(test_dir, "custom_template_page.pdf")
+    pdf_doc_render.render_file(pdf_file)
+    assert(File.exist?(pdf_file) && File.size(pdf_file) > 1000, "PDF документ с кастомным шаблоном успешно создан и содержит данные")
+    FileUtils.rm_rf(test_dir)
+
+    # 6. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")

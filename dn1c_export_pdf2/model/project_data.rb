@@ -23,6 +23,9 @@ module DN1Code
         PROGRAM_SETTINGS_FILE = File.join(PLUGIN_CONFIG_DIR, "settings.yaml")
         PROGRAM_LAYOUT_FILE   = File.join(PLUGIN_CONFIG_DIR, "layout.yaml")
 
+        # Допустимые пропорции кадра в настройках плагина
+        VALID_ASPECT_RATIOS   = %w[page 16:9 4:3 3:2 1:1 custom].freeze
+
         # Прокси-хэш для фасада @project_info: перенаправляет изменения напрямую
         # в модульные структуры (@project, @customer, @workflow) и синхронизирует синонимы полей
         class ProjectInfoProxy < Hash
@@ -192,6 +195,8 @@ module DN1Code
         attr_accessor :api_targets
         # @return [Array<Hash>, Hash] каталоги проекта и настройки их отображения
         attr_accessor :directories
+        # @return [Boolean] флаг наличия явно сохраненных пропорций кадра в файле модели или YAML
+        attr_accessor :file_has_saved_aspect_ratio
 
         # @return [Hash] конфигурация макетов страниц (прокси к @pdf_settings[:custom_layouts])
         def custom_layouts
@@ -216,6 +221,7 @@ module DN1Code
           @directories  = default_directories
           @scenes       = []
           @history      = []
+          @file_has_saved_aspect_ratio = false
 
           sync_project_fields!
 
@@ -250,6 +256,8 @@ module DN1Code
                   @pdf_settings ||= {}
                   @pdf_settings.merge!(pdf_cfg)
                   @pdf_settings[:custom_layouts] = layouts_backup if layouts_backup && !pdf_cfg.key?(:custom_layouts)
+                  ratio_str = @pdf_settings[:image_aspect_ratio].to_s.strip
+                  @pdf_settings[:image_aspect_ratio] = "4:3" unless VALID_ASPECT_RATIOS.include?(ratio_str)
                 end
               end
             rescue StandardError => e
@@ -291,6 +299,71 @@ module DN1Code
           true
         rescue StandardError => e
           warn "Ошибка сохранения настроек программы: #{e.message}"
+          false
+        end
+
+        # Сохраняет параметры рамки кадра (Overlay) в настройки плагина по умолчанию (settings.yaml)
+        # @param params [Hash] параметры рамки (:image_aspect_ratio, :aspect_ratio, :custom_ratio_w, :custom_ratio_h, :show_aspect_overlay, :overlay_border_color, etc.)
+        # @return [Boolean]
+        def self.save_default_frame_settings(params)
+          return false unless params.is_a?(Hash)
+
+          FileUtils.mkdir_p(PLUGIN_CONFIG_DIR)
+          settings_file = PROGRAM_SETTINGS_FILE
+
+          current_data = {}
+          if File.exist?(settings_file)
+            begin
+              content = File.read(settings_file, encoding: "utf-8")
+              raw = begin
+                      YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
+                    rescue ArgumentError
+                      YAML.load(content)
+                    end
+              current_data = deep_symbolize_keys(raw) if raw.is_a?(Hash)
+            rescue StandardError
+            end
+          end
+
+          pdf_cfg = current_data[:pdf_settings] || {}
+
+          ratio_val = params[:image_aspect_ratio] || params["image_aspect_ratio"] || params[:aspect_ratio] || params["aspect_ratio"]
+          if ratio_val && !ratio_val.to_s.strip.empty?
+            ratio_str = ratio_val.to_s.strip
+            if VALID_ASPECT_RATIOS.include?(ratio_str)
+              pdf_cfg[:image_aspect_ratio] = ratio_str
+            end
+          end
+
+          if params.key?(:custom_ratio_w) || params.key?("custom_ratio_w")
+            cw = (params[:custom_ratio_w] || params["custom_ratio_w"]).to_f
+            pdf_cfg[:custom_ratio_w] = cw if cw > 0.0
+          end
+
+          if params.key?(:custom_ratio_h) || params.key?("custom_ratio_h")
+            ch = (params[:custom_ratio_h] || params["custom_ratio_h"]).to_f
+            pdf_cfg[:custom_ratio_h] = ch if ch > 0.0
+          end
+
+          if params.key?(:show_aspect_overlay) || params.key?("show_aspect_overlay")
+            v = params[:show_aspect_overlay]
+            v = params["show_aspect_overlay"] if v.nil?
+            pdf_cfg[:show_aspect_overlay] = (v == true || v.to_s == "true")
+          end
+
+          [:overlay_border_color, :overlay_border_opacity, :overlay_mask_color, :overlay_mask_opacity].each do |k|
+            val = params[k] || params[k.to_s]
+            pdf_cfg[k] = val unless val.nil?
+          end
+
+          current_data[:pdf_settings] = pdf_cfg
+
+          File.open(settings_file, "w:utf-8") do |f|
+            f.write deep_stringify_keys(current_data).to_yaml
+          end
+          true
+        rescue StandardError => e
+          warn "Ошибка сохранения параметров фрейма в настройки по умолчанию: #{e.message}"
           false
         end
 
@@ -463,26 +536,22 @@ module DN1Code
             {
               path:        "!_замер_фото_задание",
               title:       "Замеры помещения",
-              description: "Дополнительное описание",
-              display:     "grid"
+              description: "Дополнительное описание"
             },
             {
               path:        "!_инфо_заказчика",
               title:       "Инфо заказчика",
-              description: "Дополнительное описание",
-              display:     "grid"
+              description: "Дополнительное описание"
             },
             {
               path:        "!_материалы_фурнитура",
               title:       "Материалы и фурнитура",
-              description: "Дополнительное описание",
-              display:     "grid"
+              description: "Дополнительное описание"
             },
             {
               path:        "!_техника_подсветка",
               title:       "Техника, подсветка",
-              description: "Дополнительное описание",
-              display:     "list"
+              description: "Дополнительное описание"
             }
           ]
         end
@@ -586,7 +655,7 @@ module DN1Code
             margin:             15,
             margin_mm:          5,
             image_width:        2400,
-            image_aspect_ratio: "page",
+            image_aspect_ratio: "4:3",
             custom_ratio_w:     16,
             custom_ratio_h:     9,
             show_aspect_overlay: false,
@@ -935,22 +1004,31 @@ module DN1Code
           if dirs.is_a?(Hash)
             dirs.map do |k, v|
               next unless v.is_a?(Hash)
-              {
-                path:        (v[:path] || v["path"] || "").to_s,
-                title:       (v[:title] || v["title"] || "").to_s,
-                description: (v[:description] || v["description"] || "").to_s,
-                display:     (v[:display] || v["display"] || "grid").to_s
+              p_val = (v[:path] || v["path"] || "").to_s
+              t_val = (v[:title] || v["title"] || "").to_s
+              t_val = File.basename(p_val) if t_val.empty? && !p_val.empty?
+              t_val = k.to_s if t_val.empty?
+              item = {
+                path:        p_val,
+                title:       t_val,
+                description: (v[:description] || v["description"] || "").to_s
               }
+              item[:display] = (v[:display] || v["display"]).to_s if v[:display] || v["display"]
+              item
             end.compact
           elsif dirs.is_a?(Array)
             dirs.map do |d|
               next unless d.is_a?(Hash)
-              {
-                path:        (d[:path] || d["path"] || "").to_s,
-                title:       (d[:title] || d["title"] || "").to_s,
-                description: (d[:description] || d["description"] || "").to_s,
-                display:     (d[:display] || d["display"] || "grid").to_s
+              p_val = (d[:path] || d["path"] || "").to_s
+              t_val = (d[:title] || d["title"] || "").to_s
+              t_val = File.basename(p_val) if t_val.empty? && !p_val.empty?
+              item = {
+                path:        p_val,
+                title:       t_val,
+                description: (d[:description] || d["description"] || "").to_s
               }
+              item[:display] = (d[:display] || d["display"]).to_s if d[:display] || d["display"]
+              item
             end.compact
           else
             default_directories
@@ -1127,6 +1205,17 @@ module DN1Code
           # помечать модель измененной (диалог "Сохранить изменения?" без правок пользователя).
           # Данные попадают в библиотеку модели при сохранении .skp (handle_pre_save /
           # handle_post_save) и при экспорте PDF (save_auto).
+
+          # При открытии файла устанавливаем пропорции фрейма 4:3, если в файле не сохранено другое
+          unless @file_has_saved_aspect_ratio
+            @pdf_settings[:image_aspect_ratio] = "4:3"
+          else
+            # Если в файле сохранено значение, которого нет в настройках, нормализуем к 4:3
+            saved_val = @pdf_settings[:image_aspect_ratio].to_s.strip
+            unless VALID_ASPECT_RATIOS.include?(saved_val)
+              @pdf_settings[:image_aspect_ratio] = "4:3"
+            end
+          end
 
           # Синхронизация списка сцен из модели
           sync_with_model_scenes(model) if model
@@ -1337,6 +1426,10 @@ module DN1Code
               # Шаблоны страниц из .skp игнорируются (источник — layout.yaml),
               # зачистка на случай старых моделей, где они сохранялись в атрибутах
               parsed.delete(:custom_layouts)
+              if parsed.key?(:image_aspect_ratio) || parsed.key?("image_aspect_ratio")
+                v = parsed[:image_aspect_ratio] || parsed["image_aspect_ratio"]
+                @file_has_saved_aspect_ratio = true unless v.to_s.strip.empty?
+              end
               @pdf_settings.merge!(parsed)
               has_data = true
             rescue StandardError; end
@@ -1815,6 +1908,10 @@ module DN1Code
               sync_project_fields!
 
               if root.key?(:pdf_settings) && root[:pdf_settings].is_a?(Hash)
+                if root[:pdf_settings].key?(:image_aspect_ratio) || root[:pdf_settings].key?("image_aspect_ratio")
+                  v = root[:pdf_settings][:image_aspect_ratio] || root[:pdf_settings]["image_aspect_ratio"]
+                  @file_has_saved_aspect_ratio = true unless v.to_s.strip.empty?
+                end
                 @pdf_settings.merge!(root[:pdf_settings])
               end
 
@@ -1941,7 +2038,13 @@ module DN1Code
           end.compact
 
           # 5. Секция directories (Массив объектов)
-          dirs_out = normalize_directories_to_array(@directories)
+          dirs_out = normalize_directories_to_array(@directories).map do |d|
+            {
+              "path"        => d[:path].to_s,
+              "title"       => d[:title].to_s,
+              "description" => d[:description].to_s
+            }
+          end
 
           # 6. Сборка итогового документа в чистом строгом порядке, соответствующем project.yaml
           data = {

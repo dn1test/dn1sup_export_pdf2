@@ -123,6 +123,7 @@ module DN1Code
               else
                 Service::OverlayService.disable(model)
               end
+              Model::ProjectData.save_default_frame_settings(show_aspect_overlay: is_on) if defined?(Model::ProjectData)
               active = Service::OverlayService.overlay_active?(model)
               dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{active});")
             end
@@ -136,6 +137,7 @@ module DN1Code
               model = Sketchup.active_model
               if defined?(Service::OverlayService)
                 Service::OverlayService.update_settings(params, model)
+                Model::ProjectData.save_default_frame_settings(params) if defined?(Model::ProjectData)
                 info = Service::OverlayService.calculate_target_info(model)
                 dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(true);")
                 dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});")
@@ -161,11 +163,11 @@ module DN1Code
               begin
                 parsed = JSON.parse(params_json)
                 commercial = parsed["commercial"] == true || parsed["commercial"] == "true" || parsed["commercial"] == 1 || parsed["commercial"] == "1"
-                index = parsed["index"] || 1
+                index = parsed["suffix"] || parsed["index"] || "01"
               rescue StandardError
               end
             end
-            art = Model::ProjectData.generate_articul(commercial: commercial, index: index)
+            art = Model::ProjectData.generate_articul(commercial: commercial, index: index, suffix: index)
             dialog.execute_script("window.app && window.app.onArticulGenerated(#{JSON.generate(art)});")
           end
 
@@ -540,6 +542,18 @@ module DN1Code
             if file_path && File.exist?(file_path)
               folder = File.dirname(file_path.to_s.tr("\\", "/"))
               UI.openURL("file:///" + folder)
+            end
+          end
+
+          # Открыть файл (изображение, документ, чертеж, текст) системной программой по умолчанию
+          dialog.add_action_callback("openFile") do |_action_context, file_path|
+            begin
+              clean_path = file_path.to_s.strip.tr("\\", "/")
+              if !clean_path.empty? && File.exist?(clean_path)
+                UI.openURL("file:///" + clean_path)
+              end
+            rescue StandardError => e
+              puts "[openFile error]: #{e.message}"
             end
           end
 

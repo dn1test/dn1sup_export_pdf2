@@ -25,10 +25,10 @@ module DN1Code
             if defined?(Sketchup::Overlay)
               super(OVERLAY_ID, OVERLAY_NAME, description: "Отображает границы и пропорции кадра для экспорта в PDF")
             end
-            @ratio_cache          = 1.4142
-            @label_cache          = "A4 Альбомный (1.41:1)"
+            @ratio_cache          = 4.0 / 3.0
+            @label_cache          = "4:3"
             @width_cache          = 2400
-            @height_cache         = 1697
+            @height_cache         = 1800
             @border_color_cache   = "#0EA5E9"
             @border_opacity_cache = 100
             @mask_color_cache     = "#0F172A"
@@ -187,12 +187,12 @@ module DN1Code
               ]
               view.draw2d(GL_LINES, c_lines)
 
-              # 5. Информационный бейдж с контрастной подложкой
+              # 5. Информационный бейдж с контрастной подложкой (в правом нижнем углу кадра)
               badge_text = "📐 #{target_label || 'Кадр'}  |  #{target_w || 2400} × #{target_h || 1800} px"
-              badge_x = frame_x + 12.0
-              badge_y = [frame_y + 12.0, 36.0].max
-              badge_w = 230.0
+              badge_w = 240.0
               badge_h = 24.0
+              badge_x = [frame_x + frame_w - badge_w - 12.0, frame_x + 12.0].max
+              badge_y = [frame_y + frame_h - badge_h - 12.0, frame_y + 12.0].max
 
               # Подложка под текст бейджа
               plate_color = OverlayService.parse_color(@mask_color_cache || "#0F172A", 85, 15, 23, 42, 210)
@@ -267,21 +267,25 @@ module DN1Code
           tpl_cfg = custom_layouts[tpl_key] || custom_layouts[tpl_key.to_s] || {}
           img_cfg = tpl_cfg[:image_4_3] || tpl_cfg["image_4_3"] || {}
 
-          # Приоритет пропорций:
-          # 1. Явный aspect_ratio (переданный извне / живой выбор из редактора шаблона)
-          # 2. Явный выбор пользователя в GUI (image_aspect_ratio != "page")
-          # 3. Блок image_4_3 текущего шаблона
-          # 4. Сохраненный глобальный image_aspect_ratio ("page" = по формату листа)
-          gui_aspect = settings[:image_aspect_ratio] || settings["image_aspect_ratio"]
-          gui_explicit = gui_aspect && !gui_aspect.to_s.strip.empty? && gui_aspect.to_s.strip != "page"
+          valid_modes = %w[page 16:9 4:3 3:2 1:1 custom].freeze
+
+          gui_aspect = (settings[:image_aspect_ratio] || settings["image_aspect_ratio"]).to_s.strip
+          gui_aspect = "4:3" if !gui_aspect.empty? && !valid_modes.include?(gui_aspect)
+
+          img_aspect = (img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"]).to_s.strip
+          img_aspect = nil unless valid_modes.include?(img_aspect)
+
+          explicit_ratio = (settings[:aspect_ratio] || settings["aspect_ratio"]).to_s.strip
+          explicit_ratio = nil if explicit_ratio.empty?
+
+          gui_explicit = !gui_aspect.empty? && gui_aspect != "page"
           aspect_mode = if gui_explicit
-                          settings[:aspect_ratio] || settings["aspect_ratio"] || gui_aspect
+                          explicit_ratio || gui_aspect
                         else
-                          settings[:aspect_ratio] || settings["aspect_ratio"] ||
-                            img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] ||
-                            gui_aspect || "4:3"
+                          explicit_ratio || img_aspect || (!gui_aspect.empty? ? gui_aspect : "4:3")
                         end
           aspect_mode = aspect_mode.to_s.strip
+          aspect_mode = "4:3" if aspect_mode.empty?
 
           page_size   = (settings[:page_size] || settings["page_size"] || (pdata ? pdata.pdf_settings[:page_size] : nil) || "A4").to_s.upcase
           page_layout = (settings[:page_layout] || settings["page_layout"] || (pdata ? pdata.pdf_settings[:page_layout] : nil) || "landscape").to_s.downcase
@@ -575,6 +579,43 @@ module DN1Code
                 end
               end
             end
+          end
+        end
+
+        # Синхронизация оверлея при открытии модели: сброс старых настроек сессии
+        # и актуализация рамки кадра (4:3 если не сохранено иное)
+        # @param model [Sketchup::Model, nil]
+        # @param project_data [Model::ProjectData, nil]
+        # @return [void]
+        def self.on_model_opened(model = nil, project_data = nil)
+          m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
+          @current_settings = nil
+
+          pdata = project_data
+          if pdata.nil? && m && defined?(Model::ProjectData)
+            pdata = Model::ProjectData.new
+            pdata.load_auto(m)
+          end
+
+          info = calculate_target_info(m, pdata ? pdata.pdf_settings : nil)
+          ov = find_model_overlay(m) || overlay_instance
+          if ov
+            ov.ratio_cache          = info[:ratio]
+            ov.label_cache          = info[:label]
+            ov.width_cache          = info[:render_w]
+            ov.height_cache         = info[:render_h]
+            ov.border_color_cache   = info[:border_color]
+            ov.border_opacity_cache = info[:border_opacity]
+            ov.mask_color_cache     = info[:mask_color]
+            ov.mask_opacity_cache   = info[:mask_opacity]
+          end
+
+          is_active = overlay_active?(m)
+          should_show = pdata && pdata.pdf_settings && pdata.pdf_settings[:show_aspect_overlay]
+          if should_show
+            enable(m)
+          elsif is_active
+            invalidate_view(m)
           end
         end
       end

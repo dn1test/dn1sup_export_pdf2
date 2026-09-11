@@ -221,6 +221,43 @@
     }
   ];
 
+  // Helper to resolve info line definitions including dynamic directory lines
+  function getInfoLineDef(key) {
+    if (!key) return null;
+    const found = AVAILABLE_INFO_LINES.find((l) => l.key === key);
+    if (found) return found;
+
+    if (typeof key === "string" && key.startsWith("dir_desc_")) {
+      const idx = parseInt(key.replace("dir_desc_", ""), 10);
+      const dirs = Array.isArray(state.directories) ? state.directories : [];
+      const d = dirs[idx] || {};
+      const dTitle = (d.title || getFolderName(d.path) || `Раздел #${idx + 1}`).trim();
+      return {
+        key: key,
+        group: "specs",
+        label: `📁 ${dTitle}`,
+        icon: "📁",
+        getVal: () => (d.description || "").trim() || "—"
+      };
+    }
+
+    if (key === "dir_specs" || key === "directories_spec") {
+      return {
+        key: key,
+        group: "specs",
+        label: "📁 Все спецификации папок",
+        icon: "📁",
+        getVal: () => {
+          const dirs = (state.directories || []).filter(d => d && (d.description || "").trim());
+          if (dirs.length === 0) return "—";
+          return dirs.map((d, i) => `${d.title || ("Раздел #" + (i + 1))}: ${(d.description || "").trim()}`).join(" • ");
+        }
+      };
+    }
+
+    return null;
+  }
+
   // Deep clone utility to guarantee complete independence of template slot settings
   function deepClone(obj) {
     if (obj === null || typeof obj !== "object") return obj;
@@ -256,6 +293,8 @@
   const DEFAULT_MIDDLE_SLOT = {
     visible: true,
     content: "info_lines",
+    show_titles: true,
+    line_show_titles: {},
     align: "left",
     valign: "top",
     font_size: 8,
@@ -492,7 +531,11 @@
     inputCompany: document.getElementById("inputCompany"),
     companyFieldGroup: document.getElementById("companyFieldGroup"),
     inputArticul: document.getElementById("inputArticul"),
+    inputArticulSuffix: document.getElementById("inputArticulSuffix"),
     btnGenerateArticul: document.getElementById("btnGenerateArticul"),
+    tradeToggleGroup: document.getElementById("tradeToggleGroup"),
+    btnTradeHF: document.getElementById("btnTradeHF"),
+    btnTradeCF: document.getElementById("btnTradeCF"),
     selectTrade: document.getElementById("selectTrade"),
     inputTags: document.getElementById("inputTags"),
     inputProjectDescription: document.getElementById("inputProjectDescription"),
@@ -528,6 +571,26 @@
     scenesSplitResizer: document.getElementById("scenesSplitResizer"),
 
     // Template & List Settings Elements
+    templatesSidebar: document.getElementById("templatesSidebar"),
+    templatesList: document.getElementById("templatesList"),
+    btnCreateTemplate: document.getElementById("btnCreateTemplate"),
+    btnDeleteTemplateSidebar: document.getElementById("btnDeleteTemplateSidebar"),
+    currentTemplateTitle: document.getElementById("currentTemplateTitle"),
+    btnRenameCurrentTemplate: document.getElementById("btnRenameCurrentTemplate"),
+    btnDeleteCurrentTemplate: document.getElementById("btnDeleteCurrentTemplate"),
+    newTemplateModal: document.getElementById("newTemplateModal"),
+    inputNewTemplateName: document.getElementById("inputNewTemplateName"),
+    selectNewTemplateBase: document.getElementById("selectNewTemplateBase"),
+    btnConfirmNewTemplate: document.getElementById("btnConfirmNewTemplate"),
+    btnCancelNewTemplate: document.getElementById("btnCancelNewTemplate"),
+    deleteTemplateModal: document.getElementById("deleteTemplateModal"),
+    deleteTemplateMsg: document.getElementById("deleteTemplateMsg"),
+    btnCancelDeleteTemplate: document.getElementById("btnCancelDeleteTemplate"),
+    btnConfirmDeleteTemplate: document.getElementById("btnConfirmDeleteTemplate"),
+    renameTemplateModal: document.getElementById("renameTemplateModal"),
+    inputRenameTemplateName: document.getElementById("inputRenameTemplateName"),
+    btnCancelRenameTemplate: document.getElementById("btnCancelRenameTemplate"),
+    btnConfirmRenameTemplate: document.getElementById("btnConfirmRenameTemplate"),
     templateSettingsPanel: document.getElementById("templateSettingsPanel"),
     templateSettingsContainer: document.getElementById("templateSettingsContainer"),
     selectLayoutTemplate: document.getElementById("selectLayoutTemplate"),
@@ -646,14 +709,16 @@
 
         tab.classList.add("active");
         if (appContent) {
-          appContent.classList.toggle("no-padding", tab.dataset.tab === "tab-scenes");
+          appContent.classList.toggle("no-padding", tab.dataset.tab === "tab-scenes" || tab.dataset.tab === "tab-templates");
         }
         const targetPane = document.getElementById(tab.dataset.tab);
         if (targetPane) {
           targetPane.classList.add("active");
           if (tab.dataset.tab === "tab-scenes") {
             renderScenesTable();
+          } else if (tab.dataset.tab === "tab-templates") {
             renderLayoutCanvas();
+            renderTemplateSettingsList();
             updateLayoutUsageBadge();
           } else if (tab.dataset.tab === "tab-directories") {
             renderDirectories();
@@ -663,6 +728,44 @@
         }
       });
     });
+  }
+
+  function switchToTab(tabId) {
+    const tabs = document.querySelectorAll(".tab-btn");
+    const tabPanes = document.querySelectorAll(".tab-pane");
+    const appContent = document.querySelector(".app-content");
+
+    tabs.forEach((t) => {
+      if (t.dataset.tab === tabId) {
+        t.classList.add("active");
+      } else {
+        t.classList.remove("active");
+      }
+    });
+
+    tabPanes.forEach((p) => {
+      if (p.id === tabId) {
+        p.classList.add("active");
+      } else {
+        p.classList.remove("active");
+      }
+    });
+
+    if (appContent) {
+      appContent.classList.toggle("no-padding", tabId === "tab-scenes" || tabId === "tab-templates");
+    }
+
+    if (tabId === "tab-scenes") {
+      renderScenesTable();
+    } else if (tabId === "tab-templates") {
+      renderLayoutCanvas();
+      renderTemplateSettingsList();
+      updateLayoutUsageBadge();
+    } else if (tabId === "tab-directories") {
+      renderDirectories();
+    } else if (tabId === "tab-settings") {
+      renderApiTargets();
+    }
   }
 
   function updateLayoutUsageBadge() {
@@ -770,20 +873,24 @@
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
 
     const validSlotIds = new Set(FIXED_SLOT_DEFS.map((s) => s.id));
+    const metaKeys = new Set(["name", "_name", "_base_type", "_icon", "_meta"]);
 
-    Object.keys(DEFAULT_LAYOUTS).forEach((tplKey) => {
+    const allTplKeys = Array.from(new Set([...Object.keys(DEFAULT_LAYOUTS), ...Object.keys(state.pdf_settings.custom_layouts)]));
+
+    allTplKeys.forEach((tplKey) => {
       if (!state.pdf_settings.custom_layouts[tplKey]) {
         state.pdf_settings.custom_layouts[tplKey] = {};
       }
 
-      // Purge legacy keys (e.g. cover_accent_bar, cover_hero_image, desc_header, etc.)
+      // Purge legacy keys (e.g. cover_accent_bar, cover_hero_image, desc_header, etc.), preserving metadata
       Object.keys(state.pdf_settings.custom_layouts[tplKey]).forEach((k) => {
-        if (!validSlotIds.has(k)) {
+        if (!validSlotIds.has(k) && !metaKeys.has(k)) {
           delete state.pdf_settings.custom_layouts[tplKey][k];
         }
       });
 
-      const tplDefaults = DEFAULT_LAYOUTS[tplKey]?.slots || {};
+      const baseKey = state.pdf_settings.custom_layouts[tplKey]?._base_type || (DEFAULT_LAYOUTS[tplKey] ? tplKey : "general");
+      const tplDefaults = (DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general)?.slots || {};
       FIXED_SLOT_DEFS.forEach((slotDef) => {
         const current = state.pdf_settings.custom_layouts[tplKey][slotDef.id];
         const defSlot = tplDefaults[slotDef.id] || {};
@@ -861,10 +968,346 @@
     });
   }
 
+  // -----------------------------------------------------------------------------
+  // Dynamic Template Registry & Management
+  // -----------------------------------------------------------------------------
+  function getAllTemplates() {
+    const builtins = [
+      { key: "cover", name: "Титульный лист (Cover)", icon: "🏷️", isDefault: true },
+      { key: "description", name: "Описание и спецификации (Description)", icon: "📝", isDefault: true },
+      { key: "explain", name: "Содержание и ведомость (Explain)", icon: "📋", isDefault: true },
+      { key: "general", name: "Общий вид (General)", icon: "🖼️", isDefault: true },
+      { key: "visual", name: "Визуализация (Visual)", icon: "👁️", isDefault: true }
+    ];
+
+    const result = [...builtins];
+    const customLayouts = state.pdf_settings?.custom_layouts || {};
+
+    Object.keys(customLayouts).forEach((key) => {
+      if (!builtins.some((b) => b.key === key)) {
+        const tplObj = customLayouts[key];
+        const customName = tplObj?._name || tplObj?.name || state.pdf_settings?.template_names?.[key] || `Шаблон (${key})`;
+        const customIcon = tplObj?._icon || "📄";
+        result.push({
+          key: key,
+          name: customName,
+          icon: customIcon,
+          isDefault: false,
+          baseType: tplObj?._base_type || "general"
+        });
+      }
+    });
+
+    return result;
+  }
+
+  function getTemplateDef(tplKey) {
+    if (DEFAULT_LAYOUTS[tplKey]) {
+      return {
+        key: tplKey,
+        name: DEFAULT_LAYOUTS[tplKey].name,
+        icon: tplKey === "cover" ? "🏷️" : (tplKey === "description" ? "📝" : (tplKey === "explain" ? "📋" : (tplKey === "general" ? "🖼️" : "👁️"))),
+        isDefault: true,
+        slots: DEFAULT_LAYOUTS[tplKey].slots || {}
+      };
+    }
+    const customLayouts = state.pdf_settings?.custom_layouts || {};
+    const custom = customLayouts[tplKey] || {};
+    const baseKey = custom._base_type || "general";
+    const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
+    const name = custom._name || custom.name || state.pdf_settings?.template_names?.[tplKey] || `Шаблон (${tplKey})`;
+    const icon = custom._icon || "📄";
+
+    return {
+      key: tplKey,
+      name: name,
+      icon: icon,
+      isDefault: false,
+      baseType: baseKey,
+      slots: baseDef.slots || {}
+    };
+  }
+
+  function renderTemplatesList() {
+    const listEl = els.templatesList || document.getElementById("templatesList");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+
+    const templates = getAllTemplates();
+    const currentKey = layoutState.currentTemplate || "cover";
+    const scenes = state.scenes || [];
+
+    templates.forEach((tpl) => {
+      const item = document.createElement("div");
+      item.className = `template-list-item${tpl.key === currentKey ? " active" : ""}`;
+      item.dataset.tpl = tpl.key;
+
+      const matchingScenes = scenes.filter((s) => s.page_type === tpl.key);
+      const usageText = matchingScenes.length > 0 
+        ? `${matchingScenes.length} ${matchingScenes.length === 1 ? "сцена" : (matchingScenes.length < 5 ? "сцены" : "сцен")}`
+        : "не используется";
+
+      const subText = tpl.isDefault ? `По умолчанию • ${usageText}` : `Пользовательский • ${usageText}`;
+
+      const mainDiv = document.createElement("div");
+      mainDiv.className = "tpl-item-main";
+
+      const iconSpan = document.createElement("span");
+      iconSpan.className = "tpl-item-icon";
+      iconSpan.textContent = tpl.icon;
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "tpl-item-text";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "tpl-item-name";
+      nameSpan.textContent = tpl.name;
+
+      const subSpan = document.createElement("span");
+      subSpan.className = "tpl-item-sub";
+      subSpan.textContent = subText;
+
+      textDiv.appendChild(nameSpan);
+      textDiv.appendChild(subSpan);
+      mainDiv.appendChild(iconSpan);
+      mainDiv.appendChild(textDiv);
+      item.appendChild(mainDiv);
+
+      // Actions (for custom templates)
+      if (!tpl.isDefault) {
+        const actionsDiv = document.createElement("div");
+        actionsDiv.className = "tpl-item-actions";
+
+        const btnRename = document.createElement("button");
+        btnRename.type = "button";
+        btnRename.className = "tpl-item-action-btn";
+        btnRename.title = "Переименовать шаблон";
+        btnRename.textContent = "✏️";
+        btnRename.addEventListener("click", (e) => {
+          e.stopPropagation();
+          promptRenameTemplate(tpl.key);
+        });
+
+        const btnDel = document.createElement("button");
+        btnDel.type = "button";
+        btnDel.className = "tpl-item-action-btn delete";
+        btnDel.title = "Удалить шаблон";
+        btnDel.textContent = "🗑️";
+        btnDel.addEventListener("click", (e) => {
+          e.stopPropagation();
+          deleteCustomTemplate(tpl.key);
+        });
+
+        actionsDiv.appendChild(btnRename);
+        actionsDiv.appendChild(btnDel);
+        item.appendChild(actionsDiv);
+      }
+
+      item.addEventListener("click", () => {
+        selectTemplate(tpl.key);
+      });
+
+      listEl.appendChild(item);
+    });
+  }
+
+  let templatePendingDelete = null;
+  let templatePendingRename = null;
+
+  function selectTemplate(tplKey) {
+    layoutState.currentTemplate = tplKey;
+    const tplDef = getTemplateDef(tplKey);
+
+    if (els.currentTemplateTitle) {
+      els.currentTemplateTitle.textContent = `${tplDef.icon || "📄"} ${tplDef.name}`;
+    }
+
+    if (els.selectLayoutTemplate) {
+      els.selectLayoutTemplate.value = tplKey;
+    }
+
+    const isCustom = !DEFAULT_LAYOUTS[tplKey];
+    if (els.btnDeleteCurrentTemplate) {
+      els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    }
+    if (els.btnDeleteTemplateSidebar) {
+      els.btnDeleteTemplateSidebar.style.display = isCustom ? "inline-flex" : "none";
+    }
+    if (els.btnRenameCurrentTemplate) {
+      els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    }
+
+    renderTemplateSettingsList(true);
+    renderTemplatesList();
+    updateLayoutUsageBadge();
+  }
+
+  function syncTemplateDropdowns() {
+    // Update els.selectLayoutTemplate options
+    if (els.selectLayoutTemplate) {
+      const currentVal = layoutState.currentTemplate;
+      els.selectLayoutTemplate.innerHTML = "";
+      const templates = getAllTemplates();
+      templates.forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.key;
+        opt.textContent = `${t.icon || "📄"} ${t.name}`;
+        if (t.key === currentVal) opt.selected = true;
+        els.selectLayoutTemplate.appendChild(opt);
+      });
+    }
+  }
+
+  function createCustomTemplate(name, baseKey = "general") {
+    if (!name || !name.trim()) return;
+    const trimmedName = name.trim();
+
+    ensureCustomLayouts();
+    const newKey = "custom_" + Date.now().toString(36);
+
+    const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
+    const baseSlots = state.pdf_settings.custom_layouts[baseKey] || baseDef.slots || {};
+
+    state.pdf_settings.custom_layouts[newKey] = deepClone(baseSlots);
+    state.pdf_settings.custom_layouts[newKey].name = trimmedName;
+    state.pdf_settings.custom_layouts[newKey]._name = trimmedName;
+    state.pdf_settings.custom_layouts[newKey]._base_type = baseKey;
+    state.pdf_settings.custom_layouts[newKey]._icon = "📄";
+
+    if (!state.pdf_settings.template_names) state.pdf_settings.template_names = {};
+    state.pdf_settings.template_names[newKey] = trimmedName;
+
+    syncTemplateDropdowns();
+    selectTemplate(newKey);
+    renderScenesTable();
+    notifyChange();
+    showNotification(`Шаблон «${trimmedName}» успешно создан`, "success");
+  }
+
+  function openDeleteTemplateModal(tplKey) {
+    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+      showNotification("Стандартные шаблоны нельзя удалить", "warning");
+      return;
+    }
+    templatePendingDelete = tplKey;
+    const tplDef = getTemplateDef(tplKey);
+    if (els.deleteTemplateMsg) {
+      els.deleteTemplateMsg.textContent = `Вы действительно хотите удалить пользовательский шаблон «${tplDef.name}»?`;
+    }
+    if (els.deleteTemplateModal) {
+      els.deleteTemplateModal.classList.remove("hidden");
+    }
+  }
+
+  function closeDeleteTemplateModal() {
+    templatePendingDelete = null;
+    if (els.deleteTemplateModal) {
+      els.deleteTemplateModal.classList.add("hidden");
+    }
+  }
+
+  function confirmDeleteTemplate() {
+    const tplKey = templatePendingDelete;
+    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+      closeDeleteTemplateModal();
+      return;
+    }
+    const tplDef = getTemplateDef(tplKey);
+
+    // Reassign scenes
+    let reassignedCount = 0;
+    (state.scenes || []).forEach((s) => {
+      if (s.page_type === tplKey) {
+        s.page_type = "general";
+        reassignedCount++;
+      }
+    });
+
+    if (state.pdf_settings?.custom_layouts) {
+      delete state.pdf_settings.custom_layouts[tplKey];
+    }
+    if (state.pdf_settings?.template_names) {
+      delete state.pdf_settings.template_names[tplKey];
+    }
+
+    closeDeleteTemplateModal();
+    layoutState.currentTemplate = "general";
+    syncTemplateDropdowns();
+    renderTemplatesList();
+    renderScenesTable();
+    selectTemplate("general");
+    notifyChange();
+    showNotification(`Шаблон «${tplDef.name}» удален${reassignedCount > 0 ? ` (сцен переключено на Общий вид: ${reassignedCount})` : ""}`, "info");
+  }
+
+  function deleteCustomTemplate(tplKey) {
+    openDeleteTemplateModal(tplKey);
+  }
+
+  function openRenameTemplateModal(tplKey) {
+    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+      showNotification("Стандартные шаблоны нельзя переименовать", "warning");
+      return;
+    }
+    templatePendingRename = tplKey;
+    const tplDef = getTemplateDef(tplKey);
+    if (els.inputRenameTemplateName) {
+      els.inputRenameTemplateName.value = tplDef.name;
+    }
+    if (els.renameTemplateModal) {
+      els.renameTemplateModal.classList.remove("hidden");
+      if (els.inputRenameTemplateName) {
+        setTimeout(() => els.inputRenameTemplateName.focus(), 50);
+      }
+    }
+  }
+
+  function closeRenameTemplateModal() {
+    templatePendingRename = null;
+    if (els.renameTemplateModal) {
+      els.renameTemplateModal.classList.add("hidden");
+    }
+  }
+
+  function confirmRenameTemplate() {
+    const tplKey = templatePendingRename;
+    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+      closeRenameTemplateModal();
+      return;
+    }
+    const newName = els.inputRenameTemplateName ? els.inputRenameTemplateName.value.trim() : "";
+    if (!newName) {
+      showNotification("Название шаблона не может быть пустым", "warning");
+      if (els.inputRenameTemplateName) els.inputRenameTemplateName.focus();
+      return;
+    }
+
+    if (!state.pdf_settings) state.pdf_settings = {};
+    if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
+    if (!state.pdf_settings.custom_layouts[tplKey]) state.pdf_settings.custom_layouts[tplKey] = {};
+    state.pdf_settings.custom_layouts[tplKey].name = newName;
+    state.pdf_settings.custom_layouts[tplKey]._name = newName;
+    if (!state.pdf_settings.template_names) state.pdf_settings.template_names = {};
+    state.pdf_settings.template_names[tplKey] = newName;
+
+    closeRenameTemplateModal();
+    syncTemplateDropdowns();
+    renderTemplatesList();
+    renderScenesTable();
+    selectTemplate(tplKey);
+    notifyChange();
+    showNotification(`Шаблон переименован в «${newName}»`, "success");
+  }
+
+  function promptRenameTemplate(tplKey) {
+    openRenameTemplateModal(tplKey);
+  }
+
   function getActiveLayoutBlocks() {
     ensureCustomLayouts();
     const tplKey = layoutState.currentTemplate || "cover";
-    const tplDefaults = (DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS.cover).slots || {};
+    const tplDef = getTemplateDef(tplKey);
+    const tplDefaults = tplDef.slots || {};
     const customTpl = state.pdf_settings.custom_layouts[tplKey] || {};
 
     return FIXED_SLOT_DEFS.map((slotDef) => {
@@ -912,6 +1355,8 @@
         line_colors: custom.line_colors ? Object.assign({}, custom.line_colors) : (defaultLineColors ? Object.assign({}, defaultLineColors) : null),
         line_aligns: custom.line_aligns ? Object.assign({}, custom.line_aligns) : (defaultLineAligns ? Object.assign({}, defaultLineAligns) : null),
         line_valigns: custom.line_valigns ? Object.assign({}, custom.line_valigns) : (defaultLineValigns ? Object.assign({}, defaultLineValigns) : null),
+        show_titles: custom.show_titles !== undefined ? custom.show_titles : (defSlot.show_titles !== undefined ? defSlot.show_titles : true),
+        line_show_titles: custom.line_show_titles ? Object.assign({}, custom.line_show_titles) : (defSlot.line_show_titles ? Object.assign({}, defSlot.line_show_titles) : null),
         opacity: custom.opacity !== undefined ? custom.opacity : (defSlot.opacity !== undefined ? defSlot.opacity : 0.9),
         content_options: slotDef.content_options || null
       };
@@ -929,7 +1374,7 @@
     if (!state.pdf_settings.custom_layouts[tplKey]) {
       state.pdf_settings.custom_layouts[tplKey] = {};
     }
-    const defTpl = DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS.cover;
+    const defTpl = getTemplateDef(tplKey);
     const defSlot1 = defTpl.slots?.slot_1 || DEFAULT_MIDDLE_SLOT;
     if (!state.pdf_settings.custom_layouts[tplKey].slot_1) {
       state.pdf_settings.custom_layouts[tplKey].slot_1 = deepClone(defSlot1);
@@ -938,6 +1383,12 @@
     if (!s1.content) s1.content = defSlot1.content || "info_lines";
     if (!s1.lines) {
       s1.lines = deepClone(defSlot1.lines || DEFAULT_MIDDLE_SLOT.lines);
+    }
+    if (s1.show_titles === undefined) {
+      s1.show_titles = defSlot1.show_titles !== undefined ? defSlot1.show_titles : true;
+    }
+    if (!s1.line_show_titles) {
+      s1.line_show_titles = deepClone(defSlot1.line_show_titles || {});
     }
     if (!s1.line_aligns) s1.line_aligns = deepClone(defSlot1.line_aligns || DEFAULT_MIDDLE_ALIGNS);
     if (!s1.line_valigns) s1.line_valigns = deepClone(defSlot1.line_valigns || DEFAULT_MIDDLE_VALIGNS);
@@ -1087,7 +1538,7 @@
         if (k === "customer_or_company") return sampleCust;
         if (k === "scene_name" || k === "name" || k === "name_scene") return sampleSceneName;
         if (k === "scene_description" || k === "description" || k === "scene_desc" || k === "desc") return sampleSceneDesc;
-        const lineDef = AVAILABLE_INFO_LINES.find((l) => l.key === k);
+        const lineDef = getInfoLineDef(k);
         return lineDef ? lineDef.getVal(info, wf) : "";
       };
 
@@ -1160,7 +1611,7 @@
           actualKeys = ["footer_ver_rev", "footer_articul", "footer_date"];
         }
         actualKeys.forEach((k) => {
-          const lineDef = AVAILABLE_INFO_LINES.find((l) => l.key === k);
+          const lineDef = getInfoLineDef(k);
           if (!lineDef) return;
           const val = lineDef.getVal(info, wf);
           if (!val && val !== 0) return;
@@ -1218,7 +1669,7 @@
     const lineColors = blk.line_colors || {};
     if (activeLines.length > 0) {
       renderedLinesHtml = activeLines.map((lineKey) => {
-        const lineDef = AVAILABLE_INFO_LINES.find((l) => l.key === lineKey);
+        const lineDef = getInfoLineDef(lineKey);
         if (!lineDef) return "";
         const val = lineDef.getVal(info, wf);
         if (!val && val !== 0) return "";
@@ -1289,15 +1740,22 @@
   }
 
   // Синхронизация пропорций кадра и параметров оверлея в SketchUp с блоком "Картинка чертежа" шаблона
-  function syncCurrentTemplateOverlay(overrideRatio) {
+  function syncCurrentTemplateOverlay(overrideRatio, isUserAction = false) {
     const tplKey = layoutState.currentTemplate || "cover";
     ensureCustomLayouts();
     const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
     const tplCfg = customLayouts[tplKey] || {};
     const imgCfg = tplCfg.image_4_3 || {};
 
-    let ratio = overrideRatio || imgCfg.aspect_ratio || "4:3";
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    let ratio = overrideRatio || imgCfg.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
     ratio = String(ratio).trim();
+    if (!VALID_ASPECT_RATIOS.includes(ratio)) {
+      ratio = state.pdf_settings?.image_aspect_ratio || "4:3";
+      if (!VALID_ASPECT_RATIOS.includes(ratio)) {
+        ratio = "4:3";
+      }
+    }
 
     const displayRatio = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
     const tplText = document.getElementById("tplAspectOverlayText");
@@ -1307,6 +1765,11 @@
     const tplNote = document.querySelector(".tpl-image-note");
     if (tplNote) {
       tplNote.textContent = `Рамка в окне SketchUp отображает точные границы кадра для текущего шаблона с выбранными пропорциями (${displayRatio}).`;
+    }
+
+    // Отправка настроек в SketchUp происходит только при явном действии пользователя
+    if (!isUserAction) {
+      return;
     }
 
     const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
@@ -1336,15 +1799,28 @@
     callRuby("updateAspectSettings", JSON.stringify(payload));
   }
 
-  function renderTemplateSettingsList() {
+  function renderTemplateSettingsList(isUserAction = false) {
     if (!els.templateSettingsContainer) return;
     ensureCustomLayouts();
+    syncDirectoriesSpecifications();
 
     const tplKey = layoutState.currentTemplate || "cover";
     const customTpl = state.pdf_settings.custom_layouts[tplKey] || {};
-    const tplDef = DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS.cover;
+    const tplDefObj = getTemplateDef(tplKey);
+    const tplDef = tplDefObj.slots ? tplDefObj : (DEFAULT_LAYOUTS[tplDefObj.baseType] || DEFAULT_LAYOUTS.cover);
     const info = state.project_info || {};
     const wf = state.workflow || {};
+
+    if (els.currentTemplateTitle) {
+      els.currentTemplateTitle.textContent = `${tplDefObj.icon || "📄"} ${tplDefObj.name}`;
+    }
+    const isCustom = !DEFAULT_LAYOUTS[tplKey];
+    if (els.btnDeleteCurrentTemplate) {
+      els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    }
+    if (els.btnRenameCurrentTemplate) {
+      els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    }
 
     // Page format badge
     const isPortrait = (els.selectPageLayout ? els.selectPageLayout.value : state.pdf_settings?.page_layout) === "portrait";
@@ -1550,6 +2026,7 @@
     // CARD 2: СРЕДНИЙ БЛОК (Middle)
     // -------------------------------------------------------------
     const isMiddleVis = slot1.visible !== false;
+    const isTitlesVis = slot1.show_titles !== false;
     const middleFontSize = slot1.font_size !== undefined ? parseFloat(slot1.font_size) : 8;
     const middleItemGap = slot1.item_gap_mm !== undefined ? parseFloat(slot1.item_gap_mm) : (slot1.item_gap !== undefined ? parseFloat(slot1.item_gap) : 2);
     const middleLines = Array.isArray(slot1.lines) ? slot1.lines : (DEFAULT_LINES_BY_CONTENT.slot_1 || []);
@@ -1557,6 +2034,7 @@
     const middleLineValigns = slot1.line_valigns || {};
     const middleLineFontSizes = slot1.line_font_sizes || {};
     const middleLineColors = slot1.line_colors || {};
+    const middleLineShowTitles = slot1.line_show_titles || {};
 
     const getMidAlign = (k, def = "left") => {
       const val = (middleLineAligns[k] || "").trim();
@@ -1574,6 +2052,9 @@
       const val = (middleLineColors[k] || "").trim();
       return val || def;
     };
+    const getMidShowTitle = (k, def = isTitlesVis) => {
+      return middleLineShowTitles[k] !== undefined ? !!middleLineShowTitles[k] : def;
+    };
 
     const middleAvailableLines = [
       { key: "toc_pages",         label: "📑 Содержание (список страниц)", val: "1. Титул, 2. План" },
@@ -1587,6 +2068,29 @@
       { key: "workflow_date",     label: "📅 Дата",                      val: String(wf.date_order || info.date || new Date().toISOString().slice(0, 10)).trim() },
       { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
     ];
+
+    // Динамически добавляем описание каждого блока папки (directories) в средний список шаблонов
+    if (Array.isArray(state.directories) && state.directories.length > 0) {
+      state.directories.forEach((d, idx) => {
+        if (!d) return;
+        const dTitle = (d.title || getFolderName(d.path) || `Раздел #${idx + 1}`).trim();
+        const dDesc = (d.description || "").trim();
+        const dKey = `dir_desc_${idx}`;
+        middleAvailableLines.push({
+          key: dKey,
+          label: `📁 ${dTitle}`,
+          val: dDesc || "(описание раздела не заполнено)"
+        });
+      });
+      const allSpecs = state.directories.filter(d => d && (d.description || "").trim()).map((d, i) => `${d.title || ("Раздел #" + (i + 1))}: ${(d.description || "").trim()}`).join(" • ");
+      if (allSpecs) {
+        middleAvailableLines.push({
+          key: "dir_specs",
+          label: "📁 Все спецификации папок",
+          val: allSpecs
+        });
+      }
+    }
 
     const renderMiddleItemControls = (key, activeAlign, activeValign, activeSize, activeColor) => {
       let sizeOptions = "";
@@ -1657,6 +2161,10 @@
               <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Все</button>
               <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Снять</button>
             </div>
+            <label class="checkbox-label tpl-chk-titles-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;" title="Выводить заголовки пунктов на листах проекта">
+              <input type="checkbox" class="chk-slot-show-titles" data-slot="slot_1" ${isTitlesVis ? 'checked' : ''}>
+              <span>Заголовок</span>
+            </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
               <input type="checkbox" class="chk-slot-visible" data-slot="slot_1" ${isMiddleVis ? 'checked' : ''}>
               <span>Вкл</span>
@@ -1830,7 +2338,9 @@
     // CARD 4: КАРТИНКА ЧЕРТЕЖА ПОД ТЕКСТ (Drawing Viewport)
     // -------------------------------------------------------------
     const isImageVis = image43.visible !== false;
-    const imageAspectRatio = (image43.aspect_ratio || "4:3").trim();
+    const VALID_TPL_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
+    let rawTplRatio = (image43.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
+    const imageAspectRatio = VALID_TPL_ASPECTS.includes(rawTplRatio) ? rawTplRatio : "4:3";
     const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
     const imageScalePct = parseInt(image43.scale_pct !== undefined ? image43.scale_pct : 100, 10) || 100;
     const isOverlayOn = Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
@@ -1938,7 +2448,7 @@
 
     els.templateSettingsContainer.innerHTML = html;
     bindTemplateSettingsEvents(tplKey);
-    syncCurrentTemplateOverlay();
+    syncCurrentTemplateOverlay(null, isUserAction);
   }
 
   function renderSlotCardHtml(slotId, title, icon, side, slotData, isFullList, widthPct, info, wf) {
@@ -2467,6 +2977,20 @@
       inp.addEventListener("change", handleColorChange);
     });
 
+    // Middle Block Titles Toggle (Галка "Заголовок" для страниц проекта)
+    const chkSlotShowTitles = els.templateSettingsContainer.querySelectorAll(".chk-slot-show-titles");
+    chkSlotShowTitles.forEach((chk) => {
+      chk.addEventListener("change", (e) => {
+        const sId = e.target.dataset.slot || "slot_1";
+        const isShown = e.target.checked;
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        const s1 = ensureMiddleSlotDefaults(targetTpl);
+        s1.show_titles = isShown;
+        updateBlockSlot(sId, { show_titles: isShown, content: "info_lines" }, tplKey);
+        notifyChange();
+      });
+    });
+
     // Footer Visible Toggle
     const chkFtrVis = document.getElementById("chk_footer_visible");
     if (chkFtrVis) {
@@ -2816,8 +3340,8 @@
   }
 
   // Alias for backward compatibility with existing render calls
-  function renderLayoutCanvas() {
-    renderTemplateSettingsList();
+  function renderLayoutCanvas(isUserAction = false) {
+    renderTemplateSettingsList(isUserAction);
   }
 
   // Layout & Template Settings Setup
@@ -2825,9 +3349,109 @@
     // Template switcher
     if (els.selectLayoutTemplate) {
       els.selectLayoutTemplate.addEventListener("change", (e) => {
-        layoutState.currentTemplate = e.target.value;
-        renderTemplateSettingsList();
-        updateLayoutUsageBadge();
+        selectTemplate(e.target.value);
+      });
+    }
+
+    // Modal and Template Management Buttons
+    if (els.btnCreateTemplate) {
+      els.btnCreateTemplate.addEventListener("click", () => {
+        if (els.newTemplateModal) {
+          if (els.inputNewTemplateName) els.inputNewTemplateName.value = "";
+          els.newTemplateModal.classList.remove("hidden");
+          if (els.inputNewTemplateName) {
+            setTimeout(() => els.inputNewTemplateName.focus(), 50);
+          }
+        }
+      });
+    }
+
+    if (els.btnCancelNewTemplate) {
+      els.btnCancelNewTemplate.addEventListener("click", () => {
+        if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
+      });
+    }
+
+    if (els.btnConfirmNewTemplate) {
+      els.btnConfirmNewTemplate.addEventListener("click", () => {
+        const name = els.inputNewTemplateName ? els.inputNewTemplateName.value.trim() : "";
+        const baseType = els.selectNewTemplateBase ? els.selectNewTemplateBase.value : "general";
+        if (!name) {
+          showNotification("Введите название шаблона", "warning");
+          if (els.inputNewTemplateName) els.inputNewTemplateName.focus();
+          return;
+        }
+        createCustomTemplate(name, baseType);
+        if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
+      });
+    }
+
+    if (els.inputNewTemplateName) {
+      els.inputNewTemplateName.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (els.btnConfirmNewTemplate) els.btnConfirmNewTemplate.click();
+        } else if (e.key === "Escape") {
+          if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
+        }
+      });
+    }
+
+    // Delete Template Modal Handlers
+    if (els.btnDeleteCurrentTemplate) {
+      els.btnDeleteCurrentTemplate.addEventListener("click", () => {
+        const tplKey = layoutState.currentTemplate;
+        openDeleteTemplateModal(tplKey);
+      });
+    }
+
+    if (els.btnDeleteTemplateSidebar) {
+      els.btnDeleteTemplateSidebar.addEventListener("click", () => {
+        const tplKey = layoutState.currentTemplate;
+        openDeleteTemplateModal(tplKey);
+      });
+    }
+
+    if (els.btnCancelDeleteTemplate) {
+      els.btnCancelDeleteTemplate.addEventListener("click", () => {
+        closeDeleteTemplateModal();
+      });
+    }
+
+    if (els.btnConfirmDeleteTemplate) {
+      els.btnConfirmDeleteTemplate.addEventListener("click", () => {
+        confirmDeleteTemplate();
+      });
+    }
+
+    // Rename Template Modal Handlers
+    if (els.btnRenameCurrentTemplate) {
+      els.btnRenameCurrentTemplate.addEventListener("click", () => {
+        const tplKey = layoutState.currentTemplate;
+        openRenameTemplateModal(tplKey);
+      });
+    }
+
+    if (els.btnCancelRenameTemplate) {
+      els.btnCancelRenameTemplate.addEventListener("click", () => {
+        closeRenameTemplateModal();
+      });
+    }
+
+    if (els.btnConfirmRenameTemplate) {
+      els.btnConfirmRenameTemplate.addEventListener("click", () => {
+        confirmRenameTemplate();
+      });
+    }
+
+    if (els.inputRenameTemplateName) {
+      els.inputRenameTemplateName.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          confirmRenameTemplate();
+        } else if (e.key === "Escape") {
+          closeRenameTemplateModal();
+        }
       });
     }
 
@@ -2846,11 +3470,19 @@
     if (els.btnResetLayout) {
       els.btnResetLayout.addEventListener("click", () => {
         const tplKey = layoutState.currentTemplate;
-        const defTpl = DEFAULT_LAYOUTS[tplKey];
+        const tplDefObj = getTemplateDef(tplKey);
+        const defTpl = DEFAULT_LAYOUTS[tplDefObj.baseType] || DEFAULT_LAYOUTS.cover;
         if (!defTpl) return;
 
         if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
-        state.pdf_settings.custom_layouts[tplKey] = {};
+        const prevMeta = {};
+        if (state.pdf_settings.custom_layouts[tplKey]) {
+          const cur = state.pdf_settings.custom_layouts[tplKey];
+          ["name", "_name", "_base_type", "_icon", "_meta"].forEach((k) => {
+            if (cur[k] !== undefined) prevMeta[k] = cur[k];
+          });
+        }
+        state.pdf_settings.custom_layouts[tplKey] = Object.assign({}, prevMeta);
 
         const tplDefaults = defTpl.slots || {};
         FIXED_SLOT_DEFS.forEach((slotDef) => {
@@ -2876,6 +3508,8 @@
             line_font_sizes: defLineFontSizes,
             line_colors: defLineColors,
             line_aligns: defLineAligns,
+            show_titles: defSlot.show_titles !== undefined ? defSlot.show_titles : (slotDef.id === "slot_1" ? true : undefined),
+            line_show_titles: defSlot.line_show_titles ? deepClone(defSlot.line_show_titles) : (slotDef.id === "slot_1" ? {} : undefined),
             item_gap_mm: defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : (defSlot.item_gap !== undefined ? defSlot.item_gap : (slotDef.id === "slot_1" ? 2 : undefined)),
             item_gap: defSlot.item_gap !== undefined ? defSlot.item_gap : (defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : (slotDef.id === "slot_1" ? 2 : undefined)),
             opacity: defSlot.opacity !== undefined ? defSlot.opacity : 0.9,
@@ -2887,11 +3521,14 @@
         });
 
         renderTemplateSettingsList();
-        showNotification(`Настройки шаблона «${defTpl.name}» сброшены к стандартам`, "success");
+        renderTemplatesList();
+        showNotification(`Настройки шаблона «${tplDefObj.name}» сброшены к стандартам`, "success");
         notifyChange();
       });
     }
 
+    syncTemplateDropdowns();
+    renderTemplatesList();
     renderTemplateSettingsList();
   }
 
@@ -3005,13 +3642,30 @@
   // Data Population & Form Handling
   // -----------------------------------------------------------------------------
 
+  function getTradeValue() {
+    const activeBtn = document.querySelector("#tradeToggleGroup .segmented-btn.active");
+    if (activeBtn) return activeBtn.getAttribute("data-value") || "0";
+    if (els.selectTrade) return els.selectTrade.value;
+    return "0";
+  }
+
+  function setTradeValue(val) {
+    const strVal = String(val) === "1" ? "1" : "0";
+    const btns = document.querySelectorAll("#tradeToggleGroup .segmented-btn");
+    btns.forEach(btn => {
+      btn.classList.toggle("active", btn.getAttribute("data-value") === strVal);
+    });
+    if (els.selectTrade) els.selectTrade.value = strVal;
+    updateCompanyVisibility();
+  }
+
   function updateCompanyVisibility() {
     if (!els.companyFieldGroup) return;
-    const isCommercial = els.selectTrade && els.selectTrade.value === "1";
+    const isCommercial = getTradeValue() === "1";
     els.companyFieldGroup.style.display = isCommercial ? "flex" : "none";
   }
 
-  function generateArticulLocal(isCommercial, index = 1) {
+  function generateArticulLocal(isCommercial, suffix = "01") {
     const prefix = isCommercial ? "CF#" : "HF#";
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
@@ -3020,8 +3674,8 @@
     const hh = String(now.getHours()).padStart(2, '0');
     const mi = String(now.getMinutes()).padStart(2, '0');
     const ss = String(now.getSeconds()).padStart(2, '0');
-    const idx = String(index || 1).padStart(2, '0');
-    return `${prefix}${yy}${mm}${dd}_${hh}${mi}${ss}_${idx}`;
+    const suf = String(suffix || "01").trim() || "01";
+    return `${prefix}${yy}${mm}${dd}_${hh}${mi}${ss}_${suf}`;
   }
 
   function generateCustomerIdLocal() {
@@ -3064,22 +3718,22 @@
       ? Boolean(prj.commercial)
       : (info.trade === 1 || info.trade === "1" || (prj.articul || info.articul || "").startsWith("CF#"));
 
-    if (els.selectTrade) {
-      els.selectTrade.value = isCommercial ? "1" : "0";
-    }
+    setTradeValue(isCommercial ? "1" : "0");
     updateCompanyVisibility();
 
     if (els.inputArticul) els.inputArticul.value = prj.articul || info.articul || "";
     if (els.inputCompany) els.inputCompany.value = prj.name_company || info.company || "";
+    if (els.inputFurnitureName) {
+      const pTags = prj.product_tags || info.product_tags;
+      if (Array.isArray(pTags) && pTags.length) {
+        els.inputFurnitureName.value = pTags.join(", ");
+      } else {
+        els.inputFurnitureName.value = prj.product || info.name_product || info.furniture_name || prj.tags || info.tags || "";
+      }
+    }
     if (els.inputTags) {
       const tagsVal = prj.tags !== undefined ? prj.tags : (info.tags || "");
       els.inputTags.value = Array.isArray(tagsVal) ? tagsVal.join(", ") : String(tagsVal || "");
-    }
-    if (els.inputFurnitureName) {
-      const pTags = prj.product_tags || info.product_tags;
-      els.inputFurnitureName.value = (Array.isArray(pTags) && pTags.length)
-        ? pTags.join(", ")
-        : (prj.product || info.name_product || info.furniture_name || "");
     }
     if (els.inputRoomName) els.inputRoomName.value = prj.place || info.name_place || info.room_name || "";
     if (els.inputAddress) els.inputAddress.value = prj.adress || info.adress || info.address || "";
@@ -3127,11 +3781,16 @@
       : (settings.margin !== undefined && settings.margin !== null ? Math.round((parseFloat(settings.margin) * 25.4) / 72.0) : 5);
     if (els.inputPageMargin) els.inputPageMargin.value = marginMm;
     if (els.inputLayoutMargin) els.inputLayoutMargin.value = marginMm;
-    if (els.selectImageAspect) els.selectImageAspect.value = settings.image_aspect_ratio || "page";
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    let initialAspect = settings.image_aspect_ratio;
+    if (!VALID_ASPECT_RATIOS.includes(initialAspect)) {
+      initialAspect = "4:3";
+    }
+    if (els.selectImageAspect) els.selectImageAspect.value = initialAspect;
     if (els.inputAspectCustomW) els.inputAspectCustomW.value = settings.custom_ratio_w || 16;
     if (els.inputAspectCustomH) els.inputAspectCustomH.value = settings.custom_ratio_h || 9;
     if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = settings.show_aspect_overlay === true;
-    updateAspectUI();
+    updateAspectUI(false);
     if (els.selectQuality) els.selectQuality.value = (settings.scale_factor || 2.0).toString();
     if (els.selectStamp) els.selectStamp.value = settings.stamp_type || "draft";
     if (els.inputCustomStamp) els.inputCustomStamp.value = settings.stamp_custom || "НЕ УТВЕРЖДЕН";
@@ -3158,12 +3817,15 @@
     if (els.chkAntialias) els.chkAntialias.checked = settings.antialias !== false;
 
     updateHeaderTitles();
+    ensureCustomLayouts();
+    syncTemplateDropdowns();
+    renderTemplatesList();
     renderScenesTable();
     renderStadia();
     renderHistoryTable();
     renderDirectories();
     renderApiTargets();
-    renderLayoutCanvas();
+    selectTemplate(layoutState.currentTemplate || "cover");
     updateLayoutUsageBadge();
   }
 
@@ -3185,6 +3847,14 @@
     if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return "📝";
     if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return "📊";
     return "📄";
+  }
+
+  // Helper: Extract folder basename from directory path
+  function getFolderName(pathStr) {
+    if (!pathStr || typeof pathStr !== "string") return "";
+    const clean = pathStr.replace(/\\/g, "/").replace(/\/+$/, "");
+    const segments = clean.split("/").filter(Boolean);
+    return segments.length > 0 ? segments[segments.length - 1] : "";
   }
 
   // Scan timeouts tracker for directory previews
@@ -3215,20 +3885,76 @@
     }, 4500);
   }
 
+  // Синхронизирует спецификации проекта, связывая их с описаниями (description) в каталогах directories
+  function syncDirectoriesSpecifications() {
+    if (!Array.isArray(state.directories)) return;
+    if (!state.project_info) state.project_info = {};
+
+    state.directories.forEach((d) => {
+      if (!d || typeof d !== "object") return;
+      const pathStr = (d.path || "").toLowerCase();
+      const titleStr = (d.title || "").toLowerCase();
+      const descVal = (d.description || "").trim();
+      const descIsReal = descVal.length > 0 && descVal !== "Дополнительное описание";
+
+      // 1. Материалы и фурнитура
+      if (pathStr.includes("материал") || pathStr.includes("фурнитур") ||
+          titleStr.includes("материал") || titleStr.includes("фурнитур")) {
+        if (descIsReal) {
+          state.project_info.materials = descVal;
+        } else if ((state.project_info.materials || "").trim()) {
+          d.description = state.project_info.materials.trim();
+        }
+      }
+      // 2. Техника и подсветка
+      else if (pathStr.includes("техник") || pathStr.includes("подсветк") ||
+               titleStr.includes("техник") || titleStr.includes("подсветк")) {
+        if (descIsReal) {
+          if (!state.project_info.appliances || state.project_info.appliances.trim() === "") {
+            state.project_info.appliances = descVal;
+          }
+          if (!state.project_info.lighting || state.project_info.lighting.trim() === "") {
+            state.project_info.lighting = descVal;
+          }
+        } else {
+          const comb = [state.project_info.appliances, state.project_info.lighting].filter(Boolean).map(s => s.trim()).filter(Boolean).join("; ");
+          if (comb) d.description = comb;
+        }
+      }
+      // 3. Замеры помещения и ТЗ
+      else if (pathStr.includes("замер") || titleStr.includes("замер")) {
+        if (descIsReal) {
+          state.project_info.task_dimensions = descVal;
+        }
+      }
+      // 4. Инфо заказчика и примечания
+      else if (pathStr.includes("инфо") || pathStr.includes("заказчик") ||
+               titleStr.includes("инфо") || titleStr.includes("заказчик")) {
+        if (descIsReal) {
+          state.project_info.notes = descVal;
+        }
+      }
+    });
+  }
+
+  let draggedDirIndex = null;
+
   // Render Project Directories (directories from YAML) as full Cards with Previews
   function renderDirectories() {
     if (!els.directoriesCardsContainer) return;
     els.directoriesCardsContainer.innerHTML = "";
+    syncDirectoriesSpecifications();
 
     // Нормализация к массиву объектов
     if (state.directories && !Array.isArray(state.directories) && typeof state.directories === "object") {
       state.directories = Object.keys(state.directories).map((k) => {
         const v = state.directories[k] || {};
+        const p = v.path || "";
+        const fn = getFolderName(p);
         return {
-          path:        v.path || "",
-          title:       v.title || k,
-          description: v.description || "",
-          display:     v.display || "grid"
+          path:        p,
+          title:       v.title || fn || k,
+          description: v.description || ""
         };
       });
     }
@@ -3252,22 +3978,103 @@
       card.className = "directory-card";
       card.dataset.index = index;
 
-      // 1. HEADER (Номер, Заголовок, Режим отображения, Удалить)
+      const folderName = getFolderName(d.path);
+      if (!d.title && folderName) {
+        d.title = folderName;
+      }
+
+      // Drag and Drop обработчики для карточки
+      card.addEventListener("dragstart", (e) => {
+        draggedDirIndex = index;
+        card.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", index.toString());
+      });
+
+      card.addEventListener("dragend", () => {
+        card.classList.remove("dragging");
+        card.setAttribute("draggable", "false");
+        draggedDirIndex = null;
+        if (els.directoriesCardsContainer) {
+          els.directoriesCardsContainer.querySelectorAll(".directory-card").forEach((c) => {
+            c.classList.remove("drag-over-top", "drag-over-bottom");
+          });
+        }
+      });
+
+      card.addEventListener("dragover", (e) => {
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (draggedDirIndex === null || draggedDirIndex === index) return;
+
+        const rect = card.getBoundingClientRect();
+        const relY = e.clientY - rect.top;
+        const isTop = relY < rect.height / 2;
+
+        card.classList.toggle("drag-over-top", isTop);
+        card.classList.toggle("drag-over-bottom", !isTop);
+      });
+
+      card.addEventListener("dragleave", () => {
+        card.classList.remove("drag-over-top", "drag-over-bottom");
+      });
+
+      card.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        card.classList.remove("drag-over-top", "drag-over-bottom");
+
+        if (draggedDirIndex === null || draggedDirIndex === index) return;
+
+        const rect = card.getBoundingClientRect();
+        const relY = e.clientY - rect.top;
+        const isTop = relY < rect.height / 2;
+
+        let dropIndex = index;
+        if (!isTop) {
+          dropIndex = index + 1;
+        }
+        if (draggedDirIndex < dropIndex) {
+          dropIndex--;
+        }
+
+        const moved = state.directories.splice(draggedDirIndex, 1)[0];
+        state.directories.splice(dropIndex, 0, moved);
+
+        renderDirectories();
+        notifyChange();
+        showNotification(`Раздел «${moved.title || "Папка"}» перемещен на позицию #${dropIndex + 1}`, "info");
+      });
+
+      // 1. HEADER (Ручка перетаскивания, Номер раздела, Заголовок, Кнопки порядка и Удаления)
       const headerDiv = document.createElement("div");
       headerDiv.className = "dir-card-header";
 
       const headerLeft = document.createElement("div");
       headerLeft.className = "dir-header-left";
 
+      // Ручка для перетаскивания мышкой
+      const dragHandle = document.createElement("div");
+      dragHandle.className = "dir-drag-handle";
+      dragHandle.innerHTML = "&#x283F;"; // ⠿
+      dragHandle.title = "Потяните мышкой для изменения порядка разделов";
+      dragHandle.addEventListener("mousedown", () => {
+        card.setAttribute("draggable", "true");
+      });
+      dragHandle.addEventListener("mouseup", () => {
+        card.setAttribute("draggable", "false");
+      });
+
       const idxBadge = document.createElement("span");
       idxBadge.className = "dir-idx-badge";
-      idxBadge.textContent = `📁 Папка #${index + 1}`;
+      idxBadge.textContent = `📁 #${index + 1}`;
 
       const titleInput = document.createElement("input");
       titleInput.type = "text";
       titleInput.className = "form-control dir-title-input";
-      titleInput.value = d.title || "";
-      titleInput.placeholder = "Заголовок раздела (например: Материалы и фурнитура)...";
+      titleInput.value = d.title || folderName || `Папка #${index + 1}`;
+      titleInput.placeholder = "Название раздела проекта (например: Материалы и фурнитура)...";
+      titleInput.title = "Название блока/раздела (сохраняется в спецификациях)";
       titleInput.addEventListener("input", (e) => {
         d.title = e.target.value;
       });
@@ -3276,31 +4083,43 @@
         notifyChange();
       });
 
+      headerLeft.appendChild(dragHandle);
       headerLeft.appendChild(idxBadge);
       headerLeft.appendChild(titleInput);
 
       const headerRight = document.createElement("div");
       headerRight.className = "dir-header-right";
 
-      const selDisplay = document.createElement("select");
-      selDisplay.className = "table-select";
-      selDisplay.style.fontSize = "11.5px";
+      // Кнопка перемещения вверх
+      const btnUp = document.createElement("button");
+      btnUp.type = "button";
+      btnUp.className = "btn-move-dir";
+      btnUp.innerHTML = "&#9650;"; // ▲
+      btnUp.title = "Поднять раздел выше";
+      btnUp.disabled = (index === 0);
+      btnUp.addEventListener("click", () => {
+        if (index > 0) {
+          const item = state.directories.splice(index, 1)[0];
+          state.directories.splice(index - 1, 0, item);
+          renderDirectories();
+          notifyChange();
+        }
+      });
 
-      const optGrid = document.createElement("option");
-      optGrid.value = "grid";
-      optGrid.textContent = "grid (сетка)";
-      if ((d.display || "grid") === "grid") optGrid.selected = true;
-
-      const optList = document.createElement("option");
-      optList.value = "list";
-      optList.textContent = "list (список)";
-      if (d.display === "list") optList.selected = true;
-
-      selDisplay.appendChild(optGrid);
-      selDisplay.appendChild(optList);
-      selDisplay.addEventListener("change", (e) => {
-        d.display = e.target.value;
-        notifyChange();
+      // Кнопка перемещения вниз
+      const btnDown = document.createElement("button");
+      btnDown.type = "button";
+      btnDown.className = "btn-move-dir";
+      btnDown.innerHTML = "&#9660;"; // ▼
+      btnDown.title = "Опустить раздел ниже";
+      btnDown.disabled = (index === state.directories.length - 1);
+      btnDown.addEventListener("click", () => {
+        if (index < state.directories.length - 1) {
+          const item = state.directories.splice(index, 1)[0];
+          state.directories.splice(index + 1, 0, item);
+          renderDirectories();
+          notifyChange();
+        }
       });
 
       const btnDelete = document.createElement("button");
@@ -3314,14 +4133,27 @@
         notifyChange();
       });
 
-      headerRight.appendChild(selDisplay);
+      headerRight.appendChild(btnUp);
+      headerRight.appendChild(btnDown);
       headerRight.appendChild(btnDelete);
 
       headerDiv.appendChild(headerLeft);
       headerDiv.appendChild(headerRight);
       card.appendChild(headerDiv);
 
-      // 2. PATH ROW (Путь к папке, Обзор, Открыть, Обновить)
+      // 2. PATH SECTION (Блок пути к рабочей папке)
+      const pathSection = document.createElement("div");
+      pathSection.className = "dir-section-box dir-section-path";
+
+      const pathHeader = document.createElement("div");
+      pathHeader.className = "dir-section-header";
+      pathHeader.innerHTML = `
+        <div class="dir-section-title">
+          <span>📂 Расположение рабочей папки:</span>
+        </div>
+        <span class="dir-section-hint">Каталог на диске с файлами чертежей, замеров и спецификаций</span>`;
+      pathSection.appendChild(pathHeader);
+
       const pathRow = document.createElement("div");
       pathRow.className = "dir-path-row";
 
@@ -3331,13 +4163,23 @@
       pathInput.style.flex = "1";
       pathInput.value = d.path || "";
       pathInput.placeholder = "Путь к папке (например: !_материалы_фурнитура или C:/Projects/...)";
-      pathInput.addEventListener("change", (e) => {
-        d.path = e.target.value;
-        callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
-        notifyChange();
-      });
       pathInput.addEventListener("input", (e) => {
         d.path = e.target.value;
+        const autoName = getFolderName(d.path);
+        if (autoName) {
+          d.title = autoName;
+          titleInput.value = autoName;
+        }
+      });
+      pathInput.addEventListener("change", (e) => {
+        d.path = e.target.value.trim();
+        const autoName = getFolderName(d.path);
+        if (autoName) {
+          d.title = autoName;
+          titleInput.value = autoName;
+        }
+        callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
+        notifyChange();
       });
 
       const btnBrowse = document.createElement("button");
@@ -3361,6 +4203,7 @@
           showNotification("Укажите путь к папке", "warning");
         }
       });
+
       const btnRefresh = document.createElement("button");
       btnRefresh.type = "button";
       btnRefresh.className = "btn btn-xs btn-secondary";
@@ -3378,6 +4221,7 @@
             grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
           }
           if (state.folderFiles) delete state.folderFiles[index];
+          if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
           scheduleScanTimeout(index, d.path);
           callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
         } else {
@@ -3389,63 +4233,82 @@
       pathRow.appendChild(btnBrowse);
       pathRow.appendChild(btnOpen);
       pathRow.appendChild(btnRefresh);
-      card.appendChild(pathRow);
+      pathSection.appendChild(pathRow);
+      card.appendChild(pathSection);
 
-      // 3. DESCRIPTION / SPECIFICATION BLOCK
-      const descBlock = document.createElement("div");
-      descBlock.className = "dir-desc-block";
+      // 3. DESCRIPTION SECTION (Блок описания и спецификации)
+      const descSection = document.createElement("div");
+      descSection.className = "dir-section-box dir-section-desc";
 
-      const descLabel = document.createElement("div");
-      descLabel.className = "dir-desc-label";
-      descLabel.innerHTML = `<span>📝 Описание и спецификация раздела:</span><span style="font-size: 10.5px; color: var(--text-dim);">Сохраняется в YAML и попадает в страницы проекта</span>`;
+      const descHeader = document.createElement("div");
+      descHeader.className = "dir-section-header";
+      descHeader.innerHTML = `
+        <div class="dir-section-title">
+          <span>📝 Описание и спецификация раздела:</span>
+        </div>
+        <span class="dir-section-hint">Сохраняется в YAML и попадает в страницы/спецификации PDF</span>`;
+      descSection.appendChild(descHeader);
 
       const descTextarea = document.createElement("textarea");
       descTextarea.className = "form-control dir-desc-textarea";
       descTextarea.rows = 3;
-      descTextarea.placeholder = "Опишите подробно спецификацию материалов, техники, фурнитуры, габаритов или особенности этого раздела...";
+      descTextarea.placeholder = "Спецификация раздела (материалы, фурнитура, техника, размеры, пояснения к заказу)...";
       descTextarea.value = d.description || "";
       descTextarea.addEventListener("input", (e) => {
         d.description = e.target.value;
+        syncDirectoriesSpecifications();
         notifyChange();
       });
       descTextarea.addEventListener("change", (e) => {
         d.description = e.target.value;
+        syncDirectoriesSpecifications();
         notifyChange();
       });
 
-      descBlock.appendChild(descLabel);
-      descBlock.appendChild(descTextarea);
-      card.appendChild(descBlock);
+      descSection.appendChild(descTextarea);
+      card.appendChild(descSection);
 
-      // 4. PREVIEWS BLOCK
-      const previewBlock = document.createElement("div");
-      previewBlock.className = "dir-preview-block";
-      previewBlock.id = `dirPreviewBlock_${index}`;
+      // 4. PREVIEWS SECTION (Блок файлов и предпросмотра)
+      const previewSection = document.createElement("div");
+      previewSection.className = "dir-section-box dir-section-previews";
+      previewSection.id = `dirPreviewBlock_${index}`;
 
       const previewHeader = document.createElement("div");
       previewHeader.className = "dir-preview-header";
       previewHeader.innerHTML = `
-        <span style="display: flex; align-items: center; gap: 6px;">
-          <span>🖼️ Превью файлов в папке:</span>
-          <code style="font-size: 11px; color: var(--text-dim);">${d.path || "(папка не задана)"}</code>
-        </span>
+        <div class="dir-section-title">
+          <span>🖼️ Файлы и предпросмотр в папке:</span>
+          <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>
+        </div>
         <span class="badge badge-tag badge-grid" id="dirFileBadge_${index}">Сканирование...</span>`;
+      previewSection.appendChild(previewHeader);
 
       const previewGrid = document.createElement("div");
       previewGrid.className = "dir-preview-grid";
       previewGrid.id = `dirPreviewGrid_${index}`;
       previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
+      previewSection.appendChild(previewGrid);
 
-      previewBlock.appendChild(previewHeader);
-      previewBlock.appendChild(previewGrid);
-      card.appendChild(previewBlock);
+      card.appendChild(previewSection);
+
+      // Предотвращение случайного старта drag при клике на текстовые поля и кнопки
+      card.querySelectorAll("input, textarea, button").forEach((el) => {
+        el.addEventListener("mousedown", (e) => {
+          e.stopPropagation();
+          card.setAttribute("draggable", "false");
+        });
+      });
 
       els.directoriesCardsContainer.appendChild(card);
 
       // Запрашиваем файлы для папки, если путь указан
       if (d.path) {
-        if (state.folderFiles && state.folderFiles[index] && state.folderFiles[index].path === d.path) {
-          renderDirectoryPreview(index, state.folderFiles[index]);
+        const cached = (state.folderFiles && state.folderFiles[index] && state.folderFiles[index].path === d.path)
+          ? state.folderFiles[index]
+          : (state.folderFilesByPath ? state.folderFilesByPath[d.path] : null);
+        if (cached) {
+          state.folderFiles[index] = cached;
+          renderDirectoryPreview(index, cached);
         } else {
           scheduleScanTimeout(index, d.path);
           callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
@@ -3546,7 +4409,7 @@
       item.appendChild(meta);
 
       item.addEventListener("click", () => {
-        callRuby("openFolder", file.path);
+        callRuby("openFile", file.path);
       });
 
       gridEl.appendChild(item);
@@ -3632,8 +4495,13 @@
   }
 
   // Update Aspect Ratio UI & SketchUp Overlay state
-  function updateAspectUI() {
-    const aspectMode = els.selectImageAspect ? els.selectImageAspect.value : "page";
+  function updateAspectUI(isUserAction = false) {
+    let aspectMode = els.selectImageAspect ? els.selectImageAspect.value : "4:3";
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    if (!VALID_ASPECT_RATIOS.includes(aspectMode)) {
+      aspectMode = "4:3";
+      if (els.selectImageAspect) els.selectImageAspect.value = "4:3";
+    }
     if (els.customAspectGroup) {
       els.customAspectGroup.style.display = (aspectMode === "custom") ? "block" : "none";
     }
@@ -3684,19 +4552,21 @@
       els.aspectOverlayBadge.textContent = `${label} • ${baseWidth} × ${renderH} px`;
     }
 
-    // Отправка обновленных настроек в SketchUp для оверлея
-    if (window.sketchup && typeof window.sketchup.updateAspectSettings === "function") {
-      const payload = {
-        image_aspect_ratio: aspectMode,
-        custom_ratio_w: parseFloat(els.inputAspectCustomW ? els.inputAspectCustomW.value : 16) || 16,
-        custom_ratio_h: parseFloat(els.inputAspectCustomH ? els.inputAspectCustomH.value : 9) || 9,
-        page_size: pageSize,
-        page_layout: pageLayout,
-        image_width: baseWidth
-      };
-      callRuby("updateAspectSettings", JSON.stringify(payload));
+    // Отправка обновленных настроек в SketchUp для оверлея ТОЛЬКО при явном действии пользователя
+    if (isUserAction) {
+      if (window.sketchup && typeof window.sketchup.updateAspectSettings === "function") {
+        const payload = {
+          image_aspect_ratio: aspectMode,
+          custom_ratio_w: parseFloat(els.inputAspectCustomW ? els.inputAspectCustomW.value : 16) || 16,
+          custom_ratio_h: parseFloat(els.inputAspectCustomH ? els.inputAspectCustomH.value : 9) || 9,
+          page_size: pageSize,
+          page_layout: pageLayout,
+          image_width: baseWidth
+        };
+        callRuby("updateAspectSettings", JSON.stringify(payload));
+      }
+      notifyChange();
     }
-    notifyChange();
   }
 
   // Update Header Title & Subtitle
@@ -3725,8 +4595,8 @@
     }
 
     // Refresh previews in layout canvas
-    const layoutTab = document.getElementById("tab-scenes");
-    if (layoutTab && layoutTab.classList.contains("active")) {
+    const tplTab = document.getElementById("tab-templates");
+    if (tplTab && tplTab.classList.contains("active")) {
       renderLayoutCanvas();
     }
     notifyChange();
@@ -3758,12 +4628,9 @@
         tr.classList.add("active-split-scene");
       }
 
-      // Checkbox & Number (two rows in one cell)
-      const tdNumCheck = document.createElement("td");
-      tdNumCheck.className = "scene-num-check-cell";
-
-      const numCheckWrap = document.createElement("div");
-      numCheckWrap.className = "scene-num-check-wrap";
+      // 1. Checkbox (Вкл)
+      const tdCheck = document.createElement("td");
+      tdCheck.className = "scene-check-cell";
 
       const chk = document.createElement("input");
       chk.type = "checkbox";
@@ -3777,22 +4644,25 @@
         notifyChange();
       });
       chk.addEventListener("click", (e) => e.stopPropagation());
+      tdCheck.appendChild(chk);
+
+      // 2. Order & Drag Handle (Перемещение и номер)
+      const tdNum = document.createElement("td");
+      tdNum.className = "scene-num-cell";
+      tdNum.title = "Перетащите строку мышью для изменения порядка";
 
       const numRow = document.createElement("div");
       numRow.className = "scene-num-row";
-      numRow.title = "Перетащите строку мышью для изменения порядка";
       const dragHandle = document.createElement("span");
       dragHandle.className = "drag-handle";
       dragHandle.textContent = "⠿";
+      dragHandle.title = "Перетащите мышью для изменения порядка";
       const rowNum = document.createElement("span");
       rowNum.className = "row-num";
       rowNum.textContent = index + 1;
       numRow.appendChild(dragHandle);
       numRow.appendChild(rowNum);
-
-      numCheckWrap.appendChild(chk);
-      numCheckWrap.appendChild(numRow);
-      tdNumCheck.appendChild(numCheckWrap);
+      tdNum.appendChild(numRow);
 
       // Scene Name & Description (two rows in one cell)
       const tdInfo = document.createElement("td");
@@ -3850,35 +4720,50 @@
 
       // Page Type Select
       const tdType = document.createElement("td");
+      const typeWrap = document.createElement("div");
+      typeWrap.className = "scene-template-cell-wrap";
+
       const selType = document.createElement("select");
       selType.className = "table-select";
-      const types = [
-        { value: "cover", label: "Титульный лист (Cover)" },
-        { value: "description", label: "Описание проекта (Description)" },
-        { value: "explain", label: "Содержание и ведомость (Explain)" },
-        { value: "visual", label: "Визуализация (Visual)" },
-        { value: "general", label: "Общий вид (General)" }
-      ];
-      types.forEach((t) => {
+      const allTemplates = getAllTemplates();
+      allTemplates.forEach((t) => {
         const opt = document.createElement("option");
-        opt.value = t.value;
-        opt.textContent = t.label;
-        if (scene.page_type === t.value) opt.selected = true;
+        opt.value = t.key;
+        opt.textContent = `${t.icon || "📄"} ${t.name}`;
+        if (scene.page_type === t.key) opt.selected = true;
         selType.appendChild(opt);
       });
+      if (scene.page_type && !allTemplates.some((t) => t.key === scene.page_type)) {
+        const opt = document.createElement("option");
+        opt.value = scene.page_type;
+        opt.textContent = scene.page_type;
+        opt.selected = true;
+        selType.appendChild(opt);
+      }
       selType.addEventListener("change", (e) => {
         scene.page_type = e.target.value;
         updateSceneBadge();
-        layoutState.currentTemplate = e.target.value;
-        if (els.selectLayoutTemplate) {
-          els.selectLayoutTemplate.value = e.target.value;
-        }
-        renderLayoutCanvas();
+        selectTemplate(e.target.value);
         updateLayoutUsageBadge();
         notifyChange();
       });
       selType.addEventListener("click", (e) => e.stopPropagation());
-      tdType.appendChild(selType);
+
+      const btnEditTpl = document.createElement("button");
+      btnEditTpl.type = "button";
+      btnEditTpl.className = "btn-goto-template";
+      btnEditTpl.title = "Перейти к настройке этого шаблона страницы";
+      btnEditTpl.textContent = "⚙️";
+      btnEditTpl.addEventListener("click", (e) => {
+        e.stopPropagation();
+        layoutState.selectedSceneIndex = index;
+        selectTemplate(scene.page_type || "cover");
+        switchToTab("tab-templates");
+      });
+
+      typeWrap.appendChild(selType);
+      typeWrap.appendChild(btnEditTpl);
+      tdType.appendChild(typeWrap);
 
       // Drag and Drop event listeners for row reordering
       tr.addEventListener("mousedown", (e) => {
@@ -3950,27 +4835,24 @@
           state.scenes.forEach((s, idx) => (s.order = idx));
           renderScenesTable();
           updateLayoutUsageBadge();
-          if (layoutTab && layoutTab.classList.contains("active")) {
+          const tplTab = document.getElementById("tab-templates");
+          if (tplTab && tplTab.classList.contains("active")) {
             renderLayoutCanvas();
           }
           notifyChange();
         }
       });
 
-      // Click on row in split view to focus template
+      // Click on row to focus template
       tr.addEventListener("click", () => {
         const tpl = scene.page_type || "cover";
-        layoutState.currentTemplate = tpl;
         layoutState.selectedSceneIndex = index;
-        if (els.selectLayoutTemplate) {
-          els.selectLayoutTemplate.value = tpl;
-        }
-        renderLayoutCanvas();
-        renderTemplateSettingsList();
+        selectTemplate(tpl);
         updateLayoutUsageBadge();
       });
 
-      tr.appendChild(tdNumCheck);
+      tr.appendChild(tdCheck);
+      tr.appendChild(tdNum);
       tr.appendChild(tdInfo);
       tr.appendChild(tdType);
 
@@ -4015,14 +4897,20 @@
         st.status = e.target.checked;
         label.classList.toggle("checked", st.status);
 
-        // Обновляем текущий статус в выпадающем списке/поле
+        // Обновляем текущий статус по последней отмеченной стадии
         const lastChecked = [...stadia].reverse().find(s => s.status);
+        if (lastChecked) {
+          state.workflow = state.workflow || {};
+          state.workflow.status = lastChecked.name;
+          if (state.project_info) state.project_info.status = lastChecked.name;
+        }
         if (lastChecked && els.inputStatus) {
           const opts = Array.from(els.inputStatus.options).map(o => o.value);
           if (opts.includes(lastChecked.name)) {
             els.inputStatus.value = lastChecked.name;
           }
         }
+        notifyChange();
       });
 
       const span = document.createElement("span");
@@ -4134,7 +5022,7 @@
     const custVal = (els.inputCustomer ? els.inputCustomer.value : "").trim();
     const compVal = (els.inputCompany ? els.inputCompany.value : "").trim();
     const addrVal = (els.inputAddress ? els.inputAddress.value : "").trim();
-    const isCommercial = els.selectTrade ? (els.selectTrade.value === "1") : articulVal.startsWith("CF#");
+    const isCommercial = getTradeValue() === "1";
     const tradeVal = isCommercial ? "1" : "0";
     const lastEditVal = (els.inputLastEdit ? els.inputLastEdit.value : "").trim();
     const tagsVal = (els.inputTags ? els.inputTags.value : "").trim();
@@ -4147,7 +5035,11 @@
     const startDateVal = (els.inputStartDate ? els.inputStartDate.value : "").trim();
     const endDateVal = (els.inputEndDate ? els.inputEndDate.value : "").trim();
     const totalDurationVal = (els.inputTotalDuration ? els.inputTotalDuration.value : "").trim();
-    const statusVal = els.inputStatus ? els.inputStatus.value : "Предварительный";
+
+    // Статус определяется по последней активной стадии
+    const activeStadia = (state.workflow?.stadia || []).filter(s => s.status);
+    const statusVal = activeStadia.length ? activeStadia[activeStadia.length - 1].name : (state.workflow?.status || "Предварительный");
+
     const revVal = parseInt(els.inputRevision ? els.inputRevision.value : 1, 10) || 1;
     const verVal = parseInt(els.inputVersion ? els.inputVersion.value : 1, 10) || 1;
 
@@ -4169,7 +5061,7 @@
       place: room,
       adress: addrVal,
       description: descVal,
-      tags: tagsVal,
+      tags: productTags,
       commercial: isCommercial,
       name_company: compVal
     };
@@ -4267,7 +5159,7 @@
       page_layout: els.selectPageLayout.value,
       margin_mm: els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5),
       margin: Math.round((((els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5)) * 72.0) / 25.4) * 10) / 10,
-      image_aspect_ratio: els.selectImageAspect ? els.selectImageAspect.value : (state.pdf_settings?.image_aspect_ratio || "page"),
+      image_aspect_ratio: els.selectImageAspect ? els.selectImageAspect.value : (state.pdf_settings?.image_aspect_ratio || "4:3"),
       custom_ratio_w: els.inputAspectCustomW ? parseFloat(els.inputAspectCustomW.value) || 16 : 16,
       custom_ratio_h: els.inputAspectCustomH ? parseFloat(els.inputAspectCustomH.value) || 9 : 9,
       show_aspect_overlay: (function() {
@@ -4321,11 +5213,12 @@
 
   // Trigger Articul Generation
   function triggerGenerateArticul() {
-    const isCommercial = els.selectTrade ? (els.selectTrade.value === "1") : false;
+    const isCommercial = getTradeValue() === "1";
+    const suffix = (els.inputArticulSuffix ? els.inputArticulSuffix.value : "").trim() || "01";
     if (window.sketchup && typeof window.sketchup.generateArticul === "function") {
-      callRuby("generateArticul", JSON.stringify({ commercial: isCommercial, index: 1 }));
+      callRuby("generateArticul", JSON.stringify({ commercial: isCommercial, index: suffix, suffix: suffix }));
     } else {
-      const newArt = generateArticulLocal(isCommercial, 1);
+      const newArt = generateArticulLocal(isCommercial, suffix);
       if (els.inputArticul) {
         els.inputArticul.value = newArt;
         updateHeaderTitles();
@@ -4363,9 +5256,28 @@
       els.btnGenerateCustomerId.addEventListener("click", triggerGenerateCustomerId);
     }
 
+    // Segmented toggle for project type (trade)
+    const tradeBtns = document.querySelectorAll("#tradeToggleGroup .segmented-btn");
+    tradeBtns.forEach(btn => {
+      btn.addEventListener("click", () => {
+        const val = btn.getAttribute("data-value");
+        setTradeValue(val);
+        const isComm = val === "1";
+        const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
+        if (curArt.startsWith("CF#") && !isComm) {
+          els.inputArticul.value = curArt.replace(/^CF#/, "HF#");
+          updateHeaderTitles();
+        } else if (curArt.startsWith("HF#") && isComm) {
+          els.inputArticul.value = curArt.replace(/^HF#/, "CF#");
+          updateHeaderTitles();
+        }
+        notifyChange();
+      });
+    });
+
     if (els.selectTrade) {
       els.selectTrade.addEventListener("change", () => {
-        updateCompanyVisibility();
+        setTradeValue(els.selectTrade.value);
         const isComm = els.selectTrade.value === "1";
         const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
         if (curArt.startsWith("CF#") && !isComm) {
@@ -4382,13 +5294,10 @@
       els.inputArticul.addEventListener("input", () => {
         updateHeaderTitles();
         const val = els.inputArticul.value.trim();
-        if (els.selectTrade) {
-          if (val.startsWith("CF#")) {
-            els.selectTrade.value = "1";
-          } else if (val.startsWith("HF#")) {
-            els.selectTrade.value = "0";
-          }
-          updateCompanyVisibility();
+        if (val.startsWith("CF#")) {
+          setTradeValue("1");
+        } else if (val.startsWith("HF#")) {
+          setTradeValue("0");
         }
       });
     }
@@ -4397,14 +5306,27 @@
     if (els.btnAddDirectory) {
       els.btnAddDirectory.addEventListener("click", () => {
         if (!Array.isArray(state.directories)) state.directories = [];
+        const nextNum = state.directories.length + 1;
+        const newPath = "!_новые_материалы";
         state.directories.push({
-          path: "!_новые_материалы",
-          title: "Новый раздел",
-          description: "Дополнительное описание",
-          display: "grid"
+          path: newPath,
+          title: `Раздел #${nextNum}`,
+          description: "Дополнительное описание"
         });
         renderDirectories();
         notifyChange();
+        if (els.directoriesCardsContainer) {
+          const cards = els.directoriesCardsContainer.querySelectorAll(".directory-card");
+          if (cards.length > 0) {
+            const lastCard = cards[cards.length - 1];
+            lastCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
+            const titleInp = lastCard.querySelector(".dir-title-input");
+            if (titleInp) {
+              titleInp.focus();
+              titleInp.select();
+            }
+          }
+        }
       });
     }
 
@@ -4438,28 +5360,28 @@
     // Page orientation / size change updates layout canvas sheet and aspect overlay
     if (els.selectPageLayout) {
       els.selectPageLayout.addEventListener("change", () => {
-        renderLayoutCanvas();
-        updateAspectUI();
+        renderLayoutCanvas(true);
+        updateAspectUI(true);
       });
     }
     if (els.selectPageSize) {
       els.selectPageSize.addEventListener("change", () => {
-        renderLayoutCanvas();
-        updateAspectUI();
+        renderLayoutCanvas(true);
+        updateAspectUI(true);
       });
     }
 
     if (els.selectImageAspect) {
-      els.selectImageAspect.addEventListener("change", updateAspectUI);
+      els.selectImageAspect.addEventListener("change", () => updateAspectUI(true));
     }
     if (els.inputAspectCustomW) {
-      els.inputAspectCustomW.addEventListener("input", updateAspectUI);
+      els.inputAspectCustomW.addEventListener("input", () => updateAspectUI(true));
     }
     if (els.inputAspectCustomH) {
-      els.inputAspectCustomH.addEventListener("input", updateAspectUI);
+      els.inputAspectCustomH.addEventListener("input", () => updateAspectUI(true));
     }
     if (els.selectQuality) {
-      els.selectQuality.addEventListener("change", updateAspectUI);
+      els.selectQuality.addEventListener("change", () => updateAspectUI(true));
     }
     if (els.chkShowAspectOverlay) {
       els.chkShowAspectOverlay.addEventListener("change", (e) => {
@@ -4766,7 +5688,7 @@
     // Auto-save listeners for all dialog input fields across tabs
     const autoSaveInputIds = [
       "inputRoomName", "inputFurnitureName", "inputCustomer", "inputCustomerId",
-      "inputCompany", "inputArticul", "selectTrade", "inputTags",
+      "inputCompany", "inputArticul", "inputArticulSuffix", "selectTrade", "inputTags",
       "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
       "inputTotalDuration", "inputStatus", "inputRevision", "inputVersion",
@@ -4793,6 +5715,7 @@
       if (!data) return;
       Object.assign(state, data);
       ensureCustomLayouts();
+      syncDirectoriesSpecifications();
       renderUI();
     },
 
@@ -4823,7 +5746,12 @@
       const idx = parseInt(index, 10);
       if (Array.isArray(state.directories) && state.directories[idx]) {
         state.directories[idx].path = chosenPath;
+        const autoName = getFolderName(chosenPath);
+        if (autoName) {
+          state.directories[idx].title = autoName;
+        }
         renderDirectories();
+        notifyChange();
         showNotification(`Выбрана папка: ${chosenPath}`, "info");
       }
     },
@@ -4893,6 +5821,10 @@
     },
 
     setAspectRatio: function (ratio) {
+      const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+      if (!VALID_ASPECT_RATIOS.includes(ratio)) {
+        ratio = "4:3";
+      }
       const grpRatio = document.getElementById("grp_image_aspect_ratio");
       if (grpRatio) {
         grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => {
@@ -4902,13 +5834,15 @@
       updateBlockSlot("image_4_3", { aspect_ratio: ratio });
       if (!state.pdf_settings) state.pdf_settings = {};
       state.pdf_settings.show_aspect_overlay = true;
+      state.pdf_settings.image_aspect_ratio = ratio;
+      if (els.selectImageAspect) els.selectImageAspect.value = ratio;
       if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = true;
       const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
       if (chkTpl) chkTpl.checked = true;
       const tplBadge = document.getElementById("tplAspectOverlayBadge");
       if (tplBadge) tplBadge.classList.remove("disabled-overlay");
       callRuby("toggleAspectOverlay", true);
-      syncCurrentTemplateOverlay(ratio);
+      syncCurrentTemplateOverlay(ratio, true);
       notifyChange();
     },
 

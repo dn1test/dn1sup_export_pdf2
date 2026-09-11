@@ -18,6 +18,9 @@ module DN1Code
         class AppObserverHandler < (defined?(Sketchup::AppObserver) ? Sketchup::AppObserver : Object)
           def onNewModel(model)
             ObserverService.attach_model_observer(model)
+            if defined?(OverlayService)
+              OverlayService.on_model_opened(model)
+            end
             Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
           end
 
@@ -125,6 +128,11 @@ module DN1Code
 
             project_data = Model::ProjectData.new
             project_data.load_auto(model)
+
+            # Актуализация оверлея с открытой моделью (4:3 если в файле не сохранено другое)
+            if defined?(OverlayService)
+              OverlayService.on_model_opened(model, project_data)
+            end
 
             # Историю правок автоматически не создаем при открытии модели
             Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
