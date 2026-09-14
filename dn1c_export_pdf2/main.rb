@@ -13,11 +13,9 @@ end
 # Загрузка версии
 require_relative "version"
 
-# Загрузка сервисов
-require_relative "service/gem_loader"
+# Загрузка сервисов (генерация PDF через SketchUp LayOut Ruby API)
 require_relative "service/font_service"
 require_relative "service/render_service"
-require_relative "service/pdf_builder"
 require_relative "service/layout_builder"
 require_relative "service/observer_service"
 require_relative "service/overlay_service"
@@ -26,13 +24,7 @@ require_relative "service/overlay_service"
 require_relative "model/scene_item"
 require_relative "model/project_data"
 
-# Загрузка контроллеров страниц
-require_relative "controller/page_base"
-require_relative "controller/cover_page"
-require_relative "controller/description_page"
-require_relative "controller/explain_page"
-require_relative "controller/visual_page"
-require_relative "controller/general_page"
+# Загрузка контроллера экспорта
 require_relative "controller/export_controller"
 
 # Загрузка пользовательского интерфейса

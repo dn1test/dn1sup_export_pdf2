@@ -2,9 +2,7 @@
 
 source "https://rubygems.org"
 
-gem "prawn", "~> 2.5"
-gem "pdf-core", "~> 0.10.0"
-gem "ttfunk", "~> 1.8"
+# Runtime dependencies: None (uses native SketchUp LayOut Ruby API)
 
 group :development do
   gem "minitest"

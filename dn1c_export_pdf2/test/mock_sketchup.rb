@@ -20,13 +20,61 @@ if defined?(Sketchup) && Sketchup.respond_to?(:version)
 end
 
 module Sketchup
+  class Text
+    attr_accessor :text, :font
+    def initialize(text = "Выноска", font = { name: "DIN Condensed", size: 14, bold: false, italic: false })
+      @text = text
+      @font = font
+    end
+  end
+
+  class MockEntities
+    include Enumerable
+    attr_accessor :items
+    def initialize(items = [])
+      @items = items
+    end
+    def each(&block); @items.each(&block); end
+    def grep(klass)
+      @items.select { |item| item.is_a?(klass) }
+    end
+    def <<(item); @items << item; self; end
+  end
+
+  class MockStyle
+    attr_accessor :name
+    def initialize(name = "Default Style")
+      @name = name
+    end
+  end
+
+  class MockStyles
+    attr_accessor :selected_style, :active_style
+    def initialize
+      @selected_style = MockStyle.new("Default Style")
+      @active_style = @selected_style
+    end
+  end
+
   class MockPage
-    attr_accessor :name, :description, :include_in_animation
+    attr_accessor :name, :description, :include_in_animation, :rendering_options, :style
 
     def initialize(name, description = "", include_in_anim = true)
       @name = name
       @description = description
       @include_in_animation = include_in_anim
+      @style = MockStyle.new("#{name} Style")
+      @rendering_options = {
+        "SilhouetteWidth" => 2,
+        "SectionCutWidth" => 4,
+        "DepthQueWidth" => 4,
+        "LineEndWidth" => 1,
+        "LineExtension" => 1,
+        "DrawSilhouettes" => true,
+        "DrawLineEnds" => false,
+        "ExtendLines" => false,
+        "DrawProfilesOnly" => false
+      }
     end
 
     def include_in_animation?
@@ -70,7 +118,7 @@ module Sketchup
   end
 
   class MockView
-    attr_accessor :vpwidth, :vpheight, :drawing_color, :line_width, :line_stipple, :drawn_elements
+    attr_accessor :vpwidth, :vpheight, :drawing_color, :line_width, :line_stipple, :drawn_elements, :last_write_image_options
 
     def initialize
       @vpwidth = 1920.0
@@ -79,6 +127,7 @@ module Sketchup
       @line_width = 1
       @line_stipple = ""
       @drawn_elements = []
+      @last_write_image_options = nil
     end
 
     def draw2d(mode, pts)
@@ -94,6 +143,7 @@ module Sketchup
     end
 
     def write_image(options = {})
+      @last_write_image_options = options
       filename = options[:filename]
       width = options[:width] || 800
       height = options[:height] || 600
@@ -167,15 +217,23 @@ module Sketchup
   end
 
   class MockModel
-    attr_accessor :path, :pages, :active_view, :attributes, :observers, :overlays
+    attr_accessor :path, :pages, :active_view, :attributes, :observers, :overlays, :rendering_options, :styles, :entities
 
     def initialize(path = "U:/Projects/SampleProject/model.skp")
       @path = path
       @pages = MockPages.new
       @active_view = MockView.new
       @overlays = MockOverlaysCollection.new
+      @styles = MockStyles.new
       @attributes = {}
       @observers = []
+      @entities = MockEntities.new([Text.new])
+      @rendering_options = {
+        "SilhouetteWidth" => 2,
+        "SectionCutWidth" => 4,
+        "DepthQueWidth" => 4,
+        "LineEndWidth" => 1
+      }
     end
 
     def add_observer(obs)
@@ -448,7 +506,12 @@ end
 
 module Layout
   class PageInfo
-    attr_accessor :width, :height, :left_margin, :right_margin, :top_margin, :bottom_margin, :display_margins, :show_margins
+    RESOLUTION_LOW    = 0
+    RESOLUTION_MEDIUM = 1
+    RESOLUTION_HIGH   = 2
+
+    attr_accessor :width, :height, :left_margin, :right_margin, :top_margin, :bottom_margin,
+                  :display_margins, :show_margins, :output_resolution, :image_output_resolution
     def initialize
       @width = 11.6929
       @height = 8.2677
@@ -458,6 +521,8 @@ module Layout
       @bottom_margin = 0.2
       @display_margins = false
       @show_margins = false
+      @output_resolution = RESOLUTION_MEDIUM
+      @image_output_resolution = RESOLUTION_MEDIUM
     end
   end
 
@@ -502,23 +567,37 @@ module Layout
   end
 
   class Layer
-    attr_accessor :name
-    def initialize(name = "Default")
+    attr_accessor :name, :shared
+    def initialize(name = "Default", shared = false)
       @name = name
+      @shared = shared
+    end
+
+    def shared?
+      @shared
     end
   end
 
   class Layers
+    include Enumerable
     def initialize
       @layers = [Layer.new("Default")]
+    end
+
+    def each(&block)
+      @layers.each(&block)
+    end
+
+    def size
+      @layers.size
     end
 
     def first
       @layers.first
     end
 
-    def add(name)
-      l = Layer.new(name)
+    def add(name, shared = false)
+      l = Layer.new(name, shared)
       @layers << l
       l
     end
@@ -538,13 +617,19 @@ module Layout
   end
 
   class Entity
-    attr_accessor :style
+    attr_accessor :style, :transformation
     def initialize
       @style = Style.new
+      @transformation = nil
     end
 
     def bounds
       @bounds
+    end
+
+    def transform!(transformation)
+      @transformation = transformation
+      self
     end
   end
 
@@ -553,7 +638,7 @@ module Layout
     VECTOR_RENDER = 1
     HYBRID_RENDER = 2
 
-    attr_accessor :skp_path, :bounds, :scenes, :current_scene, :render_mode
+    attr_accessor :skp_path, :bounds, :scenes, :current_scene, :render_mode, :line_weight
 
     def initialize(skp_path, bounds)
       super()
@@ -562,6 +647,7 @@ module Layout
       @scenes = ["Last Saved SketchUp View", "01. Обложка", "02. Описание", "03. Вид", "Scene 1", "Scene 2"]
       @current_scene = 1
       @render_mode = RASTER_RENDER
+      @line_weight = 0.5
     end
 
     def render_needed?
@@ -569,6 +655,10 @@ module Layout
     end
 
     def render
+      true
+    end
+
+    def reset_style
       true
     end
   end
@@ -652,14 +742,66 @@ module Layout
     end
   end
 
-  class Document
-    attr_accessor :page_info, :pages, :layers, :entities
+  class Grid
+    attr_accessor :show_grid, :print_grid
+    def initialize
+      @show_grid = true
+      @print_grid = false
+    end
+  end
 
-    def initialize(template_path = nil)
+  class Document
+    attr_accessor :page_info, :pages, :layers, :entities, :grid
+
+    def initialize(template_path_or_opts = nil)
       @page_info = PageInfo.new
+      if template_path_or_opts.is_a?(Hash)
+        margin = template_path_or_opts[:margin] || template_path_or_opts[:margin_mm]
+        is_mm = !template_path_or_opts[:margin_mm].nil?
+        factor = is_mm ? 25.4 : 72.0
+        if margin.is_a?(Array)
+          top_m    = (margin[0] || 15).to_f / factor
+          right_m  = (margin[1] || margin[0] || 15).to_f / factor
+          bottom_m = (margin[2] || margin[0] || 15).to_f / factor
+          left_m   = (margin[3] || margin[1] || margin[0] || 15).to_f / factor
+          @page_info.top_margin    = top_m
+          @page_info.right_margin  = right_m
+          @page_info.bottom_margin = bottom_m
+          @page_info.left_margin   = left_m
+        elsif margin
+          m_in = margin.to_f / factor
+          @page_info.left_margin   = m_in
+          @page_info.right_margin  = m_in
+          @page_info.top_margin    = m_in
+          @page_info.bottom_margin = m_in
+        end
+      end
       @pages     = Pages.new
       @layers    = Layers.new
+      @grid      = Grid.new
       @entities  = []
+    end
+
+    def bounds
+      w = (@page_info && @page_info.width) ? @page_info.width.to_f * 72.0 : 841.89
+      h = (@page_info && @page_info.height) ? @page_info.height.to_f * 72.0 : 595.28
+      margin = (@page_info && @page_info.left_margin) ? @page_info.left_margin.to_f * 72.0 : 14.17
+      Struct.new(:width, :height, :top, :bottom, :left, :right).new(
+        w - (margin * 2),
+        h - (margin * 2),
+        h - margin,
+        margin,
+        margin,
+        w - margin
+      )
+    end
+
+    def render_file(pdf_path)
+      export(pdf_path)
+    end
+
+    def start_new_page
+      pages.add("Page #{@pages.count + 1}")
     end
 
     def add_entity(entity, layer, page = nil)
@@ -667,18 +809,32 @@ module Layout
     end
 
     def export(pdf_path, options = nil)
-      FileUtils.mkdir_p(File.dirname(pdf_path))
-      # Создаем валидный тестовый PDF реалистичного размера (без сжатия потоков),
-      # перенося тексты сущностей с каждой страницы мок-документа
-      require "prawn" unless defined?(::Prawn)
-      pdf = ::Prawn::Document.new(page_size: "A4", page_layout: :landscape, compress: false)
+      ::FileUtils.mkdir_p(File.dirname(pdf_path))
 
-      sanitize = ->(s) { s.to_s.gsub(/[^\x20-\x7E\n]/, "") }
+      # Определение параметров сжатия:
+      # compress: true -> сжатие потоков через Zlib / FlateDecode
+      # compress: false -> без сжатия, потоки сырые (максимальное качество)
+      compress = if options.is_a?(Hash)
+                   val = options.key?(:compress) ? options[:compress] : (options.key?(:compress_pdf) ? options[:compress_pdf] : options[:compress_images])
+                   val == true || val.to_s == "true" || val == "compress"
+                 else
+                   false
+                 end
+
+      # Генерация валидного PDF-1.4 на чистом Ruby без сторонних библиотек
+      sanitize = ->(s) { s.to_s.gsub(/[\\()]/, "").gsub(/[^\x20-\x7E\n]/, " ") }
+
+      page_obj_nums = []
+      content_obj_nums = []
 
       @pages.each_with_index do |page, page_idx|
-        pdf.start_new_page unless page_idx.zero?
-        pdf.text sanitize.call("Mock LayOut API Export - #{page.name}")
-        pdf.text "Page #{page_idx + 1} of #{@pages.count}"
+        stream_lines = []
+        stream_lines << "BT"
+        stream_lines << "/F1 12 Tf"
+        stream_lines << "50 550 Td"
+        stream_lines << "(Mock LayOut API Export - #{sanitize.call(page.name)}) Tj"
+        stream_lines << "0 -20 Td"
+        stream_lines << "(Page #{page_idx + 1} of #{@pages.count}) Tj"
 
         page_entities = @entities.select { |rec| rec[:page].nil? || rec[:page].equal?(page) }
         page_entities.each do |rec|
@@ -686,24 +842,70 @@ module Layout
           case ent
           when FormattedText
             txt = ent.respond_to?(:plain_text) ? ent.plain_text : ent.text.to_s
-            pdf.text sanitize.call(txt)
+            stream_lines << "0 -14 Td (#{sanitize.call(txt)[0..100]}) Tj"
           when Image
-            pdf.text sanitize.call("[image:#{File.basename(ent.path.to_s)} #{ent.bounds&.width}x#{ent.bounds&.height}]")
+            stream_lines << "0 -14 Td ([image:#{File.basename(ent.path.to_s)}]) Tj"
           when Rectangle
-            pdf.stroke_rectangle [40 + rand(200), 300 + rand(200)], 80 + rand(60), 1 + rand(3)
+            stream_lines << "0 -6 Td (--- divider line ---) Tj"
           when SketchUpModel
-            pdf.text sanitize.call("[viewport:#{ent.skp_path}]")
+            stream_lines << "0 -14 Td ([viewport:#{File.basename(ent.skp_path.to_s)} mode:#{ent.render_mode}]) Tj"
           end
         end
 
-        # Добор объема до реалистичного размера PDF (как у настоящего экспорта)
-        220.times do |i|
+        # Добор объема для реалистичного размера PDF (с учетом сжатия Deflate)
+        1400.times do |i|
           a = (i * 7919) % 99_991
           b = (i * 104_729) % 99_991
-          pdf.text "entity p#{page_idx} n#{i} ref#{a} pos#{b} #{'-' * (i % 17)}"
+          stream_lines << "0 -6 Td (p#{page_idx} n#{i} ref#{a} pos#{b} #{'-' * (i % 12)}) Tj"
+        end
+
+        stream_lines << "ET"
+        stream_data = stream_lines.join("\n")
+
+        content_obj_num = 4 + (page_idx * 2) + 1
+        page_obj_num = 4 + (page_idx * 2)
+
+        page_obj_nums << page_obj_num
+        content_obj_nums << { num: content_obj_num, data: stream_data }
+      end
+
+      # Формирование таблицы объектов PDF
+      all_objs = {}
+      all_objs[1] = "<</Type /Catalog /Pages 2 0 R>>"
+      kids_str = page_obj_nums.map { |n| "#{n} 0 R" }.join(" ")
+      all_objs[2] = "<</Type /Pages /Kids [#{kids_str}] /Count #{page_obj_nums.size}>>"
+      all_objs[3] = "<</Type /Font /Subtype /Type1 /BaseFont /Helvetica>>"
+
+      page_obj_nums.each_with_index do |p_num, idx|
+        c_num = content_obj_nums[idx][:num]
+        all_objs[p_num] = "<</Type /Page /Parent 2 0 R /MediaBox [0 0 842 595] /Resources <</Font <</F1 3 0 R>>>> /Contents #{c_num} 0 R>>"
+        c_data = content_obj_nums[idx][:data]
+        if compress
+          require "zlib" unless defined?(::Zlib)
+          compressed_data = ::Zlib::Deflate.deflate(c_data)
+          all_objs[c_num] = "<</Length #{compressed_data.bytesize} /Filter /FlateDecode>>\nstream\n#{compressed_data}\nendstream"
+        else
+          all_objs[c_num] = "<</Length #{c_data.bytesize}>>\nstream\n#{c_data}\nendstream"
         end
       end
-      pdf.render_file(pdf_path)
+
+      File.open(pdf_path, "wb") do |f|
+        f.write("%PDF-1.4\n%\xE2\xE3\xCF\xD3\n")
+        offsets = {}
+        total_objs = all_objs.keys.max
+        (1..total_objs).each do |num|
+          offsets[num] = f.pos
+          f.write("#{num} 0 obj\n#{all_objs[num]}\nendobj\n")
+        end
+        xref_pos = f.pos
+        f.write("xref\n0 #{total_objs + 1}\n")
+        f.write("0000000000 65535 f \n")
+        (1..total_objs).each do |num|
+          f.write(sprintf("%010d 00000 n \n", offsets[num]))
+        end
+        f.write("trailer\n<</Size #{total_objs + 1} /Root 1 0 R>>\n")
+        f.write("startxref\n#{xref_pos}\n%%EOF\n")
+      end
       true
     end
 

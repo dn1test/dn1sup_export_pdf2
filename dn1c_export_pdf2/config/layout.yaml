@@ -69,17 +69,11 @@ layout:
       item_gap_mm: 2.0
       item_gap: 2
       lines:
-      - toc_pages
-      - spec_materials
-      - spec_appliances
-      - general_notes
-      - workflow_history
-      - workflow_stadia
-      - workflow_revision
-      - workflow_version
-      - workflow_date
       - articul
-      - dir_specs
+      - workflow_date
+      - workflow_version
+      - workflow_revision
+      - workflow_stadia
       line_aligns:
         articul: left
         workflow_date: left
@@ -102,11 +96,6 @@ layout:
         spec_appliances: top
         general_notes: top
         workflow_history: bottom
-        dir_desc_0: bottom
-        dir_desc_1: bottom
-        dir_desc_2: bottom
-        dir_desc_3: bottom
-        dir_specs: bottom
       line_font_sizes:
         articul: 8
         workflow_date: 8
@@ -130,8 +119,6 @@ layout:
         general_notes: "#334155"
         workflow_history: "#334155"
       opacity: 0.92
-      show_titles: true
-      line_show_titles: {}
     slot_2:
       x: 0
       "y": 58
@@ -879,7 +866,7 @@ layout:
       align: left
       valign: top
       font_size: 8
-      aspect_ratio: '3:2'
+      aspect_ratio: '16:9'
       scale_pct: 100
       lines: []
       line_rows:

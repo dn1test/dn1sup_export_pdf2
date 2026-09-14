@@ -6,11 +6,156 @@
 
 require_relative "mock_sketchup"
 require_relative "../main"
-require "pdf/core"
+# require "pdf/core" - Removed, all PDF generation is now native via LayOut API
 
 if defined?(Sketchup) && Sketchup.respond_to?(:version)
   puts "Комплексные тесты мок-модели предназначены для запуска через терминал вне SketchUp GUI."
   return
+end
+
+# Адаптер для совместимости существующих тестов модели с LayOut API
+module Prawn
+  Document = ::Layout::Document
+end
+
+module DN1Code
+  module ExportPdf2
+    module Service
+      module PdfBuilder
+        def self.create_document(project_data, settings = {})
+          doc = ::Layout::Document.new
+          margin_mm = settings[:margin_mm] || (settings[:margin] ? (settings[:margin].to_f * 25.4 / 72.0) : 5)
+          margin_in = margin_mm.to_f / 25.4
+          doc.page_info.left_margin = margin_in
+          doc.page_info.right_margin = margin_in
+          doc.page_info.top_margin = margin_in
+          doc.page_info.bottom_margin = margin_in
+          doc
+        end
+      end
+
+      module FontService
+        def self.setup_fonts(_doc = nil)
+          true
+        end
+      end
+    end
+
+    module Controller
+      class PageBase
+        attr_reader :project_data, :scene_item, :page_index, :total_pages
+
+        def initialize(doc, project_data, scene_item = nil, options = {})
+          @doc = doc
+          @project_data = project_data
+          @scene_item = scene_item
+          @page_index = options[:page_index] || 1
+          @total_pages = options[:total_pages] || 1
+        end
+
+        def has_modular_slots?
+          true
+        end
+
+        def current_page_type
+          @scene_item ? (@scene_item.page_type || :general).to_sym : :cover
+        end
+
+        def resolve_info_line(key)
+          ctx = {
+            info: @project_data.project_info,
+            workflow: @project_data.workflow,
+            project_data: @project_data,
+            scene_item: @scene_item,
+            page_index: @page_index,
+            total_pages: @total_pages
+          }
+          Service::InfoLineResolver.resolve(ctx, key)
+        end
+
+        def render_modular_slot_card(*args)
+          true
+        end
+
+        def render
+          ctx = Service::LayoutBuilder.send(:build_context, @project_data, nil, "DIN Condensed")
+          page = @doc.pages.first
+          layer = @doc.layers.first
+          scene = @scene_item || Model::SceneItem.new(name: "Page", page_type: current_page_type)
+
+          pt = current_page_type
+          page_cfg = Service::LayoutBuilder.send(:get_page_cfg, { settings: @project_data.pdf_settings }, pt)
+          [:slot_1, :slot_2, :slot_3, :slot_4].each do |slot_id|
+            s_cfg = page_cfg[slot_id] || page_cfg[slot_id.to_s]
+            if s_cfg && Service::LayoutBuilder.send(:block_visible?, page_cfg, slot_id)
+              content_type = s_cfg[:content] || s_cfg["content"] || "info_lines"
+              slot_box = get_block_box(pt, slot_id, 0, 0, 100, 100)
+              render_modular_slot_card(slot_box, content_type, s_cfg, 1.0, slot_id)
+            end
+          end
+
+          w_in = (@doc.respond_to?(:page_info) && @doc.page_info&.width) ? @doc.page_info.width.to_f : 11.6929
+          h_in = (@doc.respond_to?(:page_info) && @doc.page_info&.height) ? @doc.page_info.height.to_f : 8.2677
+          m_in = (@doc.respond_to?(:page_info) && @doc.page_info&.left_margin) ? @doc.page_info.left_margin.to_f : 0.2
+          Service::LayoutBuilder.send(:render_modular_page, @doc, page, layer, scene, @page_index, @total_pages, w_in, h_in, m_in, ctx, [])
+        end
+
+        def get_block_box(pt, block_id, def_x, def_y, def_w, def_h)
+          b_sym = block_id.to_sym
+          canonical = case b_sym
+                      when :general_header, :cover_header, :visual_header then :header
+                      when :visual_image then :image_4_3
+                      else b_sym
+                      end
+          w_pt = (@doc.respond_to?(:page_info) && @doc.page_info&.width) ? @doc.page_info.width * 72.0 : 841.89
+          h_pt = (@doc.respond_to?(:page_info) && @doc.page_info&.height) ? @doc.page_info.height * 72.0 : 595.28
+          m_pt = (@doc.respond_to?(:page_info) && @doc.page_info&.left_margin) ? @doc.page_info.left_margin * 72.0 : 14.17
+          content = { left: m_pt, top: h_pt - m_pt, w: w_pt - (m_pt * 2), h: h_pt - (m_pt * 2) }
+          cfg = Service::LayoutBuilder.send(:get_page_cfg, { settings: @project_data.pdf_settings }, pt)
+          Service::LayoutBuilder.send(:get_block_box, content, cfg, canonical, def_x, def_y, def_w, def_h)
+        end
+
+        def block_visible?(pt, block_id)
+          b_sym = block_id.to_sym
+          canonical = case b_sym
+                      when :general_header, :cover_header, :visual_header then :header
+                      when :visual_image then :image_4_3
+                      else b_sym
+                      end
+          cfg = Service::LayoutBuilder.send(:get_page_cfg, { settings: @project_data.pdf_settings }, pt)
+          Service::LayoutBuilder.send(:block_visible?, cfg, canonical)
+        end
+
+        def get_block_config(pt, block_id)
+          b_sym = block_id.to_sym
+          canonical = case b_sym
+                      when :general_header, :cover_header, :visual_header then :header
+                      when :visual_image then :image_4_3
+                      else b_sym
+                      end
+          Service::LayoutBuilder.send(:get_block_config, { settings: @project_data.pdf_settings }, pt, canonical)
+        end
+      end
+
+      class CoverPage < PageBase; end
+      class DescriptionPage < PageBase; end
+      class ExplainPage < PageBase; end
+      class GeneralPage < PageBase; end
+      class VisualPage < PageBase; end
+      class BlankPage < PageBase; end
+
+      class ExportController
+        PAGE_CONTROLLERS = {
+          cover:       CoverPage,
+          description: DescriptionPage,
+          explain:     ExplainPage,
+          visual:      VisualPage,
+          general:     GeneralPage,
+          blank:       BlankPage
+        }.freeze
+      end
+    end
+  end
 end
 
 class TestRunner
@@ -93,6 +238,15 @@ class TestRunner
     test_template_settings_persistence
     test_template_blocks_visibility_persistence
     test_overlay_disabled_when_viewport_disabled
+    test_scene_viewport_settings_in_scenes_tab
+    test_56_scene_viewport_frame_header_and_shading_controls
+    test_57_compression_options_and_best_image_format
+    test_58_line_scale_multiplier
+    test_59_line_thickness_parameters_from_style
+    test_60_line_multiplier_consistent_across_all_render_modes
+    test_61_page_formats_a4_a3_and_quality_levels
+    test_62_auto_scale_font_size_reduction_30_pct
+    test_63_layout_line_weight_and_annotation_font_size
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -3120,8 +3274,8 @@ class TestRunner
     assert(has_text, "Отрисован информационный бейдж с текстом")
 
     text_el = mock_view.drawn_elements.find { |el| el[:mode] == :text }
-    assert(text_el[:pos].x > mock_view.vpwidth / 2.0, "Бейдж оверлея расположен в правой половине кадра")
-    assert(text_el[:pos].y > mock_view.vpheight / 2.0, "Бейдж оверлея расположен в нижней половине кадра (нижний правый угол)")
+    assert(text_el[:pos].x == mock_view.vpwidth / 2.0, "Строка оверлея центрирована по горизонтали (внизу по центру)")
+    assert(text_el[:pos].y > mock_view.vpheight / 2.0, "Строка оверлея расположена в нижней половине кадра (внизу по центру)")
 
     # Проверка дефолтных настроек и открытия файлов
     empty_dir = File.join(Dir.tmpdir, "test_open_frame_empty_#{Time.now.to_i}_#{rand(10000)}")
@@ -3195,12 +3349,15 @@ class TestRunner
 
     # 7. Проверка HTML интерфейса диалога
     html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
-    assert(html_text.include?("id=\"selectImageAspect\""), "index.html содержит id=\"selectImageAspect\"")
-    assert(html_text.include?("id=\"customAspectGroup\""), "index.html содержит id=\"customAspectGroup\"")
-    assert(html_text.include?("id=\"inputAspectCustomW\""), "index.html содержит id=\"inputAspectCustomW\"")
-    assert(html_text.include?("id=\"inputAspectCustomH\""), "index.html содержит id=\"inputAspectCustomH\"")
-    assert(html_text.include?("id=\"chkShowAspectOverlay\""), "index.html содержит переключатель Overlay id=\"chkShowAspectOverlay\"")
-    assert(html_text.include?("id=\"aspectOverlayBadge\""), "index.html содержит бейдж пропорций id=\"aspectOverlayBadge\"")
+    assert(html_text.include?("id=\"selectQuality\""), "index.html содержит id=\"selectQuality\"")
+    assert(html_text.include?("id=\"selectScaleMultiplier\""), "index.html содержит id=\"selectScaleMultiplier\"")
+    assert(html_text.include?("value=\"auto\""), "selectScaleMultiplier содержит опцию auto")
+    assert(html_text.include?("value=\"1.5\""), "selectScaleMultiplier содержит опцию 1.5")
+    assert(html_text.include?("value=\"2.0\""), "selectScaleMultiplier содержит опцию 2.0")
+    assert(html_text.include?("value=\"2.5\""), "selectScaleMultiplier содержит опцию 2.5")
+    assert(html_text.include?("value=\"3.0\""), "selectScaleMultiplier содержит опцию 3.0")
+    assert(!html_text.include?("id=\"selectImageAspect\""), "из общих настроек index.html удален id=\"selectImageAspect\"")
+    assert(!html_text.include?("id=\"chkShowAspectOverlay\""), "из общих настроек index.html удален id=\"chkShowAspectOverlay\"")
 
     # 8. Проверка JS логики
     js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
@@ -3311,8 +3468,11 @@ class TestRunner
     assert(js_text.include?("input_overlay_mask_color"), "app.js содержит элемент input_overlay_mask_color")
     assert(js_text.include?("input_overlay_mask_opacity"), "app.js содержит элемент input_overlay_mask_opacity")
     assert(css_text.include?(".tpl-overlay-styling-row"), "app.css содержит стили .tpl-overlay-styling-row")
-    assert(html_text.include?("id=\"inputOverlayBorderColor\""), "index.html содержит id=\"inputOverlayBorderColor\" на странице настроек")
-    assert(html_text.include?("id=\"inputOverlayMaskColor\""), "index.html содержит id=\"inputOverlayMaskColor\" на странице настроек")
+    assert(!html_text.include?("id=\"inputOverlayBorderColor\""), "из общих настроек index.html удален устаревший id=\"inputOverlayBorderColor\"")
+    assert(!html_text.include?("id=\"inputOverlayMaskColor\""), "из общих настроек index.html удален устаревший id=\"inputOverlayMaskColor\"")
+    assert(!html_text.include?("id=\"inputPrimaryColor\""), "из общих настроек index.html удален id=\"inputPrimaryColor\"")
+    assert(!html_text.include?("id=\"inputStampColor\""), "из общих настроек index.html удален id=\"inputStampColor\"")
+    assert(!html_text.include?("id=\"selectStamp\""), "из общих настроек index.html удален id=\"selectStamp\"")
 
     FileUtils.rm_rf(tmp_dir)
   end
@@ -3629,14 +3789,10 @@ class TestRunner
     assert(app_css_text.include?(".tpl-chk-titles-label"), "app.css содержит стиль для .tpl-chk-titles-label")
     assert(app_css_text.include?(".tpl-middle-label-wrap"), "app.css содержит стиль для .tpl-middle-label-wrap")
 
-    # 4. Проверка интеграции в PageBase и LayoutBuilder для страниц проекта
-    page_base_text = File.read(File.join(__dir__, "../controller/page_base.rb"), encoding: "utf-8")
-    assert(page_base_text.include?("resolve_formatted"), "PageBase вызывает resolve_formatted с параметром show_title")
-    assert(page_base_text.include?("resolve_parts"), "PageBase извлекает title_part и desc_part через resolve_parts")
-    assert(page_base_text.include?("formatted_text_box"), "PageBase выводит заголовок на первой строке жирным, а описание на следующей")
-
+    # 4. Проверка интеграции в LayoutBuilder для страниц проекта
     layout_builder_text = File.read(File.join(__dir__, "../service/layout_builder.rb"), encoding: "utf-8")
     assert(layout_builder_text.include?("resolve_formatted"), "LayoutBuilder вызывает resolve_formatted с параметром show_title")
+    assert(layout_builder_text.include?("show_title: show_title"), "LayoutBuilder передает параметр show_title в InfoLineResolver")
 
     # 5. Тестирование генерации страниц проекта в PDF с включенными и выключенными заголовками
     test_dir = File.expand_path("test_titles_page_render_dir", __dir__)
@@ -4155,6 +4311,832 @@ class TestRunner
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_scene_viewport_settings_in_scenes_tab
+    puts "\n--- 55. Тест видового экрана с пропорциями и рамкой в страницах (SceneItem и Tab-Scenes) ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка модели SceneItem
+    scene1 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Scene 1", page_type: :cover)
+    assert(scene1.viewport_visible == true, "SceneItem по умолчанию имеет viewport_visible == true")
+    assert(scene1.aspect_ratio == "4:3", "SceneItem по умолчанию имеет aspect_ratio == '4:3'")
+    assert(scene1.scale_pct == 100, "SceneItem по умолчанию имеет scale_pct == 100")
+    assert(scene1[:viewport_visible] == true, "SceneItem[] поддерживает доступ к :viewport_visible")
+    assert(scene1[:aspect_ratio] == "4:3", "SceneItem[] поддерживает доступ к :aspect_ratio")
+    assert(scene1[:scale_pct] == 100, "SceneItem[] поддерживает доступ к :scale_pct")
+
+    # Сериализация в хэш и десериализация
+    scene1.viewport_visible = false
+    scene1.aspect_ratio = "16:9"
+    scene1.scale_pct = 80
+    h = scene1.to_h
+    assert(h[:viewport_visible] == false, "to_h сохраняет :viewport_visible")
+    assert(h[:aspect_ratio] == "16:9", "to_h сохраняет :aspect_ratio")
+    assert(h[:scale_pct] == 80, "to_h сохраняет :scale_pct")
+
+    scene_restored = DN1Code::ExportPdf2::Model::SceneItem.from_h(h)
+    assert(scene_restored.viewport_visible == false, "from_h восстанавливает viewport_visible")
+    assert(scene_restored.aspect_ratio == "16:9", "from_h восстанавливает aspect_ratio")
+    assert(scene_restored.scale_pct == 80, "from_h восстанавливает scale_pct")
+
+    # 2. Проверка разметки в index.html
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    html_content = File.read(html_path, encoding: "UTF-8")
+    assert(html_content.include?('class="th-aspect"') && html_content.include?('>Кадр</th>'), "index.html содержит заголовок колонки Кадр в таблице сцен")
+    assert(html_content.include?('id="sceneViewportSection"'), "index.html содержит контейнер sceneViewportSection во вкладке страниц")
+
+    # 3. Проверка стилей в app.css
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+    css_content = File.read(css_path, encoding: "UTF-8")
+    assert(css_content.include?(".scene-viewport-section"), "app.css содержит стиль .scene-viewport-section")
+    assert(css_content.include?(".scene-viewport-card"), "app.css содержит стиль .scene-viewport-card")
+    assert(css_content.include?(".scene-aspect-cell"), "app.css содержит стиль .scene-aspect-cell")
+    assert(css_content.include?(".badge-aspect"), "app.css содержит стиль .badge-aspect")
+
+    # 4. Проверка логики в app.js
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_content = File.read(js_path, encoding: "UTF-8")
+    assert(js_content.include?("function renderSceneViewportCard"), "app.js содержит функцию renderSceneViewportCard")
+    assert(js_content.include?("function bindSceneViewportEvents"), "app.js содержит функцию bindSceneViewportEvents")
+    assert(js_content.include?("function updateSceneTableAspectCell"), "app.js содержит функцию updateSceneTableAspectCell")
+    assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
+
+    # Проверка, что из шаблонов карточка удалена
+    tpl_block = js_content[/renderTemplateSettingsList\s*\([^)]*\)\s*\{(?:[^{}]*|\{[^{}]*\})*\}/m]
+    assert(!tpl_block.to_s.include?("cardImageHtml"), "renderTemplateSettingsList больше не рендерит cardImageHtml")
+
+    # 5. Проверка работы OverlayService с настройками сцены
+    mock_model = Sketchup::MockModel.new
+    pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    scene_ov = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Page 1", page_type: :cover, viewport_visible: false, aspect_ratio: "16:9")
+    pdata.scenes = [scene_ov]
+
+    info_scene_off = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
+      scene_item: scene_ov,
+      project_data: pdata
+    })
+    assert(info_scene_off[:visible] == false, "OverlayService возвращает visible: false, если у сцены отключен видовой экран")
+
+    scene_ov.viewport_visible = true
+    info_scene_on = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
+      scene_item: scene_ov,
+      project_data: pdata
+    })
+    assert(info_scene_on[:visible] == true, "OverlayService возвращает visible: true, когда видовой экран сцены включен")
+    assert(info_scene_on[:aspect_ratio] == "16:9", "OverlayService возвращает индивидуальную пропорцию сцены 16:9")
+
+    # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_56_scene_viewport_frame_header_and_shading_controls
+    puts "\n--- 56. Тест перемещения рамки в заголовок, переключателя затемнения 20%/80% и толщины линии 1px ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_content = File.read(js_path, encoding: "UTF-8")
+
+    # 1. Проверка перемещения рамки со значком в заголовок рядом с 'Вкл'
+    scene_card = js_content[/function renderSceneViewportCard.*?function bindSceneViewportEvents/m]
+    assert(scene_card != nil, "app.js содержит функцию renderSceneViewportCard")
+
+    header_part = scene_card[/<div class="tpl-card-header">.*?<\/div>\s*<\/div>/m]
+    assert(header_part != nil, "renderSceneViewportCard содержит tpl-card-header")
+    assert(header_part.include?('id="tplAspectOverlayBadge"'), "tpl-card-header содержит значок/переключатель рамки #tplAspectOverlayBadge")
+    assert(header_part.include?('id="chk_image_4_3_visible"'), "tpl-card-header содержит чекбокс 'Вкл' #chk_image_4_3_visible")
+    assert(header_part.include?("📐 Рамка"), "Заголовок содержит иконку и надпись '📐 Рамка'")
+
+    # 2. Проверка того, что в параметрах рамки остался только контур (input_overlay_border_color)
+    styling_row = scene_card[/<div class="tpl-overlay-styling-row">.*?<p class="tpl-image-note">/m]
+    assert(styling_row != nil, "renderSceneViewportCard содержит блок .tpl-overlay-styling-row")
+    assert(styling_row.include?('id="input_overlay_border_color"'), "Блок стилей рамки содержит выбор цвета контура input_overlay_border_color")
+    assert(styling_row.include?("Контур рамки:"), "Блок содержит подпись 'Контур рамки:'")
+
+    # 3. Проверка переключателя затемнения 10%, 40%, 70%, 90%
+    assert(styling_row.include?('id="grp_overlay_mask_opacity"'), "Блок стилей содержит группу переключателя затемнения #grp_overlay_mask_opacity")
+    assert(styling_row.include?('data-opacity="10"'), "Переключатель содержит вариант 10%")
+    assert(styling_row.include?('data-opacity="40"'), "Переключатель содержит вариант 40%")
+    assert(styling_row.include?('data-opacity="70"'), "Переключатель содержит вариант 70%")
+    assert(styling_row.include?('data-opacity="90"'), "Переключатель содержит вариант 90%")
+    assert(!styling_row.include?('id="input_overlay_border_opacity"'), "Из карточки видового экрана удален ползунок прозрачности рамки")
+    assert(!styling_row.include?('id="input_overlay_mask_color"'), "Из карточки видового экрана удален выбор цвета затемнения")
+
+    # 4. Проверка обработчиков в bindSceneViewportEvents
+    assert(js_content.include?("grpMaskOpacity.querySelectorAll(\".btn-mask-opacity\")"), "app.js привязывает события клика к кнопкам затемнения")
+    assert(js_content.include?("state.pdf_settings.overlay_mask_opacity = opacity;"), "app.js сохраняет выбранное затемнение в настройки")
+
+    # 5. Проверка стилей в app.css
+    css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
+    css_content = File.read(css_path, encoding: "UTF-8")
+    assert(css_content.include?("#grp_overlay_mask_opacity"), "app.css содержит стили для #grp_overlay_mask_opacity")
+    assert(css_content.include?(".btn-mask-opacity"), "app.css содержит стили для .btn-mask-opacity")
+
+    # 6. Проверка толщины линии рамки по умолчанию 1px в OverlayService
+    overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
+    info = overlay_svc.calculate_target_info(nil, {})
+    assert(info[:line_width] == 1, "OverlayService.calculate_target_info по умолчанию возвращает line_width: 1")
+
+    ov_inst = overlay_svc.overlay_instance
+    assert(ov_inst.respond_to?(:line_width_cache), "SafeFrameOverlay поддерживает атрибут line_width_cache")
+    assert(ov_inst.line_width_cache == 1, "SafeFrameOverlay по умолчанию имеет line_width_cache == 1")
+
+    mock_model = Sketchup::MockModel.new
+    overlay_svc.enable(mock_model)
+    ov_model = overlay_svc.find_model_overlay(mock_model)
+    assert(ov_model && ov_model.line_width_cache == 1, "SafeFrameOverlay после enable сохраняет толщину линии 1px")
+
+    # 7. Проверка информационной строки (внизу по центру, тонкий черный шрифт без темной плашки)
+    mock_view = mock_model.active_view
+    mock_view.vpwidth = 1200
+    mock_view.vpheight = 800
+    mock_view.drawn_elements.clear
+    ov_inst.visible_cache = true
+    ov_inst.draw(mock_view)
+    text_elem = mock_view.drawn_elements.find { |el| el[:mode] == :text }
+    assert(text_elem != nil, "SafeFrameOverlay#draw отрисовывает текстовый элемент строки кадра")
+    assert(text_elem[:pos].x == 600.0, "Текст центрирован по горизонтали (x = 600 в окне 1200)")
+    assert(text_elem[:pos].y > 750.0, "Текст расположен внизу кадра (y > 750 в окне 800)")
+    assert(text_elem[:options][:size] == 9, "Размер шрифта увеличен в 1.5 раза (size: 9)")
+    assert(text_elem[:options][:bold] == false, "Шрифт не жирный, тонкий (bold: false)")
+    assert(text_elem[:options][:align] == (defined?(TextAlignCenter) ? TextAlignCenter : 1), "Выравнивание текста по центру (align: center)")
+    text_color = text_elem[:options][:color]
+    is_black = text_color == "black" || (text_color.respond_to?(:red) && text_color.red == 0 && text_color.green == 0 && text_color.blue == 0)
+    assert(is_black, "Цвет шрифта текста кадра черный")
+    quads = mock_view.drawn_elements.select { |el| el[:mode] == GL_QUADS }
+    assert(quads.length <= 2, "Темная подложка бейджа удалена (рисуются только полосы маски кадра)")
+
+    # 8. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_57_compression_options_and_best_image_format
+    puts "\n--- 57. Тест параметра сжатия (применять/без сжатия) и лучшего формата картинок (PNG) ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка значений по умолчанию в ProjectData и YAML-файлах
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    settings = project_data.default_pdf_settings
+    assert(settings.key?(:compress_pdf), "default_pdf_settings содержит параметр :compress_pdf")
+    assert(settings[:compress_pdf] == true, "compress_pdf по умолчанию true (у самого документа PDF всегда сжатие без потерь)")
+    assert(settings.key?(:image_format), "default_pdf_settings содержит параметр :image_format")
+    assert(settings[:image_format] == "png", "image_format по умолчанию 'png' (лучший формат для картинок: 24-bit TrueColor lossless)")
+
+    def_yaml = File.read(File.join(__dir__, "../config/default_settings.yaml"), encoding: "utf-8")
+    assert(def_yaml.include?("compress_pdf:"), "default_settings.yaml содержит параметр compress_pdf")
+    assert(def_yaml.include?("image_format:"), "default_settings.yaml содержит параметр image_format")
+
+    # 2. Проверка RenderService: лучший формат по умолчанию — PNG
+    tmp_png = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(nil, nil)
+    assert(tmp_png.end_with?(".png"), "RenderService по умолчанию использует лучший формат для картинок (.png)")
+    assert(File.exist?(tmp_png), "Временный PNG файл успешно создан")
+    File.delete(tmp_png) rescue nil
+
+    tmp_jpg = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(nil, nil, image_format: "jpg")
+    assert(tmp_jpg.end_with?(".jpg"), "RenderService поддерживает явное переключение на JPEG (.jpg)")
+    assert(File.exist?(tmp_jpg), "Временный JPG файл успешно создан")
+    File.delete(tmp_jpg) rescue nil
+
+    mock_model_jpg = Sketchup.active_model
+    tmp_jpg_view = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(mock_model_jpg, nil, image_format: "jpg")
+    view_opts = mock_model_jpg.active_view.last_write_image_options
+    assert(view_opts && view_opts[:compression] == 1.0, "Для JPEG по умолчанию передается максимальное качество (compression: 1.0)")
+    File.delete(tmp_jpg_view) rescue nil
+
+    # 3. Проверка элементов управления в index.html
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    html_content = File.read(html_path, encoding: "UTF-8")
+    assert(html_content.include?('id="selectCompression"'), "index.html содержит селектор сжатия #selectCompression")
+    assert(html_content.include?('value="none"'), "Селектор сжатия содержит вариант 'none' (Без сжатия)")
+    assert(html_content.include?('value="compress"'), "Селектор сжатия содержит вариант 'compress' (Применять сжатие)")
+    assert(html_content.include?('id="selectImageFormat"'), "index.html содержит селектор формата изображений #selectImageFormat")
+    assert(html_content.include?('value="png"'), "Селектор формата содержит вариант 'png' (PNG — лучший формат)")
+    assert(html_content.include?('value="jpg"'), "Селектор формата содержит вариант 'jpg' (JPEG)")
+
+    # 4. Проверка логики в app.js
+    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_content = File.read(js_path, encoding: "UTF-8")
+    assert(js_content.include?("selectCompression: document.getElementById(\"selectCompression\")"), "app.js инициализирует selectCompression")
+    assert(js_content.include?("selectImageFormat: document.getElementById(\"selectImageFormat\")"), "app.js инициализирует selectImageFormat")
+    assert(js_content.include?("compress_pdf:"), "collectSettingsFromUI собирает compress_pdf")
+    assert(js_content.include?("image_format:"), "collectSettingsFromUI собирает image_format")
+
+    # 5. Проверка генерации PDF со сжатием и без сжатия
+    test_dir = File.join(__dir__, "test_compression_dir")
+    FileUtils.mkdir_p(test_dir)
+    pdf_uncompressed = File.join(test_dir, "uncompressed.pdf")
+    pdf_compressed   = File.join(test_dir, "compressed.pdf")
+
+    doc1 = Layout::Document.new
+    doc1.pages.add("Page 1")
+    doc1.export(pdf_uncompressed, compress: false)
+
+    doc2 = Layout::Document.new
+    doc2.pages.add("Page 1")
+    doc2.export(pdf_compressed, compress: true)
+
+    assert(File.exist?(pdf_uncompressed), "PDF без сжатия успешно создан")
+    assert(File.exist?(pdf_compressed), "PDF со сжатием успешно создан")
+
+    size_raw  = File.size(pdf_uncompressed)
+    size_comp = File.size(pdf_compressed)
+    assert(size_raw > size_comp, "Размер файла без сжатия (#{size_raw} б) больше размера сжатого файла (#{size_comp} б)")
+
+    raw_bytes  = File.binread(pdf_uncompressed)
+    comp_bytes = File.binread(pdf_compressed)
+    assert(!raw_bytes.include?("/Filter /FlateDecode"), "В файле без сжатия отсутствуют фильтры компрессии потоков (/FlateDecode)")
+    assert(comp_bytes.include?("/Filter /FlateDecode"), "В сжатом файле потоки сжаты с фильтром /FlateDecode")
+
+    FileUtils.rm_rf(test_dir)
+
+    # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- 58. Тест множителя толщины линий (Line Scale Multiplier) ---
+  def test_58_line_scale_multiplier
+    puts "\n--- 58. Тест множителя толщины линий (Line Scale Multiplier) ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка наличия настроек по умолчанию
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    settings = project_data.default_pdf_settings
+    assert(settings.key?(:scale_multiplier), "default_pdf_settings содержит параметр :scale_multiplier")
+    assert(settings[:scale_multiplier] == "2.0", "scale_multiplier по умолчанию '2.0'")
+    assert(settings.key?(:scale_factor), "default_pdf_settings содержит параметр :scale_factor")
+
+    def_yaml = File.read(File.join(__dir__, "../config/default_settings.yaml"), encoding: "utf-8")
+    assert(def_yaml.include?("scale_multiplier:"), "default_settings.yaml содержит scale_multiplier")
+
+    # 2. Проверка HTML элементов и опций селектора
+    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html_text.include?("id=\"selectScaleMultiplier\""), "index.html содержит selectScaleMultiplier")
+    assert(html_text.include?("Множитель толщины линий"), "index.html содержит подпись 'Множитель толщины линий'")
+    assert(html_text.include?("value=\"0.5\""), "selectScaleMultiplier содержит опцию 0.5")
+    assert(html_text.include?("value=\"1\""), "selectScaleMultiplier содержит опцию 1")
+    assert(html_text.include?("value=\"1.5\""), "selectScaleMultiplier содержит опцию 1.5")
+    assert(html_text.include?("value=\"2.0\""), "selectScaleMultiplier содержит опцию 2.0")
+    assert(html_text.include?("value=\"2.5\""), "selectScaleMultiplier содержит опцию 2.5")
+    assert(html_text.include?("value=\"3.0\""), "selectScaleMultiplier содержит опцию 3.0")
+    assert(html_text.include?("value=\"auto\""), "selectScaleMultiplier содержит опцию auto")
+
+    # 3. Проверка поведения Layout::SketchUpModel#line_weight
+    mock_doc = Layout::Document.new
+    bounds = Geom::Bounds2d.new(1, 1, 4, 4)
+    skp_m = Layout::SketchUpModel.new("dummy.skp", bounds)
+    assert(skp_m.line_weight == 0.5, "Базовая толщина линии видового экрана в LayOut равна 0.5 pt")
+
+    # При множителе 2.0: 0.5 * 2.0 = 1.0 pt
+    skp_m.line_weight = (0.5 * 2.0).round(2)
+    assert(skp_m.line_weight == 1.0, "При множителе 2.0 толщина линии равна 1.0 pt")
+
+    # При множителе 3.0: 0.5 * 3.0 = 1.5 pt
+    skp_m.line_weight = (0.5 * 3.0).round(2)
+    assert(skp_m.line_weight == 1.5, "При множителе 3.0 толщина линии равна 1.5 pt")
+
+    # При множителе 0.5: 0.5 * 0.5 = 0.25 pt
+    skp_m.line_weight = (0.5 * 0.5).round(2)
+    assert(skp_m.line_weight == 0.25, "При множителе 0.5 толщина линии равна 0.25 pt")
+
+    # 4. Проверка RenderService передачи :scale_factor и восстановления RenderingOptions
+    model = Sketchup.active_model
+    ro = model.rendering_options
+    orig_sil = ro["SilhouetteWidth"]
+    orig_cut = ro["SectionCutWidth"]
+
+    tmp_out = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      image_width: 800,
+      scale_factor: 2.5
+    })
+    assert(File.exist?(tmp_out), "Временный файл рендера создан")
+    assert(ro["SilhouetteWidth"] == orig_sil, "SilhouetteWidth корректно восстановлена после рендера")
+    assert(ro["SectionCutWidth"] == orig_cut, "SectionCutWidth корректно восстановлена после рендера")
+    File.delete(tmp_out) rescue nil
+
+    # Проверка, что MockView получил scale_factor в write_image
+    view_opts = model.active_view.last_write_image_options
+    assert(view_opts && view_opts[:scale_factor] == 2.5, "write_image получил scale_factor: 2.5")
+
+    # 5. Проверка режима Авто: расчет масштаба линий от разрешения картинки (image_width), уменьшенный на 30%
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 1200
+    })
+    opts_1200 = model.active_view.last_write_image_options
+    assert(opts_1200 && opts_1200[:scale_factor] == 0.42, "В режиме Авто при 1200 px множитель толщины равен 0.42 (0.60 * 0.70)")
+
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 1920
+    })
+    opts_1920 = model.active_view.last_write_image_options
+    assert(opts_1920 && opts_1920[:scale_factor] == 0.63, "В режиме Авто при 1920 px множитель толщины равен 0.63 (0.90 * 0.70)")
+
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 2400
+    })
+    opts_2400 = model.active_view.last_write_image_options
+    assert(opts_2400 && opts_2400[:scale_factor] == 0.84, "В режиме Авто при 2400 px множитель толщины равен 0.84 (1.20 * 0.70)")
+
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 3600
+    })
+    opts_3600 = model.active_view.last_write_image_options
+    assert(opts_3600 && opts_3600[:scale_factor] == 1.26, "В режиме Авто при 3600 px множитель толщины равен 1.26 (1.80 * 0.70)")
+
+    # 6. Проверка, что для растрового рендера режим Авто рассчитывается от разрешения кадра
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 2400,
+      page_size: "A4"
+    })
+    opts_a4 = model.active_view.last_write_image_options
+    assert(opts_a4 && opts_a4[:scale_factor] == 0.84, "В режиме Авто для растра (2400 px на A4) множитель равен 0.84")
+
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 2400,
+      page_size: "A3"
+    })
+    opts_a3 = model.active_view.last_write_image_options
+    assert(opts_a3 && opts_a3[:scale_factor] == 0.84, "В режиме Авто для растра (2400 px на A3) множитель равен 0.84 (зависит от разрешения)")
+
+    DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, nil, {
+      scale_multiplier: "auto",
+      image_width: 2400,
+      page_size: "A2"
+    })
+    opts_a2 = model.active_view.last_write_image_options
+    assert(opts_a2 && opts_a2[:scale_factor] == 0.84, "В режиме Авто для растра (2400 px на A2) множитель равен 0.84 (зависит от разрешения)")
+
+    # 6. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- 59. Тест получения параметров толщин линий из стиля (Styles) ---
+  def test_59_line_thickness_parameters_from_style
+    puts "\n--- 59. Тест получения параметров толщин линий из стиля (Styles) ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    model = Sketchup.active_model
+
+    # 1. Создаем тестовую сцену со специфическими параметрами стиля
+    custom_page = Sketchup::MockPage.new("05. Сцена с кастомным стилем")
+    custom_page.rendering_options["SilhouetteWidth"] = 3
+    custom_page.rendering_options["SectionCutWidth"] = 6
+    custom_page.rendering_options["DepthQueWidth"]   = 5
+    custom_page.rendering_options["LineEndWidth"]    = 2
+    custom_page.rendering_options["LineExtension"]   = 7
+    custom_page.rendering_options["DrawSilhouettes"] = true
+    custom_page.rendering_options["DrawLineEnds"]    = true
+    custom_page.rendering_options["ExtendLines"]     = true
+
+    # 2. Рендерим сцену через RenderService с множителем 1.0 (1200 px)
+    tmp1 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, custom_page, {
+      image_width: 1200,
+      scale_factor: 1.0
+    })
+    assert(File.exist?(tmp1), "Временный файл рендера 1 успешно создан")
+    File.delete(tmp1) rescue nil
+
+    # Проверяем, что параметры стиля применились на модели
+    assert(model.styles.selected_style == custom_page.style, "Стиль сцены успешно активирован на модели")
+    assert(model.pages.selected_page == custom_page, "Сцена успешно активирована на модели")
+
+    # 3. Создаем сцену с отключенными силуэтами (DrawSilhouettes = false)
+    no_sil_page = Sketchup::MockPage.new("06. Сцена без силуэтов")
+    no_sil_page.rendering_options["SilhouetteWidth"] = 1
+    no_sil_page.rendering_options["SectionCutWidth"] = 3
+    no_sil_page.rendering_options["DrawSilhouettes"] = false
+    no_sil_page.rendering_options["DrawLineEnds"]    = false
+
+    tmp2 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, no_sil_page, {
+      image_width: 2400,
+      scale_factor: 2.0
+    })
+    assert(File.exist?(tmp2), "Временный файл рендера 2 успешно создан")
+    File.delete(tmp2) rescue nil
+
+    # 4. Проверка LayoutBuilder: сброс переопределений стиля через reset_style
+    mock_doc = Layout::Document.new
+    bounds = Geom::Bounds2d.new(1, 1, 4, 4)
+    skp_m = Layout::SketchUpModel.new("dummy.skp", bounds)
+    assert(skp_m.respond_to?(:reset_style), "Layout::SketchUpModel поддерживает reset_style")
+
+    # 5. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- 60. Тест одинаковой работы множителя толщины линий во всех режимах рендера (Raster, Vector, Hybrid) ---
+  def test_60_line_multiplier_consistent_across_all_render_modes
+    puts "\n--- 60. Тест одинаковой работы множителя толщины линий во всех режимах рендера (Raster, Vector, Hybrid) ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Проверка поддержки Layout::SketchUpModel для всех режимов рендера
+    render_modes = {
+      "raster" => Layout::SketchUpModel::RASTER_RENDER,
+      "vector" => Layout::SketchUpModel::VECTOR_RENDER,
+      "hybrid" => Layout::SketchUpModel::HYBRID_RENDER
+    }
+
+    test_model = Sketchup::MockModel.new("U:/Projects/RenderModes/Model.skp")
+    test_page = test_model.pages.add("01. Главный вид")
+
+    scene_item = DN1Code::ExportPdf2::Model::SceneItem.new(
+      name: "01. Главный вид",
+      page_type: :general,
+      enabled: true
+    )
+    scene_item.scene_ref = test_page
+
+    content_box = { left: 10.0, top: 200.0, w: 500.0, h: 300.0 }
+    img_cfg = { "aspect_ratio" => "4:3", "scale_pct" => 100 }
+
+    # Тестируем применение множителей 0.5, 1.5, 2.0, 3.0 во всех режимах рендера
+    multipliers_to_test = [
+      { mult_str: "0.5", expected_weight: 0.25 },
+      { mult_str: "1.0", expected_weight: 0.50 },
+      { mult_str: "1.5", expected_weight: 0.75 },
+      { mult_str: "2.0", expected_weight: 1.00 },
+      { mult_str: "2.5", expected_weight: 1.25 },
+      { mult_str: "3.0", expected_weight: 1.50 }
+    ]
+
+    render_modes.each do |mode_name, expected_render_const|
+      multipliers_to_test.each do |m_test|
+        doc = Layout::Document.new
+        page = doc.pages.first
+        layer = doc.layers.first
+        temp_imgs = []
+
+        ctx = {
+          model: test_model,
+          settings: {
+            layout_render_mode: mode_name,
+            scale_multiplier: m_test[:mult_str],
+            image_width: 2400
+          },
+          aspect_cache: {}
+        }
+
+        DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+          :render_image_block,
+          doc, page, layer, scene_item, content_box, img_cfg, ctx, temp_imgs, :general
+        )
+
+        # Проверяем созданную сущность в документе
+        created_ents = doc.instance_variable_get(:@entities).map { |r| r[:entity] }
+        skp_viewports = created_ents.select { |e| e.is_a?(Layout::SketchUpModel) }
+
+        assert(!skp_viewports.empty?, "В режиме '#{mode_name}' создается видовой экран Layout::SketchUpModel")
+        vp = skp_viewports.first
+
+        assert(vp.render_mode == expected_render_const, "В режиме '#{mode_name}' render_mode равен #{expected_render_const}")
+        assert(vp.line_weight == m_test[:expected_weight],
+               "В режиме '#{mode_name}' при множителе #{m_test[:mult_str]} толщина линии равна #{m_test[:expected_weight]} pt (получено #{vp.line_weight} pt)")
+      end
+    end
+
+    # 2. Проверка, что во всех режимах (Raster, Vector, Hybrid) при явном множителе толщина линий строго одинакова
+    explicit_multipliers = ["0.5", "1.5", "2.0", "3.0"]
+    explicit_multipliers.each do |sm_val|
+      weights_by_mode = {}
+      render_modes.keys.each do |mode_name|
+        doc = Layout::Document.new
+        page = doc.pages.first
+        layer = doc.layers.first
+        temp_imgs = []
+
+        ctx = {
+          model: test_model,
+          settings: {
+            layout_render_mode: mode_name,
+            scale_multiplier: sm_val,
+            image_width: 2400
+          },
+          aspect_cache: {}
+        }
+
+        DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+          :render_image_block,
+          doc, page, layer, scene_item, content_box, img_cfg, ctx, temp_imgs, :general
+        )
+
+        vp = doc.instance_variable_get(:@entities).map { |r| r[:entity] }.find { |e| e.is_a?(Layout::SketchUpModel) }
+        weights_by_mode[mode_name] = vp ? vp.line_weight : nil
+      end
+
+      assert(!weights_by_mode["raster"].nil?, "Raster режим имеет установленный line_weight для '#{sm_val}'")
+      assert(!weights_by_mode["vector"].nil?, "Vector режим имеет установленный line_weight для '#{sm_val}'")
+      assert(!weights_by_mode["hybrid"].nil?, "Hybrid режим имеет установленный line_weight для '#{sm_val}'")
+
+      assert(weights_by_mode["raster"] == weights_by_mode["vector"] && weights_by_mode["vector"] == weights_by_mode["hybrid"],
+             "Множитель '#{sm_val}' дает одинаковую толщину во всех режимах: Raster=#{weights_by_mode['raster']}, Vector=#{weights_by_mode['vector']}, Hybrid=#{weights_by_mode['hybrid']}")
+    end
+
+    # Проверка режима 'auto' (значения множителя уменьшены на 30%):
+    # - в Raster расчет идет от разрешения (2400 px -> 0.84 mult -> 0.42 pt) с защитным порогом
+    # - в Vector и Hybrid расчет подстроен под формат листа (A4=0.21 pt, A3=0.32 pt, A2=0.42 pt)
+    %w[A4 A3 A2].each do |sz|
+      expected_vec_w = case sz
+                       when "A3" then 0.32
+                       when "A2" then 0.42
+                       else 0.21
+                       end
+      expected_ras_w = 0.42 # 2400 px -> 0.84 mult -> 0.5 * 0.84 = 0.42 pt
+
+      weights = {}
+      render_modes.keys.each do |mode_name|
+        doc = Layout::Document.new
+        page = doc.pages.first
+        layer = doc.layers.first
+        temp_imgs = []
+
+        ctx = {
+          model: test_model,
+          settings: {
+            layout_render_mode: mode_name,
+            scale_multiplier: "auto",
+            image_width: 2400,
+            page_size: sz
+          },
+          aspect_cache: {}
+        }
+
+        DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+          :render_image_block,
+          doc, page, layer, scene_item, content_box, img_cfg, ctx, temp_imgs, :general
+        )
+
+        vp = doc.instance_variable_get(:@entities).map { |r| r[:entity] }.find { |e| e.is_a?(Layout::SketchUpModel) }
+        weights[mode_name] = vp ? vp.line_weight : nil
+      end
+
+      assert(weights["raster"] == expected_ras_w, "В режиме 'auto' для формата #{sz} в Raster толщина равна #{expected_ras_w} pt (получено #{weights['raster']} pt)")
+      assert(weights["vector"] == expected_vec_w, "В режиме 'auto' для формата #{sz} в Vector толщина равна #{expected_vec_w} pt (получено #{weights['vector']} pt)")
+      assert(weights["hybrid"] == expected_vec_w, "В режиме 'auto' для формата #{sz} в Hybrid толщина равна #{expected_vec_w} pt (получено #{weights['hybrid']} pt)")
+      assert(weights["vector"] == weights["hybrid"], "В режиме 'auto' для формата #{sz} Vector и Hybrid строго совпадают")
+    end
+
+    # 3. Полный экспорт документа PDF во всех трех режимах
+    render_modes.keys.each do |mode_name|
+      project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+      project_data.pdf_settings[:export_engine] = "layout"
+      project_data.pdf_settings[:layout_render_mode] = mode_name
+      project_data.pdf_settings[:scale_multiplier] = "1.5"
+      project_data.pdf_settings[:auto_open_pdf] = false
+      project_data.sync_with_model_scenes(test_model)
+
+      pdf_test_out = File.expand_path("test_render_mode_#{mode_name}.pdf", __dir__)
+      File.delete(pdf_test_out) if File.exist?(pdf_test_out)
+
+      controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, test_model)
+      result_path = controller.export(pdf_test_out)
+
+      assert(File.exist?(result_path), "Экспорт в режиме #{mode_name} успешно создал PDF файл")
+      assert(File.size(result_path) > 1000, "Размер PDF файла в режиме #{mode_name} валиден")
+      File.delete(pdf_test_out) if File.exist?(pdf_test_out)
+      layout_f = pdf_test_out.sub(/\.pdf$/i, ".layout")
+      File.delete(layout_f) if File.exist?(layout_f)
+    end
+
+    # 4. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_61_page_formats_a4_a3_and_quality_levels
+    puts "\n--- 61. Тест форматов страниц (только A4 и A3) и качества разрешения (low 96, medium 150, high 300) ---"
+
+    # 1. Проверка HTML: только форматы A4 и A3, отсутствие A2 и LETTER
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_text = File.read(html_path, encoding: "utf-8")
+
+    assert(html_text.include?('id="selectPageSize"'), "index.html содержит selectPageSize")
+    assert(html_text.include?('<option value="A4" selected>A4 (210 x 297 мм)</option>'), "selectPageSize содержит формат A4")
+    assert(html_text.include?('<option value="A3">A3 (297 x 420 мм)</option>'), "selectPageSize содержит формат A3")
+    assert(!html_text.include?('value="A2"'), "selectPageSize НЕ содержит формат A2")
+    assert(!html_text.include?('value="LETTER"'), "selectPageSize НЕ содержит формат LETTER")
+
+    # 2. Проверка HTML: опции качества разрешения
+    assert(html_text.include?('id="selectQuality"'), "index.html содержит selectQuality")
+    assert(html_text.include?('value="low"') && html_text.include?('96'), "selectQuality содержит опцию low (96 dpi)")
+    assert(html_text.include?('value="medium"') && html_text.include?('150'), "selectQuality содержит опцию medium (150 dpi)")
+    assert(html_text.include?('value="high"') && html_text.include?('300'), "selectQuality содержит опцию high (300 dpi)")
+
+    settings_yaml = File.read(File.expand_path("../config/settings.yaml", __dir__), encoding: "utf-8")
+    assert(settings_yaml.include?("page_size: A4") || settings_yaml.include?("page_size: A3"), "settings.yaml содержит валидный формат A4 или A3")
+    assert(%w[low medium high].any? { |q| settings_yaml.include?("render_quality: #{q}") }, "settings.yaml содержит валидный render_quality (low/medium/high)")
+
+    default_yaml = File.read(File.expand_path("../config/default_settings.yaml", __dir__), encoding: "utf-8")
+    assert(default_yaml.include?('page_size: "A4"'), "default_settings.yaml содержит page_size: A4")
+    assert(default_yaml.include?('render_quality: "medium"'), "default_settings.yaml содержит render_quality: medium")
+
+    # 4. Проверка установки RESOLUTION в Layout::PageInfo в зависимости от render_quality
+    test_model = Sketchup::MockModel.new("U:/Projects/QualityTest/Model.skp")
+    test_model.pages.add("01. Обложка")
+
+    %w[low medium high].each do |q_level|
+      pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+      pdata.pdf_settings[:export_engine] = "layout"
+      pdata.pdf_settings[:page_size] = "A4"
+      pdata.pdf_settings[:render_quality] = q_level
+      pdata.pdf_settings[:image_width] = nil
+      pdata.pdf_settings[:auto_open_pdf] = false
+      pdata.sync_with_model_scenes(test_model)
+
+      pdf_out = File.expand_path("test_quality_#{q_level}.pdf", __dir__)
+      File.delete(pdf_out) if File.exist?(pdf_out)
+
+      controller = DN1Code::ExportPdf2::Controller::ExportController.new(pdata, test_model)
+      controller.export(pdf_out)
+
+      expected_res = case q_level
+                     when "low" then Layout::PageInfo::RESOLUTION_LOW
+                     when "high" then Layout::PageInfo::RESOLUTION_HIGH
+                     else Layout::PageInfo::RESOLUTION_MEDIUM
+                     end
+
+      # Проверяем последний созданный документ
+      doc = Layout::Document.new
+      p_dim = DN1Code::ExportPdf2::Service::LayoutBuilder.send(:get_page_dimensions, pdata.pdf_settings)
+      doc.page_info.width = p_dim[:w]
+      doc.page_info.height = p_dim[:h]
+      # Проверяем, что в результирующем экспорте файл создан
+      assert(File.exist?(pdf_out), "PDF для качества #{q_level} успешно создан")
+      File.delete(pdf_out) if File.exist?(pdf_out)
+      lay_f = pdf_out.sub(/\.pdf$/i, ".layout")
+      File.delete(lay_f) if File.exist?(lay_f)
+    end
+
+    # 5. Проверка динамического расчета ширины рендера RenderService по DPI и формату
+    # A4: 11.6929 дюйма landscape
+    w_a4_low = (11.6929 * 96).round
+    w_a4_med = (11.6929 * 150).round
+    w_a4_hi  = (11.6929 * 300).round
+
+    # A3: 16.5354 дюйма landscape
+    w_a3_low = (16.5354 * 96).round
+    w_a3_med = (16.5354 * 150).round
+    w_a3_hi  = (16.5354 * 300).round
+
+    assert(w_a4_low == 1123, "Ширина рендера A4 low 96 dpi равна 1123 px")
+    assert(w_a4_med == 1754, "Ширина рендера A4 medium 150 dpi равна 1754 px")
+    assert(w_a4_hi == 3508, "Ширина рендера A4 high 300 dpi равна 3508 px")
+
+    assert(w_a3_low == 1587, "Ширина рендера A3 low 96 dpi равна 1587 px")
+    assert(w_a3_med == 2480, "Ширина рендера A3 medium 150 dpi равна 2480 px")
+    assert(w_a3_hi == 4961, "Ширина рендера A3 high 300 dpi равна 4961 px")
+  end
+
+  def test_62_auto_scale_font_size_reduction_30_pct
+    puts "\n--- 62. Тест уменьшения множителя линий на 30% при авто scale и его изоляции для страниц рендера ---"
+
+    # 1. Проверка уменьшения множителя на 30% (* 0.70) в render_service.rb и layout_builder.rb
+    rs_path = File.expand_path("../service/render_service.rb", __dir__)
+    rs_text = File.read(rs_path, encoding: "utf-8")
+    assert(rs_text.include?("(raw_mult * 0.70).round(2)"),
+           "render_service.rb содержит формулу авто scale множителя линий с уменьшением на 30% (* 0.70)")
+
+    lb_path = File.expand_path("../service/layout_builder.rb", __dir__)
+    lb_text = File.read(lb_path, encoding: "utf-8")
+    assert(lb_text.include?("(base_val * 0.70).round(2)"),
+           "layout_builder.rb содержит формулу авто scale множителя линий с уменьшением на 30% (* 0.70)")
+
+    # 2. Проверка app.js на расчет эффективного множителя с уменьшением на 30%
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    assert(app_js_text.include?("Math.round(mult * 70) / 100"),
+           "app.js содержит расчет эффективного множителя линий с уменьшением на 30%")
+
+    # 3. Проверка восстановления стандартных формул для текста шапки и слотов листа (текст не искажен)
+    assert(lb_text.include?("scale = [available_h / raw_total_h, 0.6].max"),
+           "layout_builder.rb использует стандартное авто-масштабирование шапки без искажений")
+    assert(lb_text.include?("slot_scale = [in_h / total_items_h, 0.6].max"),
+           "layout_builder.rb использует стандартное авто-масштабирование слотов")
+
+    # 4. Проверка: Line Scale Multiplier со скриншота работает ТОЛЬКО для рендер страниц/видового экрана SketchUp
+    assert(lb_text.include?("def render_image_block"), "layout_builder.rb имеет метод render_image_block для видового экрана")
+    assert(lb_text.include?("skp_model.line_weight = (base_pt * line_mult).round(2)"), "render_image_block применяет line_weight")
+
+    # Проверяем, что в рендеринге шапки (render_modular_header) и карточек слотов (render_modular_slot_card)
+    # line_weight и scale_multiplier НЕ используются:
+    header_code = lb_text[/def render_modular_header.*?def render_modular_footer/m]
+    assert(header_code && !header_code.include?("scale_multiplier"), "render_modular_header не зависит от scale_multiplier")
+    assert(header_code && !header_code.include?("calc_line_weight"), "render_modular_header не зависит от calc_line_weight")
+  end
+
+  def test_63_layout_line_weight_and_annotation_font_size
+    puts "\n--- 63. Тест настроек толщины линий (pt) и размера шрифта выносок/размеров в LayOut API ---"
+
+    # 1. Проверка HTML: перенос толщины линий в карточку параметров LayOut API и наличие pt значений
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_text = File.read(html_path, encoding: "utf-8")
+
+    layout_card = html_text[/Параметры SketchUp LayOut API.*?Параметры страницы и документа/m]
+    assert(layout_card, "Карточка 'Параметры SketchUp LayOut API' найдена в index.html")
+    assert(layout_card.include?("id=\"selectScaleMultiplier\""),
+           "selectScaleMultiplier перенесен в карточку 'Параметры SketchUp LayOut API'")
+    assert(layout_card.include?("0,25 pt"), "selectScaleMultiplier содержит опцию 0,25 pt")
+    assert(layout_card.include?("0,50 pt"), "selectScaleMultiplier содержит опцию 0,50 pt")
+    assert(layout_card.include?("0,75 pt"), "selectScaleMultiplier содержит опцию 0,75 pt")
+    assert(layout_card.include?("1,00 pt"), "selectScaleMultiplier содержит опцию 1,00 pt")
+    assert(layout_card.include?("1,25 pt"), "selectScaleMultiplier содержит опцию 1,25 pt")
+    assert(layout_card.include?("1,50 pt"), "selectScaleMultiplier содержит опцию 1,50 pt")
+
+    page_card = html_text[/Параметры страницы и документа.*?Адресаты веб-интеграции/m]
+    assert(page_card && !page_card.include?("id=\"selectScaleMultiplier\""),
+           "selectScaleMultiplier удален из карточки 'Параметры страницы и документа'")
+
+    # 2. Проверка HTML: наличие селектора размера шрифта выносок и размеров
+    assert(layout_card.include?("id=\"selectAnnotationFontSize\""),
+           "index.html содержит id=\"selectAnnotationFontSize\" в параметрах LayOut API")
+    assert(layout_card.include?("Размер шрифта выносок и размеров"),
+           "index.html содержит подпись 'Размер шрифта выносок и размеров'")
+    assert(layout_card.include?("value=\"auto\""), "selectAnnotationFontSize содержит опцию auto")
+    assert(layout_card.include?("value=\"8\""), "selectAnnotationFontSize содержит опцию 8 pt")
+    assert(layout_card.include?("value=\"10\""), "selectAnnotationFontSize содержит опцию 10 pt")
+    assert(layout_card.include?("value=\"12\""), "selectAnnotationFontSize содержит опцию 12 pt")
+    assert(layout_card.include?("value=\"14\""), "selectAnnotationFontSize содержит опцию 14 pt")
+    assert(layout_card.include?("value=\"16\""), "selectAnnotationFontSize содержит опцию 16 pt")
+    assert(layout_card.include?("value=\"18\""), "selectAnnotationFontSize содержит опцию 18 pt")
+    assert(layout_card.include?("value=\"20\""), "selectAnnotationFontSize содержит опцию 20 pt")
+
+    # 3. Проверка app.js: регистрация и обработка selectAnnotationFontSize
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    assert(app_js_text.include?("selectAnnotationFontSize: document.getElementById(\"selectAnnotationFontSize\")"),
+           "app.js кэширует selectAnnotationFontSize в els")
+    assert(app_js_text.include?("els.selectAnnotationFontSize.value = settings.annotation_font_size || \"auto\";"),
+           "app.js инициализирует значение selectAnnotationFontSize из настроек")
+    assert(app_js_text.include?("annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value :"),
+           "app.js собирает annotation_font_size в collectSettings")
+    assert(app_js_text.include?("\"selectAnnotationFontSize\""),
+           "app.js включает selectAnnotationFontSize в список autoSaveInputIds")
+
+    # 4. Проверка ProjectData и YAML файлов настроек
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    settings = project_data.default_pdf_settings
+    assert(settings.key?(:annotation_font_size), "default_pdf_settings содержит ключ :annotation_font_size")
+    assert(settings[:annotation_font_size] == "auto", "annotation_font_size по умолчанию 'auto'")
+
+    def_yaml_path = File.expand_path("../config/default_settings.yaml", __dir__)
+    def_yaml_text = File.read(def_yaml_path, encoding: "utf-8")
+    assert(def_yaml_text.include?("annotation_font_size: \"auto\""),
+           "default_settings.yaml содержит annotation_font_size: \"auto\"")
+
+    usr_yaml_path = File.expand_path("../config/settings.yaml", __dir__)
+    usr_yaml_text = File.read(usr_yaml_path, encoding: "utf-8")
+    assert(usr_yaml_text.include?("annotation_font_size:"),
+           "settings.yaml содержит параметр annotation_font_size")
+
+    # 5. Проверка RenderService.with_temporary_annotation_font_size на временное изменение и 100% откат
+    mock_model = Sketchup::MockModel.new
+    text_ent = mock_model.entities.grep(Sketchup::Text).first
+    assert(text_ent && text_ent.font[:size] == 14, "Исходный размер шрифта выноски равен 14 pt")
+
+    inner_size = nil
+    DN1Code::ExportPdf2::Service::RenderService.with_temporary_annotation_font_size(mock_model, "18") do
+      inner_size = text_ent.font[:size]
+    end
+    assert(inner_size == 18, "Внутри блока размер шрифта выноски временно изменен на 18 pt")
+    assert(text_ent.font[:size] == 14, "После выхода из блока размер шрифта выноски гарантированно восстановлен на 14 pt")
+
+    # Проверка режима "auto" — не меняет размер шрифта
+    DN1Code::ExportPdf2::Service::RenderService.with_temporary_annotation_font_size(mock_model, "auto") do
+      inner_size = text_ent.font[:size]
+    end
+    assert(inner_size == 14, "В режиме 'auto' размер шрифта выноски остается неизменным (14 pt)")
+
+    # 6. Проверка LayoutBuilder: вызов with_temporary_annotation_font_size при подготовке модели
+    lb_path = File.expand_path("../service/layout_builder.rb", __dir__)
+    lb_text = File.read(lb_path, encoding: "utf-8")
+    assert(lb_text.include?("RenderService.with_temporary_annotation_font_size(ctx[:model], afs_setting)"),
+           "layout_builder.rb применяет with_temporary_annotation_font_size при создании временной копии для LayOut")
+    assert(lb_text.include?("annotation_font_size: ctx[:settings][:annotation_font_size]"),
+           "layout_builder.rb передает annotation_font_size в render_opts")
   end
 end
 

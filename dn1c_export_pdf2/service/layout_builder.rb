@@ -8,19 +8,18 @@ require_relative "font_service"
 module DN1Code
   module ExportPdf2
     module Service
-      # Экспорт PDF через SketchUp LayOut Ruby API.
+      # Полнофункциональный экспорт PDF и проектов LayOut через SketchUp LayOut Ruby API.
       #
-      # Страницы строятся по той же модульной сетке (custom_layouts из layout.yaml),
-      # что и эталонный Prawn-движок (Controller::PageBase#render_modular_page):
-      #   image_4_3 — PNG-рендер сцены (тот же RenderService, что и в Prawn),
-      #   header    — многострочный заголовок с разделителями,
-      #   slot_1..4 — информационные колонки,
+      # Страницы и видовые экраны строятся по модульной сетке (из layout.yaml):
+      #   image_4_3 — видовой экран модели (Layout::SketchUpModel) или растровый оверрайд (Layout::Image),
+      #   header    — многострочный заголовок проекта и сцены с разделителями,
+      #   slot_1..4 — информационные колонки спецификаций и истории,
       #   footer    — нижний колонтитул в 3 колонки,
-      #   stamp     — повернутый полупрозрачный штамп.
+      #   stamp     — повернутый полупрозрачный водяной знак/штамп.
       #
-      # Все внутренние вычисления ведутся в пунктах (pt), как в Prawn;
-      # в координаты LayOut (дюймы, начало — левый нижний угол) переводим
-      # только при создании сущностей (PT_PER_INCH).
+      # Документ формируется в многослойной структуре (Viewports, Graphics, Content, Annotations)
+      # с возможностью выбора режима рендера видовых экранов (Raster, Vector, Hybrid)
+      # и сохранения редактируемого файла .layout.
       module LayoutBuilder
         extend self
 
@@ -33,7 +32,7 @@ module DN1Code
 
         PT_PER_INCH = 72.0
 
-        # Цвета оформления — зеркально PageBase (Prawn)
+        # Цвета оформления
         SEP_COLOR         = "CBD5E1" # разделительные линии
         FOOTER_COLOR      = "475569" # текст подвала
         SLOT_TEXT_COLOR   = "334155" # строки слотов
@@ -70,7 +69,7 @@ module DN1Code
             total_pages = enabled_scenes.size
             progress_block&.call(0, total_pages, "Инициализация документа LayOut...")
 
-            # Установка DIN Condensed в систему (визуальное совпадение с Prawn)
+            # Установка DIN Condensed в систему
             font_family = FontService.layout_font_family
 
             # 1. Создание нового документа LayOut
@@ -91,16 +90,66 @@ module DN1Code
               page_info.top_margin    = margin_in if page_info.respond_to?(:top_margin=)
               page_info.bottom_margin = margin_in if page_info.respond_to?(:bottom_margin=)
               page_info.show_margins  = false if page_info.respond_to?(:show_margins=)
+              # Настройка качества разрешения LayOut (low: 96 dpi, medium: 150 dpi, high: 300 dpi)
+              q_mode = (settings[:render_quality] || settings["render_quality"] || "").to_s.downcase.strip
+              if q_mode.empty?
+                w_val = (settings[:image_width] || settings["image_width"] || 2400).to_i
+                q_mode = if w_val <= 1400
+                           "low"
+                         elsif w_val > 2800
+                           "high"
+                         else
+                           "medium"
+                         end
+              end
+
+              # Настройка качества разрешения LayOut:
+              # В Trimble LayOut API:
+              #   RESOLUTION_LOW    = 0 -> 36 DPI (черновые миниатюры 377px, где надписи не читаются)
+              #   RESOLUTION_MEDIUM = 1 -> 96 DPI (экранный вывод, четкие надписи и размеры)
+              #   RESOLUTION_HIGH   = 2 -> 300 DPI (высокое качество для печати)
+              res_val = case q_mode
+                        when "low"
+                          defined?(::Layout::PageInfo::RESOLUTION_MEDIUM) ? ::Layout::PageInfo::RESOLUTION_MEDIUM : 1
+                        when "high"
+                          defined?(::Layout::PageInfo::RESOLUTION_HIGH) ? ::Layout::PageInfo::RESOLUTION_HIGH : 2
+                        else # "medium"
+                          defined?(::Layout::PageInfo::RESOLUTION_HIGH) ? ::Layout::PageInfo::RESOLUTION_HIGH : 2
+                        end
+
+              if page_info.respond_to?(:image_output_resolution=)
+                page_info.image_output_resolution = res_val
+              end
+              if page_info.respond_to?(:output_resolution=)
+                page_info.output_resolution = res_val
+              end
             end
 
-            layer = doc.layers.first rescue nil
-            layer ||= doc.layers.add("DN1C_Export") rescue nil
+            # Создание структурированных слоев документа LayOut
+            layers = {}
+            if doc.respond_to?(:layers) && doc.layers
+              first_layer = doc.layers.first rescue nil
+              layers[:viewport]   = doc.layers.add("DN1C_Viewports", false) rescue first_layer
+              layers[:graphics]   = doc.layers.add("DN1C_Graphics", false) rescue (layers[:viewport] || first_layer)
+              layers[:content]    = doc.layers.add("DN1C_Content", false) rescue (layers[:graphics] || first_layer)
+              layers[:annotation] = doc.layers.add("DN1C_Annotations", false) rescue (layers[:content] || first_layer)
+              layers[:default]    = layers[:content] || first_layer
+            else
+              first_layer = (doc.respond_to?(:layers) && doc.layers) ? (doc.layers.first rescue nil) : nil
+              layers = { default: first_layer, viewport: first_layer, graphics: first_layer, content: first_layer, annotation: first_layer }
+            end
+
+            # Отключение фоновой сетки для чистого вывода
+            if doc.respond_to?(:grid) && doc.grid
+              doc.grid.show_grid = false if doc.grid.respond_to?(:show_grid=)
+              doc.grid.print_grid = false if doc.grid.respond_to?(:print_grid=)
+            end
 
             ctx = build_context(project_data, model, font_family)
             ctx[:page_w_pt] = in2pt(page_w_in)
             ctx[:page_h_pt] = in2pt(page_h_in)
 
-            # 3. Построение страниц по модульной сетке (как в Prawn)
+            # 3. Построение страниц по модульной сетке
             enabled_scenes.each_with_index do |scene_item, idx|
               page_index = idx + 1
               progress_block&.call(page_index, total_pages, "Построение страницы LayOut #{page_index}/#{total_pages}: #{scene_item.name}")
@@ -112,13 +161,27 @@ module DN1Code
                      end
               page.name = scene_item.name if page.respond_to?(:name=)
 
-              render_modular_page(doc, page, layer, scene_item, page_index, total_pages, page_w_in, page_h_in, margin_in, ctx, temp_images)
+              render_modular_page(doc, page, layers, scene_item, page_index, total_pages, page_w_in, page_h_in, margin_in, ctx, temp_images)
             end
 
             progress_block&.call(total_pages, total_pages, "Экспорт документа LayOut в PDF...")
 
-            # 4. Экспорт в PDF
-            doc.export(pdf_path)
+            # 4. Экспорт в PDF: сам документ ВСЕГДА сжимается без потерь (FlateDecode)
+            raw_fmt = (settings[:image_format] || "png").to_s.downcase.strip
+            is_png_format = (raw_fmt != "jpg" && raw_fmt != "jpeg")
+
+            # Для документа всегда compress: true (сжатие без потерь).
+            # Для PNG compress_images: false (сохраняет оригинальный lossless FlateDecode).
+            # Для JPEG compress_images: true (сохраняет сжатие JPEG с максимальным качеством 100%).
+            export_opts = {
+              compress_images: !is_png_format,
+              compress:        true
+            }
+            if doc.method(:export).arity.abs > 1 || doc.method(:export).parameters.any? { |p| p[0] == :rest || p[0] == :opt }
+              doc.export(pdf_path, export_opts) rescue doc.export(pdf_path)
+            else
+              doc.export(pdf_path)
+            end
 
             # 5. Сохранение файла .layout если включено
             if settings[:save_layout_file]
@@ -174,7 +237,7 @@ module DN1Code
           { w: w, h: h }
         end
 
-        # Поля страницы в дюймах (логика идентична Prawn: margin_mm -> pt -> in)
+        # Поля страницы в дюймах (margin_mm -> pt -> in)
         def resolve_margin_inches(settings)
           if settings.key?(:margin_mm) && !settings[:margin_mm].nil?
             settings[:margin_mm].to_f * PT_PER_INCH / 25.4 / PT_PER_INCH
@@ -219,7 +282,7 @@ module DN1Code
         end
 
         # ------------------------------------------------------------------
-        # Доступ к конфигурации модульной сетки (зеркало PageBase)
+        # Доступ к конфигурации модульной сетки
         # ------------------------------------------------------------------
 
         def get_page_cfg(ctx, pt)
@@ -244,7 +307,7 @@ module DN1Code
           !(val == false || val.to_s.strip.downcase == "false" || val.to_s.strip == "0")
         end
 
-        # Расчет абсолютных координат блока в пунктах (зеркало PageBase#get_block_box).
+        # Расчет абсолютных координат блока в пунктах.
         # content: { left:, top:, w:, h: } — рабочая область листа в pt (top = верхняя грань).
         def get_block_box(content, page_cfg, block_id, def_x, def_y, def_w, def_h)
           cfg = page_cfg[block_id] || page_cfg[block_id.to_s] || {}
@@ -299,7 +362,7 @@ module DN1Code
         end
 
         # LayOut не поддерживает alpha в цвете текста — эмулируем прозрачность
-        # Prawn (transparent(opacity)) смешиванием с белой бумагой
+        # смешиванием с белой бумагой
         def tinted_rgb(hex, opacity, fallback = [51, 65, 85])
           r, g, b = hex_to_rgb(hex, fallback)
           k = opacity.to_f.clamp(0.0, 1.0)
@@ -341,20 +404,21 @@ module DN1Code
           nil
         end
 
-        # Преобразование Y: внутренние координаты — как в Prawn (y вверх, от низа листа),
+        # Преобразование Y: внутренняя координатная система листа (y вверх, от низа листа),
         # у LayOut бумажные координаты — y вниз, от верхнего левого угла листа.
         def lay_y(ctx, y_pt)
-          ctx[:page_h_pt] - y_pt.to_f
+          h_pt = (ctx && ctx[:page_h_pt]) ? ctx[:page_h_pt] : 595.28
+          h_pt - y_pt.to_f
         end
 
         def make_bounds_pt(ctx, x_pt, y_top_pt, w_pt, h_pt)
           raise ArgumentError, "zero size bounds" if w_pt <= 0 || h_pt <= 0
 
-          # y_top_pt — верхняя грань блока в системе Prawn; в LayOut это верх рамки (y вниз)
+          # y_top_pt — верхняя грань блока; в LayOut это верх рамки (y вниз)
           ::Geom::Bounds2d.new(pt2in(x_pt), pt2in(lay_y(ctx, y_top_pt)), pt2in(w_pt), pt2in(h_pt))
         end
 
-        # Ограниченный текстовый блок (box — координаты в системе Prawn, y — верхняя грань, в pt)
+        # Ограниченный текстовый блок (box — координаты блока, y — верхняя грань, в pt)
         def add_bounded_text(ctx, doc, page, layer, text, box, opts = {})
           return if text.to_s.empty?
 
@@ -391,7 +455,7 @@ module DN1Code
           out
         end
 
-        # Многофрагментная строка заголовка через RTF (разные цвета/размеры как в Prawn formatted_text_box)
+        # Многофрагментная строка заголовка через RTF (разные цвета/размеры для элементов)
         # fragments: [{ text:, size:, color:, bold: }]
         def add_rtf_text(ctx, doc, page, layer, fragments, box, opts = {})
           runs = []
@@ -438,7 +502,7 @@ module DN1Code
         def add_hline(ctx, doc, page, layer, x_pt, y_center_pt, w_pt, color_hex = SEP_COLOR, thickness_pt = 0.7)
           return if w_pt <= 0 || thickness_pt <= 0
 
-          # верхняя грань плашки в системе Prawn = центр + половина толщины
+          # верхняя грань плашки = центр + половина толщины
           bounds = make_bounds_pt(ctx, x_pt, y_center_pt + thickness_pt / 2.0, w_pt, thickness_pt)
           rect = ::Layout::Rectangle.new(bounds)
           style = rect.style
@@ -456,7 +520,7 @@ module DN1Code
         end
 
         # Повернутый текст (штамп): привязка в точке + поворот вокруг нее.
-        # Prawn rotate: положительный угол — против часовой стрелки (система y вверх);
+        # Положительный угол в геометрии — против часовой стрелки;
         # в LayOut y направлен вниз, поэтому знак угла инвертируется.
         def add_rotated_text(ctx, doc, page, layer, text, x_pt, y_pt, size_pt, color_obj, bold, angle_deg)
           return if text.to_s.empty?
@@ -475,10 +539,13 @@ module DN1Code
         end
 
         # ------------------------------------------------------------------
-        # Рендер страницы по модульной сетке (зеркало PageBase#render_modular_page)
+        # Рендер страницы по модульной сетке
         # ------------------------------------------------------------------
 
         def render_modular_page(doc, page, layer, scene_item, page_index, total_pages, page_w_in, page_h_in, margin_in, ctx, temp_images)
+          ctx[:page_w_pt] ||= in2pt(page_w_in || 11.6929)
+          ctx[:page_h_pt] ||= in2pt(page_h_in || 8.2677)
+
           pt = (scene_item.page_type || :general).to_sym
           page_cfg = get_page_cfg(ctx, pt)
 
@@ -492,45 +559,67 @@ module DN1Code
 
           rctx = resolver_context(ctx, scene_item, page_index, total_pages)
 
-          # 1. Изображение чертежа/модели в пропорциях (3:2, 4:3, 16:9) и масштабом ниже всего текста
-          if block_visible?(page_cfg, :image_4_3)
+          # Разделение по специализированным слоям документа
+          vp_layer  = layer.is_a?(Hash) ? (layer[:viewport] || layer[:default]) : layer
+          gfx_layer = layer.is_a?(Hash) ? (layer[:graphics] || layer[:default]) : layer
+          cnt_layer = layer.is_a?(Hash) ? (layer[:content] || layer[:default]) : layer
+          ann_layer = layer.is_a?(Hash) ? (layer[:annotation] || layer[:default]) : layer
+
+          # 1. Видовой экран чертежа/модели (Layout::SketchUpModel / Layout::Image)
+          is_viewport_on = if scene_item && scene_item.respond_to?(:viewport_visible) && !scene_item.viewport_visible.nil?
+                             scene_item.viewport_visible != false
+                           else
+                             block_visible?(page_cfg, :image_4_3)
+                           end
+
+          if is_viewport_on
             img_cfg = get_block_config(ctx, pt, :image_4_3)
-            render_image_block(doc, page, layer, scene_item, content, img_cfg, ctx, temp_images, pt)
+            render_image_block(doc, page, vp_layer, scene_item, content, img_cfg, ctx, temp_images, pt)
           end
 
           # 2. Верхний заголовок (Header)
           if block_visible?(page_cfg, :header)
             hdr_box = get_block_box(content, page_cfg, :header, 0.0, 0.0, 100.0, 30.0)
-            render_modular_header(doc, page, layer, hdr_box, page_cfg, ctx, rctx)
+            render_modular_header(doc, page, cnt_layer, hdr_box, page_cfg, ctx, rctx, gfx_layer)
           end
 
-          # 3. 4 информационных слота поверх картинки
-          render_modular_slots(doc, page, layer, content, page_cfg, pt, ctx, rctx)
+          # 3. Информационные слоты поверх видового экрана
+          render_modular_slots(doc, page, cnt_layer, content, page_cfg, pt, ctx, rctx, gfx_layer)
 
           # 4. Нижний колонтитул (Footer)
           if block_visible?(page_cfg, :footer)
             ftr_cfg = get_block_config(ctx, pt, :footer)
             ftr_box = get_block_box(content, page_cfg, :footer, 0.0, 94.0, 100.0, 6.0)
-            render_modular_footer(doc, page, layer, ftr_box, ftr_cfg, ctx, rctx)
+            render_modular_footer(doc, page, cnt_layer, ftr_box, ftr_cfg, ctx, rctx)
           end
 
           # 5. Штамп/водяной знак
-          render_stamp(doc, page, layer, content, ctx)
+          render_stamp(doc, page, ann_layer, content, ctx)
         end
 
         # ------------------------------------------------------------------
-        # Блок изображения (зеркало PageBase image_4_3 + draw_scene_image)
+        # Блок видового экрана (Layout::SketchUpModel с режимами Vector/Raster/Hybrid либо Layout::Image)
         # ------------------------------------------------------------------
 
         def render_image_block(doc, page, layer, scene_item, content, img_cfg, ctx, temp_images, pt)
-          ratio_str = (img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] || "4:3").to_s.strip
+          ratio_str = if scene_item && scene_item.respond_to?(:aspect_ratio) && !scene_item.aspect_ratio.to_s.empty?
+                        scene_item.aspect_ratio.to_s.strip
+                      else
+                        (img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"] || "4:3").to_s.strip
+                      end
           target_ratio = case ratio_str
                          when "3:2"  then 3.0 / 2.0
                          when "16:9" then 16.0 / 9.0
+                         when "1:1"  then 1.0
+                         when "page" then content[:w] / content[:h]
                          else 4.0 / 3.0
                          end
 
-          raw_scale = (img_cfg[:scale_pct] || img_cfg["scale_pct"] || 100).to_f
+          raw_scale = if scene_item && scene_item.respond_to?(:scale_pct) && scene_item.scale_pct.to_f > 0
+                        scene_item.scale_pct.to_f
+                      else
+                        (img_cfg[:scale_pct] || img_cfg["scale_pct"] || 100).to_f
+                      end
           raw_scale = 100.0 if raw_scale <= 0.0 || raw_scale > 100.0
           scale_factor = raw_scale / 100.0
 
@@ -550,35 +639,205 @@ module DN1Code
           img_x = content[:left] + ((content[:w] - img_w) / 2.0)
           img_y = content[:top] - ((content[:h] - img_h) / 2.0)
 
-          # Источник изображения: оверрайд сцены либо PNG-рендер тем же RenderService, что и Prawn
-          image_path = nil
+          # 1. Проверяем наличие прямого пользовательского оверрайда сцены (готовый рендер из файла)
           if scene_item.respond_to?(:image_override) && scene_item.image_override && File.exist?(scene_item.image_override.to_s)
             image_path = scene_item.image_override.to_s
+            draw_w, draw_h = fit_image_size(image_path, img_w, img_h)
+            if draw_w > 0 && draw_h > 0
+              bounds = ::Geom::Bounds2d.new(pt2in(img_x), pt2in(lay_y(ctx, img_y)), pt2in(draw_w), pt2in(draw_h))
+              img = ::Layout::Image.new(image_path, bounds)
+              doc.add_entity(img, layer, page)
+              return
+            end
           end
 
-          unless image_path
-            render_opts = {
-              image_width:        ctx[:settings][:image_width] || 2400,
-              scale_factor:       ctx[:settings][:scale_factor] || 2.0,
-              antialias:          ctx[:settings].fetch(:antialias, true),
-              aspect_ratio:       target_ratio,
-              image_aspect_ratio: ctx[:settings][:image_aspect_ratio]
-            }
-            if defined?(OverlayService)
-              scene_aspect_info = ctx[:aspect_cache][pt]
-              unless scene_aspect_info
-                scene_aspect_info = OverlayService.calculate_target_info(ctx[:model], { template_key: pt }) rescue nil
-                ctx[:aspect_cache][pt] = scene_aspect_info
+          # 2. Создание живого видового экрана SketchUp (Layout::SketchUpModel)
+          # Используется для всех режимов рендеринга видового экрана (Raster, Vector, Hybrid)
+          mode_str = (ctx[:settings][:layout_render_mode] || "raster").to_s.downcase
+          use_skp_viewport = (mode_str == "vector" || mode_str == "hybrid" || mode_str == "raster" || mode_str == "model" || mode_str == "viewport")
+
+          if use_skp_viewport && defined?(::Layout::SketchUpModel) && ctx[:model]
+            skp_path = nil
+            if ctx[:temp_skp_path] && File.exist?(ctx[:temp_skp_path])
+              skp_path = ctx[:temp_skp_path]
+            else
+              afs_setting = ctx[:settings][:annotation_font_size] || ctx[:settings]["annotation_font_size"]
+              has_custom_font = afs_setting && !afs_setting.to_s.strip.empty? && afs_setting.to_s.downcase.strip != "auto"
+              is_modified = (ctx[:model].respond_to?(:modified?) && ctx[:model].modified?) || has_custom_font
+              has_disk_path = ctx[:model].respond_to?(:path) && !ctx[:model].path.to_s.empty? && File.exist?(ctx[:model].path.to_s)
+
+              # Если в модели есть несохраненные изменения в SketchUp или задан кастомный размер шрифта выносок,
+              # создаем временную копию save_copy, чтобы LayOut увидел актуальное состояние, а не старый файл с диска
+              if is_modified && ctx[:model].respond_to?(:save_copy)
+                temp_skp = File.join(Dir.tmpdir, "dn1c_model_#{$$}_#{Time.now.to_i}.skp")
+                begin
+                  RenderService.with_temporary_annotation_font_size(ctx[:model], afs_setting) do
+                    ctx[:model].save_copy(temp_skp)
+                  end
+                  if File.exist?(temp_skp)
+                    ctx[:temp_skp_path] = temp_skp
+                    temp_images << temp_skp
+                    skp_path = temp_skp
+                  end
+                rescue StandardError
+                  skp_path = nil
+                end
               end
-              render_opts[:aspect_ratio] = scene_aspect_info[:ratio] if scene_aspect_info && scene_aspect_info[:ratio]
+
+              if skp_path.nil? && has_disk_path && !has_custom_font
+                skp_path = ctx[:model].path.to_s
+              elsif skp_path.nil? && ctx[:model].respond_to?(:save_copy)
+                temp_skp = File.join(Dir.tmpdir, "dn1c_model_#{$$}_#{Time.now.to_i}.skp")
+                begin
+                  RenderService.with_temporary_annotation_font_size(ctx[:model], afs_setting) do
+                    ctx[:model].save_copy(temp_skp)
+                  end
+                  if File.exist?(temp_skp)
+                    ctx[:temp_skp_path] = temp_skp
+                    temp_images << temp_skp
+                    skp_path = temp_skp
+                  end
+                rescue StandardError
+                  skp_path = nil
+                end
+              end
             end
-            image_path = RenderService.render_scene_temp(ctx[:model], scene_item.scene_ref, render_opts)
-            temp_images << image_path
+
+            if skp_path && File.exist?(skp_path)
+              begin
+                bounds = ::Geom::Bounds2d.new(pt2in(img_x), pt2in(lay_y(ctx, img_y)), pt2in(img_w), pt2in(img_h))
+                skp_model = ::Layout::SketchUpModel.new(skp_path, bounds)
+
+                # Выбор текущей сцены модели
+                target_scene_name = scene_item.respond_to?(:name) ? scene_item.name.to_s : ""
+                if skp_model.respond_to?(:scenes) && skp_model.scenes.is_a?(Array)
+                  scene_idx = skp_model.scenes.index(target_scene_name)
+                  if scene_idx && skp_model.respond_to?(:current_scene=)
+                    skp_model.current_scene = scene_idx
+                  elsif skp_model.respond_to?(:current_scene=) && skp_model.scenes.size > 1
+                    skp_model.current_scene = 1
+                  end
+                end
+
+                # Сброс переопределений стиля для точного следования стилю сцены SketchUp
+                if skp_model.respond_to?(:reset_style)
+                  skp_model.reset_style rescue nil
+                end
+
+                # Установка режима рендеринга видового экрана (Raster / Vector / Hybrid)
+                mode_str = (ctx[:settings][:layout_render_mode] || ctx[:settings]["layout_render_mode"] || "raster").to_s.downcase
+                if skp_model.respond_to?(:render_mode=)
+                  case mode_str
+                  when "vector"
+                    skp_model.render_mode = ::Layout::SketchUpModel::VECTOR_RENDER if defined?(::Layout::SketchUpModel::VECTOR_RENDER)
+                  when "hybrid"
+                    skp_model.render_mode = ::Layout::SketchUpModel::HYBRID_RENDER if defined?(::Layout::SketchUpModel::HYBRID_RENDER)
+                  else
+                    skp_model.render_mode = ::Layout::SketchUpModel::RASTER_RENDER if defined?(::Layout::SketchUpModel::RASTER_RENDER)
+                  end
+                end
+
+                # Установка масштаба толщины линий (Line Scale Multiplier)
+                # В SketchUp LayOut базовая толщина линий модели равна 0.5 pt
+                # При ручном множителе (0.5, 1.0, 1.5, 2.0, 2.5, 3.0) значение одинаково для всех режимов.
+                # В режиме "auto" (с уменьшением на 40%):
+                # - Растр (Raster): расчет от разрешения (1200px=0.60->0.30pt, 1800px=0.90->0.45pt, 2400px=1.20->0.60pt, 3000px=1.50->0.75pt, 3840px=1.80->0.90pt)
+                #   с защитным порогом для больших форматов A3 (min 0.90) и A2 (min 1.20)
+                # - Вектор и Гибрид (Vector, Hybrid): подстроены под растр по формату листа (A4=0.60->0.30pt, A3=0.90->0.45pt, A2=1.20->0.60pt)
+                sm_setting = ctx[:settings][:scale_multiplier] || ctx[:settings]["scale_multiplier"]
+                sf_setting = ctx[:settings][:scale_factor] || ctx[:settings]["scale_factor"]
+                page_sz = (ctx[:settings][:page_size] || ctx[:settings]["page_size"] || "A4").to_s.upcase.strip
+
+                line_mult = if sm_setting
+                              case sm_setting.to_s.downcase.strip
+                              when "auto"
+                                base_val = if mode_str == "vector" || mode_str == "hybrid"
+                                             case page_sz
+                                             when "A2" then 1.20
+                                             when "A3" then 0.90
+                                             else 0.60
+                                             end
+                                           else
+                                             img_w = (ctx[:settings][:image_width] || ctx[:settings]["image_width"] || 2400).to_i
+                                             ras_mult = if img_w <= 1400
+                                                          0.60
+                                                        elsif img_w <= 2000
+                                                          0.90
+                                                        elsif img_w <= 2800
+                                                          1.20
+                                                        elsif img_w <= 3400
+                                                          1.50
+                                                        else
+                                                          1.80
+                                                        end
+                                             case page_sz
+                                             when "A2" then [ras_mult, 1.20].max
+                                             when "A3" then [ras_mult, 0.90].max
+                                             else ras_mult
+                                             end
+                                           end
+                                # При авто scale множитель меньше на 30% (* 0.70)
+                                (base_val * 0.70).round(2)
+                              else
+                                f = sm_setting.to_f
+                                f > 0.0 ? f : 2.0
+                              end
+                            elsif sf_setting && sf_setting.to_f > 0
+                              sf_setting.to_f
+                            else
+                              2.0
+                            end
+
+                # Базовая толщина линий модели в LayOut по умолчанию равна 0.5 pt
+                base_pt = 0.5
+                if skp_model.respond_to?(:line_weight=)
+                  skp_model.line_weight = (base_pt * line_mult).round(2)
+                end
+
+                # Рендеринг видового экрана, если требуется
+                if skp_model.respond_to?(:render_needed?) && skp_model.render_needed?
+                  skp_model.render rescue nil
+                end
+
+                doc.add_entity(skp_model, layer, page)
+                return
+              rescue StandardError => e
+                warn "Предупреждение: создание Layout::SketchUpModel (#{e.message}), используется растровый вывод"
+              end
+            end
           end
+
+          # 3. Резервный растровый рендер высокого разрешения через RenderService
+          render_opts = {
+            image_width:        ctx[:settings][:image_width],
+            render_quality:     ctx[:settings][:render_quality] || "medium",
+            scale_multiplier:   ctx[:settings][:scale_multiplier] || "2.0",
+            scale_factor:       line_mult || (ctx[:settings][:scale_factor] || 2.0),
+            annotation_font_size: ctx[:settings][:annotation_font_size],
+            page_size:          ctx[:settings][:page_size] || "A4",
+            antialias:          ctx[:settings].fetch(:antialias, true),
+            aspect_ratio:       target_ratio,
+            image_aspect_ratio: ctx[:settings][:image_aspect_ratio],
+            image_format:       ctx[:settings][:image_format] || "png",
+            compress_pdf:       ctx[:settings][:compress_pdf]
+          }
+          if defined?(OverlayService)
+            scene_aspect_info = ctx[:aspect_cache][pt]
+            unless scene_aspect_info
+              scene_aspect_info = OverlayService.calculate_target_info(ctx[:model], { template_key: pt }) rescue nil
+              ctx[:aspect_cache][pt] = scene_aspect_info
+            end
+            render_opts[:aspect_ratio] = scene_aspect_info[:ratio] if scene_aspect_info && scene_aspect_info[:ratio]
+          end
+          scene_obj = scene_item.respond_to?(:scene_ref) ? scene_item.scene_ref : nil
+          if scene_obj.nil? && ctx[:model] && ctx[:model].respond_to?(:pages) && scene_item.respond_to?(:name)
+            scene_obj = ctx[:model].pages[scene_item.name.to_s] rescue nil
+          end
+          image_path = RenderService.render_scene_temp(ctx[:model], scene_obj, render_opts)
+          temp_images << image_path if image_path
+
           return unless image_path && File.exist?(image_path)
 
-          # Prawn (fit: [w, h], at: [x, y]) вписывает изображение с сохранением пропорций
-          # от левого верхнего угла блока — повторяем то же для Layout::Image
           draw_w, draw_h = fit_image_size(image_path, img_w, img_h)
           return unless draw_w > 0 && draw_h > 0
 
@@ -589,7 +848,7 @@ module DN1Code
           warn "Ошибка вставки изображения LayOut: #{e.message}"
         end
 
-        # Вписывает изображение в блок с сохранением пропорций (аналог Prawn fit:)
+        # Вписывает изображение в блок с сохранением пропорций
         def fit_image_size(image_path, box_w_pt, box_h_pt)
           px = png_pixel_size(image_path)
           return [box_w_pt, box_h_pt] unless px
@@ -601,14 +860,53 @@ module DN1Code
           [px_w * k, px_h * k]
         end
 
-        # Чтение размеров PNG из заголовка IHDR
+        # Чтение размеров изображения (PNG и JPEG) для точного вписывания
         def png_pixel_size(path)
-          File.open(path, "rb") do |f|
-            data = f.read(24)
-            return nil unless data && data.bytesize >= 24 && data[0, 8] == "\x89PNG\r\n\x1a\n".b
+          return nil unless path && File.exist?(path)
 
-            [data[16, 4].unpack1("N"), data[20, 4].unpack1("N")]
+          File.open(path, "rb") do |f|
+            header = f.read(24)
+            return nil unless header
+
+            # PNG: сигнатура \x89PNG, размеры в IHDR
+            if header.bytesize >= 24 && header.getbyte(0) == 0x89 && header[1, 3] == "PNG"
+              return [header[16, 4].unpack1("N"), header[20, 4].unpack1("N")]
+            end
+
+            # JPEG: сигнатура 0xFF, 0xD8
+            if header.bytesize >= 2 && header.getbyte(0) == 0xFF && header.getbyte(1) == 0xD8
+              f.seek(2)
+              while !f.eof?
+                b = f.getbyte
+                next unless b == 0xFF
+
+                m = f.getbyte
+                while m == 0xFF
+                  m = f.getbyte
+                end
+                break if m.nil? || m == 0xDA || m == 0xD9 # SOS или EOI
+
+                len_data = f.read(2)
+                break unless len_data && len_data.bytesize == 2
+                len = len_data.unpack1("n")
+                break if len < 2
+
+                if (0xC0..0xC3).include?(m) || (0xC5..0xC7).include?(m) ||
+                   (0xC9..0xCB).include?(m) || (0xCD..0xCF).include?(m)
+                  sof = f.read(5)
+                  if sof && sof.bytesize == 5
+                    h = sof[1, 2].unpack1("n")
+                    w = sof[3, 2].unpack1("n")
+                    return [w, h] if w > 0 && h > 0
+                  end
+                  break
+                else
+                  f.seek(len - 2, IO::SEEK_CUR)
+                end
+              end
+            end
           end
+          nil
         rescue StandardError
           nil
         end
@@ -617,7 +915,7 @@ module DN1Code
         # Верхний заголовок (зеркало PageBase#render_modular_header)
         # ------------------------------------------------------------------
 
-        def render_modular_header(doc, page, layer, hdr_box, page_cfg, ctx, rctx)
+        def render_modular_header(doc, page, layer, hdr_box, page_cfg, ctx, rctx, gfx_layer = nil)
           cfg = page_cfg[:header] || page_cfg["header"] || {}
           content_type = (cfg[:content] || cfg["content"] || "header_title").to_s
           valign = (cfg[:valign] || cfg["valign"] || "top").to_s.to_sym
@@ -741,17 +1039,17 @@ module DN1Code
               sep_y = cur_y - (scaled_item_gap / 2.0)
               line_w = [hdr_box[:width] * 0.45, 130.0].min
               lx = hdr_box[:x] + (hdr_box[:width] - line_w) / 2.0
-              add_hline(ctx, doc, page, layer, lx, sep_y, line_w, SEP_COLOR, 0.5)
+              add_hline(ctx, doc, page, (gfx_layer || layer), lx, sep_y, line_w, SEP_COLOR, 0.5)
               cur_y -= scaled_item_gap
             end
           end
         end
 
         # ------------------------------------------------------------------
-        # Слоты (зеркало PageBase#render_modular_page, блок 3)
+        # Слоты (информационные колонки спецификаций и истории)
         # ------------------------------------------------------------------
 
-        def render_modular_slots(doc, page, layer, content, page_cfg, pt, ctx, rctx)
+        def render_modular_slots(doc, page, layer, content, page_cfg, pt, ctx, rctx, gfx_layer = nil)
           slot_coords = {
             slot_1: [0.0, 0.0, 25.0, 58.0],
             slot_2: [0.0, 58.0, 25.0, 36.0],
@@ -857,7 +1155,7 @@ module DN1Code
               q_cfg[:align] = z_data[:align]
               q_cfg[:valign] = z_data[:valign]
 
-              render_modular_slot_card(doc, page, layer, slot_box, "info_lines", q_cfg, opacity, target_slot, ctx, rctx)
+              render_modular_slot_card(doc, page, layer, slot_box, "info_lines", q_cfg, opacity, target_slot, ctx, rctx, gfx_layer)
             end
           end
 
@@ -874,12 +1172,12 @@ module DN1Code
 
             slot_box = get_block_box(content, page_cfg, slot_id, defs[0], defs[1], defs[2], defs[3])
             opacity = (cfg[:opacity] || cfg["opacity"] || 0.90).to_f
-            render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, opacity, slot_id, ctx, rctx)
+            render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, opacity, slot_id, ctx, rctx, gfx_layer)
           end
         end
 
-        # Карточка слота (зеркало PageBase#render_modular_slot_card)
-        def render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, _opacity, slot_id, ctx, rctx)
+        # Карточка слота (информационный блок)
+        def render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, _opacity, slot_id, ctx, rctx, gfx_layer = nil)
           pad = 4
           in_x = slot_box[:x] + pad
           in_y = slot_box[:y] - pad
@@ -1014,6 +1312,17 @@ module DN1Code
           end
           total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
 
+          slot_scale = 1.0
+          if total_items_h > in_h && total_items_h > 0
+            slot_scale = [in_h / total_items_h, 0.6].max
+            item_gap = (item_gap * slot_scale).round(2)
+            item_heights = items.map do |it|
+              sc_sz = (it[:size] * slot_scale).round(2)
+              [estimate_text_height(it[:text], sc_sz, in_w) + 1.0, sc_sz + 2.0].max
+            end
+            total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
+          end
+
           cur_y = if valign == :bottom
                     [in_bottom_y + total_items_h, in_y].min
                   elsif valign == :center
@@ -1026,7 +1335,7 @@ module DN1Code
           items.each_with_index do |it, idx|
             h = item_heights[idx]
             add_bounded_text(ctx, doc, page, layer, it[:text], { x: in_x, y: cur_y, width: in_w, height: h },
-                             size: it[:size], color: it[:color], align: it[:align] || align, anchor: :top, font: ctx[:font])
+                             size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: ctx[:font])
             cur_y -= h
 
             if idx < items.size - 1
@@ -1040,14 +1349,13 @@ module DN1Code
                    else
                      in_x
                    end
-              add_hline(ctx, doc, page, layer, lx, sep_y, line_w, SEP_COLOR, 0.5)
+              add_hline(ctx, doc, page, (gfx_layer || layer), lx, sep_y, line_w, SEP_COLOR, 0.5)
               cur_y -= item_gap
             end
           end
         end
 
-        # Приблизительная высота многострочного текста в pt
-        # (замена Prawn height_of: DIN Condensed узкий, средняя ширина глифа ~0.45 кегля)
+        # Приблизительная высота многострочного текста в pt (DIN Condensed узкий, средняя ширина глифа ~0.45 кегля)
         def estimate_text_height(text, size_pt, width_pt)
           cpl = [(width_pt / (size_pt * 0.45)).floor, 1].max
           lines = text.to_s.split("\n", -1).sum { |seg| [(seg.length.to_f / cpl).ceil, 1].max }
@@ -1185,7 +1493,7 @@ module DN1Code
 
           text2 = "Проект не является финальным чертежом"
 
-          # Prawn: pos_x = bounds.right - 260; pos_y = bounds.bottom + 110 (pt)
+          # Координаты штампа в правом нижнем углу
           pos_x = content[:left] + content[:w] - 260.0
           pos_y = content[:top] - content[:h] + 110.0
 

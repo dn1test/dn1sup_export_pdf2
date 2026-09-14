@@ -4,13 +4,11 @@ module DN1Code
   module ExportPdf2
     module Service
       # Общий сервис разрешения строковых ключей информации в текст для отображения на листе.
-      # Используется и Prawn-движком (PageBase), и LayOut-движком (LayoutBuilder),
-      # что гарантирует побайтно одинаковые тексты в обоих PDF.
+      # Используется генератором LayoutBuilder для формирования страниц в LayOut Ruby API.
       module InfoLineResolver
         module_function
 
         # Разрешает элемент заголовка в «сырое» значение без префиксов
-        # (точный порт PageBase#resolve_header_item для строки заголовка)
         def resolve_header_item(context, key)
           info = context[:info] || {}
           scene_item = context[:scene_item]

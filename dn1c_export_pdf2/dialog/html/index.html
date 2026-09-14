@@ -236,13 +236,19 @@
                   <th width="44" class="th-order" title="Перетащите строку мышью для изменения порядка следования">№</th>
                   <th width="108" class="th-preview" title="Мини предпросмотр страницы (3:2)">Превью</th>
                   <th>Сцена / Описание</th>
-                  <th width="220">Шаблон страницы</th>
+                  <th width="75" class="th-aspect" title="Пропорции кадра видового экрана">Кадр</th>
+                  <th width="210">Шаблон страницы</th>
                 </tr>
               </thead>
               <tbody id="scenesTableBody">
                 <!-- Dynamically populated via JS -->
               </tbody>
             </table>
+          </div>
+
+          <!-- Scene Viewport & Safe Frame Card (Dedicated panel for selected scene) -->
+          <div class="scene-viewport-section" id="sceneViewportSection">
+            <!-- Dynamically populated via renderSceneViewportCard() in app.js -->
           </div>
         </div>
       </section>
@@ -362,37 +368,86 @@
 
       <!-- TAB 6: SETTINGS -->
       <section id="tab-settings" class="tab-pane">
-        <!-- Engine Selection Card -->
+        <!-- LayOut Parameters Card -->
         <div class="settings-card" style="margin-bottom: 16px;">
           <div class="card-header">
-            <span class="card-header-icon">⚙️</span>
-            <span class="card-header-title">Метод генерации и движок экспорта</span>
+            <span class="card-header-icon">📐</span>
+            <span class="card-header-title">Параметры SketchUp LayOut API</span>
           </div>
           <div class="form-grid">
-            <div class="form-group full-width">
-              <label for="selectExportEngine">Движок создания PDF документа *</label>
-              <select id="selectExportEngine" class="form-control">
-                <option value="prawn" selected>⚡ Prawn PDF (Автономный быстрый генератор без LayOut)</option>
-                <option value="layout">📐 SketchUp LayOut API (Создание страниц LayOut и экспорт в PDF)</option>
-              </select>
-              <span class="field-hint" id="engineHintText">Prawn генерирует PDF напрямую, используя векторные примитивы и высококачественные растровые рендеры сцен.</span>
-            </div>
-
-            <!-- LayOut Specific Options (Shown when LayOut engine is selected) -->
-            <div class="form-group" id="layoutRenderModeGroup" style="display: none;">
+            <input type="hidden" id="selectExportEngine" value="layout">
+            <div class="form-group" id="layoutRenderModeGroup">
               <label for="selectLayoutRenderMode">Режим отображения видовых экранов LayOut</label>
               <select id="selectLayoutRenderMode" class="form-control">
-                <option value="raster" selected>Растровый (Raster, быстро)</option>
+                <option value="raster" selected>Растровый (Raster, видовой экран LayOut)</option>
+                <option value="image">Растровый GPU (Ambient Occlusion, мягкие тени)</option>
                 <option value="vector">Векторный (Vector, четкие линии)</option>
                 <option value="hybrid">Гибридный (Hybrid, растр + вектор)</option>
               </select>
+              <span class="field-hint">Режим GPU рендерит тени Ambient Occlusion напрямую через графический ускоритель SketchUp. Векторный и гибридный — для четких CAD линий.</span>
             </div>
 
-            <div class="form-group" id="layoutSaveFileGroup" style="display: none;">
+            <div class="form-group" id="compressionGroup" style="display: none;">
+              <select id="selectCompression" class="form-control">
+                <option value="compress" selected>Применять сжатие (Оптимальный размер файла)</option>
+                <option value="none">Без сжатия (Максимальное качество, Lossless)</option>
+              </select>
+            </div>
+
+            <div class="form-group" id="imageFormatGroup">
+              <label for="selectImageFormat">Формат изображений</label>
+              <select id="selectImageFormat" class="form-control">
+                <option value="png" selected>PNG — максимальное сжатие без потерь (24-bit TrueColor)</option>
+                <option value="jpg">JPEG — максимальное качество (100%)</option>
+              </select>
+              <span class="field-hint">PNG использует максимальное сжатие без потерь (TrueColor), JPEG — максимальное качество (100%).</span>
+            </div>
+
+            <div class="form-group" id="qualityGroup">
+              <label for="selectQuality">Качество разрешения</label>
+              <select id="selectQuality" class="form-control">
+                <option value="low">low (для экранов 96 dpi)</option>
+                <option value="medium" selected>medium (оптимальный 150 dpi)</option>
+                <option value="high">high (для печати 300 dpi)</option>
+              </select>
+              <span class="field-hint">Разрешение вывода: 96 dpi (экраны), 150 dpi (оптимально), 300 dpi (печать).</span>
+            </div>
+
+            <div class="form-group" id="scaleMultiplierGroup">
+              <label for="selectScaleMultiplier">Толщина линий видового экрана (Множитель толщины линий, pt)</label>
+              <select id="selectScaleMultiplier" class="form-control">
+                <option value="auto">Авто (подбор под формат листа и разрешение)</option>
+                <option value="0.5">0,25 pt (тонкие, 0.5x)</option>
+                <option value="1">0,50 pt (стандарт LayOut, 1.0x)</option>
+                <option value="1.5">0,75 pt (множитель 1.5x)</option>
+                <option value="2.0" selected>1,00 pt (множитель 2.0x)</option>
+                <option value="2.5">1,25 pt (множитель 2.5x)</option>
+                <option value="3.0">1,50 pt (утолщенные, 3.0x)</option>
+              </select>
+              <span class="field-hint">Толщина линий 3D-модели в видовом экране LayOut и рендере (0.25–1.50 pt или Авто).</span>
+            </div>
+
+            <div class="form-group" id="annotationFontSizeGroup">
+              <label for="selectAnnotationFontSize">Размер шрифта выносок и размеров</label>
+              <select id="selectAnnotationFontSize" class="form-control">
+                <option value="auto" selected>Авто (исходный из модели SketchUp)</option>
+                <option value="8">8 pt (мелкий)</option>
+                <option value="10">10 pt</option>
+                <option value="12">12 pt</option>
+                <option value="14">14 pt (стандартный)</option>
+                <option value="16">16 pt</option>
+                <option value="18">18 pt (крупный)</option>
+                <option value="20">20 pt (очень крупный)</option>
+              </select>
+              <span class="field-hint">Размер шрифта выносок, сносок и надписей модели (размеры Dimension настраиваются в SketchUp: Окно &rarr; Данные модели &rarr; Размеры &rarr; Обновить).</span>
+            </div>
+
+            <div class="form-group" id="layoutSaveFileGroup">
               <label class="checkbox-label" style="margin-top: 26px;">
                 <input type="checkbox" id="chkSaveLayoutFile" checked>
                 <span>Сохранять проект (.layout) рядом с PDF</span>
               </label>
+              <span class="field-hint">Файл .layout можно открыть в Trimble LayOut для дальнейшего оформления чертежей.</span>
             </div>
           </div>
         </div>
@@ -407,10 +462,8 @@
             <div class="form-group">
               <label for="selectPageSize">Формат листа</label>
               <select id="selectPageSize" class="form-control">
-                <option value="A4">A4 (210 x 297 мм)</option>
+                <option value="A4" selected>A4 (210 x 297 мм)</option>
                 <option value="A3">A3 (297 x 420 мм)</option>
-                <option value="A2">A2 (420 x 594 мм)</option>
-                <option value="LETTER">US Letter</option>
               </select>
             </div>
 
@@ -426,93 +479,6 @@
               <label for="inputPageMargin">Отступ по периметру страницы (мм)</label>
               <input type="number" id="inputPageMargin" class="form-control" min="0" max="100" step="1" value="5">
               <span class="field-hint">Поля от края листа (в мм) для всех страниц при экспорте</span>
-            </div>
-
-            <div class="form-group">
-              <label for="selectImageAspect">Пропорции кадра (Aspect Ratio)</label>
-              <select id="selectImageAspect" class="form-control">
-                <option value="page">По формату листа PDF (Auto)</option>
-                <option value="16:9">16:9 (Широкоформатный)</option>
-                <option value="4:3" selected>4:3 (Традиционный)</option>
-                <option value="3:2">3:2 (Фотокадр)</option>
-                <option value="1:1">1:1 (Квадрат)</option>
-                <option value="custom">Пользовательские пропорции (Ш:В)</option>
-              </select>
-              <span class="field-hint" id="aspectOverlayBadge">—</span>
-            </div>
-
-            <div class="form-group">
-              <label class="checkbox-label">
-                <input type="checkbox" id="chkShowAspectOverlay">
-                <span>Показывать рамку пропорций кадра в окне SketchUp (Overlay)</span>
-              </label>
-              <span class="field-hint">Границы кадра рендера, сетка третей и затемнение за пределами рамки</span>
-            </div>
-
-            <div class="form-group" id="customAspectGroup" style="display: none;">
-              <label>Ширина : Высота (кастом)</label>
-              <div class="aspect-custom-inputs" style="display: flex; gap: 8px; align-items: center;">
-                <input type="number" id="inputAspectCustomW" class="form-control" min="0.1" step="0.1" value="16" placeholder="16" style="width: 85px;">
-                <span style="font-weight: 700; color: var(--text-muted); font-size: 14px;">:</span>
-                <input type="number" id="inputAspectCustomH" class="form-control" min="0.1" step="0.1" value="9" placeholder="9" style="width: 85px;">
-              </div>
-            </div>
-
-
-            <div class="form-group">
-              <label for="selectQuality">Качество рендера сцен</label>
-              <select id="selectQuality" class="form-control">
-                <option value="1.0">Черновое (Draft, 1x)</option>
-                <option value="2.0" selected>Стандартное HD (2x, 2400px)</option>
-                <option value="3.0">Максимальное Ultra-HD (3x, 3600px)</option>
-              </select>
-            </div>
-
-            <div class="form-group">
-              <label for="selectStamp">Водяной знак / Штамп</label>
-              <select id="selectStamp" class="form-control">
-                <option value="draft">НЕ УТВЕРЖДЕН (Draft)</option>
-                <option value="approved">В ПРОИЗВОДСТВО (Approved)</option>
-                <option value="custom">Пользовательский текст</option>
-                <option value="none">Без водяного знака</option>
-              </select>
-            </div>
-
-            <div class="form-group full-width" id="customStampGroup" style="display: none;">
-              <label for="inputCustomStamp">Текст пользовательского штампа</label>
-              <input type="text" id="inputCustomStamp" class="form-control" placeholder="например: ПРЕДВАРИТЕЛЬНЫЙ ЭСКИЗ">
-            </div>
-
-            <div class="form-group">
-              <label for="inputPrimaryColor">Цвет акцентов / заголовков</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="inputPrimaryColor" value="#005EB0">
-                <span class="color-hex" id="primaryColorHex">#005EB0</span>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="inputStampColor">Цвет водяного знака</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="inputStampColor" value="#D32F2F">
-                <span class="color-hex" id="stampColorHex">#D32F2F</span>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="inputOverlayBorderColor">Цвет рамки оверлея кадра</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="inputOverlayBorderColor" value="#0EA5E9">
-                <span class="color-hex" id="overlayBorderColorHex">#0EA5E9</span>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="inputOverlayMaskColor">Цвет затемнения вне кадра</label>
-              <div class="color-picker-wrapper">
-                <input type="color" id="inputOverlayMaskColor" value="#0F172A">
-                <span class="color-hex" id="overlayMaskColorHex">#0F172A</span>
-              </div>
             </div>
 
             <div class="form-group full-width">

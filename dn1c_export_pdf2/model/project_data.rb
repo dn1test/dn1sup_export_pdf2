@@ -647,14 +647,17 @@ module DN1Code
         # @return [Hash] хэш с параметрами PDF (размер листа, ориентация, цвета, штамп и т.д.)
         def default_pdf_settings
           {
-            export_engine:      "prawn",
+            export_engine:      "layout",
             layout_render_mode: "raster",
             save_layout_file:   true,
+            compress_pdf:       true,
+            image_format:       "png",
+            render_quality:     "medium",
             page_size:          "A4",
             page_layout:        "landscape",
             margin:             15,
             margin_mm:          5,
-            image_width:        2400,
+            image_width:        1754,
             image_aspect_ratio: "4:3",
             custom_ratio_w:     16,
             custom_ratio_h:     9,
@@ -664,6 +667,8 @@ module DN1Code
             overlay_mask_color:     "#0F172A",
             overlay_mask_opacity:   55,
             scale_factor:       2.0,
+            scale_multiplier:   "2.0",
+            annotation_font_size: "auto",
             antialias:          true,
             stamp_type:         "draft",
             stamp_custom:       "НЕ УТВЕРЖДЕН",

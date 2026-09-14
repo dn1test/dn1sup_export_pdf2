@@ -67,14 +67,17 @@ directories:
     display: "list"
 
 pdf_settings:
-  export_engine: "prawn"        # 'prawn' (Prawn PDF) или 'layout' (SketchUp LayOut API)
-  layout_render_mode: "raster"  # 'raster' (Растровый), 'vector' (Векторный), 'hybrid' (Гибридный)
+  export_engine: "layout"       # Генерация PDF через SketchUp LayOut API
+  layout_render_mode: "raster"  # 'raster' (Видовой экран LayOut), 'image' (Растровый GPU / Ambient Occlusion), 'vector' (Векторный), 'hybrid' (Гибридный)
   save_layout_file: true        # Сохранять файл .layout рядом с PDF (для LayOut API)
-  page_size: "A4"          # 'A4', 'A3', 'A2', 'LETTER'
+  compress_pdf: true            # У самого документа PDF всегда сжатие без потерь (true)
+  image_format: "png"           # Лучший формат для картинок: 'png' (lossless) или 'jpg'
+  render_quality: "medium"      # 'low' (96 dpi), 'medium' (150 dpi), 'high' (300 dpi)
+  page_size: "A4"          # 'A4', 'A3'
   page_layout: "landscape" # 'landscape' или 'portrait'
   margin: 15               # Отступ от края листа (в пунктах)
   margin_mm: 5             # Отступ от края листа (в миллиметрах)
-  image_width: 2400        # Базовая ширина рендера сцены
+  image_width: 1754        # Базовая ширина рендера сцены
   image_aspect_ratio: "4:3"  # Пропорции кадра: 'page' (по листу), '16:9', '4:3', '3:2', '1:1', 'custom'
   custom_ratio_w: 16       # Пользовательская ширина для custom
   custom_ratio_h: 9        # Пользовательская высота для custom
@@ -84,6 +87,8 @@ pdf_settings:
   overlay_mask_color: "#0F172A"   # Цвет затемнения вне кадра (HEX)
   overlay_mask_opacity: 55        # Степень затемнения вне кадра (0-100%)
   scale_factor: 2.0        # Множитель четкости (1.0 - 3.0)
+  scale_multiplier: "2.0"  # Множитель толщины линий (Line Scale Multiplier)
+  annotation_font_size: "auto"  # Размер шрифта выносок и размеров ('auto', '8', '10', '12', '14', '16', '18', '20')
   antialias: true          # Сглаживание линий SketchUp
   stamp_type: "draft"      # 'draft' (НЕ УТВЕРЖДЕН), 'approved' (В ПРОИЗВОДСТВО), 'none'
   font_family: "DIN Condensed"

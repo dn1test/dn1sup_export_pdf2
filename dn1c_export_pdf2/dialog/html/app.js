@@ -615,6 +615,10 @@
     engineHintText: document.getElementById("engineHintText"),
     layoutRenderModeGroup: document.getElementById("layoutRenderModeGroup"),
     selectLayoutRenderMode: document.getElementById("selectLayoutRenderMode"),
+    compressionGroup: document.getElementById("compressionGroup"),
+    selectCompression: document.getElementById("selectCompression"),
+    imageFormatGroup: document.getElementById("imageFormatGroup"),
+    selectImageFormat: document.getElementById("selectImageFormat"),
     layoutSaveFileGroup: document.getElementById("layoutSaveFileGroup"),
     chkSaveLayoutFile: document.getElementById("chkSaveLayoutFile"),
     selectPageSize: document.getElementById("selectPageSize"),
@@ -627,6 +631,8 @@
     chkShowAspectOverlay: document.getElementById("chkShowAspectOverlay"),
     aspectOverlayBadge: document.getElementById("aspectOverlayBadge"),
     selectQuality: document.getElementById("selectQuality"),
+    selectScaleMultiplier: document.getElementById("selectScaleMultiplier"),
+    selectAnnotationFontSize: document.getElementById("selectAnnotationFontSize"),
     selectStamp: document.getElementById("selectStamp"),
     customStampGroup: document.getElementById("customStampGroup"),
     inputCustomStamp: document.getElementById("inputCustomStamp"),
@@ -707,6 +713,57 @@
         } catch (e) {}
       }
     }
+  }
+
+  function getEffectiveRenderWidth() {
+    if (els.selectQuality) {
+      const val = (els.selectQuality.value || "").toLowerCase().trim();
+      const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A4")).toUpperCase().trim();
+      const pageLay = (els.selectPageLayout ? els.selectPageLayout.value : (state.pdf_settings?.page_layout || "landscape")).toLowerCase().trim();
+
+      let dpi = 150;
+      if (val === "low") dpi = 96;
+      else if (val === "high") dpi = 300;
+      else if (val === "medium") dpi = 150;
+      else if (parseFloat(val) > 100) return Math.round(parseFloat(val));
+
+      // Разрешение всегда рассчитывается по длинной стороне листа:
+      // A4 (297 мм = 11.6929 дюйма): 96 dpi = 1123 px, 150 dpi = 1754 px, 300 dpi = 3508 px
+      // A3 (420 мм = 16.5354 дюйма): 96 dpi = 1587 px, 150 dpi = 2480 px, 300 dpi = 4961 px
+      const longInches = (pageSz === "A3") ? 16.535433 : 11.692913;
+      return Math.round(longInches * dpi);
+    }
+    return state.pdf_settings?.image_width ? (parseInt(state.pdf_settings.image_width, 10) || 2400) : 2400;
+  }
+
+  function getEffectiveScaleMultiplier() {
+    if (els.selectScaleMultiplier) {
+      const raw = els.selectScaleMultiplier.value;
+      if (raw === "auto") {
+        const renderMode = (els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : (state.pdf_settings?.layout_render_mode || "raster")).toLowerCase();
+        const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A4")).toUpperCase().trim();
+        if (renderMode === "vector" || renderMode === "hybrid") {
+          // Для векторного и гибридного режимов подстраиваемся под растр по формату листа (с уменьшением на 30%)
+          if (pageSz === "A3") return 0.63;
+          return 0.42;
+        } else {
+          // Для растрового режима расчет идет от разрешения кадра (с уменьшением на 30%)
+          const qVal = getEffectiveRenderWidth();
+          let mult = 0.60;
+          if (qVal <= 1400) mult = 0.60;
+          else if (qVal <= 2000) mult = 0.90;
+          else if (qVal <= 2800) mult = 1.20;
+          else if (qVal <= 3400) mult = 1.50;
+          else mult = 1.80;
+
+          // Защитный порог для формата A3
+          if (pageSz === "A3") mult = Math.max(mult, 0.90);
+          return Math.round(mult * 70) / 100;
+        }
+      }
+      return parseFloat(raw) || 2.0;
+    }
+    return state.pdf_settings?.scale_factor ? (parseFloat(state.pdf_settings.scale_factor) || 2.0) : 2.0;
   }
 
   // Navigation Tabs Switching
@@ -1795,8 +1852,88 @@
     }).join('');
   }
 
+  // Синхронизация оверлея в SketchUp с выбранной сценой/страницей
+  function syncCurrentSceneOverlay(scene, overrideRatio, isUserAction = false) {
+    if (!scene) {
+      const idx = layoutState.selectedSceneIndex || 0;
+      scene = (state.scenes || [])[idx];
+      if (!scene) return;
+    }
+
+    const isVis = scene.viewport_visible !== false;
+    if (!isVis) {
+      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
+      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
+      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
+      if (chkTpl) {
+        chkTpl.checked = false;
+        chkTpl.disabled = true;
+      }
+      const tplBadge = document.getElementById("tplAspectOverlayBadge");
+      if (tplBadge) tplBadge.classList.add("disabled-overlay");
+      if (isUserAction) {
+        callRuby("toggleAspectOverlay", false);
+      }
+      return;
+    }
+
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    let ratio = overrideRatio || scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
+    ratio = String(ratio).trim();
+    if (!VALID_ASPECT_RATIOS.includes(ratio)) {
+      ratio = "4:3";
+    }
+
+    const displayRatio = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
+    const tplText = document.getElementById("tplAspectOverlayText");
+    if (tplText) {
+      tplText.textContent = `📐 РАМКА: ${displayRatio}`;
+    }
+    const tplNote = document.querySelector(".tpl-image-note");
+    if (tplNote) {
+      tplNote.textContent = `Рамка в окне SketchUp отображает точные границы кадра для текущей страницы с выбранными пропорциями (${displayRatio}).`;
+    }
+
+    if (!isUserAction) return;
+
+    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
+    const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
+    const baseWidth = getEffectiveRenderWidth();
+
+    const borderColor = state.pdf_settings?.overlay_border_color || "#0EA5E9";
+    const borderOpacity = state.pdf_settings?.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
+    const maskColor = state.pdf_settings?.overlay_mask_color || "#0F172A";
+    const maskOpacity = state.pdf_settings?.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
+
+    const payload = {
+      template_key: scene.page_type || "cover",
+      scene_name: scene.name || "",
+      scene_index: layoutState.selectedSceneIndex || 0,
+      aspect_ratio: ratio,
+      image_aspect_ratio: ratio,
+      visible: isVis,
+      scale_pct: scene.scale_pct || 100,
+      page_size: pageSize,
+      page_layout: pageLayout,
+      image_width: baseWidth,
+      show_aspect_overlay: true,
+      overlay_border_color: borderColor,
+      overlay_border_opacity: borderOpacity,
+      overlay_mask_color: maskColor,
+      overlay_mask_opacity: maskOpacity
+    };
+    callRuby("updateAspectSettings", JSON.stringify(payload));
+  }
+
   // Синхронизация пропорций кадра и параметров оверлея в SketchUp с блоком "Картинка чертежа" шаблона
   function syncCurrentTemplateOverlay(overrideRatio, isUserAction = false) {
+    const idx = layoutState.selectedSceneIndex || 0;
+    const scene = (state.scenes || [])[idx];
+    if (scene) {
+      syncCurrentSceneOverlay(scene, overrideRatio, isUserAction);
+      return;
+    }
+
     const tplKey = layoutState.currentTemplate || "cover";
     ensureCustomLayouts();
     const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
@@ -1847,8 +1984,7 @@
 
     const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
-    const qualityScale = parseFloat(els.selectQuality ? els.selectQuality.value : 2.0) || 2.0;
-    const baseWidth = Math.round(1200 * qualityScale);
+    const baseWidth = getEffectiveRenderWidth();
 
     const borderColor = state.pdf_settings?.overlay_border_color || "#0EA5E9";
     const borderOpacity = state.pdf_settings?.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
@@ -2408,114 +2544,13 @@
     `;
 
     // -------------------------------------------------------------
-    // CARD 4: КАРТИНКА ЧЕРТЕЖА ПОД ТЕКСТ (Drawing Viewport)
-    // -------------------------------------------------------------
-    const isImageVis = isSlotVisible(image43);
-    const VALID_TPL_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
-    let rawTplRatio = (image43.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
-    const imageAspectRatio = VALID_TPL_ASPECTS.includes(rawTplRatio) ? rawTplRatio : "4:3";
-    const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
-    const imageScalePct = parseInt(image43.scale_pct !== undefined ? image43.scale_pct : 100, 10) || 100;
-    const isOverlayOn = isImageVis && Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
-    const rawBorderColor = (state.pdf_settings && state.pdf_settings.overlay_border_color) || "#0EA5E9";
-    const overlayBorderColor = rawBorderColor.startsWith("#") ? rawBorderColor : `#${rawBorderColor}`;
-    const overlayBorderOpacity = state.pdf_settings && state.pdf_settings.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
-    const rawMaskColor = (state.pdf_settings && state.pdf_settings.overlay_mask_color) || "#0F172A";
-    const overlayMaskColor = rawMaskColor.startsWith("#") ? rawMaskColor : `#${rawMaskColor}`;
-    const overlayMaskOpacity = state.pdf_settings && state.pdf_settings.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
-
-    const cardImageHtml = `
-      <div class="tpl-card tpl-panel-left ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">🖼️</span>
-            <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D)</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer;">
-              <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
-              <span>Вкл</span>
-            </label>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-          <div class="tpl-image-controls-row">
-            <div class="tpl-control-item">
-              <span class="tpl-control-label">Пропорции картинки:</span>
-              <div class="tpl-btn-group" id="grp_image_aspect_ratio">
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '3:2' ? 'active' : ''}" data-ratio="3:2" title="Пропорция 3:2 (фотокадр)">3:2</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '4:3' ? 'active' : ''}" data-ratio="4:3" title="Пропорция 4:3 (стандарт)">4:3</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '16:9' ? 'active' : ''}" data-ratio="16:9" title="Пропорция 16:9 (широкоформатный)">16:9</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '1:1' ? 'active' : ''}" data-ratio="1:1" title="Пропорция 1:1 (квадрат)">1:1</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === 'page' ? 'active' : ''}" data-ratio="page" title="По пропорциям страницы листа">По листу</button>
-              </div>
-            </div>
-            <div class="tpl-control-item">
-              <span class="tpl-control-label">Размещение на странице:</span>
-              <div class="tpl-btn-group" id="grp_image_scale_pct">
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 60 ? 'active' : ''}" data-scale="60" title="60% от размера листа">60%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 70 ? 'active' : ''}" data-scale="70" title="70% от размера листа">70%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 80 ? 'active' : ''}" data-scale="80" title="80% от размера листа">80%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 90 ? 'active' : ''}" data-scale="90" title="90% от размера листа">90%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 100 ? 'active' : ''}" data-scale="100" title="100% (во весь лист)">100%</button>
-              </div>
-            </div>
-            <label class="checkbox-label tpl-overlay-toggle-label ${isOverlayOn ? '' : 'disabled-overlay'}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin-left: auto;">
-              <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="cursor: pointer; margin: 0;">
-              <span id="tplAspectOverlayText">📐 РАМКА: ${displayAspect}</span>
-            </label>
-          </div>
-
-          <div class="tpl-overlay-styling-row">
-            <div class="tpl-overlay-style-item" title="Цвет контурной рамки в окне SketchUp">
-              <span class="tpl-overlay-style-label">Цвет рамки:</span>
-              <div class="tpl-color-picker-wrap">
-                <input type="color" id="input_overlay_border_color" value="${overlayBorderColor}" class="tpl-color-picker">
-                <span class="tpl-color-hex" id="val_overlay_border_color">${overlayBorderColor}</span>
-              </div>
-            </div>
-
-            <div class="tpl-overlay-style-item" title="Прозрачность контурной рамки (10% - 100%)">
-              <span class="tpl-overlay-style-label">Прозрачность рамки:</span>
-              <div class="tpl-range-wrap">
-                <input type="range" min="10" max="100" step="5" id="input_overlay_border_opacity" value="${overlayBorderOpacity}" class="tpl-range-slider">
-                <span class="tpl-range-val" id="val_overlay_border_opacity">${overlayBorderOpacity}%</span>
-              </div>
-            </div>
-
-            <div class="tpl-overlay-style-item" title="Цвет затемнения вне кадра">
-              <span class="tpl-overlay-style-label">Цвет затемнения:</span>
-              <div class="tpl-color-picker-wrap">
-                <input type="color" id="input_overlay_mask_color" value="${overlayMaskColor}" class="tpl-color-picker">
-                <span class="tpl-color-hex" id="val_overlay_mask_color">${overlayMaskColor}</span>
-              </div>
-            </div>
-
-            <div class="tpl-overlay-style-item" title="Степень затемнения вне кадра (0% - 100%)">
-              <span class="tpl-overlay-style-label">Затемнение:</span>
-              <div class="tpl-range-wrap">
-                <input type="range" min="0" max="100" step="5" id="input_overlay_mask_opacity" value="${overlayMaskOpacity}" class="tpl-range-slider">
-                <span class="tpl-range-val" id="val_overlay_mask_opacity">${overlayMaskOpacity}%</span>
-              </div>
-            </div>
-          </div>
-
-          <p class="tpl-image-note">
-            Рамка в окне SketchUp отображает точные границы кадра для текущего шаблона с выбранными пропорциями (${displayAspect}).
-          </p>
-        </div>
-      </div>
-    `;
-
-    // -------------------------------------------------------------
-    // FULL TWO-COLUMN ASSEMBLY REPLACED BY SINGLE COLUMN (Заголовок, Средний, Подвал, Картинка)
+    // FULL TWO-COLUMN ASSEMBLY REPLACED BY SINGLE COLUMN (Заголовок, Средний, Подвал)
     // -------------------------------------------------------------
     html = `
       <div class="tpl-single-column-layout">
         ${cardHeaderHtml}
         ${cardMiddleHtml}
         ${cardFooterHtml}
-        ${cardImageHtml}
       </div>
     `;
 
@@ -3888,14 +3923,23 @@
     if (els.inputLighting) els.inputLighting.value = info.lighting || "";
     if (els.inputNotes) els.inputNotes.value = info.notes || "";
 
-    // PDF Settings
-    const engine = settings.export_engine || "prawn";
+    // LayOut PDF Settings
+    const engine = "layout";
     if (els.selectExportEngine) els.selectExportEngine.value = engine;
     if (els.selectLayoutRenderMode) els.selectLayoutRenderMode.value = settings.layout_render_mode || "raster";
+    if (els.selectCompression) {
+      els.selectCompression.value = (settings.compress_pdf === true || settings.compress_pdf === "compress") ? "compress" : "none";
+    }
+    if (els.selectImageFormat) {
+      els.selectImageFormat.value = (settings.image_format || "png").toLowerCase();
+    }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
     updateEngineUI();
 
-    if (els.selectPageSize) els.selectPageSize.value = settings.page_size || "A4";
+    if (els.selectPageSize) {
+      const ps = (settings.page_size || "A4").toUpperCase().trim();
+      els.selectPageSize.value = (ps === "A3") ? "A3" : "A4";
+    }
     if (els.selectPageLayout) els.selectPageLayout.value = settings.page_layout || "landscape";
     const marginMm = settings.margin_mm !== undefined && settings.margin_mm !== null
       ? parseFloat(settings.margin_mm)
@@ -3912,7 +3956,33 @@
     if (els.inputAspectCustomH) els.inputAspectCustomH.value = settings.custom_ratio_h || 9;
     if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = settings.show_aspect_overlay === true;
     updateAspectUI(false);
-    if (els.selectQuality) els.selectQuality.value = (settings.scale_factor || 2.0).toString();
+    if (els.selectQuality) {
+      let qVal = settings.render_quality ? settings.render_quality.toString().toLowerCase().trim() : "";
+      if (!["low", "medium", "high"].includes(qVal)) {
+        const num = parseInt(settings.image_width, 10);
+        if (num <= 1400) qVal = "low";
+        else if (num > 2800) qVal = "high";
+        else qVal = "medium";
+      }
+      els.selectQuality.value = qVal;
+    }
+    if (els.selectScaleMultiplier) {
+      let sm = (settings.scale_multiplier !== undefined && settings.scale_multiplier !== null)
+        ? String(settings.scale_multiplier)
+        : (settings.scale_factor ? String(settings.scale_factor) : "2.0");
+      if (sm === "0.5") sm = "0.5";
+      else if (sm === "1" || sm === "1.0") sm = "1";
+      else if (sm === "1.5") sm = "1.5";
+      else if (sm === "2" || sm === "2.0") sm = "2.0";
+      else if (sm === "2.5") sm = "2.5";
+      else if (sm === "3" || sm === "3.0") sm = "3.0";
+      else if (sm === "auto") sm = "auto";
+      else sm = "2.0";
+      els.selectScaleMultiplier.value = sm;
+    }
+    if (els.selectAnnotationFontSize) {
+      els.selectAnnotationFontSize.value = settings.annotation_font_size || "auto";
+    }
     if (els.selectStamp) els.selectStamp.value = settings.stamp_type || "draft";
     if (els.inputCustomStamp) els.inputCustomStamp.value = settings.stamp_custom || "НЕ УТВЕРЖДЕН";
     if (els.customStampGroup) els.customStampGroup.style.display = settings.stamp_type === "custom" ? "flex" : "none";
@@ -4599,19 +4669,10 @@
     });
   }
 
-  // Update LayOut / Prawn Engine UI State
+  // Update LayOut Engine UI State
   function updateEngineUI() {
-    const isLayout = els.selectExportEngine && els.selectExportEngine.value === "layout";
-    if (els.layoutRenderModeGroup) els.layoutRenderModeGroup.style.display = isLayout ? "flex" : "none";
-    if (els.layoutSaveFileGroup) els.layoutSaveFileGroup.style.display = isLayout ? "flex" : "none";
-
-    if (els.engineHintText) {
-      if (isLayout) {
-        els.engineHintText.textContent = "LayOut API создает полноценный документ LayOut со страницами и видовыми экранами SketchUp и экспортирует его в PDF.";
-      } else {
-        els.engineHintText.textContent = "Prawn генерирует PDF напрямую, используя векторные примитивы и высококачественные растровые рендеры сцен.";
-      }
-    }
+    if (els.layoutRenderModeGroup) els.layoutRenderModeGroup.style.display = "flex";
+    if (els.layoutSaveFileGroup) els.layoutSaveFileGroup.style.display = "flex";
     notifyChange();
   }
 
@@ -4629,8 +4690,7 @@
 
     const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
-    const qualityScale = parseFloat(els.selectQuality ? els.selectQuality.value : 2.0) || 2.0;
-    const baseWidth = Math.round(1200 * qualityScale);
+    const baseWidth = getEffectiveRenderWidth();
 
     let ratio = 1.4142;
     let label = "A4 Альбомный";
@@ -4753,12 +4813,11 @@
     });
     callRuby("selectScene", payload);
 
-    // Если в шаблоне выбранной сцены выключен видовой экран, выключаем оверлей в GUI
-    const tplKey = scene.page_type || "cover";
-    const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
-    const tplCfg = customLayouts[tplKey] || {};
-    const imgCfg = tplCfg.image_4_3 || {};
-    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
+    // Рендерим карточку видового экрана для выбранной страницы
+    renderSceneViewportCard(index);
+
+    // Если в выбранной странице выключен видовой экран, выключаем оверлей в GUI
+    const isVis = scene.viewport_visible !== false;
     if (!isVis) {
       if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
       if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
@@ -4769,6 +4828,9 @@
       }
       const tplBadge = document.getElementById("tplAspectOverlayBadge");
       if (tplBadge) tplBadge.classList.add("disabled-overlay");
+      callRuby("toggleAspectOverlay", false);
+    } else {
+      syncCurrentSceneOverlay(scene, null, true);
     }
   }
 
@@ -4783,6 +4845,19 @@
         row.classList.remove("selected-scene-row");
       }
     });
+  }
+
+  // Update aspect ratio badge in scenes table row
+  function updateSceneTableAspectCell(index, ratio, isVis) {
+    if (!els.scenesTableBody) return;
+    const row = els.scenesTableBody.querySelector(`tr[data-index="${index}"]`);
+    if (!row) return;
+    const cell = row.querySelector(".scene-aspect-cell");
+    if (!cell) return;
+    const visible = isVis !== undefined ? isVis : true;
+    const r = (ratio || "4:3").trim();
+    const displayRatio = r === "page" ? "Лист" : r;
+    cell.innerHTML = `<span class="badge badge-aspect ${!visible ? 'badge-aspect-disabled' : ''}" title="${visible ? 'Пропорции кадра: ' + displayRatio : 'Видовой экран выключен'}">${visible ? displayRatio : 'Выкл'}</span>`;
   }
 
   // Create mini page preview element for a scene (3:2 clean image, no blue lines)
@@ -4825,6 +4900,7 @@
       selectTemplate(scene.page_type || "cover");
       highlightActiveSceneRow(index);
       switchToSketchupScene(scene, index);
+      renderSceneViewportCard(index);
     });
 
     wrap.appendChild(thumbBox);
@@ -4846,6 +4922,297 @@
         }
       }
     });
+  }
+
+  // -------------------------------------------------------------
+  // RENDER SCENE VIEWPORT & SAFE FRAME CARD (Настройка видового экрана выбранной страницы)
+  // -------------------------------------------------------------
+  function renderSceneViewportCard(sceneIndex) {
+    const container = document.getElementById("sceneViewportSection");
+    if (!container) return;
+
+    const scenes = state.scenes || [];
+    const idx = (sceneIndex !== undefined && sceneIndex >= 0 && sceneIndex < scenes.length)
+      ? sceneIndex
+      : (layoutState.selectedSceneIndex || 0);
+
+    const scene = scenes[idx];
+    if (!scene) {
+      container.innerHTML = `
+        <div class="scene-viewport-empty">
+          <span style="color: #64748b; font-size: 11px;">Выберите страницу в таблице выше для настройки видового экрана</span>
+        </div>
+      `;
+      return;
+    }
+
+    const isImageVis = scene.viewport_visible !== false;
+    const VALID_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
+    let rawRatio = (scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
+    const imageAspectRatio = VALID_ASPECTS.includes(rawRatio) ? rawRatio : "4:3";
+    const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
+    const imageScalePct = parseInt(scene.scale_pct !== undefined ? scene.scale_pct : 100, 10) || 100;
+    const isOverlayOn = isImageVis && Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
+    const rawBorderColor = (state.pdf_settings && state.pdf_settings.overlay_border_color) || "#0EA5E9";
+    const overlayBorderColor = rawBorderColor.startsWith("#") ? rawBorderColor : `#${rawBorderColor}`;
+    const overlayBorderOpacity = state.pdf_settings && state.pdf_settings.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
+    const rawMaskColor = (state.pdf_settings && state.pdf_settings.overlay_mask_color) || "#0F172A";
+    const overlayMaskColor = rawMaskColor.startsWith("#") ? rawMaskColor : `#${rawMaskColor}`;
+    const rawMaskOpacity = state.pdf_settings && state.pdf_settings.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 70;
+    const MASK_PRESETS = [10, 40, 70, 90];
+    const overlayMaskOpacity = MASK_PRESETS.reduce((prev, curr) => Math.abs(curr - rawMaskOpacity) < Math.abs(prev - rawMaskOpacity) ? curr : prev, 70);
+    const safeSceneName = String(scene.name || `Сцена ${idx + 1}`).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
+
+    const cardImageHtml = `
+      <div class="tpl-card tpl-panel-left scene-viewport-card ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
+        <div class="tpl-card-header">
+          <div class="tpl-card-title-group">
+            <span class="tpl-card-icon">🖼️</span>
+            <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D) • Сцена ${idx + 1}: «${safeSceneName}»</span>
+          </div>
+          <div class="tpl-card-header-actions" style="display: flex; align-items: center; gap: 12px;">
+            <label class="tpl-overlay-toggle-btn ${isOverlayOn ? 'active' : ''} ${!isImageVis ? 'disabled-overlay' : ''}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin: 0; cursor: pointer;">
+              <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="display: none;">
+              <span id="tplAspectOverlayText">📐 Рамка: ${displayAspect}</span>
+            </label>
+            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
+              <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
+              <span>Вкл</span>
+            </label>
+          </div>
+        </div>
+        <div class="tpl-card-body">
+          <div class="tpl-image-controls-row">
+            <div class="tpl-control-item">
+              <span class="tpl-control-label">Пропорции картинки:</span>
+              <div class="tpl-btn-group" id="grp_image_aspect_ratio">
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '3:2' ? 'active' : ''}" data-ratio="3:2" title="Пропорция 3:2 (фотокадр)">3:2</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '4:3' ? 'active' : ''}" data-ratio="4:3" title="Пропорция 4:3 (стандарт)">4:3</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '16:9' ? 'active' : ''}" data-ratio="16:9" title="Пропорция 16:9 (широкоформатный)">16:9</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '1:1' ? 'active' : ''}" data-ratio="1:1" title="Пропорция 1:1 (квадрат)">1:1</button>
+                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === 'page' ? 'active' : ''}" data-ratio="page" title="По пропорциям страницы листа">По листу</button>
+              </div>
+            </div>
+            <div class="tpl-control-item">
+              <span class="tpl-control-label">Размещение на странице:</span>
+              <div class="tpl-btn-group" id="grp_image_scale_pct">
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 60 ? 'active' : ''}" data-scale="60" title="60% от размера листа">60%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 70 ? 'active' : ''}" data-scale="70" title="70% от размера листа">70%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 80 ? 'active' : ''}" data-scale="80" title="80% от размера листа">80%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 90 ? 'active' : ''}" data-scale="90" title="90% от размера листа">90%</button>
+                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 100 ? 'active' : ''}" data-scale="100" title="100% (во весь лист)">100%</button>
+              </div>
+            </div>
+          </div>
+
+          <div class="tpl-overlay-styling-row">
+            <div class="tpl-overlay-style-item" title="Цвет контурной рамки в окне SketchUp">
+              <span class="tpl-overlay-style-label">Контур рамки:</span>
+              <div class="tpl-color-picker-wrap">
+                <input type="color" id="input_overlay_border_color" value="${overlayBorderColor}" class="tpl-color-picker">
+                <span class="tpl-color-hex" id="val_overlay_border_color">${overlayBorderColor}</span>
+              </div>
+            </div>
+
+            <div class="tpl-overlay-style-item" title="Степень затемнения вне кадра (10%, 40%, 70%, 90%)">
+              <span class="tpl-overlay-style-label">Затемнение:</span>
+              <div class="tpl-btn-group" id="grp_overlay_mask_opacity">
+                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 10 ? 'active' : ''}" data-opacity="10" title="Легкое затемнение 10%">10%</button>
+                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 40 ? 'active' : ''}" data-opacity="40" title="Умеренное затемнение 40%">40%</button>
+                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 70 ? 'active' : ''}" data-opacity="70" title="Стандартное затемнение 70%">70%</button>
+                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 90 ? 'active' : ''}" data-opacity="90" title="Плотное затемнение 90%">90%</button>
+              </div>
+            </div>
+          </div>
+
+          <p class="tpl-image-note">
+            Рамка в окне SketchUp отображает точные границы кадра для текущей страницы с выбранными пропорциями (${displayAspect}).
+          </p>
+        </div>
+      </div>
+    `;
+
+    container.innerHTML = cardImageHtml;
+    bindSceneViewportEvents(scene, idx);
+  }
+
+  function bindSceneViewportEvents(scene, sceneIndex) {
+    if (!scene) return;
+
+    const chkVis = document.getElementById("chk_image_4_3_visible");
+    if (chkVis) {
+      chkVis.addEventListener("change", (e) => {
+        const isVis = e.target.checked;
+        scene.viewport_visible = isVis;
+        updateBlockSlot("image_4_3", { visible: isVis });
+
+        const card = document.getElementById("card_image");
+        if (card) {
+          card.classList.toggle("disabled-card", !isVis);
+          card.classList.toggle("disabled-block", !isVis);
+        }
+        const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
+        const tplBadge = document.getElementById("tplAspectOverlayBadge");
+        if (!isVis) {
+          if (chkTpl) {
+            chkTpl.checked = false;
+            chkTpl.disabled = true;
+          }
+          if (tplBadge) {
+            tplBadge.classList.add("disabled-overlay");
+          }
+          if (state.pdf_settings) {
+            state.pdf_settings.show_aspect_overlay = false;
+          }
+          if (els.chkShowAspectOverlay) {
+            els.chkShowAspectOverlay.checked = false;
+          }
+          callRuby("toggleAspectOverlay", false);
+        } else {
+          if (chkTpl) chkTpl.disabled = false;
+          syncCurrentSceneOverlay(scene, null, true);
+        }
+        updateSceneTableAspectCell(sceneIndex, scene.aspect_ratio, isVis);
+        notifyChange();
+      });
+    }
+
+    const grpRatio = document.getElementById("grp_image_aspect_ratio");
+    if (grpRatio) {
+      grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          const ratio = btn.dataset.ratio;
+          grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          scene.aspect_ratio = ratio;
+          updateBlockSlot("image_4_3", { aspect_ratio: ratio });
+          updateSceneTableAspectCell(sceneIndex, ratio, scene.viewport_visible !== false);
+          const tplAspectText = document.getElementById("tplAspectOverlayText");
+          if (tplAspectText) {
+            const disp = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
+            tplAspectText.textContent = `📐 Рамка: ${disp}`;
+          }
+          syncCurrentSceneOverlay(scene, ratio, true);
+          notifyChange();
+        });
+      });
+    }
+
+    const grpScale = document.getElementById("grp_image_scale_pct");
+    if (grpScale) {
+      grpScale.querySelectorAll(".btn-scale-pct").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          grpScale.querySelectorAll(".btn-scale-pct").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const scale = parseInt(btn.dataset.scale, 10) || 100;
+          scene.scale_pct = scale;
+          updateBlockSlot("image_4_3", { scale_pct: scale });
+          syncCurrentSceneOverlay(scene, null, true);
+          notifyChange();
+        });
+      });
+    }
+
+    const chkOverlay = document.getElementById("chk_tpl_aspect_overlay");
+    if (chkOverlay) {
+      chkOverlay.addEventListener("change", (e) => {
+        const isChecked = e.target.checked;
+        if (!state.pdf_settings) state.pdf_settings = {};
+        state.pdf_settings.show_aspect_overlay = isChecked;
+        if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = isChecked;
+        const tplBadge = document.getElementById("tplAspectOverlayBadge");
+        if (tplBadge) {
+          tplBadge.classList.toggle("active", isChecked);
+          tplBadge.classList.toggle("disabled-overlay", !isChecked);
+        }
+        callRuby("toggleAspectOverlay", isChecked);
+        if (isChecked) {
+          syncCurrentSceneOverlay(scene, null, true);
+        }
+        notifyChange();
+      });
+    }
+
+    const inpBorderColor = document.getElementById("input_overlay_border_color");
+    if (inpBorderColor) {
+      const onBorderColorChange = (e) => {
+        const val = e.target.value.toUpperCase();
+        const lbl = document.getElementById("val_overlay_border_color");
+        if (lbl) lbl.textContent = val;
+        if (!state.pdf_settings) state.pdf_settings = {};
+        state.pdf_settings.overlay_border_color = val;
+        if (els.inputOverlayBorderColor) els.inputOverlayBorderColor.value = val;
+        if (els.overlayBorderColorHex) els.overlayBorderColorHex.textContent = val;
+        syncCurrentSceneOverlay(scene, null, true);
+        notifyChange();
+      };
+      inpBorderColor.addEventListener("input", onBorderColorChange);
+      inpBorderColor.addEventListener("change", onBorderColorChange);
+    }
+
+    const grpMaskOpacity = document.getElementById("grp_overlay_mask_opacity");
+    if (grpMaskOpacity) {
+      grpMaskOpacity.querySelectorAll(".btn-mask-opacity").forEach((btn) => {
+        btn.addEventListener("click", () => {
+          grpMaskOpacity.querySelectorAll(".btn-mask-opacity").forEach((b) => b.classList.remove("active"));
+          btn.classList.add("active");
+          const opacity = parseInt(btn.dataset.opacity, 10) || 70;
+          if (!state.pdf_settings) state.pdf_settings = {};
+          state.pdf_settings.overlay_mask_opacity = opacity;
+          if (els.inputOverlayMaskOpacity) els.inputOverlayMaskOpacity.value = opacity;
+          if (els.overlayMaskOpacityVal) els.overlayMaskOpacityVal.textContent = `${opacity}%`;
+          syncCurrentSceneOverlay(scene, null, true);
+          notifyChange();
+        });
+      });
+    }
+
+    const inpBorderOpacity = document.getElementById("input_overlay_border_opacity");
+    if (inpBorderOpacity) {
+      const onBorderOpacityChange = (e) => {
+        const val = parseInt(e.target.value, 10) || 100;
+        const lbl = document.getElementById("val_overlay_border_opacity");
+        if (lbl) lbl.textContent = `${val}%`;
+        if (!state.pdf_settings) state.pdf_settings = {};
+        state.pdf_settings.overlay_border_opacity = val;
+        syncCurrentSceneOverlay(scene, null, true);
+        notifyChange();
+      };
+      inpBorderOpacity.addEventListener("input", onBorderOpacityChange);
+      inpBorderOpacity.addEventListener("change", onBorderOpacityChange);
+    }
+
+    const inpMaskColor = document.getElementById("input_overlay_mask_color");
+    if (inpMaskColor) {
+      const onMaskColorChange = (e) => {
+        const val = e.target.value.toUpperCase();
+        const lbl = document.getElementById("val_overlay_mask_color");
+        if (lbl) lbl.textContent = val;
+        if (!state.pdf_settings) state.pdf_settings = {};
+        state.pdf_settings.overlay_mask_color = val;
+        if (els.inputOverlayMaskColor) els.inputOverlayMaskColor.value = val;
+        if (els.overlayMaskColorHex) els.overlayMaskColorHex.textContent = val;
+        syncCurrentSceneOverlay(scene, null, true);
+        notifyChange();
+      };
+      inpMaskColor.addEventListener("input", onMaskColorChange);
+      inpMaskColor.addEventListener("change", onMaskColorChange);
+    }
+
+    const inpMaskOpacity = document.getElementById("input_overlay_mask_opacity");
+    if (inpMaskOpacity) {
+      const onMaskOpacityChange = (e) => {
+        const val = parseInt(e.target.value, 10) || 80;
+        const lbl = document.getElementById("val_overlay_mask_opacity");
+        if (lbl) lbl.textContent = `${val}%`;
+        if (!state.pdf_settings) state.pdf_settings = {};
+        state.pdf_settings.overlay_mask_opacity = val;
+        syncCurrentSceneOverlay(scene, null, true);
+        notifyChange();
+      };
+      inpMaskOpacity.addEventListener("input", onMaskOpacityChange);
+      inpMaskOpacity.addEventListener("change", onMaskOpacityChange);
+    }
   }
 
   // Render Scenes Table
@@ -4934,6 +5301,7 @@
         e.target.value = scene.name;
         renderTemplateSettingsList();
         updateLayoutUsageBadge();
+        renderSceneViewportCard(index);
         notifyChange();
       });
       inputName.addEventListener("keydown", (e) => {
@@ -4971,7 +5339,20 @@
       infoWrap.appendChild(inputDesc);
       tdInfo.appendChild(infoWrap);
 
-      // Page Type Select
+      // 4. Aspect Ratio Cell (Кадр)
+      const tdAspect = document.createElement("td");
+      tdAspect.className = "scene-aspect-cell";
+      const aspectBadge = document.createElement("span");
+      aspectBadge.className = "badge badge-aspect";
+      const isVpVis = scene.viewport_visible !== false;
+      const curRatio = (scene.aspect_ratio || "4:3").trim();
+      const displayRatio = curRatio === "page" ? "Лист" : curRatio;
+      aspectBadge.textContent = isVpVis ? displayRatio : "Выкл";
+      aspectBadge.title = isVpVis ? `Пропорции кадра: ${displayRatio}` : "Видовой экран выключен";
+      if (!isVpVis) aspectBadge.classList.add("badge-aspect-disabled");
+      tdAspect.appendChild(aspectBadge);
+
+      // 5. Page Type Select
       const tdType = document.createElement("td");
       tdType.className = "scene-type-cell";
       const typeWrap = document.createElement("div");
@@ -5112,7 +5493,7 @@
         }
       });
 
-      // Click on row to focus template and switch SketchUp scene
+      // Click on row to focus template, select scene, and switch SketchUp scene
       tr.addEventListener("click", () => {
         const tpl = scene.page_type || "cover";
         layoutState.selectedSceneIndex = index;
@@ -5126,12 +5507,14 @@
       tr.appendChild(tdNum);
       tr.appendChild(tdPreview);
       tr.appendChild(tdInfo);
+      tr.appendChild(tdAspect);
       tr.appendChild(tdType);
 
       els.scenesTableBody.appendChild(tr);
     });
 
     updateLayoutUsageBadge();
+    renderSceneViewportCard(layoutState.selectedSceneIndex || 0);
 
     // Trigger thumbnail generation from SketchUp if not done yet
     if (!requestedSceneThumbnails && window.sketchup && typeof window.sketchup.getSceneThumbnails === "function") {
@@ -5429,10 +5812,12 @@
     ensureCustomLayouts();
 
     state.pdf_settings = {
-      export_engine: els.selectExportEngine ? els.selectExportEngine.value : "prawn",
+      export_engine: "layout",
       layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "raster",
+      compress_pdf: els.selectCompression ? (els.selectCompression.value === "compress") : (state.pdf_settings?.compress_pdf === true),
+      image_format: els.selectImageFormat ? els.selectImageFormat.value : (state.pdf_settings?.image_format || "png"),
       save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
-      page_size: els.selectPageSize.value,
+      page_size: (els.selectPageSize && els.selectPageSize.value === "A3") ? "A3" : "A4",
       page_layout: els.selectPageLayout.value,
       margin_mm: els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5),
       margin: Math.round((((els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5)) * 72.0) / 25.4) * 10) / 10,
@@ -5466,11 +5851,15 @@
         if (inpTpl && inpTpl.value !== "") return parseInt(inpTpl.value, 10) || 55;
         return state.pdf_settings?.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
       })(),
-      scale_factor: parseFloat(els.selectQuality.value) || 2.0,
-      stamp_type: els.selectStamp.value,
-      stamp_custom: els.inputCustomStamp.value.trim(),
-      primary_color: els.inputPrimaryColor.value.replace("#", ""),
-      stamp_color: els.inputStampColor.value.replace("#", ""),
+      render_quality: els.selectQuality ? els.selectQuality.value : (state.pdf_settings?.render_quality || "medium"),
+      image_width: getEffectiveRenderWidth(),
+      scale_multiplier: els.selectScaleMultiplier ? els.selectScaleMultiplier.value : (state.pdf_settings?.scale_multiplier || "2.0"),
+      scale_factor: getEffectiveScaleMultiplier(),
+      annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value : (state.pdf_settings?.annotation_font_size || "auto"),
+      stamp_type: els.selectStamp ? els.selectStamp.value : (state.pdf_settings?.stamp_type || "none"),
+      stamp_custom: els.inputCustomStamp ? els.inputCustomStamp.value.trim() : (state.pdf_settings?.stamp_custom || ""),
+      primary_color: els.inputPrimaryColor ? els.inputPrimaryColor.value.replace("#", "") : (state.pdf_settings?.primary_color || "005EB0"),
+      stamp_color: els.inputStampColor ? els.inputStampColor.value.replace("#", "") : (state.pdf_settings?.stamp_color || "D32F2F"),
       auto_open_pdf: els.chkAutoOpen.checked,
       save_skp_backup: els.chkSaveBackup.checked,
       antialias: els.chkAntialias.checked,
@@ -5661,6 +6050,15 @@
     if (els.selectQuality) {
       els.selectQuality.addEventListener("change", () => updateAspectUI(true));
     }
+    if (els.selectScaleMultiplier) {
+      els.selectScaleMultiplier.addEventListener("change", () => updateAspectUI(true));
+    }
+    if (els.selectAnnotationFontSize) {
+      els.selectAnnotationFontSize.addEventListener("change", () => notifyChange());
+    }
+    if (els.selectLayoutRenderMode) {
+      els.selectLayoutRenderMode.addEventListener("change", () => updateAspectUI(true));
+    }
     if (els.chkShowAspectOverlay) {
       els.chkShowAspectOverlay.addEventListener("change", (e) => {
         if (window.sketchup && typeof window.sketchup.toggleAspectOverlay === "function") {
@@ -5688,17 +6086,23 @@
     }
 
     // Stamp select change
-    els.selectStamp.addEventListener("change", (e) => {
-      els.customStampGroup.style.display = e.target.value === "custom" ? "flex" : "none";
-    });
+    if (els.selectStamp) {
+      els.selectStamp.addEventListener("change", (e) => {
+        if (els.customStampGroup) els.customStampGroup.style.display = e.target.value === "custom" ? "flex" : "none";
+      });
+    }
 
     // Color pickers hex display
-    els.inputPrimaryColor.addEventListener("input", (e) => {
-      els.primaryColorHex.textContent = e.target.value;
-    });
-    els.inputStampColor.addEventListener("input", (e) => {
-      els.stampColorHex.textContent = e.target.value;
-    });
+    if (els.inputPrimaryColor) {
+      els.inputPrimaryColor.addEventListener("input", (e) => {
+        if (els.primaryColorHex) els.primaryColorHex.textContent = e.target.value;
+      });
+    }
+    if (els.inputStampColor) {
+      els.inputStampColor.addEventListener("input", (e) => {
+        if (els.stampColorHex) els.stampColorHex.textContent = e.target.value;
+      });
+    }
 
     if (els.inputOverlayBorderColor) {
       const handleOverlayBorderColor = (e) => {
@@ -5974,10 +6378,10 @@
       "inputTotalDuration", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
-      "selectExportEngine", "selectLayoutRenderMode", "chkSaveLayoutFile",
+      "selectExportEngine", "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
       "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
-      "selectQuality", "selectStamp", "inputCustomStamp",
+      "selectQuality", "selectScaleMultiplier", "selectAnnotationFontSize", "selectStamp", "inputCustomStamp",
       "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias"
     ];
     autoSaveInputIds.forEach((id) => {
@@ -6114,6 +6518,12 @@
         grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => {
           b.classList.toggle("active", b.dataset.ratio === ratio);
         });
+      }
+      const idx = layoutState.selectedSceneIndex || 0;
+      const scene = (state.scenes || [])[idx];
+      if (scene) {
+        scene.aspect_ratio = ratio;
+        updateSceneTableAspectCell(idx, ratio, scene.viewport_visible !== false);
       }
       updateBlockSlot("image_4_3", { aspect_ratio: ratio });
       if (!state.pdf_settings) state.pdf_settings = {};

@@ -1,22 +1,27 @@
 ---
 pdf_settings:
   export_engine: layout
-  layout_render_mode: raster
+  layout_render_mode: hybrid
   save_layout_file: true
+  compress_pdf: true
+  image_format: png
+  render_quality: high
   page_size: A3
   page_layout: landscape
   margin: 14.2
   margin_mm: 5
-  image_width: 2400
+  image_width: 4961
   image_aspect_ratio: '4:3'
   custom_ratio_w: 16
   custom_ratio_h: 9
-  show_aspect_overlay: false
-  overlay_border_color: "#0ea5e9"
+  show_aspect_overlay: true
+  overlay_border_color: "#ff0000"
   overlay_border_opacity: 100
   overlay_mask_color: "#0f172a"
-  overlay_mask_opacity: 55
-  scale_factor: 2
+  overlay_mask_opacity: 10
+  scale_factor: 0.63
+  scale_multiplier: auto
+  annotation_font_size: '14'
   antialias: true
   stamp_type: none
   stamp_custom: НЕ УТВЕРЖДЕН

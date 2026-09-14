@@ -20,6 +20,7 @@ module DN1Code
         class SafeFrameOverlay < (defined?(Sketchup::Overlay) ? Sketchup::Overlay : Object)
           attr_accessor :ratio_cache, :label_cache, :width_cache, :height_cache, :visible_cache
           attr_accessor :border_color_cache, :border_opacity_cache, :mask_color_cache, :mask_opacity_cache
+          attr_accessor :line_width_cache
 
           def initialize
             if defined?(Sketchup::Overlay)
@@ -33,7 +34,8 @@ module DN1Code
             @border_color_cache   = "#0EA5E9"
             @border_opacity_cache = 100
             @mask_color_cache     = "#0F172A"
-            @mask_opacity_cache   = 55
+            @mask_opacity_cache   = 80
+            @line_width_cache     = 1
           end
 
           # Отрисовка рамки в окне просмотра SketchUp
@@ -69,6 +71,7 @@ module DN1Code
                 @border_opacity_cache = ratio_info[:border_opacity]
                 @mask_color_cache     = ratio_info[:mask_color]
                 @mask_opacity_cache   = ratio_info[:mask_opacity]
+                @line_width_cache     = ratio_info[:line_width] || 1
               end
 
               return if @visible_cache == false
@@ -155,10 +158,10 @@ module DN1Code
               ]
               view.draw2d(GL_LINES, grid_lines)
 
-              # 3. Основная контурная рамка кадра (пользовательский цвет и прозрачность)
+              # 3. Основная контурная рамка кадра (пользовательский цвет и прозрачность, по умолчанию 1px)
               border_color = OverlayService.parse_color(@border_color_cache || "#0EA5E9", @border_opacity_cache || 100, 14, 165, 233, 255)
               view.drawing_color = border_color
-              view.line_width = 3 if view.respond_to?(:line_width=)
+              view.line_width = (@line_width_cache || 1) if view.respond_to?(:line_width=)
 
               frame_pts = [
                 Geom::Point3d.new(frame_x, frame_y, 0.0),
@@ -168,57 +171,44 @@ module DN1Code
               ]
               view.draw2d(GL_LINE_LOOP, frame_pts)
 
-              # 4. Угловые засечки (акцентные L-маркеры)
-              corner_len = 24.0
-              corner_color = OverlayService.parse_color(@border_color_cache || "#0EA5E9", 100, 56, 189, 248, 255)
-              view.drawing_color = corner_color
-              view.line_width = 4 if view.respond_to?(:line_width=)
+              # 4. Угловые засечки (акцентные L-маркеры рисуются только при усиленной толщине рамки)
+              if @line_width_cache && @line_width_cache > 1
+                corner_len = 24.0
+                corner_color = OverlayService.parse_color(@border_color_cache || "#0EA5E9", 100, 56, 189, 248, 255)
+                view.drawing_color = corner_color
+                view.line_width = @line_width_cache if view.respond_to?(:line_width=)
 
-              c_lines = [
-                # Верхний левый
-                Geom::Point3d.new(frame_x, frame_y, 0.0), Geom::Point3d.new(frame_x + corner_len, frame_y, 0.0),
-                Geom::Point3d.new(frame_x, frame_y, 0.0), Geom::Point3d.new(frame_x, frame_y + corner_len, 0.0),
-                # Верхний правый
-                Geom::Point3d.new(frame_x + frame_w, frame_y, 0.0), Geom::Point3d.new(frame_x + frame_w - corner_len, frame_y, 0.0),
-                Geom::Point3d.new(frame_x + frame_w, frame_y, 0.0), Geom::Point3d.new(frame_x + frame_w, frame_y + corner_len, 0.0),
-                # Нижний правый
-                Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + frame_w - corner_len, frame_y + frame_h, 0.0),
-                Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h - corner_len, 0.0),
-                # Нижний левый
-                Geom::Point3d.new(frame_x, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + corner_len, frame_y + frame_h, 0.0),
-                Geom::Point3d.new(frame_x, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x, frame_y + frame_h - corner_len, 0.0)
-              ]
-              view.draw2d(GL_LINES, c_lines)
+                c_lines = [
+                  # Верхний левый
+                  Geom::Point3d.new(frame_x, frame_y, 0.0), Geom::Point3d.new(frame_x + corner_len, frame_y, 0.0),
+                  Geom::Point3d.new(frame_x, frame_y, 0.0), Geom::Point3d.new(frame_x, frame_y + corner_len, 0.0),
+                  # Верхний правый
+                  Geom::Point3d.new(frame_x + frame_w, frame_y, 0.0), Geom::Point3d.new(frame_x + frame_w - corner_len, frame_y, 0.0),
+                  Geom::Point3d.new(frame_x + frame_w, frame_y, 0.0), Geom::Point3d.new(frame_x + frame_w, frame_y + corner_len, 0.0),
+                  # Нижний правый
+                  Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + frame_w - corner_len, frame_y + frame_h, 0.0),
+                  Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + frame_w, frame_y + frame_h - corner_len, 0.0),
+                  # Нижний левый
+                  Geom::Point3d.new(frame_x, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x + corner_len, frame_y + frame_h, 0.0),
+                  Geom::Point3d.new(frame_x, frame_y + frame_h, 0.0), Geom::Point3d.new(frame_x, frame_y + frame_h - corner_len, 0.0)
+                ]
+                view.draw2d(GL_LINES, c_lines)
+              end
 
-              # 5. Информационный бейдж с контрастной подложкой (в правом нижнем углу кадра)
-              badge_text = "📐 #{target_label || 'Кадр'}  |  #{target_w || 2400} × #{target_h || 1800} px"
-              badge_w = 240.0
-              badge_h = 24.0
-              badge_x = [frame_x + frame_w - badge_w - 12.0, frame_x + 12.0].max
-              badge_y = [frame_y + frame_h - badge_h - 12.0, frame_y + 12.0].max
-
-              # Подложка под текст бейджа
-              plate_color = OverlayService.parse_color(@mask_color_cache || "#0F172A", 85, 15, 23, 42, 210)
-              view.drawing_color = plate_color
-              plate_quad = [
-                Geom::Point3d.new(badge_x, badge_y, 0.0),
-                Geom::Point3d.new(badge_x + badge_w, badge_y, 0.0),
-                Geom::Point3d.new(badge_x + badge_w, badge_y + badge_h, 0.0),
-                Geom::Point3d.new(badge_x, badge_y + badge_h, 0.0)
-              ]
-              view.draw2d(GL_QUADS, plate_quad)
-
-              # Обводка бейджа
-              view.drawing_color = border_color
-              view.line_width = 1 if view.respond_to?(:line_width=)
-              view.draw2d(GL_LINE_LOOP, plate_quad)
-
+              # 5. Информационная строка пропорций и разрешения (внизу по центру кадра, тонкий черный шрифт 9pt без темной рамки)
               if view.respond_to?(:draw_text)
-                label_pos = Geom::Point3d.new(badge_x + 10.0, badge_y + 4.0, 0.0)
+                badge_text = "📐 #{target_label || 'Кадр'}  |  #{target_w || 2400} × #{target_h || 1800} px"
+                center_x = (frame_x + (frame_w / 2.0)).round
+                label_y = [frame_y + frame_h - 18.0, frame_y + 4.0].max
+                label_pos = Geom::Point3d.new(center_x, label_y, 0.0)
+                font_family = (RUBY_PLATFORM =~ /darwin/i) ? "Helvetica Neue" : "Segoe UI"
+                align_center = defined?(TextAlignCenter) ? TextAlignCenter : 1
                 options = {
-                  :font => "Arial",
-                  :size => 11,
-                  :color => defined?(Sketchup::Color) ? Sketchup::Color.new(255, 255, 255, 255) : "white"
+                  :font => font_family,
+                  :size => 9,
+                  :bold => false,
+                  :align => align_center,
+                  :color => defined?(Sketchup::Color) ? Sketchup::Color.new(0, 0, 0, 255) : "black"
                 }
                 view.draw_text(label_pos, badge_text, options)
               end
@@ -233,7 +223,9 @@ module DN1Code
         # @return [Hash] {:ratio => Float, :label => String, :render_w => Integer, :render_h => Integer}
         def self.calculate_target_info(model = nil, override_settings = nil)
           pdata = nil
-          if model && defined?(Model::ProjectData)
+          if override_settings && (override_settings[:project_data] || override_settings["project_data"])
+            pdata = override_settings[:project_data] || override_settings["project_data"]
+          elsif model && defined?(Model::ProjectData)
             pdata = Model::ProjectData.new
             pdata.load_program_settings
             # Безопасное чтение без изменения модели во время колбэков оверлея
@@ -252,16 +244,26 @@ module DN1Code
           settings = override_settings ? base_settings.merge(override_settings) : base_settings
           settings ||= {}
 
-          # Определение активного шаблона (template_key)
+          # Определение активной сцены и активного шаблона (template_key)
+          matched_sc = nil
+          if override_settings && (override_settings[:scene_item] || override_settings["scene_item"])
+            matched_sc = override_settings[:scene_item] || override_settings["scene_item"]
+          elsif override_settings && (override_settings[:scene_name] || override_settings["scene_name"])
+            sc_name = (override_settings[:scene_name] || override_settings["scene_name"]).to_s
+            matched_sc = pdata.scenes.find { |s| s.name == sc_name || s.original_name == sc_name } if pdata && pdata.scenes
+          elsif override_settings && (override_settings[:scene_index] || override_settings["scene_index"])
+            idx = (override_settings[:scene_index] || override_settings["scene_index"]).to_i
+            matched_sc = pdata.scenes[idx] if pdata && pdata.scenes
+          elsif model && model.respond_to?(:pages) && model.pages && model.pages.selected_page
+            sel_page_name = model.pages.selected_page.name
+            if pdata && pdata.scenes
+              matched_sc = pdata.scenes.find { |s| s.name == sel_page_name || s.original_name == sel_page_name }
+            end
+          end
+
           tpl_key = settings[:template_key] || settings["template_key"]
           unless tpl_key
-            if model && model.respond_to?(:pages) && model.pages && model.pages.selected_page
-              sel_page_name = model.pages.selected_page.name
-              if pdata && pdata.scenes
-                matched_sc = pdata.scenes.find { |s| s.name == sel_page_name }
-                tpl_key = matched_sc.page_type if matched_sc
-              end
-            end
+            tpl_key = matched_sc.page_type if matched_sc
           end
           tpl_key = (tpl_key || :cover).to_sym
 
@@ -281,9 +283,11 @@ module DN1Code
           tpl_cfg = pdata_tpl.merge(session_tpl).merge(override_tpl)
           img_cfg = pdata_img.merge(session_img).merge(override_img)
 
-          # Проверка видимости блока видового экрана (image_4_3)
-          img_visible = if tpl_key.to_s == "blank"
+          # Проверка видимости блока видового экрана (из сцены или из шаблона)
+          img_visible = if tpl_key.to_s == "blank" && (matched_sc.nil? || matched_sc.viewport_visible != true)
                           false
+                        elsif matched_sc && matched_sc.respond_to?(:viewport_visible) && !matched_sc.viewport_visible.nil?
+                          matched_sc.viewport_visible != false
                         elsif img_cfg.key?(:visible)
                           v = img_cfg[:visible]
                           v != false && v.to_s != "false" && v != 0 && v.to_s != "0"
@@ -303,6 +307,9 @@ module DN1Code
           gui_aspect = (settings[:image_aspect_ratio] || settings["image_aspect_ratio"]).to_s.strip
           gui_aspect = "4:3" if !gui_aspect.empty? && !valid_modes.include?(gui_aspect)
 
+          scene_aspect = (matched_sc && matched_sc.respond_to?(:aspect_ratio)) ? matched_sc.aspect_ratio.to_s.strip : nil
+          scene_aspect = nil unless valid_modes.include?(scene_aspect)
+
           img_aspect = (img_cfg[:aspect_ratio] || img_cfg["aspect_ratio"]).to_s.strip
           img_aspect = nil unless valid_modes.include?(img_aspect)
 
@@ -313,7 +320,7 @@ module DN1Code
           aspect_mode = if gui_explicit
                           explicit_ratio || gui_aspect
                         else
-                          explicit_ratio || img_aspect || (!gui_aspect.empty? ? gui_aspect : "4:3")
+                          explicit_ratio || scene_aspect || img_aspect || (!gui_aspect.empty? ? gui_aspect : "4:3")
                         end
           aspect_mode = aspect_mode.to_s.strip
           aspect_mode = "4:3" if aspect_mode.empty?
@@ -399,17 +406,24 @@ module DN1Code
           border_opacity_val = border_opacity_val.to_i.clamp(0, 100)
           mask_opacity_val   = mask_opacity_val.to_i.clamp(0, 100)
 
+          line_width_val     = (settings[:overlay_line_width] || settings["overlay_line_width"] ||
+                               img_cfg[:overlay_line_width] || img_cfg["overlay_line_width"] ||
+                               (pdata ? pdata.pdf_settings[:overlay_line_width] : nil) || 1).to_i
+          line_width_val = 1 if line_width_val <= 0
+
           img_h = (img_w / ratio).round
 
           {
             ratio:          ratio,
             label:          label,
+            aspect_ratio:   aspect_mode,
             render_w:       img_w,
             render_h:       img_h,
             border_color:   border_color_val,
             border_opacity: border_opacity_val,
             mask_color:     mask_color_val,
             mask_opacity:   mask_opacity_val,
+            line_width:     line_width_val,
             visible:        img_visible,
             image_visible:  img_visible
           }
@@ -513,6 +527,7 @@ module DN1Code
           ov.border_opacity_cache = info[:border_opacity]
           ov.mask_color_cache     = info[:mask_color]
           ov.mask_opacity_cache   = info[:mask_opacity]
+          ov.line_width_cache     = info[:line_width] || 1
 
           if info[:visible] == false
             disable(m)
@@ -561,6 +576,7 @@ module DN1Code
             ov.border_opacity_cache = info[:border_opacity]
             ov.mask_color_cache     = info[:mask_color]
             ov.mask_opacity_cache   = info[:mask_opacity]
+            ov.line_width_cache     = info[:line_width] || 1
           end
 
           if info[:visible] == false
@@ -626,6 +642,7 @@ module DN1Code
             ov.border_opacity_cache = info[:border_opacity]
             ov.mask_color_cache     = info[:mask_color]
             ov.mask_opacity_cache   = info[:mask_opacity]
+            ov.line_width_cache     = info[:line_width] || 1
             if info[:visible] == false
               ov.enabled = false if ov.respond_to?(:enabled=)
               invalidate_view(m)

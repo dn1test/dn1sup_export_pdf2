@@ -25,6 +25,12 @@ module DN1Code
         attr_accessor :enabled
         # @return [String, nil] путь к кастомному изображению для подмены рендера (опционально)
         attr_accessor :image_override
+        # @return [Boolean] флаг включения видового экрана 3D на этой странице
+        attr_accessor :viewport_visible
+        # @return [String] пропорции видового экрана ('3:2', '4:3', '16:9', '1:1', 'page')
+        attr_accessor :aspect_ratio
+        # @return [Integer] процент масштабирования/размещения на листе (60-100)
+        attr_accessor :scale_pct
 
         # Инициализирует новый элемент сцены
         # @param name [String] название сцены
@@ -34,15 +40,21 @@ module DN1Code
         # @param description [String] примечание/описание к сцене
         # @param order [Integer] порядковый индекс сцены
         # @param enabled [Boolean] включена ли сцена в экспорт
-        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true)
-          @name           = name.to_s
-          @original_name  = (original_name || name).to_s
-          @scene_ref      = scene_ref
-          @description    = description.to_s
-          @order          = order.to_i
-          @enabled        = enabled
-          @image_override = nil
-          @page_type      = page_type ? page_type.to_sym : detect_page_type(@name)
+        # @param viewport_visible [Boolean] включен ли 3D видовой экран на этой странице
+        # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 16:9, 1:1, page)
+        # @param scale_pct [Integer] масштаб/размещение кадра на листе в % (60-100)
+        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, aspect_ratio: "4:3", scale_pct: 100)
+          @name             = name.to_s
+          @original_name    = (original_name || name).to_s
+          @scene_ref        = scene_ref
+          @description      = description.to_s
+          @order            = order.to_i
+          @enabled          = enabled
+          @viewport_visible = (viewport_visible != false && viewport_visible.to_s != "false" && viewport_visible != 0 && viewport_visible.to_s != "0")
+          @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
+          @scale_pct        = (scale_pct || 100).to_i
+          @image_override   = nil
+          @page_type        = page_type ? page_type.to_sym : detect_page_type(@name)
         end
 
         # Автоматически определяет подходящий тип шаблона страницы на основе имени сцены
@@ -70,12 +82,15 @@ module DN1Code
         # @return [Hash] хэш с параметрами сцены
         def to_h
           {
-            name:          @name,
-            original_name: @original_name,
-            page_type:     @page_type.to_s,
-            description:   @description,
-            order:         @order,
-            enabled:       @enabled
+            name:             @name,
+            original_name:    @original_name,
+            page_type:        @page_type.to_s,
+            description:      @description,
+            order:            @order,
+            enabled:          @enabled,
+            viewport_visible: @viewport_visible,
+            aspect_ratio:     @aspect_ratio,
+            scale_pct:        @scale_pct
           }
         end
 
@@ -91,6 +106,9 @@ module DN1Code
           when :order then @order
           when :enabled then @enabled
           when :image_override then @image_override
+          when :viewport_visible then @viewport_visible
+          when :aspect_ratio then @aspect_ratio
+          when :scale_pct then @scale_pct
           else nil
           end
         end
@@ -101,13 +119,16 @@ module DN1Code
         # @return [SceneItem] восстановленный объект сцены
         def self.from_h(hash, scene_ref = nil)
           new(
-            name:          hash[:name] || hash["name"] || "Scene",
-            original_name: hash[:original_name] || hash["original_name"] || hash[:name] || hash["name"],
-            scene_ref:     scene_ref,
-            page_type:     hash[:page_type] || hash["page_type"],
-            description:   hash[:description] || hash["description"] || "",
-            order:         hash[:order] || hash["order"] || 0,
-            enabled:       hash.fetch(:enabled, hash.fetch("enabled", true))
+            name:             hash[:name] || hash["name"] || "Scene",
+            original_name:    hash[:original_name] || hash["original_name"] || hash[:name] || hash["name"],
+            scene_ref:        scene_ref,
+            page_type:        hash[:page_type] || hash["page_type"],
+            description:      hash[:description] || hash["description"] || "",
+            order:            hash[:order] || hash["order"] || 0,
+            enabled:          hash.fetch(:enabled, hash.fetch("enabled", true)),
+            viewport_visible: hash.fetch(:viewport_visible, hash.fetch("viewport_visible", true)),
+            aspect_ratio:     hash[:aspect_ratio] || hash["aspect_ratio"] || "4:3",
+            scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100
           )
         end
       end
