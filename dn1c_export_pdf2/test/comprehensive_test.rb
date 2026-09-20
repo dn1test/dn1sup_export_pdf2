@@ -245,6 +245,7 @@ class TestRunner
     test_57_compression_options_and_best_image_format
     test_58_line_scale_multiplier
     test_59_line_thickness_parameters_from_style
+    test_viewport_background_toggle
     test_60_line_multiplier_consistent_across_all_render_modes
     test_61_page_formats_a4_a3_and_quality_levels
     test_62_auto_scale_font_size_reduction_30_pct
@@ -4417,22 +4418,30 @@ class TestRunner
     # 1. Проверка модели SceneItem
     scene1 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Scene 1", page_type: :cover)
     assert(scene1.viewport_visible == true, "SceneItem по умолчанию имеет viewport_visible == true")
+    assert(scene1.viewport_background == true, "SceneItem по умолчанию имеет viewport_background == true")
     assert(scene1.aspect_ratio == "4:3", "SceneItem по умолчанию имеет aspect_ratio == '4:3'")
     assert(scene1.scale_pct == 100, "SceneItem по умолчанию имеет scale_pct == 100")
 
     # Сериализация в хэш и десериализация
     scene1.viewport_visible = false
+    scene1.viewport_background = false
     scene1.aspect_ratio = "16:9"
     scene1.scale_pct = 80
     h = scene1.to_h
     assert(h[:viewport_visible] == false, "to_h сохраняет :viewport_visible")
+    assert(h[:viewport_background] == false, "to_h сохраняет :viewport_background")
     assert(h[:aspect_ratio] == "16:9", "to_h сохраняет :aspect_ratio")
     assert(h[:scale_pct] == 80, "to_h сохраняет :scale_pct")
 
     scene_restored = DN1Code::ExportPdf2::Model::SceneItem.from_h(h)
     assert(scene_restored.viewport_visible == false, "from_h восстанавливает viewport_visible")
+    assert(scene_restored.viewport_background == false, "from_h восстанавливает viewport_background")
     assert(scene_restored.aspect_ratio == "16:9", "from_h восстанавливает aspect_ratio")
     assert(scene_restored.scale_pct == 80, "from_h восстанавливает scale_pct")
+
+    # Старые проекты без ключа viewport_background получают значение по умолчанию (true)
+    legacy_scene = DN1Code::ExportPdf2::Model::SceneItem.from_h({ name: "Legacy" })
+    assert(legacy_scene.viewport_background == true, "from_h без viewport_background подставляет true (совместимость со старыми проектами)")
 
     # 2. Проверка разметки в index.html
     html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
@@ -4455,6 +4464,9 @@ class TestRunner
     assert(js_content.include?("function bindSceneViewportEvents"), "app.js содержит функцию bindSceneViewportEvents")
     assert(js_content.include?("function updateSceneTableAspectCell"), "app.js содержит функцию updateSceneTableAspectCell")
     assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
+    assert(js_content.include?('id="chk_viewport_background"'), "app.js содержит чекбокс фона chk_viewport_background в карточке видового экрана")
+    assert(js_content.include?("scene.viewport_background = bgOn"), "app.js сохраняет viewport_background при переключении чекбокса фона")
+    assert(js_content.include?('updateBlockSlot("image_4_3", { show_background: bgOn })'), "app.js синхронизирует show_background в слоте шаблона")
 
     # Проверка, что из шаблонов карточка удалена
     tpl_block = js_content[/renderTemplateSettingsList\s*\([^)]*\)\s*\{(?:[^{}]*|\{[^{}]*\})*\}/m]
@@ -4834,6 +4846,70 @@ class TestRunner
     assert(skp_m.respond_to?(:reset_style), "Layout::SketchUpModel поддерживает reset_style")
 
     # 5. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- Тест включения/выключения фона видового экрана (Фон) ---
+  def test_viewport_background_toggle
+    puts "\n--- Тест включения/выключения фона видового экрана (show_background) ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. Дефолты слотов image_4_3 во всех шаблонах содержат show_background: true
+    pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    DN1Code::ExportPdf2::Model::ProjectData.new.default_custom_layouts.each_key do |tpl|
+      slot = pdata.pdf_settings[:custom_layouts][tpl][:image_4_3]
+      assert(!slot.nil? && slot[:show_background] == true, "default_custom_layouts[#{tpl}][:image_4_3] содержит show_background: true")
+    end
+
+    # 2. Рендер с show_background: false отключает фон и восстанавливает rendering_options
+    model = Sketchup.active_model
+    model.rendering_options["DrawGround"] = true
+    model.rendering_options["DisplayWatermarks"] = true
+    model.rendering_options["DisplayFog"] = false
+    bg_page = Sketchup::MockPage.new("07. Сцена с фоном")
+    tmp = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0,
+      show_background: false
+    })
+    assert(File.exist?(tmp), "Временный файл рендера с отключенным фоном создан")
+    File.delete(tmp) rescue nil
+    assert(model.rendering_options["DrawGround"] == true, "DrawGround восстановлен после рендера с show_background: false")
+    assert(model.rendering_options["DisplayWatermarks"] == true, "DisplayWatermarks восстановлен после рендера с show_background: false")
+
+    # 3. Строковое значение "false" (из YAML) тоже выключает фон
+    tmp2 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0,
+      show_background: "false"
+    })
+    assert(File.exist?(tmp2), "Временный файл рендера со строковым show_background: 'false' создан")
+    File.delete(tmp2) rescue nil
+    assert(model.rendering_options["DrawGround"] == true, "DrawGround восстановлен после рендера со строковым 'false'")
+
+    # 4. С включенным фоном (по умолчанию) rendering_options не затрагиваются
+    tmp3 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0
+    })
+    assert(File.exist?(tmp3), "Временный файл рендера с фоном по умолчанию создан")
+    File.delete(tmp3) rescue nil
+    assert(model.rendering_options["DrawGround"] == true, "DrawGround не изменяется при рендере с включенным фоном")
+
+    # 5. LayoutBuilder прокидывает флаг сцены в render_opts (посценный приоритет над слотом шаблона)
+    scene_bg_off = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Сцена без фона", viewport_background: false)
+    assert(scene_bg_off.viewport_background == false, "SceneItem принимает viewport_background: false")
+
+    # 6. Layout::SketchUpModel поддерживает display_background (гибридный режим)
+    if defined?(::Layout::SketchUpModel)
+      skp_m = ::Layout::SketchUpModel.new("dummy.skp", ::Geom::Bounds2d.new(1, 1, 4, 4))
+      assert(skp_m.respond_to?(:display_background=), "Layout::SketchUpModel поддерживает display_background=")
+    end
+
+    # 7. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
@@ -5322,20 +5398,24 @@ class TestRunner
   def test_66_page_font_family_selection
     puts "\n--- 66. Тест выбора 5 шрифтов для отображения на странице ---"
 
-    # 1. Проверка физических файлов шрифтов в папке config/fonts
+    # 1. Проверка физических файлов шрифтов в папке config/fonts (вариативные VF)
     fonts_dir = File.expand_path("../config/fonts", __dir__)
     expected_files = [
-      "Oswald-Light.ttf",
-      "RobotoCondensed-Regular.ttf",
-      "SofiaSansCondensed-Regular.ttf",
-      "SofiaSansExtraCond-Regular.ttf",
-      "SofiaSansExtraCondensed-Regular.ttf",
+      "Oswald-VariableFont_wght.ttf",
+      "RobotoCondensed-VariableFont_wght.ttf",
+      "SofiaSansCondensed-VariableFont_wght.ttf",
+      "SofiaSansExtraCond-VariableFont_wght.ttf",
       "UbuntuCondensed-Regular.ttf"
     ]
     expected_files.each do |fn|
       font_path = File.join(fonts_dir, fn)
       assert(File.exist?(font_path), "Файл шрифта #{fn} присутствует в папке config/fonts")
       assert(File.size(font_path) > 50_000, "Размер файла шрифта #{fn} валиден (> 50KB)")
+    end
+    # Старые статические шрифты прежних версий удалены из комплекта
+    ["Oswald-Light.ttf", "SofiaSansCondensed-Regular.ttf",
+     "SofiaSansExtraCond-Regular.ttf", "SofiaSansExtraCondensed-Regular.ttf"].each do |old|
+      assert(!File.exist?(File.join(fonts_dir, old)), "Старый статический шрифт #{old} удален из config/fonts")
     end
 
     # 2. Проверка FontService::AVAILABLE_FONTS
@@ -5349,24 +5429,25 @@ class TestRunner
     assert(families.include?("Ubuntu Condensed"), "AVAILABLE_FONTS содержит Ubuntu Condensed")
 
     # 3. Проверка метода layout_font_family для каждого из 5 шрифтов.
-    # Семейство "Oswald" маппится в точное начертание "Oswald Light" (файл из config/fonts)
+    # Вариативный Oswald резолвится напрямую по имени семейства (Regular 400),
+    # переименованного статика "Oswald Light" больше нет.
     fs = DN1Code::ExportPdf2::Service::FontService
     assert(fs.const_defined?(:LAYOUT_FACE_NAMES), "FontService::LAYOUT_FACE_NAMES определен")
-    assert(fs.layout_face_name("Oswald") == "Oswald Light",
-           "layout_face_name('Oswald') вернул 'Oswald Light'")
-    # "Extra Condensed" вырезается LayOut из имени семейства -> передаётся
-    # переименованное семейство "Sofia Sans ExtraCond" (копия того же TTF)
+    assert(fs.layout_face_name("Oswald") == "Oswald",
+           "layout_face_name('Oswald') вернул 'Oswald' (VF Regular)")
+    # "Extra Condensed" вырезается LayOut из имени семейства -> VF офлайн
+    # переименован в семейство "Sofia Sans ExtraCond"
     assert(fs.layout_face_name("Sofia Sans Extra Condensed") == "Sofia Sans ExtraCond",
            "layout_face_name('Sofia Sans Extra Condensed') вернул 'Sofia Sans ExtraCond'")
     assert(fs.layout_face_name("Sofia Sans Condensed") == "Sofia Sans Condensed",
            "layout_face_name('Sofia Sans Condensed') возвращает имя как есть")
-    assert(fs::AVAILABLE_FONTS["Oswald"][:files] == ["Oswald-Light.ttf"],
-           "AVAILABLE_FONTS['Oswald'] использует только Oswald-Light.ttf из config/fonts")
+    assert(fs::AVAILABLE_FONTS["Oswald"][:files] == ["Oswald-VariableFont_wght.ttf"],
+           "AVAILABLE_FONTS['Oswald'] использует вариативный Oswald-VariableFont_wght.ttf")
 
     expected_layout_names = {
       "Sofia Sans Condensed" => "Sofia Sans Condensed",
       "Sofia Sans Extra Condensed" => "Sofia Sans ExtraCond",
-      "Oswald" => "Oswald Light",
+      "Oswald" => "Oswald",
       "Roboto Condensed" => "Roboto Condensed",
       "Ubuntu Condensed" => "Ubuntu Condensed"
     }
@@ -5376,17 +5457,21 @@ class TestRunner
     end
     # Обратная совместимость с DIN Condensed
     din_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family(font_family: "DIN Condensed")
-    assert(din_res == "Oswald Light", "layout_font_family для старого 'DIN Condensed' возвращает 'Oswald Light' (получено: '#{din_res}')")
+    assert(din_res == "Oswald", "layout_font_family для старого 'DIN Condensed' возвращает 'Oswald' (получено: '#{din_res}')")
 
     # Значение по умолчанию
     default_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family({})
     assert(default_res == "Sofia Sans Condensed", "layout_font_family по умолчанию возвращает Sofia Sans Condensed")
 
-    # 3a. Методы надежности шрифтов: repair + GDI-проба + аудит PDF
+    # 3a. Методы надежности шрифтов: repair + GDI-проба + аудит PDF + новые параметры
     assert(fs.respond_to?(:repair_font_registrations!), "FontService.repair_font_registrations! определен")
+    assert(fs.respond_to?(:cleanup_legacy_fonts!), "FontService.cleanup_legacy_fonts! определен")
     assert(fs.respond_to?(:font_resolvable?), "FontService.font_resolvable? определен")
     assert(fs.respond_to?(:ensure_font_resolvable!), "FontService.ensure_font_resolvable! определен")
     assert(fs.respond_to?(:canonical_reg_name_for_file), "FontService.canonical_reg_name_for_file определен")
+    assert(fs.respond_to?(:apply_font_width), "FontService.apply_font_width определен")
+    assert(fs.respond_to?(:font_weight_setting), "FontService.font_weight_setting определен")
+    assert(fs.respond_to?(:font_width_setting), "FontService.font_width_setting определен")
     assert(DN1Code::ExportPdf2::Service.const_defined?(:PdfFontAudit), "Service::PdfFontAudit определен")
     assert(DN1Code::ExportPdf2::Service::PdfFontAudit.normalize("AMEJOL+Oswald-Light") == "oswaldlight",
            "PdfFontAudit.normalize корректно нормализует PS-имя шрифта")
@@ -5408,13 +5493,20 @@ class TestRunner
     assert(pdf_audit.audit_exported_pdf!(p1, "Sofia Sans Condensed"),
            "аудит принимает встроенный SofiaSansCondensed-Regular для 'Sofia Sans Condensed'")
 
-    p2 = write_fake_pdf.call("oswald.pdf", ["AMEJOL+Oswald-Light"])
-    assert(pdf_audit.audit_exported_pdf!(p2, "Oswald"), "аудит принимает Oswald-Light для 'Oswald'")
-    assert(pdf_audit.audit_exported_pdf!(p2, "Oswald Light"), "аудит принимает Oswald-Light для 'Oswald Light'")
+    p2 = write_fake_pdf.call("oswald.pdf", ["AMEJOL+Oswald-Regular"])
+    assert(pdf_audit.audit_exported_pdf!(p2, "Oswald"), "аудит принимает Oswald-Regular для 'Oswald'")
 
-    p3 = write_fake_pdf.call("extra.pdf", ["SofiaSansExtraCond-Regular"])
+    p2b = write_fake_pdf.call("oswald_bold.pdf", ["ABCDEE+Oswald-Bold"])
+    assert(pdf_audit.audit_exported_pdf!(p2b, "Oswald"),
+           "аудит принимает инстанс Oswald-Bold (font_weight=bold)")
+
+    p3 = write_fake_pdf.call("extra.pdf", ["SofiaSansExtraCond-VariableFont"])
     assert(pdf_audit.audit_exported_pdf!(p3, "Sofia Sans Extra Condensed"),
-           "аудит принимает переименованное семейство ExtraCond для 'Sofia Sans Extra Condensed'")
+           "аудит принимает переименованный VF ExtraCond для 'Sofia Sans Extra Condensed'")
+
+    p3b = write_fake_pdf.call("sofia_bold.pdf", ["ABCDEE+SofiaSansCondensed-Bold"])
+    assert(pdf_audit.audit_exported_pdf!(p3b, "Sofia Sans Condensed"),
+           "аудит принимает инстанс SofiaSansCondensed-Bold (font_weight=bold)")
 
     p4 = write_fake_pdf.call("verdana.pdf", ["Verdana", "MicrosoftSansSerif"])
     assert(!pdf_audit.audit_exported_pdf!(p4, "Sofia Sans Condensed"),
@@ -5432,6 +5524,22 @@ class TestRunner
 
     assert(html_text.include?('id="selectFontFamily"'), "index.html содержит id=\"selectFontFamily\" в параметрах страницы")
     assert(html_text.include?('id="selectLayoutFontFamily"'), "index.html содержит id=\"selectLayoutFontFamily\" в панели шаблонов")
+    assert(html_text.include?('id="selectFontWeight"'), "index.html содержит id=\"selectFontWeight\" (начертание)")
+    assert(html_text.include?('id="selectFontWidth"'), "index.html содержит id=\"selectFontWidth\" (ширина)")
+    assert(html_text.include?('value="bold"'), "selectFontWeight содержит вариант bold")
+    assert(html_text.include?('value="extra_condensed"'), "selectFontWidth содержит вариант extra_condensed")
+
+    # Начертание и ширина размещаются только на тулбаре панели шаблонов,
+    # а не на вкладке настроек страницы
+    tpl_toolbar = html_text[/toolbar-font-control.*?btnResetLayout/m]
+    assert(tpl_toolbar, "Тулбар панели шаблонов присутствует в index.html")
+    assert(tpl_toolbar.include?('id="selectLayoutFontFamily"'), "Тулбар шаблонов содержит выбор шрифта")
+    assert(tpl_toolbar.include?('id="selectFontWeight"'), "Начертание (selectFontWeight) находится на тулбаре панели шаблонов")
+    assert(tpl_toolbar.include?('id="selectFontWidth"'), "Ширина (selectFontWidth) находится на тулбаре панели шаблонов")
+    settings_font_card = html_text[/id="fontFamilyGroup".*?id="chkSaveBackup"/m]
+    assert(settings_font_card, "Карточка настроек страницы присутствует в index.html")
+    assert(!settings_font_card.include?('id="selectFontWeight"'), "На вкладке настроек нет селекта начертания")
+    assert(!settings_font_card.include?('id="selectFontWidth"'), "На вкладке настроек нет селекта ширины")
 
     # Проверка наличия всех 5 шрифтов в селекторе настроек страницы
     page_font_group = html_text[/id="fontFamilyGroup".*?<\/select>/m]
@@ -5469,27 +5577,73 @@ class TestRunner
            "app.js включает selectFontFamily в список autoSaveInputIds")
     assert(app_js_text.include?('"selectLayoutFontFamily"'),
            "app.js включает selectLayoutFontFamily в список autoSaveInputIds")
+    assert(app_js_text.include?('selectFontWeight: document.getElementById("selectFontWeight")'),
+           "app.js кэширует selectFontWeight в els")
+    assert(app_js_text.include?('selectFontWidth: document.getElementById("selectFontWidth")'),
+           "app.js кэширует selectFontWidth в els")
+    assert(app_js_text.include?('handleFontWeightChange'),
+           "app.js содержит обработчик handleFontWeightChange")
+    assert(app_js_text.include?('handleFontWidthChange'),
+           "app.js содержит обработчик handleFontWidthChange")
+    assert(app_js_text.include?('--page-font-weight'),
+           "app.js динамически обновляет CSS-переменную --page-font-weight")
+    assert(app_js_text.include?('font_weight:'),
+           "app.js собирает font_weight в collectFormData")
+    assert(app_js_text.include?('font_width:'),
+           "app.js собирает font_width в collectFormData")
+    assert(app_js_text.include?('"selectFontWeight"'),
+           "app.js включает selectFontWeight в список autoSaveInputIds")
+    assert(app_js_text.include?('"selectFontWidth"'),
+           "app.js включает selectFontWidth в список autoSaveInputIds")
+    assert(app_js_text.include?('previewFontFamilyFor'),
+           "app.js синхронизирует превью семейства с параметром ширины")
 
     # 6. Проверка app.css: @font-face для всех 5 шрифтов и переменная --page-font-family
     app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
     app_css_text = File.read(app_css_path, encoding: "utf-8")
 
-    assert(app_css_text.include?("Oswald-Light.ttf"), "app.css содержит @font-face для Oswald-Light.ttf")
-    assert(app_css_text.include?("RobotoCondensed-Regular.ttf"), "app.css содержит @font-face для RobotoCondensed-Regular.ttf")
-    assert(app_css_text.include?("SofiaSansCondensed-Regular.ttf"), "app.css содержит @font-face для SofiaSansCondensed-Regular.ttf")
-    assert(app_css_text.include?("SofiaSansExtraCondensed-Regular.ttf"), "app.css содержит @font-face для SofiaSansExtraCondensed-Regular.ttf")
+    assert(app_css_text.include?("Oswald-VariableFont_wght.ttf"), "app.css содержит @font-face для Oswald-VariableFont_wght.ttf")
+    assert(app_css_text.include?("RobotoCondensed-VariableFont_wght.ttf"), "app.css содержит @font-face для RobotoCondensed-VariableFont_wght.ttf")
+    assert(app_css_text.include?("SofiaSansCondensed-VariableFont_wght.ttf"), "app.css содержит @font-face для SofiaSansCondensed-VariableFont_wght.ttf")
+    assert(app_css_text.include?("SofiaSansExtraCond-VariableFont_wght.ttf"), "app.css содержит @font-face для SofiaSansExtraCond-VariableFont_wght.ttf")
     assert(app_css_text.include?("UbuntuCondensed-Regular.ttf"), "app.css содержит @font-face для UbuntuCondensed-Regular.ttf")
     assert(app_css_text.include?("--page-font-family"), "app.css содержит CSS-переменную --page-font-family")
+    assert(app_css_text.include?("--page-font-weight"), "app.css содержит CSS-переменную --page-font-weight")
     assert(app_css_text.include?("--font-family-base: \"Roboto Condensed\""), "app.css применяет Roboto Condensed как базовый шрифт GUI")
     assert(app_css_text.include?("--font-stretch-base: ultra-condensed"), "app.css задает ультра-сжатую ширину букв (--font-stretch-base: ultra-condensed)")
     assert(app_css_text.include?("--letter-spacing-base: -0.025em"), "app.css задает компактный межбуквенный интервал (--letter-spacing-base: -0.025em)")
     assert(app_css_text.include?("--bs-body-font-family: var(--font-family-base)"), "app.css переопределяет Bootstrap/Modus шрифт на var(--font-family-base)")
 
-    # 7. Проверка передачи font_family в LayoutBuilder context
+    # 7. Проверка передачи font_family/font_weight в LayoutBuilder context
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     project_data.pdf_settings[:font_family] = "Oswald"
     ctx = DN1Code::ExportPdf2::Service::LayoutBuilder.send(:build_context, project_data, nil, "Oswald")
     assert(ctx[:font] == "Oswald", "build_context сохраняет выбранный шрифт (:font == 'Oswald')")
+    assert(ctx[:text_bold] == false, "build_context: font_weight=normal -> ctx[:text_bold] == false")
+
+    project_data_bold = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data_bold.pdf_settings[:font_weight] = "bold"
+    ctx_bold = DN1Code::ExportPdf2::Service::LayoutBuilder.send(:build_context, project_data_bold, nil, "Oswald")
+    assert(ctx_bold[:text_bold] == true, "build_context: font_weight=bold -> ctx[:text_bold] == true")
+
+    # 7b. Параметр ширины: модификатор Sofia Sans Condensed -> Extra Condensed
+    assert(fs.apply_font_width("Sofia Sans Condensed", "extra_condensed") == "Sofia Sans Extra Condensed",
+           "apply_font_width: extra_condensed переводит Sofia Sans Condensed в Extra Condensed")
+    assert(fs.apply_font_width("Sofia Sans Condensed", "condensed") == "Sofia Sans Condensed",
+           "apply_font_width: condensed оставляет базовое семейство")
+    assert(fs.apply_font_width("Sofia Sans Extra Condensed", "condensed") == "Sofia Sans Extra Condensed",
+           "apply_font_width: явно выбранное Extra Condensed не изменяется параметром ширины")
+    assert(fs.apply_font_width("Oswald", "extra_condensed") == "Oswald",
+           "apply_font_width: для Oswald ширина не применяется")
+    wide_res = fs.layout_font_family(font_family: "Sofia Sans Condensed", font_width: "extra_condensed")
+    assert(wide_res == "Sofia Sans ExtraCond",
+           "layout_font_family с font_width=extra_condensed вернул 'Sofia Sans ExtraCond' (получено: '#{wide_res}')")
+    assert(fs.font_weight_setting(font_weight: "bold") == "bold", "font_weight_setting распознает 'bold'")
+    assert(fs.font_weight_setting(font_weight: "bogus") == "normal",
+           "font_weight_setting нормализует неизвестное значение в 'normal'")
+    assert(fs.font_width_setting(font_width: "extra_condensed") == "extra_condensed",
+           "font_width_setting распознает 'extra_condensed'")
+    assert(fs.font_width_setting({}) == "condensed", "font_width_setting по умолчанию 'condensed'")
 
     # 7a. Проверка: add_rtf_text применяет шрифт/кегль к стилю entity.
     # LayOut игнорирует \fonttbl из RTF — без стиля entity заголовки печатаются
@@ -5514,6 +5668,17 @@ class TestRunner
     assert(rtf_ent.style(0).font_size == 12.0,
            "add_rtf_text задает базовый font_size entity = max фрагмент (получено: #{rtf_ent.style(0).font_size.inspect})")
 
+    # 7a-2. Глобальный font_weight=bold распространяется на RTF-заголовок
+    ctx_m_bold = { page_h_pt: 841.89, font: "Oswald", text_bold: true }
+    rtf_ent_b = DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :add_rtf_text, ctx_m_bold, doc_m, page_m, layer_m, fragments_m,
+      { x: 10, y: 40, width: 200, height: 20 },
+      align: :center, font: "Oswald"
+    )
+    assert(rtf_ent_b, "add_rtf_text (bold) вернул entity")
+    assert(rtf_ent_b.style(0).text_bold == true,
+           "add_rtf_text: глобальный font_weight=bold включает text_bold у entity (получено: #{rtf_ent_b.style(0).text_bold.inspect})")
+
     # 8. Проверка автозамены (fallback) для несуществующего шрифта
     fallback_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family(font_family: "NonExistentFontXYZ")
     fallback_allowed = DN1Code::ExportPdf2::Service::FontService::LAYOUT_FONT_CANDIDATES
@@ -5521,16 +5686,16 @@ class TestRunner
     assert(fallback_allowed.include?(fallback_res),
            "layout_font_family для несуществующего шрифта возвращает кандидата из fallback цепочки (#{fallback_res})")
 
-    # 9. Проверка автозамены DIN -> Oswald (Light).
+    # 9. Проверка автозамены DIN -> Oswald.
     # Замена в ProjectData срабатывает при загрузке файла настроек, содержащего DIN;
     # здесь проверяем герметично: FontService обязан маппить DIN Condensed в
-    # "Oswald Light" независимо от содержимого пользовательского settings.yaml.
+    # "Oswald" независимо от содержимого пользовательского settings.yaml.
     prj = DN1Code::ExportPdf2::Model::ProjectData.new
     prj.pdf_settings[:font_family] = "DIN Condensed"
     prj.load_program_settings
     prj.pdf_settings[:font_family] = "DIN Condensed" # реальный settings.yaml мог перезаписать значение
-    assert(DN1Code::ExportPdf2::Service::FontService.layout_font_family(prj.pdf_settings) == "Oswald Light",
-           "FontService заменяет DIN Condensed на Oswald Light")
+    assert(DN1Code::ExportPdf2::Service::FontService.layout_font_family(prj.pdf_settings) == "Oswald",
+           "FontService заменяет DIN Condensed на Oswald")
 
     # 10. Проверка font_line_pitch_ratio для DIN (как алиаса Oswald)
     lb = DN1Code::ExportPdf2::Service::LayoutBuilder
@@ -5545,6 +5710,8 @@ class TestRunner
     assert(readme_text.include?("5 свободных кириллических шрифтов"), "README.MD описывает 5 свободных кириллических шрифтов")
     assert(readme_text.include?("Бесшовная замена DIN Condensed"), "README.MD описывает замену DIN Condensed")
     assert(readme_text.include?("Отказоустойчивый шрифтовой Fallback"), "README.MD описывает шрифтовой fallback")
+    assert(readme_text.include?("font_weight"), "README.MD описывает параметр начертания font_weight")
+    assert(readme_text.include?("font_width"), "README.MD описывает параметр ширины font_width")
   end
 
   # --- 67. Тест предотвращения обрезания многострочного текста и адаптивных интервалов (LayoutBuilder) ---

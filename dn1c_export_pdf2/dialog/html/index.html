@@ -302,6 +302,20 @@
                     <option value="Ubuntu Condensed">Ubuntu Condensed</option>
                   </select>
                 </div>
+                <div class="toolbar-font-control">
+                  <label for="selectFontWeight" class="toolbar-label-sub" title="Начертание всего текста PDF: заголовков, таблиц, подвала и штампа">Начертание:</label>
+                  <select id="selectFontWeight" class="form-control toolbar-select-sm" title="Начертание всего текста PDF: заголовков, таблиц, подвала и штампа">
+                    <option value="normal" selected>Обычное</option>
+                    <option value="bold">Жирное</option>
+                  </select>
+                </div>
+                <div class="toolbar-font-control">
+                  <label for="selectFontWidth" class="toolbar-label-sub" title="Ширина шрифта: повышает сжатие Sofia Sans Condensed до Extra Condensed. Для Oswald, Roboto Condensed и Ubuntu Condensed ширина фиксированная">Ширина:</label>
+                  <select id="selectFontWidth" class="form-control toolbar-select-sm" title="Ширина шрифта: повышает сжатие Sofia Sans Condensed до Extra Condensed. Для Oswald, Roboto Condensed и Ubuntu Condensed ширина фиксированная">
+                    <option value="condensed" selected>Узкая</option>
+                    <option value="extra_condensed">Сверхузкая</option>
+                  </select>
+                </div>
                 <div class="toolbar-margin-control">
                   <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
                   <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
@@ -477,7 +491,7 @@
                 <option value="Roboto Condensed">Roboto Condensed</option>
                 <option value="Ubuntu Condensed">Ubuntu Condensed</option>
               </select>
-              <span class="field-hint">Основной шрифт для штампа, таблиц и текстовых блоков страниц документа LayOut / PDF.</span>
+              <span class="field-hint">Основной шрифт для штампа, таблиц и текстовых блоков страниц документа LayOut / PDF. Вариативные шрифты комплекта содержат все начертания.</span>
             </div>
 
             <div class="form-group full-width">

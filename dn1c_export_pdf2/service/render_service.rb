@@ -196,6 +196,28 @@ module DN1Code
               ro["LineExtension"]   = [1, (ext_val * line_mult).round].max if ext_val > 0
             end
 
+            # Временное отключение фона сцены (небо/земля/водяные знаки/туман) при show_background: false.
+            # Ключа DisplaySky в RenderingOptions нет, поэтому градиент неба гасится принудительно белыми цветами.
+            show_bg = options[:show_background].nil? ||
+                      (options[:show_background] != false && options[:show_background].to_s != "false" &&
+                       options[:show_background] != 0 && options[:show_background].to_s != "0")
+            orig_bg = {}
+            if ro && !show_bg
+              bg_keys = %w[BackgroundColor SkyColor GroundColor DrawGround DrawUnderground DisplayWatermarks DisplayFog]
+              bg_keys.each do |k|
+                has_key = ro.respond_to?(:keys) ? ro.keys.include?(k) : !ro[k].nil?
+                orig_bg[k] = ro[k] if has_key
+              end
+              white = defined?(::Sketchup::Color) ? ::Sketchup::Color.new(255, 255, 255) : "white"
+              orig_bg.each_key do |k|
+                if k == "BackgroundColor" || k == "SkyColor" || k == "GroundColor"
+                  ro[k] = white
+                else
+                  ro[k] = false
+                end
+              end
+            end
+
             afs_setting = options[:annotation_font_size] || options["annotation_font_size"]
             hide_annot = options[:hide_annotations] == true || options["hide_annotations"] == true
             with_temporary_hidden_annotations(model, hide_annot) do
@@ -206,9 +228,12 @@ module DN1Code
                 rescue StandardError => e
                   warn "[DN1C Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
                 ensure
-                  # Восстановление исходных параметров отрисовки линий
+                  # Восстановление исходных параметров отрисовки линий и фона
                   if ro && !orig_widths.empty?
                     orig_widths.each { |k, v| ro[k] = v }
+                  end
+                  if ro && !orig_bg.empty?
+                    orig_bg.each { |k, v| ro[k] = v }
                   end
                 end
               end

@@ -274,6 +274,7 @@ module DN1Code
             project_data:  project_data,
             model:         model,
             font:          font_family,
+            text_bold:     FontService.font_weight_setting(settings) == "bold",
             aspect_cache:  {},
             primary_color: settings[:primary_color] || "005EB0",
             secondary_color: settings[:secondary_color] || "64748B",
@@ -401,7 +402,7 @@ module DN1Code
           end
         end
 
-        def apply_text_style!(style, opts)
+        def apply_text_style!(style, opts, ctx = nil)
           style.font_family = opts[:font] if opts[:font] && style.respond_to?(:font_family=)
           style.font_size   = opts[:size].to_f if opts[:size] && style.respond_to?(:font_size=)
           if opts[:color_obj].is_a?(::Sketchup::Color)
@@ -409,7 +410,9 @@ module DN1Code
           elsif opts[:color]
             style.text_color = layout_color(opts[:color]) if style.respond_to?(:text_color=)
           end
-          style.text_bold = opts[:bold] ? true : false if style.respond_to?(:text_bold=)
+          # Жирность: явный bold в opts или глобальный параметр font_weight
+          bold = opts[:bold] || (ctx && ctx[:text_bold]) ? true : false
+          style.text_bold = bold if style.respond_to?(:text_bold=)
           style.text_alignment = style_alignment(opts[:align]) if style.respond_to?(:text_alignment=)
           style.text_anchor = style_anchor(opts[:anchor]) if style.respond_to?(:text_anchor=)
         rescue StandardError
@@ -439,7 +442,7 @@ module DN1Code
           text_ent = ::Layout::FormattedText.new(text.to_s, make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height] + extra_h))
           text_ent.grow_mode = ::Layout::FormattedText::GROW_MODE_BOUNDED
           style = text_ent.style(0)
-          apply_text_style!(style, opts)
+          apply_text_style!(style, opts, ctx)
           text_ent.apply_style(style)
           doc.add_entity(text_ent, layer, page)
           text_ent
@@ -484,10 +487,12 @@ module DN1Code
               idx = colors.size - 1
             end
             half = [(f[:size].to_f * 2).round, 2].max
+            # Глобальный font_weight=bold распространяется и на RTF-фрагменты
+            bold = f[:bold] || ctx[:text_bold] ? true : false
             run = +"\\cf#{idx}\\fs#{half} "
-            run << "\\b " if f[:bold]
+            run << "\\b " if bold
             run << rtf_escape(f[:text])
-            run << "\\b0 " if f[:bold]
+            run << "\\b0 " if bold
             runs << run
           end
           return if runs.empty?
@@ -498,7 +503,7 @@ module DN1Code
                        when :center then "qc"
                        else "ql"
                        end
-          font = opts[:font] || "Arial"
+          font = opts[:font] || ctx[:font] || "Sofia Sans Condensed"
           rtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 #{font};}}{\\colortbl;#{colortbl}}" \
                 "\\pard\\#{align_code}\\f0 #{runs.join}\\par}"
 
@@ -511,7 +516,7 @@ module DN1Code
           # (Microsoft Sans Serif), игнорируя выбор пользователя.
           base_size = fragments.map { |f| f[:size].to_f }.max
           style = text_ent.style(0)
-          apply_text_style!(style, size: base_size, align: opts[:align], font: font)
+          apply_text_style!(style, size: base_size, align: opts[:align], font: font, bold: ctx[:text_bold])
           text_ent.apply_style(style)
           doc.add_entity(text_ent, layer, page)
           text_ent
@@ -550,7 +555,7 @@ module DN1Code
           anchor_pt = ::Geom::Point2d.new(pt2in(x_pt), pt2in(lay_y(ctx, y_pt)))
           text_ent = ::Layout::FormattedText.new(text.to_s, anchor_pt, ::Layout::FormattedText::ANCHOR_TYPE_TOP_LEFT)
           style = text_ent.style(0)
-          apply_text_style!(style, size: size_pt, color_obj: color_obj, bold: bold, font: ctx[:font])
+          apply_text_style!(style, size: size_pt, color_obj: color_obj, font: ctx[:font], bold: bold || ctx[:text_bold])
           text_ent.apply_style(style)
           doc.add_entity(text_ent, layer, page)
           text_ent.transform!(::Geom::Transformation2d.rotation(anchor_pt, -angle_deg * Math::PI / 180.0))
@@ -638,6 +643,14 @@ module DN1Code
         # ------------------------------------------------------------------
 
         def render_image_block(doc, page, layer, scene_item, content, img_cfg, ctx, temp_images, pt)
+          # Фон сцены (небо/земля/водяные знаки): посценный флаг с фолбэком на настройку слота шаблона
+          show_bg = if scene_item && scene_item.respond_to?(:viewport_background) && !scene_item.viewport_background.nil?
+                      scene_item.viewport_background != false
+                    else
+                      slot_bg = img_cfg[:show_background] || img_cfg["show_background"]
+                      !(slot_bg == false || slot_bg.to_s == "false" || slot_bg == 0 || slot_bg.to_s == "0")
+                    end
+
           ratio_str = if scene_item && scene_item.respond_to?(:aspect_ratio) && !scene_item.aspect_ratio.to_s.empty?
                         scene_item.aspect_ratio.to_s.strip
                       else
@@ -736,6 +749,15 @@ module DN1Code
                   skp_model.reset_style rescue nil
                 end
 
+                # Отключение фона видового экрана (небо/земля) в LayOut при выключенном фоне
+                if !show_bg && skp_model.respond_to?(:display_background=)
+                  begin
+                    skp_model.display_background = false
+                  rescue StandardError => _e
+                    # Не критично: останется фон сцены
+                  end
+                end
+
                 # Установка режима рендеринга видового экрана (Гибридный)
                 if skp_model.respond_to?(:render_mode=)
                   skp_model.render_mode = ::Layout::SketchUpModel::HYBRID_RENDER if defined?(::Layout::SketchUpModel::HYBRID_RENDER)
@@ -822,6 +844,7 @@ module DN1Code
             annotation_font_size: ctx[:settings][:annotation_font_size],
             page_size:          ctx[:settings][:page_size] || "A4",
             antialias:          ctx[:settings].fetch(:antialias, true),
+            show_background:    show_bg,
             aspect_ratio:       target_ratio,
             image_aspect_ratio: ctx[:settings][:image_aspect_ratio],
             image_format:       ctx[:settings][:image_format] || "png",
@@ -1228,7 +1251,7 @@ module DN1Code
 
           if content_type == "custom_text"
             txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
-            txt_h = estimate_text_height(txt, font_size, in_w, slot_font)
+            txt_h = estimate_text_height(txt, font_size, in_w, slot_font, ctx[:text_bold])
             txt_box_h = [txt_h + 2.0, in_h].min
             if valign == :bottom
               target_top_y = [in_bottom_y + txt_box_h, in_y].min
@@ -1326,7 +1349,7 @@ module DN1Code
                        6.0
                      end
           item_heights = items.map do |it|
-            estimate_text_height(it[:text], it[:size], in_w, slot_font)
+            estimate_text_height(it[:text], it[:size], in_w, slot_font, ctx[:text_bold])
           end
           total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
 
@@ -1336,7 +1359,7 @@ module DN1Code
             item_gap = (item_gap * slot_scale).round(2)
             item_heights = items.map do |it|
               sc_sz = (it[:size] * slot_scale).round(2)
-              estimate_text_height(it[:text], sc_sz, in_w, slot_font)
+              estimate_text_height(it[:text], sc_sz, in_w, slot_font, ctx[:text_bold])
             end
             total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
           end
@@ -1416,10 +1439,11 @@ module DN1Code
         end
 
         # Точный расчет высоты многострочного текста в pt для LayOut FormattedText
-        def estimate_text_height(text, size_pt, width_pt, font_name = nil)
+        def estimate_text_height(text, size_pt, width_pt, font_name = nil, bold = false)
           return 0.0 if text.to_s.empty?
 
-          char_ratio = font_char_width_ratio(font_name)
+          # Жирное начертание шире — учитываем в коэффициенте символа
+          char_ratio = font_char_width_ratio(font_name) * (bold ? 1.05 : 1.0)
           pitch_ratio = font_line_pitch_ratio(font_name)
 
           # Учитываем перенос по словам: эффективная ширина ~90% от геометрической границы

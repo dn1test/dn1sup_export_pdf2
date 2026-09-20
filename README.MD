@@ -50,14 +50,17 @@
    - Автоматическое сохранение сгенерированного PDF документа рядом с исходным файлом `.skp` и открытие в PDF-просмотрщике по умолчанию.
 
 5. **Профессиональная типографика (5 свободных кириллических шрифтов и автозамена)**:
-   - 🔤 **5 свободных шрифтов в комплекте** (полные права встраивания в PDF `fsType: 0x0000`):
+   - 🔤 **5 свободных вариативных шрифтов в комплекте** (полные права встраивания в PDF `fsType: 0x0000`; VF-файлы содержат все начертания от Thin до Black в одном файле):
      - `Sofia Sans Condensed` — основной чертежный узкий шрифт по умолчанию (SIL OFL 1.1).
-     - `Sofia Sans Extra Condensed` — сверхсжатый узкий шрифт для емких спецификаций и таблиц.
+     - `Sofia Sans Extra Condensed` — сверхсжатый узкий шрифт для емких спецификаций и таблиц (VF переименован в семейство `Sofia Sans ExtraCond` для корректного выбора в LayOut).
      - `Oswald` — строгий классический гротеск (свободная открытая замена коммерческого DIN).
      - `Roboto Condensed` — современный технологичный гротеск от Google (Apache 2.0).
      - `Ubuntu Condensed` — компактный технический шрифт от Canonical (Ubuntu Font Licence 1.0).
+   - 🅱️ **Параметр начертания `font_weight`**: `normal` (Обычное) или `bold` (Жирное) — применяется ко всему тексту PDF. Вариативные шрифты дают настоящее жирное начертание (Bold 700), встраиваемое в PDF отдельным сабсетом.
+   - ↔️ **Параметр ширины `font_width`**: `condensed` (Узкая) или `extra_condensed` (Сверхузкая) — повышает сжатие базового семейства `Sofia Sans Condensed` до `Sofia Sans Extra Condensed`. Для `Oswald`, `Roboto Condensed` и `Ubuntu Condensed` ширина фиксированная.
    - 🔄 **Бесшовная замена DIN Condensed**: Устаревший `DIN Condensed` заменен на `Oswald`. В сохраненных конфигурациях и проектах ссылки на `DIN Condensed` автоматически заменяются на `Oswald`.
-   - 🛡️ **Отказоустойчивый шрифтовой Fallback**: Если запрошенный шрифт не установлен и не может быть развернут в системе, LayOut Builder производит автоматическую подстановку доступного шрифта по цепочке кандидатов (`Sofia Sans Condensed`, `Arial Narrow`, `Segoe UI`, `Arial`).
+   - 🛡️ **Отказоустойчивый шрифтовой Fallback**: Если запрошенный шрифт не установлен и не может быть развернут в системе, LayOut Builder производит автоматическую подстановку доступного шрифта из комплекта (`Sofia Sans Condensed`, `Sofia Sans Extra Condensed`, `Oswald`, `Roboto Condensed`, `Ubuntu Condensed`). Системные шрифты Windows (Arial, Segoe UI, Verdana и т.п.) сознательно не используются: плагин работает только с собственным комплектом из `config/fonts`.
+   - 🧹 **Миграция со статических шрифтов**: при первом экспорте плагин удаляет из пользовательской папки шрифтов и HKCU-реестра статические файлы прежних версий (`Oswald-Light.ttf`, `SofiaSansCondensed-Regular.ttf`, `SofiaSansExtraCond-Regular.ttf`, `SofiaSansExtraCondensed-Regular.ttf`, `RobotoCondensed-Regular.ttf`), чтобы старые копии не затеняли вариативные шрифты.
 
 ---
 
@@ -72,11 +75,11 @@ dn1c_export_pdf2/
     ├── main.rb                                # Меню, тулбар и регистрация команд
     ├── version.rb                             # Метаданные и константы версии
     ├── config/
-    │   ├── fonts/                             # 5 свободных кириллических TrueType шрифтов
-    │   │   ├── SofiaSansCondensed-Regular.ttf # Основной чертежный шрифт (по умолчанию)
-    │   │   ├── SofiaSansExtraCondensed-Regular.ttf # Сверхсжатый узкий шрифт для таблиц
-    │   │   ├── Oswald-Light.ttf               # Строгий компактный гротеск (замена DIN Condensed)
-    │   │   ├── RobotoCondensed-Regular.ttf    # Современный чистый гротеск Google
+    │   ├── fonts/                             # 5 свободных кириллических вариативных TrueType шрифтов (VF)
+    │   │   ├── SofiaSansCondensed-VariableFont_wght.ttf # Основной чертежный шрифт (по умолчанию, все начертания)
+    │   │   ├── SofiaSansExtraCond-VariableFont_wght.ttf # Сверхсжатый узкий шрифт для таблиц (переименованное семейство)
+    │   │   ├── Oswald-VariableFont_wght.ttf   # Строгий компактный гротеск (замена DIN Condensed)
+    │   │   ├── RobotoCondensed-VariableFont_wght.ttf # Современный чистый гротеск Google
     │   │   └── UbuntuCondensed-Regular.ttf    # Компактный технический шрифт
     │   └── default_settings.yaml              # Шаблон настроек по умолчанию
     ├── ico/                                   # Векторные SVG-иконки тулбара

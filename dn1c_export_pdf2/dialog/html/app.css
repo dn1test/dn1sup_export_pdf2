@@ -4,28 +4,24 @@
 ------------------------------------------------------------------------------- */
 
 /* ==========================================================================
-   Typography: 5 Bundled Fonts (Sofia Sans Condensed, Sofia Sans Extra Condensed, Oswald, Roboto Condensed, Ubuntu Condensed)
+   Typography: 5 Bundled Variable Fonts (Sofia Sans Condensed, Sofia Sans Extra
+   Condensed, Oswald, Roboto Condensed, Ubuntu Condensed). Только файлы из
+   config/fonts — системные шрифты Windows не используются.
    ========================================================================== */
 @font-face {
   font-family: 'Sofia Sans Condensed';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 1 1000;
   font-display: swap;
-  src: local('Sofia Sans Condensed'),
-       local('SofiaSansCondensed-Regular'),
-       local('SofiaSansCondensed'),
-       url('../../config/fonts/SofiaSansCondensed-Regular.ttf') format('truetype');
+  src: url('../../config/fonts/SofiaSansCondensed-VariableFont_wght.ttf') format('truetype-variations');
 }
 
 @font-face {
   font-family: 'Sofia Sans Extra Condensed';
   font-style: normal;
-  font-weight: 100 900;
+  font-weight: 1 1000;
   font-display: swap;
-  src: local('Sofia Sans Extra Condensed'),
-       local('SofiaSansExtraCondensed-Regular'),
-       local('SofiaSansExtraCondensed'),
-       url('../../config/fonts/SofiaSansExtraCondensed-Regular.ttf') format('truetype');
+  src: url('../../config/fonts/SofiaSansExtraCond-VariableFont_wght.ttf') format('truetype-variations');
 }
 
 @font-face {
@@ -33,34 +29,23 @@
   font-style: normal;
   font-weight: 200 700;
   font-display: swap;
-  src: local('Oswald Light'),
-       local('Oswald-Light'),
-       local('Oswald'),
-       local('Oswald Regular'),
-       local('Oswald-Regular'),
-       url('../../config/fonts/Oswald-Light.ttf') format('truetype');
+  src: url('../../config/fonts/Oswald-VariableFont_wght.ttf') format('truetype-variations');
 }
 
 @font-face {
   font-family: 'Roboto Condensed';
   font-style: normal;
-  font-weight: 400 700;
-  font-stretch: 50% 125%;
+  font-weight: 100 900;
   font-display: swap;
-  src: local('Roboto Condensed'),
-       local('RobotoCondensed-Regular'),
-       local('RobotoCondensed'),
-       url('../../config/fonts/RobotoCondensed-Regular.ttf') format('truetype');
+  src: url('../../config/fonts/RobotoCondensed-VariableFont_wght.ttf') format('truetype-variations');
 }
 
 @font-face {
   font-family: 'Ubuntu Condensed';
   font-style: normal;
-  font-weight: 400 700;
+  font-weight: 400;
   font-display: swap;
-  src: local('Ubuntu Condensed'),
-       local('UbuntuCondensed-Regular'),
-       url('../../config/fonts/UbuntuCondensed-Regular.ttf') format('truetype');
+  src: url('../../config/fonts/UbuntuCondensed-Regular.ttf') format('truetype');
 }
 
 /* ==========================================================================
@@ -2217,6 +2202,7 @@ body.is-resizing * {
 .scene-mini-preview-wrap,
 .page-font-preview {
   font-family: var(--page-font-family), var(--font-family-base);
+  font-weight: var(--page-font-weight, 400);
 }
 
 .toolbar-margin-control {

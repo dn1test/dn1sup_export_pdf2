@@ -289,6 +289,21 @@ module DN1Code
             end
           end
 
+          # Актуализация списка сцен при открытии вкладки «Страницы проекта»:
+          # добавляет новые страницы модели, убирает удалённые и возвращает
+          # актуальный список в UI (без записи на диск — как автосейв)
+          dialog.add_action_callback("refreshScenes") do |_action_context|
+            begin
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.data(model)
+              project_data.sync_with_model_scenes(model) if model && model.respond_to?(:pages)
+              scenes_json = JSON.generate(project_data.scenes.map(&:to_h))
+              dialog.execute_script("window.app && window.app.onScenesRefreshed && window.app.onScenesRefreshed(#{scenes_json});")
+            rescue StandardError => e
+              puts "[refreshScenes error]: #{e.message}"
+            end
+          end
+
           # Получить быстрые мини-превью (thumbnails) для сцен модели SketchUp
           dialog.add_action_callback("getSceneThumbnails") do |_action_context|
             begin
@@ -353,6 +368,8 @@ module DN1Code
               dialog.execute_script("window.app && window.app.onSceneThumbnailsLoaded && window.app.onSceneThumbnailsLoaded(#{JSON.generate(thumbs)});")
             rescue StandardError => e
               puts "[getSceneThumbnails error]: #{e.message}"
+              # Обязательно снимаем флаг ожидания в UI, иначе эскизы больше не запросятся
+              dialog.execute_script("window.app && window.app.onSceneThumbnailsLoaded && window.app.onSceneThumbnailsLoaded({});") rescue nil
             end
           end
 

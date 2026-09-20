@@ -72,6 +72,8 @@ pdf_settings:
   antialias: true          # Сглаживание линий SketchUp
   stamp_type: "draft"      # 'draft' (НЕ УТВЕРЖДЕН), 'approved' (В ПРОИЗВОДСТВО), 'none'
   font_family: "Sofia Sans Condensed" # Доступные шрифты: 'Sofia Sans Condensed', 'Sofia Sans Extra Condensed', 'Oswald', 'Roboto Condensed', 'Ubuntu Condensed'
+  font_weight: "normal"    # Начертание: 'normal' (Обычное) или 'bold' (Жирное) — для всего текста PDF
+  font_width: "condensed"  # Ширина: 'condensed' (Узкая) или 'extra_condensed' (Сверхузкая) — переключает пару Sofia Sans Condensed/Extra Condensed
   auto_open_pdf: true      # Открывать PDF в просмотрщике после создания
   save_skp_backup: true    # Сохранять копию .skp с номером ревизии
   primary_color: "005EB0"  # Цвет заголовков и акцентов

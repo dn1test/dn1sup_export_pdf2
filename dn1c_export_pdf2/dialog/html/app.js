@@ -623,6 +623,8 @@
     inputPageMargin: document.getElementById("inputPageMargin"),
     selectFontFamily: document.getElementById("selectFontFamily"),
     selectLayoutFontFamily: document.getElementById("selectLayoutFontFamily"),
+    selectFontWeight: document.getElementById("selectFontWeight"),
+    selectFontWidth: document.getElementById("selectFontWidth"),
     selectImageAspect: document.getElementById("selectImageAspect"),
     customAspectGroup: document.getElementById("customAspectGroup"),
     inputAspectCustomW: document.getElementById("inputAspectCustomW"),
@@ -712,6 +714,14 @@
     }
   }
 
+  // Эффективное семейство для предпросмотра: параметр ширины повышает
+  // сжатие Sofia Sans Condensed до Extra Condensed (зеркало FontService.apply_font_width)
+  function previewFontFamilyFor(family, width) {
+    const f = (family || "").toLowerCase();
+    if (!f.includes("sofia sans condensed")) return family || "Sofia Sans Condensed";
+    return width === "extra_condensed" ? "Sofia Sans Extra Condensed" : "Sofia Sans Condensed";
+  }
+
   function getEffectiveRenderWidth() {
     if (els.selectQuality) {
       const val = (els.selectQuality.value || "").toLowerCase().trim();
@@ -783,6 +793,7 @@
           targetPane.classList.add("active");
           if (tab.dataset.tab === "tab-scenes") {
             renderScenesTable();
+            refreshScenesFromModel();
           } else if (tab.dataset.tab === "tab-templates") {
             renderLayoutCanvas();
             renderTemplateSettingsList();
@@ -825,6 +836,7 @@
 
     if (tabId === "tab-scenes") {
       renderScenesTable();
+      refreshScenesFromModel();
     } else if (tabId === "tab-templates") {
       renderLayoutCanvas();
       renderTemplateSettingsList();
@@ -3253,6 +3265,16 @@
       });
     }
 
+    const chkBgTpl = document.getElementById("chk_viewport_background");
+    if (chkBgTpl) {
+      chkBgTpl.addEventListener("change", (e) => {
+        const bgOn = Boolean(e.target.checked);
+        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
+        updateBlockSlot("image_4_3", { show_background: bgOn }, targetTpl);
+        notifyChange();
+      });
+    }
+
     const grpRatio = document.getElementById("grp_image_aspect_ratio");
     if (grpRatio) {
       grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
@@ -3951,7 +3973,12 @@
     }
     if (els.selectFontFamily) els.selectFontFamily.value = curFontFamily;
     if (els.selectLayoutFontFamily) els.selectLayoutFontFamily.value = curFontFamily;
-    document.documentElement.style.setProperty("--page-font-family", `"${curFontFamily}", sans-serif`);
+    const curFontWeight = String(settings.font_weight || "normal").toLowerCase() === "bold" ? "bold" : "normal";
+    const curFontWidth = settings.font_width === "extra_condensed" ? "extra_condensed" : "condensed";
+    if (els.selectFontWeight) els.selectFontWeight.value = curFontWeight;
+    if (els.selectFontWidth) els.selectFontWidth.value = curFontWidth;
+    document.documentElement.style.setProperty("--page-font-family", `"${previewFontFamilyFor(curFontFamily, curFontWidth)}", sans-serif`);
+    document.documentElement.style.setProperty("--page-font-weight", curFontWeight === "bold" ? "700" : "400");
     const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
     let initialAspect = settings.image_aspect_ratio;
     if (!VALID_ASPECT_RATIOS.includes(initialAspect)) {
@@ -4773,10 +4800,26 @@
   // Cache for scene thumbnails from SketchUp: map of scene name / original_name -> base64 dataURL
   const sceneThumbnails = {};
   let requestedSceneThumbnails = false;
+  let sceneThumbnailsInFlight = false;
 
-  function requestSceneThumbnails() {
+  function requestSceneThumbnails(force) {
+    if (sceneThumbnailsInFlight) return;
+    if (!force && requestedSceneThumbnails) return;
     requestedSceneThumbnails = true;
+    sceneThumbnailsInFlight = true;
     callRuby("getSceneThumbnails");
+  }
+
+  // Актуализировать список страниц из модели SketchUp при открытии вкладки
+  // «Страницы проекта» (новые страницы добавляются, удалённые убираются),
+  // затем перегенерировать эскизы всех сцен
+  function refreshScenesFromModel() {
+    if (window.sketchup && typeof window.sketchup.refreshScenes === "function") {
+      callRuby("refreshScenes");
+    } else {
+      // Нет моста SketchUp (просмотр HTML в браузере) — просто обновляем эскизы
+      requestSceneThumbnails(true);
+    }
   }
 
   // Switch active scene in SketchUp interface
@@ -4923,6 +4966,7 @@
     }
 
     const isImageVis = scene.viewport_visible !== false;
+    const isBgOn = scene.viewport_background !== false;
     const VALID_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
     let rawRatio = (scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
     const imageAspectRatio = VALID_ASPECTS.includes(rawRatio) ? rawRatio : "4:3";
@@ -4950,6 +4994,10 @@
             <label class="tpl-overlay-toggle-btn ${isOverlayOn ? 'active' : ''} ${!isImageVis ? 'disabled-overlay' : ''}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin: 0; cursor: pointer;">
               <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="display: none;">
               <span id="tplAspectOverlayText">📐 Рамка: ${displayAspect}</span>
+            </label>
+            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
+              <input type="checkbox" id="chk_viewport_background" ${isBgOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} title="Отображать фон сцены (небо/земля/водяные знаки) в видовом экране на странице">
+              <span>Фон</span>
             </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
               <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
@@ -5029,6 +5077,7 @@
         }
         const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
         const tplBadge = document.getElementById("tplAspectOverlayBadge");
+        const chkBg = document.getElementById("chk_viewport_background");
         if (!isVis) {
           if (chkTpl) {
             chkTpl.checked = false;
@@ -5036,6 +5085,9 @@
           }
           if (tplBadge) {
             tplBadge.classList.add("disabled-overlay");
+          }
+          if (chkBg) {
+            chkBg.disabled = true;
           }
           if (state.pdf_settings) {
             state.pdf_settings.show_aspect_overlay = false;
@@ -5046,9 +5098,20 @@
           callRuby("toggleAspectOverlay", false);
         } else {
           if (chkTpl) chkTpl.disabled = false;
+          if (chkBg) chkBg.disabled = false;
           syncCurrentSceneOverlay(scene, null, true);
         }
         updateSceneTableAspectCell(sceneIndex, scene.aspect_ratio, isVis);
+        notifyChange();
+      });
+    }
+
+    const chkBg = document.getElementById("chk_viewport_background");
+    if (chkBg) {
+      chkBg.addEventListener("change", (e) => {
+        const bgOn = e.target.checked;
+        scene.viewport_background = bgOn;
+        updateBlockSlot("image_4_3", { show_background: bgOn });
         notifyChange();
       });
     }
@@ -5840,6 +5903,12 @@
         : (els.selectLayoutFontFamily && els.selectLayoutFontFamily.value
           ? els.selectLayoutFontFamily.value
           : (state.pdf_settings?.font_family || "Sofia Sans Condensed")),
+      font_weight: (els.selectFontWeight && els.selectFontWeight.value)
+        ? els.selectFontWeight.value
+        : (state.pdf_settings?.font_weight || "normal"),
+      font_width: (els.selectFontWidth && els.selectFontWidth.value)
+        ? els.selectFontWidth.value
+        : (state.pdf_settings?.font_width || "condensed"),
       primary_color: els.inputPrimaryColor ? els.inputPrimaryColor.value.replace("#", "") : (state.pdf_settings?.primary_color || "005EB0"),
       stamp_color: els.inputStampColor ? els.inputStampColor.value.replace("#", "") : (state.pdf_settings?.stamp_color || "D32F2F"),
       auto_open_pdf: els.chkAutoOpen.checked,
@@ -6121,7 +6190,27 @@
       if (state.pdf_settings) {
         state.pdf_settings.font_family = family;
       }
-      document.documentElement.style.setProperty("--page-font-family", `"${family}", sans-serif`);
+      const width = state.pdf_settings?.font_width === "extra_condensed" ? "extra_condensed" : "condensed";
+      document.documentElement.style.setProperty("--page-font-family", `"${previewFontFamilyFor(family, width)}", sans-serif`);
+      notifyChange();
+    };
+
+    const handleFontWeightChange = (val) => {
+      const weight = String(val || "normal").toLowerCase() === "bold" ? "bold" : "normal";
+      if (state.pdf_settings) {
+        state.pdf_settings.font_weight = weight;
+      }
+      document.documentElement.style.setProperty("--page-font-weight", weight === "bold" ? "700" : "400");
+      notifyChange();
+    };
+
+    const handleFontWidthChange = (val) => {
+      const width = val === "extra_condensed" ? "extra_condensed" : "condensed";
+      if (state.pdf_settings) {
+        state.pdf_settings.font_width = width;
+      }
+      const family = (els.selectFontFamily && els.selectFontFamily.value) || (state.pdf_settings?.font_family) || "Sofia Sans Condensed";
+      document.documentElement.style.setProperty("--page-font-family", `"${previewFontFamilyFor(family, width)}", sans-serif`);
       notifyChange();
     };
 
@@ -6130,6 +6219,12 @@
     }
     if (els.selectLayoutFontFamily) {
       els.selectLayoutFontFamily.addEventListener("change", (e) => handleFontFamilyChange(e.target.value));
+    }
+    if (els.selectFontWeight) {
+      els.selectFontWeight.addEventListener("change", (e) => handleFontWeightChange(e.target.value));
+    }
+    if (els.selectFontWidth) {
+      els.selectFontWidth.addEventListener("change", (e) => handleFontWidthChange(e.target.value));
     }
 
     // Stamp select change
@@ -6411,7 +6506,7 @@
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
       "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
-      "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily",
+      "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily", "selectFontWeight", "selectFontWidth",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
       "selectQuality", "selectScaleMultiplier", "selectStamp", "inputCustomStamp",
       "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias",
@@ -6438,6 +6533,12 @@
       ensureCustomLayouts();
       syncDirectoriesSpecifications();
       renderUI();
+      // Если диалог уже открыт на вкладке «Страницы проекта», актуализируем
+      // список страниц и эскизы (повторное открытие диалога из меню)
+      const scenesPane = document.getElementById("tab-scenes");
+      if (scenesPane && scenesPane.classList.contains("active")) {
+        refreshScenesFromModel();
+      }
     },
 
     showNotification: showNotification,
@@ -6580,10 +6681,23 @@
     },
 
     onSceneThumbnailsLoaded: function (thumbs) {
+      sceneThumbnailsInFlight = false;
       if (thumbs && typeof thumbs === "object") {
         Object.assign(sceneThumbnails, thumbs);
         updateSceneTablePreviews();
       }
+    },
+
+    onScenesRefreshed: function (scenes) {
+      if (Array.isArray(scenes)) {
+        state.scenes = scenes;
+        if (layoutState.selectedSceneIndex >= scenes.length) {
+          layoutState.selectedSceneIndex = Math.max(0, scenes.length - 1);
+        }
+      }
+      renderScenesTable();
+      // Список мог измениться — всегда перегенерируем эскизы заново
+      requestSceneThumbnails(true);
     },
 
     syncCurrentTemplateOverlay: syncCurrentTemplateOverlay
