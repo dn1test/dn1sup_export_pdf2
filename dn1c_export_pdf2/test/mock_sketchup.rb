@@ -22,7 +22,7 @@ end
 module Sketchup
   class Text
     attr_accessor :text, :font
-    def initialize(text = "Выноска", font = { name: "DIN Condensed", size: 14, bold: false, italic: false })
+    def initialize(text = "Выноска", font = { name: "Sofia Sans Condensed", size: 14, bold: false, italic: false })
       @text = text
       @font = font
     end
@@ -73,7 +73,10 @@ module Sketchup
         "DrawSilhouettes" => true,
         "DrawLineEnds" => false,
         "ExtendLines" => false,
-        "DrawProfilesOnly" => false
+        "DrawProfilesOnly" => false,
+        "DisplayDims" => true,
+        "DisplayText" => true,
+        "RenderMode" => 2
       }
     end
 
@@ -232,7 +235,10 @@ module Sketchup
         "SilhouetteWidth" => 2,
         "SectionCutWidth" => 4,
         "DepthQueWidth" => 4,
-        "LineEndWidth" => 1
+        "LineEndWidth" => 1,
+        "DisplayDims" => true,
+        "DisplayText" => true,
+        "RenderMode" => 2
       }
     end
 
@@ -638,7 +644,7 @@ module Layout
     VECTOR_RENDER = 1
     HYBRID_RENDER = 2
 
-    attr_accessor :skp_path, :bounds, :scenes, :current_scene, :render_mode, :line_weight
+    attr_accessor :skp_path, :bounds, :scenes, :current_scene, :render_mode, :line_weight, :display_background
 
     def initialize(skp_path, bounds)
       super()
@@ -648,6 +654,11 @@ module Layout
       @current_scene = 1
       @render_mode = RASTER_RENDER
       @line_weight = 0.5
+      @display_background = true
+    end
+
+    def display_background?
+      @display_background
     end
 
     def render_needed?

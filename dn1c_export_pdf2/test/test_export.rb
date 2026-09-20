@@ -16,7 +16,7 @@ if defined?(Sketchup) && Sketchup.respond_to?(:version) && Sketchup.active_model
   # Внутри реального SketchUp используем текущую активную модель
   test_model = Sketchup.active_model
 else
-  # Вне SketchUp используем мок-модель во ВРЕМЕННОЙ папке: экспорт вызывает save_auto,
+  # Вне SketchUp используем мок-модель во ВРЕМЕННОЙ папке: экспорт вызывает flush сессии,
   # который пишет YAML рядом с .skp — путь в корне репозитория загрязнял бы рабочую копию
   require "tmpdir"
   require "fileutils"

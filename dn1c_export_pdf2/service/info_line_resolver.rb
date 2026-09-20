@@ -73,7 +73,7 @@ module DN1Code
           case k_str
           when "toc_pages", "toc"
             scenes = if project_data.respond_to?(:scenes) && project_data.scenes
-                       project_data.scenes.select { |s| s.enabled && s.page_type.to_s != "skip" }
+                       project_data.scenes.select(&:enabled)
                      else
                        []
                      end
@@ -329,7 +329,7 @@ module DN1Code
         # Возвращает пару [заголовок, описание/значение] для строкового ключа
         def resolve_parts(context, key)
           project_data = context[:project_data]
-          info         = context[:info] || context[:project_info] || (project_data.respond_to?(:info) ? project_data.info : {}) || {}
+          info         = context[:info] || context[:project_info] || {}
           workflow     = context[:workflow] || (project_data.respond_to?(:workflow) ? project_data.workflow : {}) || {}
           scene_item   = context[:scene_item]
 

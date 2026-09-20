@@ -6,18 +6,17 @@ require "time"
 require "date"
 require "fileutils"
 require_relative "scene_item"
+require_relative "../service/font_service"
 
 module DN1Code
   module ExportPdf2
     module Model
       # Модель данных проекта: хранит информацию о проекте, сценах, истории ревизий и параметрах PDF.
-      # Поддерживает двухуровневую синхронизацию: первичный источник — YAML файлы рядом с SKP
-      # (project_config.yaml + edit_history.yaml), вторичный источник — библиотека модели
-      # (Attribute Dictionaries SketchUp).
+      # Единственный источник данных — YAML файлы: данные проекта — рядом с SKP
+      # (project_config.yaml / <артикул>.yaml + edit_history.yaml), настройки PDF и шаблоны
+      # страниц — в системных файлах YAML внутри расширения (settings.yaml + layout.yaml).
+      # Библиотека модели SketchUp (Attribute Dictionaries) не используется.
       class ProjectData
-        # Имя словаря атрибутов SketchUp для хранения данных
-        ATTR_DICT = "DN1C_ExportPDF"
-
         # Пути к глобальным настройкам программы (хранятся внутри плагина)
         PLUGIN_CONFIG_DIR     = File.expand_path("../config", __dir__)
         PROGRAM_SETTINGS_FILE = File.join(PLUGIN_CONFIG_DIR, "settings.yaml")
@@ -54,6 +53,10 @@ module DN1Code
                 super(:commercial, false)
                 super(:trade, "0")
               end
+            when :articul_locked
+              is_l = val == true || val.to_s == "true"
+              @owner.project[:articul_locked] = is_l
+              super(:articul_locked, is_l)
             when :name_project
               super(:name_project, val.to_s)
             when :product, :name_product, :furniture_name, :product_tags
@@ -195,18 +198,11 @@ module DN1Code
         attr_accessor :api_targets
         # @return [Array<Hash>, Hash] каталоги проекта и настройки их отображения
         attr_accessor :directories
-        # @return [Boolean] флаг наличия явно сохраненных пропорций кадра в файле модели или YAML
-        attr_accessor :file_has_saved_aspect_ratio
 
         # @return [Hash] конфигурация макетов страниц (прокси к @pdf_settings[:custom_layouts])
         def custom_layouts
           @pdf_settings ||= {}
           @pdf_settings[:custom_layouts] ||= default_custom_layouts
-        end
-
-        def custom_layouts=(val)
-          @pdf_settings ||= {}
-          @pdf_settings[:custom_layouts] = val
         end
 
         # Инициализирует новый экземпляр ProjectData со значениями по умолчанию
@@ -218,10 +214,9 @@ module DN1Code
           @project_info.merge!(default_project_info)
           @pdf_settings = default_pdf_settings
           @api_targets  = default_api_targets
-          @directories  = default_directories
+          @directories  = []
           @scenes       = []
           @history      = []
-          @file_has_saved_aspect_ratio = false
 
           sync_project_fields!
 
@@ -258,6 +253,8 @@ module DN1Code
                   @pdf_settings[:custom_layouts] = layouts_backup if layouts_backup && !pdf_cfg.key?(:custom_layouts)
                   ratio_str = @pdf_settings[:image_aspect_ratio].to_s.strip
                   @pdf_settings[:image_aspect_ratio] = "4:3" unless VALID_ASPECT_RATIOS.include?(ratio_str)
+                  legacy_font = Service::FontService.legacy_family_for(@pdf_settings[:font_family])
+                  @pdf_settings[:font_family] = legacy_font if legacy_font
                 end
               end
             rescue StandardError => e
@@ -302,69 +299,41 @@ module DN1Code
           false
         end
 
-        # Сохраняет параметры рамки кадра (Overlay) в настройки плагина по умолчанию (settings.yaml)
+        # Обновляет параметры рамки кадра (Overlay) в памяти (только @pdf_settings сессии).
+        # Запись в settings.yaml выполняется отдельно при flush (save_program_settings).
         # @param params [Hash] параметры рамки (:image_aspect_ratio, :aspect_ratio, :custom_ratio_w, :custom_ratio_h, :show_aspect_overlay, :overlay_border_color, etc.)
         # @return [Boolean]
-        def self.save_default_frame_settings(params)
+        def update_frame_settings(params)
           return false unless params.is_a?(Hash)
-
-          FileUtils.mkdir_p(PLUGIN_CONFIG_DIR)
-          settings_file = PROGRAM_SETTINGS_FILE
-
-          current_data = {}
-          if File.exist?(settings_file)
-            begin
-              content = File.read(settings_file, encoding: "utf-8")
-              raw = begin
-                      YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
-                    rescue ArgumentError
-                      YAML.load(content)
-                    end
-              current_data = deep_symbolize_keys(raw) if raw.is_a?(Hash)
-            rescue StandardError
-            end
-          end
-
-          pdf_cfg = current_data[:pdf_settings] || {}
 
           ratio_val = params[:image_aspect_ratio] || params["image_aspect_ratio"] || params[:aspect_ratio] || params["aspect_ratio"]
           if ratio_val && !ratio_val.to_s.strip.empty?
             ratio_str = ratio_val.to_s.strip
-            if VALID_ASPECT_RATIOS.include?(ratio_str)
-              pdf_cfg[:image_aspect_ratio] = ratio_str
-            end
+            @pdf_settings[:image_aspect_ratio] = ratio_str if VALID_ASPECT_RATIOS.include?(ratio_str)
           end
 
           if params.key?(:custom_ratio_w) || params.key?("custom_ratio_w")
             cw = (params[:custom_ratio_w] || params["custom_ratio_w"]).to_f
-            pdf_cfg[:custom_ratio_w] = cw if cw > 0.0
+            @pdf_settings[:custom_ratio_w] = cw if cw > 0.0
           end
 
           if params.key?(:custom_ratio_h) || params.key?("custom_ratio_h")
             ch = (params[:custom_ratio_h] || params["custom_ratio_h"]).to_f
-            pdf_cfg[:custom_ratio_h] = ch if ch > 0.0
+            @pdf_settings[:custom_ratio_h] = ch if ch > 0.0
           end
 
           if params.key?(:show_aspect_overlay) || params.key?("show_aspect_overlay")
             v = params[:show_aspect_overlay]
             v = params["show_aspect_overlay"] if v.nil?
-            pdf_cfg[:show_aspect_overlay] = (v == true || v.to_s == "true")
+            @pdf_settings[:show_aspect_overlay] = (v == true || v.to_s == "true")
           end
 
           [:overlay_border_color, :overlay_border_opacity, :overlay_mask_color, :overlay_mask_opacity].each do |k|
             val = params[k] || params[k.to_s]
-            pdf_cfg[k] = val unless val.nil?
+            @pdf_settings[k] = val unless val.nil?
           end
 
-          current_data[:pdf_settings] = pdf_cfg
-
-          File.open(settings_file, "w:utf-8") do |f|
-            f.write deep_stringify_keys(current_data).to_yaml
-          end
           true
-        rescue StandardError => e
-          warn "Ошибка сохранения параметров фрейма в настройки по умолчанию: #{e.message}"
-          false
         end
 
         # Возвращает паспорт объекта по умолчанию
@@ -372,6 +341,7 @@ module DN1Code
         def default_project
           {
             articul:      "",
+            articul_locked: false,
             product_tags: [],
             product:      "",
             place:        "",
@@ -463,18 +433,13 @@ module DN1Code
           }
         end
 
-        # Генерирует артикул проекта по шаблону: CF#ГГММДД_ЧЧММСС_НОМЕР или HF#...
+        # Генерирует артикул проекта по шаблону: CF#ГГММДД_ЧЧММСС или HF#...
         # @param commercial [Boolean] true для коммерческого (CF#), false для бытового (HF#)
-        # @param suffix [String] суффикс/номер (по умолчанию "01")
-        # @param index [Object] алиас суффикса (используется веб-интерфейсом)
         # @param time [Time] метка времени
         # @return [String]
-        def self.generate_articul(commercial: false, suffix: "01", index: nil, time: Time.now)
+        def self.generate_articul(commercial: false, time: Time.now)
           prefix = commercial ? "CF#" : "HF#"
-          ts = time.strftime("%y%m%d_%H%M%S")
-          suffix_str = index.nil? ? suffix.to_s : index.to_s
-          suffix_str = "01" if suffix_str.strip.empty?
-          "#{prefix}#{ts}_#{suffix_str}"
+          "#{prefix}#{time.strftime('%y%m%d_%H%M%S')}"
         end
 
         # Генерирует автоматический номер/ID заказчика
@@ -490,6 +455,7 @@ module DN1Code
         def default_project_info
           {
             articul:          "",
+            articul_locked:   false,
             name_product:     "",
             name_place:       "",
             adress:           "",
@@ -520,39 +486,14 @@ module DN1Code
           }
         end
 
-        # Возвращает список адресатов API по умолчанию
+        # Возвращает список адресатов API по умолчанию.
+        # Плейсхолдеры: реальные токены хранятся в локальных YAML-файлах,
+        # которые не попадают в git (settings.yaml в .gitignore).
         # @return [Array<String>]
         def default_api_targets
           [
-            "https://list.prodmd.top/api/projects?token=c2fc6e6bd272b4f9688656a7c4fcf6b9aa13ccdf7da077d53bf56e4afcf29a58",
-            "http://localhost:3000/api/projects?token=b9fdaae8ca52a355df78d12f9bde54236200d366caf4af9350d8d934d83a9fba"
-          ]
-        end
-
-        # Возвращает список каталогов проекта по умолчанию (формат массива хэшей)
-        # @return [Array<Hash>]
-        def default_directories
-          [
-            {
-              path:        "!_замер_фото_задание",
-              title:       "Замеры помещения",
-              description: "Дополнительное описание"
-            },
-            {
-              path:        "!_инфо_заказчика",
-              title:       "Инфо заказчика",
-              description: "Дополнительное описание"
-            },
-            {
-              path:        "!_материалы_фурнитура",
-              title:       "Материалы и фурнитура",
-              description: "Дополнительное описание"
-            },
-            {
-              path:        "!_техника_подсветка",
-              title:       "Техника, подсветка",
-              description: "Дополнительное описание"
-            }
+            "https://list.prodmd.top/api/projects?token=YOUR_TOKEN_HERE",
+            "http://localhost:3000/api/projects?token=YOUR_LOCAL_TOKEN"
           ]
         end
 
@@ -647,13 +588,12 @@ module DN1Code
         # @return [Hash] хэш с параметрами PDF (размер листа, ориентация, цвета, штамп и т.д.)
         def default_pdf_settings
           {
-            export_engine:      "layout",
-            layout_render_mode: "raster",
+            layout_render_mode: "image",
             save_layout_file:   true,
             compress_pdf:       true,
             image_format:       "png",
             render_quality:     "medium",
-            page_size:          "A4",
+            page_size:          "A3",
             page_layout:        "landscape",
             margin:             15,
             margin_mm:          5,
@@ -677,6 +617,7 @@ module DN1Code
             primary_color:      "005EB0",
             secondary_color:    "64748B",
             stamp_color:        "D32F2F",
+            font_family:        "Sofia Sans Condensed",
             custom_layouts:     default_custom_layouts
           }
         end
@@ -704,6 +645,13 @@ module DN1Code
           art = self.class.pick_str(@project[:articul], @project_info[:articul])
           @project[:articul]      = art
           @project_info[:articul] = art
+
+          # Блокировка артикула: источник истины — @project; nil (флаг не задан)
+          # означает правило «артикул создан однажды => заблокирован»
+          lock_raw = @project[:articul_locked]
+          locked = lock_raw.nil? ? !art.empty? : (lock_raw == true || lock_raw.to_s == "true")
+          @project[:articul_locked]      = locked
+          @project_info[:articul_locked] = locked
 
           # Commercial flag <=> Trade ('1'/'0')
           is_comm = if @project.key?(:commercial) && !@project[:commercial].nil?
@@ -996,16 +944,18 @@ module DN1Code
           nil
         end
 
-        # Нормализует каталоги directories
+        # Нормализует каталоги directories: приводит к массиву хэшей.
+        # Пустой список НЕ заменяется дефолтами — новая модель стартует без папок,
+        # а удаление всех папок пользователем сохраняется.
         def normalize_directories!
-          @directories = default_directories if @directories.nil? || (@directories.is_a?(Array) && @directories.empty?)
+          @directories = normalize_directories_to_array(@directories)
         end
 
         # Преобразует каталоги в чистый массив хэшей для сохранения в YAML
         # @param dirs [Object]
         # @return [Array<Hash>]
         def normalize_directories_to_array(dirs)
-          return default_directories if dirs.nil?
+          return [] if dirs.nil?
           if dirs.is_a?(Hash)
             dirs.map do |k, v|
               next unless v.is_a?(Hash)
@@ -1019,6 +969,7 @@ module DN1Code
                 description: (v[:description] || v["description"] || "").to_s
               }
               item[:display] = (v[:display] || v["display"]).to_s if v[:display] || v["display"]
+              item[:thumb_size] = (v[:thumb_size] || v["thumb_size"]).to_s if v[:thumb_size] || v["thumb_size"]
               item
             end.compact
           elsif dirs.is_a?(Array)
@@ -1033,10 +984,11 @@ module DN1Code
                 description: (d[:description] || d["description"] || "").to_s
               }
               item[:display] = (d[:display] || d["display"]).to_s if d[:display] || d["display"]
+              item[:thumb_size] = (d[:thumb_size] || d["thumb_size"]).to_s if d[:thumb_size] || d["thumb_size"]
               item
             end.compact
           else
-            default_directories
+            []
           end
         end
 
@@ -1078,39 +1030,21 @@ module DN1Code
           dir = File.dirname(clean_path)
           base_name = File.basename(clean_path, ".*")
 
-          # 1. Проверяем артикул из атрибутов модели
-          raw_info = model.get_attribute(ATTR_DICT, "project_info", nil) rescue nil
-          if raw_info
-            begin
-              info = JSON.parse(raw_info, symbolize_names: true)
-              articul = info[:articul].to_s.strip
-              if !articul.empty?
-                art_yaml = File.join(dir, "#{sanitize_filename(articul)}.yaml")
-                return art_yaml if File.exist?(art_yaml)
-
-                art_yml = File.join(dir, "#{sanitize_filename(articul)}.yml")
-                return art_yml if File.exist?(art_yml)
-              end
-            rescue StandardError
-              # Ignore
-            end
-          end
-
-          # 2. Проверяем имя файла модели <model_basename>.yaml / .yml
+          # 1. Проверяем имя файла модели <model_basename>.yaml / .yml
           model_yaml = File.join(dir, "#{base_name}.yaml")
           return model_yaml if File.exist?(model_yaml)
 
           model_yml = File.join(dir, "#{base_name}.yml")
           return model_yml if File.exist?(model_yml)
 
-          # 3. Проверяем project_config.yaml / .yml
+          # 2. Проверяем project_config.yaml / .yml
           cfg_yaml = File.join(dir, "project_config.yaml")
           return cfg_yaml if File.exist?(cfg_yaml)
 
           cfg_yml = File.join(dir, "project_config.yml")
           return cfg_yml if File.exist?(cfg_yml)
 
-          # 4. Сканируем папку модели на наличие YAML файла конфигурации проекта (исключая edit_history и layout)
+          # 3. Сканируем папку модели на наличие YAML файла конфигурации проекта (исключая edit_history и layout)
           layout_names = ["layout.yaml", "layout.yml", "layout_config.yaml", "layout_config.yml", "layouts.yaml", "layouts.yml"]
           all_yamls = Dir.glob(File.join(dir, "*.{yaml,yml}")).reject do |f|
             bn = File.basename(f)
@@ -1128,23 +1062,6 @@ module DN1Code
           end
 
           nil
-        end
-
-        # Ищет путь к файлу edit_history.yaml рядом с файлом модели
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [String, nil]
-        def self.find_edit_history_path_for_model(model)
-          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
-
-          clean_path = model.path.to_s.tr("\\", "/")
-          dir = File.dirname(clean_path)
-          hist_yaml = File.join(dir, "edit_history.yaml")
-          return hist_yaml if File.exist?(hist_yaml)
-
-          hist_yml = File.join(dir, "edit_history.yml")
-          return hist_yml if File.exist?(hist_yml)
-
-          hist_yaml
         end
 
         # Возвращает целевое имя YAML файла для текущего экземпляра проекта
@@ -1167,59 +1084,42 @@ module DN1Code
 
         # Автоматическая загрузка данных:
         # 1. Загрузка глобальных настроек программы из плагина (settings.yaml + layout.yaml)
-        # 2. ПЕРВИЧНО для данных проекта: YAML файлы рядом с файлом SketchUp (.skp) (project_config.yaml + edit_history.yaml)
-        # 3. ВТОРИЧНО: Библиотека файла (атрибуты модели SketchUp)
+        # 2. Данные проекта: YAML файл рядом с файлом SketchUp (.skp) (project_config.yaml / <артикул>.yaml)
+        # 3. Журнал правок: edit_history.yaml рядом с SKP (если есть)
+        # Библиотека модели SketchUp (атрибуты) не читается.
         # @param model [Sketchup::Model, nil] модель SketchUp
-        # @return [Symbol] источник загрузки (:yaml, :model или :default)
+        # @return [Symbol] источник загрузки (:yaml или :default)
         def load_auto(model)
           # Всегда начинаем с загрузки актуальных глобальных настроек программы из плагина
           load_program_settings
 
           loaded_from = nil
 
-          # 1. ПЕРВИЧНО: Ищем и загружаем YAML файл конфигурации проекта рядом с .skp
+          # 1. Ищем и загружаем YAML файл конфигурации проекта рядом с .skp
           yaml_file = self.class.find_yaml_path_for_model(model)
           if yaml_file && File.exist?(yaml_file)
-            if load_from_yaml(yaml_file)
-              loaded_from = :yaml
-            end
-          end
-
-          # 2. ВТОРИЧНО: Если YAML не найден, читаем из библиотеки модели (атрибутов)
-          if loaded_from.nil? && model
-            if load_from_model(model)
-              loaded_from = :model
-            end
+            loaded_from = :yaml if load_from_yaml(yaml_file, include_settings: false)
           end
 
           if model && model.respond_to?(:path) && !model.path.to_s.empty?
             clean_path = model.path.to_s.tr("\\", "/")
             dir = File.dirname(clean_path)
 
-            # 3. Загружаем журнал изменений из edit_history.yaml, если он есть рядом
+            # 2. Загружаем журнал изменений из edit_history.yaml, если он есть рядом
             hist_file = File.join(dir, "edit_history.yaml")
-            if File.exist?(hist_file)
-              load_from_edit_history(hist_file, @project_info[:articul])
-            end
+            load_from_edit_history(hist_file, @project_info[:articul]) if File.exist?(hist_file)
 
             # Шаблоны страниц НЕ читаются из папки проекта:
             # единый источник — layout.yaml внутри расширения (общий для всех .skp)
           end
 
-          # Запись атрибутов модели при загрузке НЕ выполняется: открытие .skp не должно
-          # помечать модель измененной (диалог "Сохранить изменения?" без правок пользователя).
-          # Данные попадают в библиотеку модели при сохранении .skp (handle_pre_save /
-          # handle_post_save) и при экспорте PDF (save_auto).
+          # Запись в библиотеку модели (.skp) не выполняется: единственные источники —
+          # YAML рядом с моделью и системные YAML файлы расширения.
 
-          # При открытии файла устанавливаем пропорции фрейма 4:3, если в файле не сохранено другое
-          unless @file_has_saved_aspect_ratio
+          # Нормализация пропорций фрейма к 4:3 при недопустимом значении
+          saved_val = @pdf_settings[:image_aspect_ratio].to_s.strip
+          unless VALID_ASPECT_RATIOS.include?(saved_val)
             @pdf_settings[:image_aspect_ratio] = "4:3"
-          else
-            # Если в файле сохранено значение, которого нет в настройках, нормализуем к 4:3
-            saved_val = @pdf_settings[:image_aspect_ratio].to_s.strip
-            unless VALID_ASPECT_RATIOS.include?(saved_val)
-              @pdf_settings[:image_aspect_ratio] = "4:3"
-            end
           end
 
           # Синхронизация списка сцен из модели
@@ -1228,64 +1128,73 @@ module DN1Code
           loaded_from || :default
         end
 
-        # Автоматическое сохранение данных:
-        # 1. Настройки программы — в файлы плагина (dn1c_export_pdf2/config/settings.yaml и layout.yaml)
-        # 2. Данные проекта — в библиотеку модели (Attribute Dictionaries)
-        # 3. Данные проекта — в YAML файл рядом с SKP (project_config.yaml / <артикул>.yaml)
-        # 4. История правок — сохраняется внутри YAML файла проекта (workflow.history_edit)
+        # Сохранение данных проекта в YAML файл рядом с .skp (только данные проекта, без pdf_settings).
+        # Настройки PDF и шаблоны пишутся отдельно через save_program_settings.
         # @param model [Sketchup::Model] модель SketchUp
+        # @param previous_articul [String, nil] артикул, сохраненный в сессии до текущих правок;
+        #   при смене артикула прежний <артикул>.yaml удаляется во избежание дубликатов
         # @return [Boolean] true в случае успешного сохранения
-        def save_auto(model)
+        def save_project_yaml(model, previous_articul: nil)
           return false unless model
+          return false unless model.respond_to?(:path) && !model.path.to_s.empty?
 
           sync_project_fields!
 
-          # 1. Артикул, сохраненный в атрибутах модели ДО обновления.
-          # Удалять при переименовании можно только YAML, названный по прежнему артикулу:
-          # общие файлы (project_config.yaml, <имя модели>.yaml, найденные эвристикой)
-          # трогать нельзя — это шаблоны и данные других проектов
-          old_articul_yamls = []
-          if model.respond_to?(:get_attribute) && model.respond_to?(:path) && !model.path.to_s.empty?
-            raw_info = model.get_attribute(ATTR_DICT, "project_info", nil) rescue nil
-            if raw_info
-              begin
-                old_art = JSON.parse(raw_info, symbolize_names: true)[:articul].to_s.strip
-                unless old_art.empty?
-                  dir = File.dirname(model.path.to_s.tr("\\", "/"))
-                  old_articul_yamls << File.join(dir, "#{self.class.sanitize_filename(old_art)}.yaml")
-                  old_articul_yamls << File.join(dir, "#{self.class.sanitize_filename(old_art)}.yml")
-                end
-              rescue StandardError
-                # Игнорируем поврежденные атрибуты — удаление не выполняем
-              end
-            end
-          end
+          target_yaml = yaml_path_for_model(model)
+          return false unless target_yaml
 
-          # 2. Сохранение макетов страниц — только в YAML расширения (общий для всех .skp)
-          save_to_layout_yaml(PROGRAM_LAYOUT_FILE)
+          return false unless save_to_yaml(target_yaml, include_settings: false)
 
-          # 3. Сохранение в библиотеку модели (атрибуты)
-          save_to_model(model)
+          # Если YAML переименован (смена или очистка артикула), удаляем прежний
+          # артикульный YAML. Общие файлы (project_config.yaml, <имя модели>.yaml,
+          # найденные эвристикой) не трогаем — это шаблоны и данные других проектов.
+          old_art = previous_articul.to_s.strip
+          unless old_art.empty?
+            dir = File.dirname(model.path.to_s.tr("\\", "/"))
+            target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
+            [".yaml", ".yml"].each do |ext|
+              old_yaml = File.join(dir, "#{self.class.sanitize_filename(old_art)}#{ext}")
+              next unless File.exist?(old_yaml)
 
-          # 4. Сохранение данных проекта в YAML файл рядом с .skp
-          if model.respond_to?(:path) && !model.path.to_s.empty?
-            target_yaml = yaml_path_for_model(model)
-            if target_yaml
-              if save_to_yaml(target_yaml, include_settings: false)
-                # Если YAML переименован (смена или очистка артикула), удаляем
-                # прежний артикульный YAML во избежание дубликатов
-                target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
-                old_articul_yamls.uniq.each do |old_yaml|
-                  next unless File.exist?(old_yaml)
-
-                  old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
-                  File.delete(old_yaml) rescue nil if old_norm != target_norm
-                end
-              end
+              old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
+              File.delete(old_yaml) rescue nil if old_norm != target_norm
             end
           end
 
           true
+        end
+
+        # Применяет данные формы (payload из веб-интерфейса) к текущему объекту в памяти.
+        # Запись на диск не выполняется — данные живут в сессии до flush.
+        # @param payload [Hash] данные из диалога (project, customer, workflow, pdf_settings, scenes, ...)
+        # @return [self]
+        def apply_payload!(payload)
+          return self unless payload.is_a?(Hash)
+
+          @project.merge!(payload[:project]) if payload[:project].is_a?(Hash)
+          @customer.merge!(payload[:customer]) if payload[:customer].is_a?(Hash)
+          @workflow.merge!(payload[:workflow]) if payload[:workflow].is_a?(Hash)
+
+          info_src = payload[:project] || payload[:project_info]
+          @project_info.merge!(info_src) if info_src
+
+          if payload.key?(:api_targets) && payload[:api_targets].is_a?(Array)
+            @api_targets = payload[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
+          end
+          @directories = payload[:directories] if payload[:directories].is_a?(Array)
+          @pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
+          if payload[:history_edit] && payload[:history_edit].is_a?(Array)
+            @history = payload[:history_edit]
+          elsif payload[:history]
+            @history = payload[:history]
+          end
+
+          if payload[:scenes].is_a?(Array)
+            @scenes = payload[:scenes].map { |h| SceneItem.from_h(h) }
+          end
+
+          sync_project_fields!
+          self
         end
 
         # Синхронизирует список сцен с активной моделью SketchUp, сохраняя настроенные параметры
@@ -1374,174 +1283,6 @@ module DN1Code
           end
 
           @scenes = new_scenes
-        end
-
-        # Читает данные проекта из словарей атрибутов модели SketchUp (библиотека модели)
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [Boolean] true, если данные были успешно прочитаны
-        def load_from_model(model)
-          return false unless model && model.respond_to?(:get_attribute)
-
-          has_data = false
-
-          # 1. Чтение модульных сущностей project, customer, workflow
-          raw_prj = model.get_attribute(ATTR_DICT, "project", nil)
-          if raw_prj
-            begin
-              parsed = JSON.parse(raw_prj, symbolize_names: true)
-              @project.merge!(parsed) if parsed.is_a?(Hash)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          raw_cust = model.get_attribute(ATTR_DICT, "customer", nil)
-          if raw_cust
-            begin
-              parsed = JSON.parse(raw_cust, symbolize_names: true)
-              @customer.merge!(parsed) if parsed.is_a?(Hash)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          raw_wf = model.get_attribute(ATTR_DICT, "workflow", nil)
-          if raw_wf
-            begin
-              parsed = JSON.parse(raw_wf, symbolize_names: true)
-              @workflow.merge!(parsed) if parsed.is_a?(Hash)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          # 2. Обратная совместимость с общим словарем project_info
-          raw_info = model.get_attribute(ATTR_DICT, "project_info", nil)
-          if raw_info
-            begin
-              parsed = JSON.parse(raw_info, symbolize_names: true)
-              @project_info.merge!(parsed) if parsed.is_a?(Hash)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          sync_project_fields!
-
-          raw_settings = model.get_attribute(ATTR_DICT, "pdf_settings", nil)
-          if raw_settings
-            begin
-              parsed = JSON.parse(raw_settings, symbolize_names: true)
-              # Шаблоны страниц из .skp игнорируются (источник — layout.yaml),
-              # зачистка на случай старых моделей, где они сохранялись в атрибутах
-              parsed.delete(:custom_layouts)
-              if parsed.key?(:image_aspect_ratio) || parsed.key?("image_aspect_ratio")
-                v = parsed[:image_aspect_ratio] || parsed["image_aspect_ratio"]
-                @file_has_saved_aspect_ratio = true unless v.to_s.strip.empty?
-              end
-              @pdf_settings.merge!(parsed)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          raw_layouts = model.get_attribute(ATTR_DICT, "custom_layouts", nil)
-          if raw_layouts
-            begin
-              parsed_layouts = JSON.parse(raw_layouts, symbolize_names: true)
-              if parsed_layouts.is_a?(Hash)
-                @pdf_settings[:custom_layouts] ||= default_custom_layouts
-                parsed_layouts.each do |page_key, blocks|
-                  @pdf_settings[:custom_layouts][page_key] ||= {}
-                  if blocks.is_a?(Hash)
-                    blocks.each do |slot_id, slot_cfg|
-                      if slot_cfg.is_a?(Hash)
-                        @pdf_settings[:custom_layouts][page_key][slot_id] ||= {}
-                        @pdf_settings[:custom_layouts][page_key][slot_id].merge!(slot_cfg)
-                      else
-                        @pdf_settings[:custom_layouts][page_key][slot_id] = slot_cfg
-                      end
-                    end
-                  end
-                end
-                has_data = true
-              end
-            rescue StandardError; end
-          end
-
-          raw_targets = model.get_attribute(ATTR_DICT, "api_targets", nil)
-          if raw_targets
-            begin
-              parsed = JSON.parse(raw_targets)
-              @api_targets = parsed if parsed.is_a?(Array)
-              has_data = true
-            rescue StandardError; end
-          end
-
-          raw_dirs = model.get_attribute(ATTR_DICT, "directories", nil)
-          if raw_dirs
-            begin
-              parsed = JSON.parse(raw_dirs, symbolize_names: true)
-              @directories = parsed if parsed.is_a?(Array) || parsed.is_a?(Hash)
-              normalize_directories!
-              has_data = true
-            rescue StandardError; end
-          end
-
-          raw_history = model.get_attribute(ATTR_DICT, "history", nil)
-          if raw_history
-            begin
-              parsed = JSON.parse(raw_history, symbolize_names: true)
-              if parsed.is_a?(Array)
-                @history = parsed.map do |item|
-                  txt = item[:text] || item[:description] || ""
-                  {
-                    date:        item[:date].to_s,
-                    text:        txt.to_s,
-                    description: txt.to_s
-                  }
-                end
-                sync_history_entries!
-                has_data = true
-              end
-            rescue StandardError; end
-          end
-
-          raw_scenes = model.get_attribute(ATTR_DICT, "scenes", nil)
-          if raw_scenes
-            begin
-              parsed = JSON.parse(raw_scenes, symbolize_names: true)
-              if parsed.is_a?(Array) && !parsed.empty?
-                @scenes = parsed.map { |h| SceneItem.from_h(h) }
-                has_data = true
-              end
-            rescue StandardError; end
-          end
-
-          sync_with_model_scenes(model)
-          has_data
-        end
-
-        # Сохраняет данные проекта в словарь атрибутов модели SketchUp (библиотека модели)
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [Boolean] true в случае успешного сохранения
-        def save_to_model(model)
-          return false unless model && model.respond_to?(:set_attribute)
-
-          sync_project_fields!
-
-          model.set_attribute(ATTR_DICT, "project", JSON.generate(@project))
-          model.set_attribute(ATTR_DICT, "customer", JSON.generate(@customer))
-          model.set_attribute(ATTR_DICT, "workflow", JSON.generate(@workflow))
-          model.set_attribute(ATTR_DICT, "project_info", JSON.generate(@project_info))
-          # Шаблоны страниц (custom_layouts) сохраняются в layout.yaml и дублируются в модель
-          pdf_settings_clean = (@pdf_settings || {}).reject { |k, _| k.to_s == "custom_layouts" }
-          model.set_attribute(ATTR_DICT, "pdf_settings", JSON.generate(pdf_settings_clean))
-          if @pdf_settings && @pdf_settings[:custom_layouts]
-            model.set_attribute(ATTR_DICT, "custom_layouts", JSON.generate(self.class.deep_stringify_keys(@pdf_settings[:custom_layouts])))
-          end
-          model.set_attribute(ATTR_DICT, "api_targets", JSON.generate(@api_targets))
-          model.set_attribute(ATTR_DICT, "directories", JSON.generate(@directories))
-          model.set_attribute(ATTR_DICT, "history", JSON.generate(@history))
-
-          scenes_data = @scenes.map(&:to_h)
-          model.set_attribute(ATTR_DICT, "scenes", JSON.generate(scenes_data))
-          true
         end
 
         # Рекурсивно преобразует строковые ключи вложенных хэшей и массивов в Symbol
@@ -1650,55 +1391,6 @@ module DN1Code
             warn "Ошибка загрузки edit_history.yaml (#{file_path}): #{e.message}"
             false
           end
-        end
-
-        # Сохраняет историю правок в файл edit_history.yaml под текущим артикулом проекта
-        # @param file_path [String] путь к файлу edit_history.yaml
-        # @param articul [String, nil] артикул проекта
-        # @return [Boolean] true в случае успешного сохранения
-        def save_to_edit_history(file_path, articul = nil)
-          FileUtils.mkdir_p(File.dirname(file_path))
-
-          existing_data = {}
-          if File.exist?(file_path)
-            begin
-              content = File.read(file_path, encoding: "utf-8")
-              parsed = begin
-                         YAML.safe_load(content, permitted_classes: [Date, Time])
-                       rescue ArgumentError
-                         YAML.load(content)
-                       end
-              existing_data = parsed if parsed.is_a?(Hash)
-            rescue StandardError
-              existing_data = {}
-            end
-          end
-
-          art_key = (articul || @project_info[:articul]).to_s.strip
-          art_key = "DEFAULT" if art_key.empty?
-
-          formatted_entries = @history.map do |item|
-            d = item[:date] || item["date"] || ""
-            d_str = if d.is_a?(Time)
-                      d.strftime("%Y-%m-%d %H:%M")
-                    elsif d.is_a?(Date)
-                      d.strftime("%Y-%m-%d")
-                    else
-                      d.to_s
-                    end
-            txt = (item[:text] || item["text"] || item[:description] || item["description"] || "").to_s
-            {
-              "date" => d_str,
-              "text" => txt
-            }
-          end
-
-          existing_data[art_key] = formatted_entries
-
-          File.open(file_path, "w:utf-8") do |f|
-            f.write existing_data.to_yaml
-          end
-          true
         end
 
         # Загружает макеты страниц из отдельного YAML файла (layout.yaml / layout_config.yaml)
@@ -1836,8 +1528,9 @@ module DN1Code
         # Загружает данные проекта из файла YAML (поддерживает структуру project_config.yaml,
         # одиночные хэши и потоковый формат)
         # @param file_path [String] путь к YAML файлу
+        # @param include_settings [Boolean] читать ли секцию pdf_settings (глобальные настройки PDF)
         # @return [Boolean] true в случае успешной загрузки
-        def load_from_yaml(file_path)
+        def load_from_yaml(file_path, include_settings: true)
           return false unless File.exist?(file_path)
 
           begin
@@ -1869,6 +1562,10 @@ module DN1Code
 
               if has_modular
                 @project.merge!(root[:project]) if root[:project].is_a?(Hash)
+                # Флага нет в файле: применяем правило «создан однажды => заблокирован»
+                if root[:project].is_a?(Hash) && !root[:project].key?(:articul_locked)
+                  @project[:articul_locked] = !@project[:articul].to_s.strip.empty?
+                end
                 @customer.merge!(root[:customer]) if root[:customer].is_a?(Hash)
                 if root[:workflow].is_a?(Hash)
                   @workflow.merge!(root[:workflow])
@@ -1888,6 +1585,13 @@ module DN1Code
                 src = root[:project] || root[:project_info] || {}
                 if src.is_a?(Hash)
                   @project[:articul]      = src[:articul].to_s
+                  # Флага нет в файле: непустой артикул считается созданным однажды
+                  @project[:articul_locked] =
+                    if src.key?(:articul_locked)
+                      src[:articul_locked]
+                    else
+                      !@project[:articul].empty?
+                    end
                   @project[:product]      = (src[:product] || src[:name_product] || src[:furniture_name]).to_s
                   @project[:place]        = (src[:place] || src[:name_place] || src[:room_name]).to_s
                   @project[:adress]       = (src[:adress] || src[:address]).to_s
@@ -1938,12 +1642,12 @@ module DN1Code
 
               sync_project_fields!
 
-              if root.key?(:pdf_settings) && root[:pdf_settings].is_a?(Hash)
-                if root[:pdf_settings].key?(:image_aspect_ratio) || root[:pdf_settings].key?("image_aspect_ratio")
-                  v = root[:pdf_settings][:image_aspect_ratio] || root[:pdf_settings]["image_aspect_ratio"]
-                  @file_has_saved_aspect_ratio = true unless v.to_s.strip.empty?
-                end
+              # Секция pdf_settings читается только при явном запросе (импорт полного
+              # YAML): настройки PDF глобальные и хранятся в settings.yaml расширения
+              if include_settings && root.key?(:pdf_settings) && root[:pdf_settings].is_a?(Hash)
                 @pdf_settings.merge!(root[:pdf_settings])
+                legacy_font = Service::FontService.legacy_family_for(@pdf_settings[:font_family])
+                @pdf_settings[:font_family] = legacy_font if legacy_font
               end
 
               if root[:scenes].is_a?(Array)
@@ -1967,8 +1671,14 @@ module DN1Code
             if docs[0].is_a?(Hash)
               if docs[0].key?(:project)
                 @project.merge!(docs[0][:project])
+                unless docs[0][:project].key?(:articul_locked)
+                  @project[:articul_locked] = !@project[:articul].to_s.strip.empty?
+                end
               else
                 @project.merge!(docs[0])
+                unless docs[0].key?(:articul_locked)
+                  @project[:articul_locked] = !@project[:articul].to_s.strip.empty?
+                end
               end
               sync_project_fields!
             end
@@ -2011,6 +1721,7 @@ module DN1Code
           # 1. Секция project (Паспорт объекта)
           prj_out = {
             articul:      @project[:articul].to_s,
+            articul_locked: @project[:articul_locked] == true,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,
@@ -2070,11 +1781,14 @@ module DN1Code
 
           # 5. Секция directories (Массив объектов)
           dirs_out = normalize_directories_to_array(@directories).map do |d|
-            {
+            entry = {
               "path"        => d[:path].to_s,
               "title"       => d[:title].to_s,
               "description" => d[:description].to_s
             }
+            entry["display"] = d[:display].to_s if d[:display]
+            entry["thumb_size"] = d[:thumb_size].to_s if d[:thumb_size]
+            entry
           end
 
           # 6. Сборка итогового документа в чистом строгом порядке, соответствующем project.yaml
@@ -2098,52 +1812,6 @@ module DN1Code
           end
 
           true
-        end
-
-        # Увеличивает номер ревизии проекта (+1) и добавляет запись с таймштампом в историю
-        # @param description [String] текстовое описание причины создания новой ревизии
-        # @param date_str [String, nil] пользовательская дата (по умолчанию Time.now)
-        # @param pdf_link [String, nil] имя/ссылка на файл PDF
-        # @return [void]
-        def increment_revision!(description = "Экспорт в PDF", date_str = nil, pdf_link = nil)
-          rev_num = (@workflow[:revision].to_i rescue 0)
-          rev_num = 1 if rev_num <= 0
-          new_rev = rev_num + 1
-          new_rev_str = sprintf("%03d", new_rev)
-
-          @workflow[:revision]     = new_rev_str
-          @project_info[:revision] = new_rev
-
-          now_str = date_str || Time.now.strftime("%Y-%m-%d %H:%M")
-          clean_desc = description.to_s.strip
-          clean_desc = "Правки" if clean_desc.empty?
-          entry_text = clean_desc.include?("(rev.") ? clean_desc : "#{clean_desc} (rev. #{new_rev_str})"
-
-          @workflow[:last_edit]     = clean_desc
-          @project_info[:last_edit] = clean_desc
-          @project_info[:edit]      = clean_desc
-
-          pdf_link_str = pdf_link.to_s.strip
-          if pdf_link_str.empty?
-            art = @project[:articul].to_s.strip
-            art = "PROJECT" if art.empty?
-            ver = @workflow[:version].to_s.strip
-            ver = "01" if ver.empty?
-            pdf_link_str = "#{art}_v#{ver}_r#{new_rev_str}.pdf"
-          end
-
-          @workflow[:history_edit] ||= []
-          @workflow[:history_edit].unshift([now_str, entry_text])
-
-          new_entry = {
-            date:        now_str,
-            data:        now_str,
-            text:        entry_text,
-            edit:        entry_text,
-            description: entry_text,
-            pdf_link:    pdf_link_str
-          }
-          @history.unshift(new_entry)
         end
 
         # Преобразует все данные проекта в стандартный Ruby Hash

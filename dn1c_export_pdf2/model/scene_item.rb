@@ -6,9 +6,6 @@ module DN1Code
       # Модель сцены проекта SketchUp для экспорта в PDF.
       # Содержит имя сцены, тип шаблона страницы, порядок следования, примечания и статус включения в документ.
       class SceneItem
-        # Поддерживаемые типы страниц в документе
-        PAGE_TYPES = %i[cover description explain visual general blank].freeze
-
         # @return [Sketchup::Page, nil] ссылка на нативный объект сцены SketchUp
         attr_accessor :scene_ref
         # @return [String] название сцены
@@ -23,8 +20,6 @@ module DN1Code
         attr_accessor :order
         # @return [Boolean] флаг включения страницы в итоговый PDF
         attr_accessor :enabled
-        # @return [String, nil] путь к кастомному изображению для подмены рендера (опционально)
-        attr_accessor :image_override
         # @return [Boolean] флаг включения видового экрана 3D на этой странице
         attr_accessor :viewport_visible
         # @return [String] пропорции видового экрана ('3:2', '4:3', '16:9', '1:1', 'page')
@@ -53,7 +48,6 @@ module DN1Code
           @viewport_visible = (viewport_visible != false && viewport_visible.to_s != "false" && viewport_visible != 0 && viewport_visible.to_s != "0")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
           @scale_pct        = (scale_pct || 100).to_i
-          @image_override   = nil
           @page_type        = page_type ? page_type.to_sym : detect_page_type(@name)
         end
 
@@ -92,25 +86,6 @@ module DN1Code
             aspect_ratio:     @aspect_ratio,
             scale_pct:        @scale_pct
           }
-        end
-
-        # Позволяет обращаться к свойствам сцены через синтаксис хэша (item[:name])
-        # @param key [Symbol, String] имя свойства
-        # @return [Object, nil]
-        def [](key)
-          case key.to_s.to_sym
-          when :name then @name
-          when :original_name then @original_name
-          when :page_type then @page_type.to_s
-          when :description then @description
-          when :order then @order
-          when :enabled then @enabled
-          when :image_override then @image_override
-          when :viewport_visible then @viewport_visible
-          when :aspect_ratio then @aspect_ratio
-          when :scale_pct then @scale_pct
-          else nil
-          end
         end
 
         # Восстанавливает экземпляр SceneItem из хэша

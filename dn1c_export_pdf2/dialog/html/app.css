@@ -4,12 +4,73 @@
 ------------------------------------------------------------------------------- */
 
 /* ==========================================================================
+   Typography: 5 Bundled Fonts (Sofia Sans Condensed, Sofia Sans Extra Condensed, Oswald, Roboto Condensed, Ubuntu Condensed)
+   ========================================================================== */
+@font-face {
+  font-family: 'Sofia Sans Condensed';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local('Sofia Sans Condensed'),
+       local('SofiaSansCondensed-Regular'),
+       local('SofiaSansCondensed'),
+       url('../../config/fonts/SofiaSansCondensed-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Sofia Sans Extra Condensed';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: local('Sofia Sans Extra Condensed'),
+       local('SofiaSansExtraCondensed-Regular'),
+       local('SofiaSansExtraCondensed'),
+       url('../../config/fonts/SofiaSansExtraCondensed-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Oswald';
+  font-style: normal;
+  font-weight: 200 700;
+  font-display: swap;
+  src: local('Oswald Light'),
+       local('Oswald-Light'),
+       local('Oswald'),
+       local('Oswald Regular'),
+       local('Oswald-Regular'),
+       url('../../config/fonts/Oswald-Light.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Roboto Condensed';
+  font-style: normal;
+  font-weight: 400 700;
+  font-stretch: 50% 125%;
+  font-display: swap;
+  src: local('Roboto Condensed'),
+       local('RobotoCondensed-Regular'),
+       local('RobotoCondensed'),
+       url('../../config/fonts/RobotoCondensed-Regular.ttf') format('truetype');
+}
+
+@font-face {
+  font-family: 'Ubuntu Condensed';
+  font-style: normal;
+  font-weight: 400 700;
+  font-display: swap;
+  src: local('Ubuntu Condensed'),
+       local('UbuntuCondensed-Regular'),
+       url('../../config/fonts/UbuntuCondensed-Regular.ttf') format('truetype');
+}
+
+/* ==========================================================================
    Typography: Roboto Condensed (bundled local woff2 + system local + fallback)
    ========================================================================== */
 @font-face {
   font-family: 'Roboto Condensed';
   font-style: normal;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed'),
        local('RobotoCondensed-Regular'),
@@ -22,6 +83,7 @@
   font-family: 'Roboto Condensed';
   font-style: normal;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed'),
        local('RobotoCondensed-Regular'),
@@ -34,6 +96,7 @@
   font-family: 'Roboto Condensed';
   font-style: normal;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed'),
        local('RobotoCondensed-Regular'),
@@ -46,6 +109,7 @@
   font-family: 'Roboto Condensed';
   font-style: normal;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed'),
        local('RobotoCondensed-Regular'),
@@ -58,6 +122,7 @@
   font-family: 'Roboto Condensed';
   font-style: italic;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed Italic'),
        local('RobotoCondensed-Italic'),
@@ -69,6 +134,7 @@
   font-family: 'Roboto Condensed';
   font-style: italic;
   font-weight: 100 900;
+  font-stretch: 50% 125%;
   font-display: swap;
   src: local('Roboto Condensed Italic'),
        local('RobotoCondensed-Italic'),
@@ -77,51 +143,70 @@
 }
 
 :root {
-  /* Font Family */
-  --font-family-base: "Roboto Condensed", "RobotoCondensed", "Arial Narrow", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  /* GUI Typography: Roboto Condensed with minimal letter width */
+  --font-family-base: "Roboto Condensed", "RobotoCondensed", "Arial Narrow", -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --page-font-family: "Sofia Sans Condensed", "Sofia Sans Extra Condensed", "Oswald", "Roboto Condensed", "Ubuntu Condensed", sans-serif;
 
-  /* SketchUp Core Palette */
-  --su-red: #ea212d;
-  --su-red-hover: #d31b26;
-  --su-red-active: #b8151f;
-  --su-red-light: #fef2f2;
-  --su-red-border: #fca5a5;
+  /* Bootstrap / Modus font overrides */
+  --bs-body-font-family: var(--font-family-base);
+  --bs-font-sans-serif: var(--font-family-base);
+  --bs-btn-font-family: var(--font-family-base);
 
-  --trimble-blue: #005f9e;
-  --trimble-blue-hover: #004c80;
+  /* Minimal letter width typography settings */
+  --font-stretch-base: ultra-condensed;
+  --letter-spacing-base: -0.025em;
 
-  /* Neutrals & Surfaces */
-  --bg-app: #ffffff;
+  /* Trimble Modus Color Palette */
+  --modus-blue: #0063a3;
+  --modus-blue-hover: #004f82;
+  --modus-blue-active: #003b61;
+  --modus-blue-subtle: #e5f1f8;
+  --modus-blue-border: #b3d4e8;
+
+  /* Modus Aliases */
+  --su-red: #0063a3;
+  --su-red-hover: #004f82;
+  --su-red-active: #003b61;
+  --su-red-light: #e5f1f8;
+  --su-red-border: #b3d4e8;
+
+  --trimble-blue: #0063a3;
+  --trimble-blue-hover: #004f82;
+
+  /* Modus Neutrals & Surfaces */
+  --bg-app: #f4f6f8;
   --bg-header: #ffffff;
   --bg-card: #ffffff;
-  --bg-input: #f8fafc;
+  --bg-input: #ffffff;
   --bg-input-alt: #f8fafc;
-  --bg-hover: #f1f5f9;
-  --bg-active: #e2e8f0;
+  --bg-hover: #f1f1f6;
+  --bg-active: #e0e1e9;
 
-  --text-main: #1e293b;
-  --text-muted: #64748b;
-  --text-dim: #94a3b8;
+  --text-main: #252a2e;
+  --text-muted: #6a6e79;
+  --text-dim: #90939f;
 
-  --border-color: #cbd5e1;
-  --border-light: #e2e8f0;
-  --border-focus: #005eb0;
+  --border-color: #cbcdd6;
+  --border-light: #e0e1e9;
+  --border-focus: #0063a3;
 
-  --primary: #ea212d;
-  --primary-hover: #d31b26;
-  --accent-cyan: #005f9e;
-  --success: #10b981;
-  --success-hover: #059669;
-  --danger: #ef4444;
-  --warning: #f59e0b;
+  --primary: #0063a3;
+  --primary-hover: #004f82;
+  --accent-cyan: #0063a3;
+  --secondary: #6a6e79;
+  --secondary-hover: #585c65;
+  --success: #006638;
+  --success-hover: #004d2a;
+  --danger: #da212c;
+  --warning: #fbad26;
 
-  --radius-sm: 0;
-  --radius-md: 0;
-  --radius-lg: 0;
+  --radius-sm: 3px;
+  --radius-md: 4px;
+  --radius-lg: 6px;
 
-  --shadow-sm: none;
-  --shadow-main: none;
-  --shadow-glow: none;
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.05);
+  --shadow-main: 0 1px 3px rgba(0, 0, 0, 0.08), 0 1px 2px rgba(0, 0, 0, 0.06);
+  --shadow-glow: 0 0 0 0.2rem rgba(0, 99, 163, 0.25);
 }
 
 * {
@@ -129,15 +214,20 @@
   margin: 0;
   padding: 0;
   font-family: var(--font-family-base);
-  font-stretch: extra-condensed;
-  letter-spacing: -0.025em;
+  font-stretch: var(--font-stretch-base, ultra-condensed);
+  letter-spacing: var(--letter-spacing-base, -0.025em);
   user-select: none;
 }
 
-body, button, input, select, textarea {
+body, button, input, select, textarea, .btn, .tab-btn, .form-control, .form-select, table, th, td, label {
   font-family: var(--font-family-base);
-  font-stretch: extra-condensed;
-  letter-spacing: -0.025em;
+  font-stretch: var(--font-stretch-base, ultra-condensed);
+  letter-spacing: var(--letter-spacing-base, -0.025em);
+}
+
+code, kbd, samp, pre, .font-mono, .badge-code, .log-content {
+  font-stretch: normal;
+  letter-spacing: normal;
 }
 
 body {
@@ -146,6 +236,7 @@ body {
   font-size: 13px;
   line-height: 1.5;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
 }
 
 .app-container {
@@ -155,31 +246,31 @@ body {
   width: 100vw;
 }
 
-/* Header */
+/* Header (Trimble Modus Style) */
 .app-header {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 8px 16px;
+  padding: 8px 18px;
   background-color: var(--bg-header);
   border-bottom: 1px solid var(--border-color);
-  box-shadow: none;
+  box-shadow: var(--shadow-sm);
 }
 
 .header-brand {
   display: flex;
   align-items: center;
-  gap: 10px;
+  gap: 12px;
 }
 
 .logo-badge {
-  background: #ea212d;
+  background: var(--modus-blue);
   color: #fff;
-  font-weight: 900;
-  font-size: 11.5px;
-  letter-spacing: 1px;
-  padding: 3px 7px;
-  border-radius: 0;
+  font-weight: 800;
+  font-size: 11px;
+  letter-spacing: 0.8px;
+  padding: 4px 8px;
+  border-radius: var(--radius-sm);
   box-shadow: none;
 }
 
@@ -192,14 +283,14 @@ body {
 .header-titles h1 {
   font-size: 14px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
 .header-titles .subtitle {
-  font-size: 11px;
+  font-size: 11.5px;
   color: var(--text-muted);
   white-space: nowrap;
   overflow: hidden;
@@ -208,27 +299,33 @@ body {
 
 .header-articul {
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  justify-content: center;
-  text-align: right;
+  flex-direction: row;
+  align-items: center;
+  gap: 8px;
   flex-shrink: 0;
   padding-left: 16px;
 }
 
 .header-articul-label {
-  font-size: 9.5px;
+  font-size: 11px;
   font-weight: 700;
   color: var(--text-muted);
   text-transform: uppercase;
   letter-spacing: 0.8px;
   line-height: 1.2;
+  white-space: nowrap;
+}
+
+.header-articul-controls {
+  display: flex;
+  gap: 6px;
+  align-items: center;
 }
 
 .header-articul-value {
   font-size: 13.5px;
   font-weight: 700;
-  color: #0f172a;
+  color: var(--text-main);
   letter-spacing: 0.3px;
   white-space: nowrap;
   overflow: hidden;
@@ -252,12 +349,12 @@ body {
   display: flex;
   align-items: center;
   gap: 6px;
-  background: #f1f5f9;
-  border: 1px solid #cbd5e1;
-  padding: 4px 9px;
-  border-radius: 4px;
+  background: #f8f9fa;
+  border: 1px solid var(--border-color);
+  padding: 4px 10px;
+  border-radius: var(--radius-md);
   font-size: 11px;
-  color: #475569;
+  color: var(--text-muted);
   font-weight: 600;
   transition: all 0.25s ease;
   user-select: none;
@@ -267,22 +364,22 @@ body {
   width: 7px;
   height: 7px;
   border-radius: 50%;
-  background-color: #10b981;
+  background-color: var(--success);
   display: inline-block;
   transition: background-color 0.25s ease;
 }
 
 .autosave-status.saving .autosave-dot {
-  background-color: #f59e0b;
+  background-color: var(--warning);
   animation: pulse-dot 0.8s infinite ease-in-out;
 }
 
 .autosave-status.saved .autosave-dot {
-  background-color: #10b981;
+  background-color: var(--success);
 }
 
 .autosave-status.error .autosave-dot {
-  background-color: #ef4444;
+  background-color: var(--danger);
 }
 
 @keyframes pulse-dot {
@@ -296,13 +393,13 @@ body {
   gap: 8px;
 }
 
-/* Tabs Navigation (SketchUp Style) */
+/* Tabs Navigation (Trimble Modus Nav Tabs) */
 .nav-tabs {
   display: flex;
   background-color: #ffffff;
-  border-bottom: 1px solid var(--border-color);
-  padding: 0 12px;
-  gap: 2px;
+  border-bottom: 2px solid var(--border-light);
+  padding: 0 14px;
+  gap: 4px;
   overflow-x: auto;
   overflow-y: hidden;
 }
@@ -313,48 +410,48 @@ body {
   gap: 6px;
   background: none;
   border: none;
-  border-bottom: 2px solid transparent;
-  color: #475569;
-  padding: 8px 14px;
-  font-size: 12px;
+  border-bottom: 3px solid transparent;
+  color: var(--text-muted);
+  padding: 10px 16px;
+  font-size: 12.5px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.15s ease;
   position: relative;
-  top: 1px;
-  border-radius: 0;
+  top: 2px;
+  border-radius: var(--radius-md) var(--radius-md) 0 0;
   white-space: nowrap;
   flex-shrink: 0;
 }
 
 .tab-btn:hover {
-  color: #0f172a;
-  background-color: #f8fafc;
+  color: var(--modus-blue);
+  background-color: var(--bg-hover);
 }
 
 .tab-btn.active {
-  color: var(--su-red);
+  color: var(--modus-blue);
   background-color: #ffffff;
-  border-bottom-color: var(--su-red);
-  border-radius: 0;
+  border-bottom-color: var(--modus-blue);
+  font-weight: 700;
 }
 
 .tab-icon {
-  font-size: 13px;
+  font-size: 13.5px;
 }
 
 .badge {
-  background-color: #f1f5f9;
-  color: #334155;
+  background-color: var(--border-light);
+  color: var(--text-muted);
   font-size: 9.5px;
   font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 0;
+  padding: 2px 7px;
+  border-radius: 10px;
 }
 
 .tab-btn.active .badge {
-  background-color: #fef2f2;
-  color: var(--su-red);
+  background-color: var(--modus-blue-subtle);
+  color: var(--modus-blue);
 }
 
 .tab-btn-settings {
@@ -512,32 +609,31 @@ body {
 }
 
 label {
-  font-size: 11px;
+  font-size: 11.5px;
   font-weight: 600;
-  color: #475569;
+  color: var(--text-muted);
 }
 
 .form-control {
-  background-color: #f8fafc;
-  border: 1px solid transparent;
-  border-radius: 0;
+  background-color: var(--bg-input);
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-md);
   color: var(--text-main);
   padding: 7px 10px;
   font-size: 12px;
   outline: none;
-  transition: all 0.15s ease;
+  transition: border-color 0.15s ease-in-out, box-shadow 0.15s ease-in-out;
   user-select: text;
 }
 
 .form-control:hover {
-  border-color: #cbd5e1;
-  background-color: #ffffff;
+  border-color: #a3a6b1;
 }
 
 .form-control:focus {
-  border-color: #005eb0;
+  border-color: var(--modus-blue);
   background-color: #ffffff;
-  box-shadow: none;
+  box-shadow: var(--shadow-glow);
 }
 
 textarea.form-control {
@@ -565,17 +661,18 @@ textarea.form-control {
   align-items: center;
   gap: 4px;
   flex-shrink: 0;
-  border-radius: 0;
-  border: none;
-  background-color: #f1f5f9;
-  color: #334155;
+  border-radius: var(--radius-md);
+  border: 1px solid var(--border-color);
+  background-color: #ffffff;
+  color: var(--text-muted);
   cursor: pointer;
   transition: all 0.15s ease;
 }
 
 .btn-action:hover {
-  background-color: #e2e8f0;
-  color: #0f172a;
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+  border-color: #b7b9c3;
 }
 
 .font-mono {
@@ -794,24 +891,24 @@ tr:hover td {
   color: #fff;
 }
 
-/* Buttons (Clean Flat UI Style) */
+/* Buttons (Trimble Modus Style) */
 .btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 6px 14px;
-  border-radius: 0;
+  padding: 7px 16px;
+  border-radius: var(--radius-md);
   font-size: 12px;
   font-weight: 600;
-  border: none;
+  border: 1px solid transparent;
   cursor: pointer;
   transition: all 0.15s ease;
   box-shadow: none;
 }
 
 .btn-sm {
-  padding: 5px 10px;
+  padding: 5px 12px;
   font-size: 11px;
 }
 
@@ -821,38 +918,46 @@ tr:hover td {
 }
 
 .btn-primary {
-  background: #ea212d;
+  background: var(--modus-blue);
   color: #fff;
-  border: none;
+  border-color: var(--modus-blue);
   box-shadow: none;
 }
 
 .btn-primary:hover {
-  background: #d31b26;
+  background: var(--modus-blue-hover);
+  border-color: var(--modus-blue-hover);
   box-shadow: none;
 }
 
+.btn-primary:active {
+  background: var(--modus-blue-active);
+  border-color: var(--modus-blue-active);
+}
+
 .btn-secondary {
-  background-color: #f1f5f9;
-  color: #334155;
-  border: none;
+  background-color: #ffffff;
+  color: var(--text-muted);
+  border: 1px solid var(--border-color);
   box-shadow: none;
 }
 
 .btn-secondary:hover {
-  background-color: #e2e8f0;
-  color: #0f172a;
+  background-color: var(--bg-hover);
+  color: var(--text-main);
+  border-color: #b7b9c3;
 }
 
 .btn-success {
-  background: #ea212d;
+  background: var(--success);
   color: #fff;
-  border: none;
+  border-color: var(--success);
   box-shadow: none;
 }
 
 .btn-success:hover {
-  background: #d31b26;
+  background: var(--success-hover);
+  border-color: var(--success-hover);
   box-shadow: none;
 }
 
@@ -970,7 +1075,7 @@ tr:hover td {
 }
 
 .progress-bar-fill {
-  background: linear-gradient(90deg, #ea212d, #ff5757);
+  background: linear-gradient(90deg, var(--modus-blue), #217cbb);
   height: 100%;
   transition: width 0.2s ease;
 }
@@ -1575,18 +1680,19 @@ body.is-resizing * {
 }
 
 .scenes-panel .scenes-quick-actions .btn {
-  border: none !important;
-  background: #f1f5f9 !important;
-  color: #334155 !important;
+  border: 1px solid var(--border-color) !important;
+  background: #ffffff !important;
+  color: var(--text-muted) !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
+  border-radius: var(--radius-md) !important;
   cursor: pointer;
-  padding: 3px 8px;
+  padding: 4px 10px;
 }
 
 .scenes-panel .scenes-quick-actions .btn:hover {
-  background: #e2e8f0 !important;
-  color: #0f172a !important;
+  background: var(--bg-hover) !important;
+  color: var(--text-main) !important;
+  border-color: #b7b9c3 !important;
 }
 
 .scenes-panel .table-container {
@@ -1598,7 +1704,6 @@ body.is-resizing * {
   background-color: #ffffff;
   border: none !important;
   box-shadow: none !important;
-  border-radius: 0 !important;
 }
 
 .scenes-table {
@@ -2076,6 +2181,42 @@ body.is-resizing * {
   color: var(--text-muted, #94a3b8);
   background-color: #f8fafc;
   border-style: dashed;
+}
+
+.toolbar-font-control {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 4px;
+}
+
+.toolbar-select-sm {
+  height: 23px;
+  font-size: 11px;
+  padding: 0 6px;
+  border: 1px solid var(--border-color, #cbd5e1);
+  border-radius: var(--radius-sm, 3px);
+  background: #ffffff;
+  color: var(--text-main, #1e293b);
+  cursor: pointer;
+  max-width: 165px;
+}
+
+.toolbar-select-sm:hover {
+  border-color: #94a3b8;
+}
+
+.toolbar-select-sm:focus {
+  border-color: #005eb0;
+  outline: none;
+}
+
+.tpl-card-body,
+.tpl-preview,
+.tpl-line-preview,
+.scene-mini-preview-wrap,
+.page-font-preview {
+  font-family: var(--page-font-family), var(--font-family-base);
 }
 
 .toolbar-margin-control {
@@ -3456,28 +3597,52 @@ body.is-resizing * {
   cursor: grabbing;
 }
 
-.dir-idx-badge {
-  background: #005eb0;
-  color: #ffffff;
-  font-weight: 700;
-  font-size: 11px;
-  padding: 3px 8px;
-  border-radius: 4px;
-  border: none;
-  white-space: nowrap;
-  letter-spacing: 0.3px;
-}
-
 .dir-title-input {
   font-weight: 700;
   font-size: 14px;
   color: #0f172a;
   flex: 1;
+  min-width: 150px;
   background: #f8fafc;
   border: 1px solid #cbd5e1;
   border-radius: 6px;
   padding: 6px 10px;
   transition: all 0.15s ease;
+}
+
+/* Путь — мелкий текст рядом с заголовком; клик открывает выбор папки */
+.dir-path-text {
+  font-size: 12px;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  max-width: 340px;
+  min-width: 90px;
+  flex: 0 1 auto;
+}
+
+.dir-path-text:hover {
+  color: #005eb0;
+  text-decoration: underline;
+}
+
+.dir-path-text.empty {
+  color: #94a3b8;
+  font-style: italic;
+}
+
+/* Описание раздела — просто поле на всю ширину, без подбокса */
+.dir-section-desc {
+  margin-bottom: 12px;
+}
+
+/* Кнопки в строке заголовка не сжимаются */
+.dir-header-left .btn {
+  flex-shrink: 0;
+  white-space: nowrap;
 }
 
 .dir-title-input:focus {
@@ -3564,12 +3729,6 @@ body.is-resizing * {
   letter-spacing: normal;
 }
 
-.dir-path-row {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-}
-
 .dir-desc-textarea {
   width: 100%;
   min-height: 64px;
@@ -3599,10 +3758,120 @@ body.is-resizing * {
   letter-spacing: 0.3px;
 }
 
+.dir-preview-header-right {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+/* Кнопка открытия папки в проводнике (шапка блока предпросмотра) */
+.dir-open-folder-btn {
+  height: 18px;
+  min-width: 24px;
+  padding: 0 5px;
+  border: 1px solid #cbd5e1;
+  border-radius: 3px;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 10px;
+  font-family: inherit;
+  line-height: 1;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.dir-open-folder-btn:hover {
+  color: #005eb0;
+  border-color: #005eb0;
+}
+
+/* Переключатель размеров эскизов (S / M / L) */
+.dir-thumb-size-group {
+  display: inline-flex;
+  align-items: center;
+}
+
+.dir-thumb-size-btn {
+  width: 22px;
+  height: 18px;
+  border: 1px solid #cbd5e1;
+  background: #ffffff;
+  color: #64748b;
+  font-size: 9px;
+  font-weight: 700;
+  font-family: inherit;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0;
+  transition: all 0.15s ease;
+}
+
+.dir-thumb-size-btn:first-child {
+  border-radius: 3px 0 0 3px;
+}
+
+.dir-thumb-size-btn:last-child {
+  border-radius: 0 3px 3px 0;
+}
+
+.dir-thumb-size-btn + .dir-thumb-size-btn {
+  border-left: none;
+}
+
+.dir-thumb-size-btn:hover {
+  color: #005eb0;
+}
+
+.dir-thumb-size-btn.active {
+  background: #005eb0;
+  border-color: #005eb0;
+  color: #ffffff;
+}
+
 .dir-preview-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
   gap: 8px;
+}
+
+/* Варианты размеров эскизов: мелкие */
+.dir-preview-grid.thumb-small {
+  grid-template-columns: repeat(auto-fill, minmax(76px, 1fr));
+  gap: 6px;
+}
+
+.dir-preview-grid.thumb-small .dir-preview-thumb-wrap {
+  height: 54px;
+}
+
+.dir-preview-grid.thumb-small .dir-preview-meta {
+  display: none;
+}
+
+/* Средние (по умолчанию) */
+.dir-preview-grid.thumb-medium {
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+}
+
+.dir-preview-grid.thumb-medium .dir-preview-thumb-wrap {
+  height: 80px;
+}
+
+/* Крупные */
+.dir-preview-grid.thumb-large {
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 10px;
+}
+
+.dir-preview-grid.thumb-large .dir-preview-thumb-wrap {
+  height: 140px;
+}
+
+.dir-preview-grid.thumb-large .dir-preview-meta {
+  font-size: 11px;
+  padding: 6px 8px;
 }
 
 .dir-preview-item {
@@ -3815,23 +4084,49 @@ body.is-resizing * {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* Articul Suffix & Action Group */
-.articul-action-group {
-  display: flex;
-  gap: 6px;
-  align-items: center;
-}
-
-.articul-action-group #inputArticul {
-  flex: 1;
+/* Articul в шапке: поле + блокировка + кнопка генерации */
+.header-articul-input {
+  width: 170px;
   min-width: 0;
+  font-size: 12px;
+  padding: 3px 8px;
+  height: auto;
 }
 
-.articul-suffix-input {
-  width: 80px !important;
-  flex: 0 0 80px;
-  text-align: center;
-  font-weight: 600;
+.header-articul-controls .btn-action {
+  padding: 3px 10px;
+  font-size: 11.5px;
+  white-space: nowrap;
+}
+
+/* Блокировка артикула */
+.articul-lock-label {
+  display: flex;
+  align-items: center;
+  gap: 2px;
+  font-size: 12px;
+  line-height: 1;
+  color: #64748b;
+  cursor: pointer;
+  user-select: none;
+}
+
+.articul-lock-label input[type="checkbox"] {
+  accent-color: #d32f2f;
+  width: 13px;
+  height: 13px;
+  cursor: pointer;
+}
+
+.header-articul-controls.articul-locked #inputArticul {
+  background-color: #f1f5f9;
+  color: #475569;
+  opacity: 0.85;
+}
+
+.header-articul-controls.articul-locked .btn-action {
+  opacity: 0.5;
+  cursor: not-allowed;
 }
 
 /* Workflow 2-Column Split Layout */

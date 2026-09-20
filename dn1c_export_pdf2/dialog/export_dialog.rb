@@ -8,7 +8,6 @@ module DN1Code
   module ExportPdf2
     module Dialog
       class ExportDialog
-        DIALOG_ID = "DN1C_ExportPdf2_Dialog"
         @dialog = nil
 
         def self.refresh_if_open(model = nil)
@@ -18,8 +17,7 @@ module DN1Code
 
             Service::ObserverService.handle_model_opened(model, false) if defined?(Service::ObserverService)
 
-            project_data = Model::ProjectData.new
-            project_data.load_auto(model)
+            project_data = Model::SessionStore.data(model)
 
             json_str = JSON.generate(project_data.to_h)
             @dialog.execute_script("window.app && window.app.loadData(#{json_str});")
@@ -61,49 +59,18 @@ module DN1Code
         end
 
         def self.populate_project_data(project_data, payload)
-          return unless payload.is_a?(Hash)
-
-          if payload[:project].is_a?(Hash)
-            project_data.project.merge!(payload[:project])
-          end
-          if payload[:customer].is_a?(Hash)
-            project_data.customer.merge!(payload[:customer])
-          end
-          if payload[:workflow].is_a?(Hash)
-            project_data.workflow.merge!(payload[:workflow])
-          end
-
-          info_src = payload[:project] || payload[:project_info]
-          project_data.project_info.merge!(info_src) if info_src
-
-          if payload.key?(:api_targets) && payload[:api_targets].is_a?(Array)
-            project_data.api_targets = payload[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
-          end
-          project_data.directories = payload[:directories] if payload[:directories]
-          project_data.pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
-          if payload[:history_edit] && payload[:history_edit].is_a?(Array)
-            project_data.history = payload[:history_edit]
-          elsif payload[:history]
-            project_data.history = payload[:history]
-          end
-
-          if payload[:scenes].is_a?(Array)
-            project_data.scenes = payload[:scenes].map { |h| Model::SceneItem.from_h(h) }
-          end
-
-          project_data.sync_project_fields!
+          project_data.apply_payload!(payload)
         end
 
         def self.setup_callbacks(dialog)
-          # Загрузка данных проекта в веб-интерфейс (первично YAML, вторично библиотека модели)
+          # Загрузка данных проекта в веб-интерфейс (из сессии памяти, первично YAML рядом с моделью)
           dialog.add_action_callback("getData") do |_action_context|
             model = Sketchup.active_model
             if model && model.respond_to?(:path) && !model.path.to_s.empty?
               Service::ObserverService.handle_model_opened(model, false) if defined?(Service::ObserverService)
             end
 
-            project_data = Model::ProjectData.new
-            project_data.load_auto(model)
+            project_data = Model::SessionStore.data(model)
             if defined?(Service::OverlayService)
               project_data.pdf_settings[:show_aspect_overlay] = Service::OverlayService.overlay_active?(model)
             end
@@ -114,7 +81,6 @@ module DN1Code
 
           # Переключение видимости рамки пропорций кадра через Sketchup::Overlay
           dialog.add_action_callback("toggleAspectOverlay") do |_action_context, enabled_val|
-            puts ">>> [CALLBACK toggleAspectOverlay]: enabled_val=#{enabled_val.inspect}"
             model = Sketchup.active_model
             is_on = enabled_val == true || enabled_val.to_s == "true"
             if defined?(Service::OverlayService)
@@ -129,7 +95,7 @@ module DN1Code
               else
                 Service::OverlayService.disable(model)
               end
-              Model::ProjectData.save_default_frame_settings(show_aspect_overlay: is_on) if defined?(Model::ProjectData)
+              Model::SessionStore.update_frame_settings(model, { show_aspect_overlay: is_on }) if defined?(Model::SessionStore)
               active = Service::OverlayService.overlay_active?(model)
               dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{active});")
             end
@@ -137,13 +103,13 @@ module DN1Code
 
           # Обновление настроек пропорций кадра и перерисовка окна SketchUp
           dialog.add_action_callback("updateAspectSettings") do |_action_context, params_json|
-            puts ">>> [CALLBACK updateAspectSettings]: params=#{params_json.inspect}"
             begin
               params = params_json.is_a?(Hash) ? params_json : (JSON.parse(params_json.to_s, symbolize_names: true) rescue {})
               model = Sketchup.active_model
               if defined?(Service::OverlayService)
                 Service::OverlayService.update_settings(params, model)
-                Model::ProjectData.save_default_frame_settings(params) if defined?(Model::ProjectData)
+                # Параметры рамки — только в память сессии (запись в settings.yaml при flush)
+                Model::SessionStore.update_frame_settings(model, params) if defined?(Model::SessionStore)
                 info = Service::OverlayService.calculate_target_info(model)
                 dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(true);")
                 dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});")
@@ -164,16 +130,14 @@ module DN1Code
           # Генератор артикула по стандарту CF# / HF#
           dialog.add_action_callback("generateArticul") do |_action_context, params_json|
             commercial = false
-            index = 1
             if params_json && !params_json.to_s.empty?
               begin
                 parsed = JSON.parse(params_json)
                 commercial = parsed["commercial"] == true || parsed["commercial"] == "true" || parsed["commercial"] == 1 || parsed["commercial"] == "1"
-                index = parsed["suffix"] || parsed["index"] || "01"
               rescue StandardError
               end
             end
-            art = Model::ProjectData.generate_articul(commercial: commercial, index: index, suffix: index)
+            art = Model::ProjectData.generate_articul(commercial: commercial)
             dialog.execute_script("window.app && window.app.onArticulGenerated(#{JSON.generate(art)});")
           end
 
@@ -474,152 +438,57 @@ module DN1Code
             end
           end
 
-          # Обновить все данные во всех хранилищах (модель, сцены, YAML)
-          dialog.add_action_callback("refreshData") do |_action_context, data_json|
-            begin
-              payload = JSON.parse(data_json, symbolize_names: true)
-              model = Sketchup.active_model
-              project_data = Model::ProjectData.new
-              populate_project_data(project_data, payload)
+          # Применить данные формы к сессии в памяти (без записи на диск)
+          # Кнопка «Обновить» удалена: изменения формы применяются автосохранением
 
-              # Синхронизация сцен из активной модели
-              project_data.sync_with_model_scenes(model)
-
-              # Сохранение во все хранилища (библиотека модели + YAML файл + edit_history.yaml)
-              project_data.save_auto(model)
-              project_data.save_program_settings
-
-              yaml_name = project_data.yaml_filename(model)
-
-              # Обновляем UI свежими данными
-              refreshed_json = JSON.generate(project_data.to_h)
-              dialog.execute_script("window.app && window.app.loadData(#{refreshed_json});")
-              dialog.execute_script("window.app && window.app.showNotification('Все данные и YAML (#{yaml_name}) успешно обновлены', 'success');")
-
-              if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
-                Sketchup.status_text = "DN1C Export PDF: Все данные и YAML (#{yaml_name}) обновлены"
-              end
-            rescue StandardError => e
-              dialog.execute_script("window.app && window.app.showNotification('Ошибка обновления: #{e.message}', 'error');")
-            end
-          end
-
-          # Сохранение данных проекта в YAML рядом с .skp и в атрибуты модели (без файлов настроек плагина)
+          # Принудительное сохранение: YAML проекта рядом с .skp + настройки PDF и шаблоны
+          # в YAML файлы расширения (settings.yaml + layout.yaml)
           dialog.add_action_callback("saveProjectYaml") do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
               model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
-              project_data = Model::ProjectData.new
-              populate_project_data(project_data, payload)
+              project_data = Model::SessionStore.apply(model, payload)
               project_data.sync_with_model_scenes(model) if model
 
-              # Определяем прежний артикульный YAML из атрибутов модели (до обновления).
-              # Удалять можно только файл, названный по старому артикулу: общие файлы
-              # (project_config.yaml, <модель>.yaml и найденные эвристикой) не трогаем
-              old_articul_yamls = []
-              if model && model.respond_to?(:get_attribute) && model.respond_to?(:path) && !model.path.to_s.empty?
-                raw_info = model.get_attribute(Model::ProjectData::ATTR_DICT, "project_info", nil) rescue nil
-                if raw_info
-                  begin
-                    old_art = JSON.parse(raw_info, symbolize_names: true)[:articul].to_s.strip
-                    unless old_art.empty?
-                      dir = File.dirname(model.path.to_s.tr("\\", "/"))
-                      old_articul_yamls << File.join(dir, "#{Model::ProjectData.sanitize_filename(old_art)}.yaml")
-                      old_articul_yamls << File.join(dir, "#{Model::ProjectData.sanitize_filename(old_art)}.yml")
-                    end
-                  rescue StandardError
-                  end
+              ok = Model::SessionStore.flush(model) if defined?(Model::SessionStore)
+
+              if ok
+                yaml_name = project_data.yaml_filename(model)
+                dialog.execute_script("window.app && window.app.showNotification('Сохранено: YAML проекта (#{yaml_name}) + настройки PDF и шаблоны расширения', 'success');")
+                if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
+                  Sketchup.status_text = "DN1C Export PDF: Данные сохранены (#{yaml_name} + settings.yaml + layout.yaml)"
                 end
-              end
-
-              # Сохранение в библиотеку модели (атрибуты)
-              project_data.save_to_model(model) if model
-
-              # Сохраняем макеты страниц в layout.yaml расширения
-              if project_data.custom_layouts && !project_data.custom_layouts.empty?
-                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
-              end
-
-              yaml_path = nil
-              if model && model.respond_to?(:path) && !model.path.to_s.empty?
-                yaml_path = project_data.yaml_path_for_model(model)
-                if yaml_path
-                  project_data.save_to_yaml(yaml_path, include_settings: false)
-                  target_norm = File.expand_path(yaml_path).tr("\\", "/").downcase
-                  old_articul_yamls.uniq.each do |old_yaml|
-                    next unless File.exist?(old_yaml)
-
-                    old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
-                    File.delete(old_yaml) rescue nil if old_norm != target_norm
-                  end
-                end
-              end
-
-              yaml_name = yaml_path ? File.basename(yaml_path) : project_data.yaml_filename(model)
-              dialog.execute_script("window.app && window.app.showNotification('Данные проекта сохранены в #{yaml_name} и в модель SketchUp', 'success');")
-              if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
-                Sketchup.status_text = "DN1C Export PDF: Данные проекта сохранены (#{yaml_name})"
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML', 'error');")
               end
             rescue StandardError => e
               dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения YAML: #{e.message}', 'error');")
             end
           end
 
-          # Сохранение данных проекта только в атрибуты модели (.skp файл не перезаписывается)
-          dialog.add_action_callback("saveProjectToSkp") do |_action_context, data_json|
-            begin
-              payload = JSON.parse(data_json, symbolize_names: true)
-              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
-              project_data = Model::ProjectData.new
-              populate_project_data(project_data, payload)
-              project_data.sync_with_model_scenes(model) if model
-              project_data.save_to_model(model) if model
-
-              # Сохраняем макеты страниц в layout.yaml расширения
-              if project_data.custom_layouts && !project_data.custom_layouts.empty?
-                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
-              end
-
-              if model
-                dialog.execute_script("window.app && window.app.showNotification('Данные проекта записаны в модель SketchUp (сохраните файл Ctrl+S)', 'success');")
-              else
-                dialog.execute_script("window.app && window.app.showNotification('Нет активной модели SketchUp', 'error');")
-              end
-            rescue StandardError => e
-              dialog.execute_script("window.app && window.app.showNotification('Ошибка записи в модель: #{e.message}', 'error');")
-            end
-          end
-
           # Сохранение настроек из веб-интерфейса.
-          # Автосейв (is_auto_save/silent) пишет в библиотеку модели (атрибуты SketchUp)
-          # и всегда актуализирует шаблоны страниц в layout.yaml.
-          # Файлы проекта YAML обновляются при явных действиях.
+          # Автосейв (is_auto_save/silent) применяет данные только к сессии в памяти.
+          # Явное сохранение пишет YAML проекта + настройки/шаблоны расширения.
           save_handler = lambda do |_action_context, data_json|
             begin
               payload = JSON.parse(data_json, symbolize_names: true)
               model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
-              project_data = Model::ProjectData.new
-              populate_project_data(project_data, payload)
-
-              # Всегда сохраняем актуальную конфигурацию шаблонов в layout.yaml
-              if project_data.custom_layouts && !project_data.custom_layouts.empty?
-                project_data.save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)
-              end
+              project_data = Model::SessionStore.apply(model, payload)
 
               is_auto = payload[:silent] == true || payload[:is_auto_save] == true
 
               if is_auto
-                if model
-                  project_data.sync_with_model_scenes(model)
-                  project_data.save_to_model(model)
-                end
-                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в модель и шаблоны")});")
+                # Автосейв: данные живут в памяти до flush (кнопка/экспорт/закрытие)
+                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в память")});")
               else
                 project_data.sync_with_model_scenes(model) if model
-                project_data.save_auto(model) if model
-                project_data.save_program_settings
+                ok = Model::SessionStore.flush(model) if defined?(Model::SessionStore)
                 yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
-                dialog.execute_script("window.app && window.app.showNotification('Настройки сохранены в плагине и файле проекта (#{yaml_name})', 'success');")
+                if ok
+                  dialog.execute_script("window.app && window.app.showNotification('Сохранено в YAML (#{yaml_name}) + настройки расширения', 'success');")
+                else
+                  dialog.execute_script("window.app && window.app.showNotification('Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML', 'error');")
+                end
               end
 
               if defined?(Service::OverlayService) && model
@@ -635,11 +504,6 @@ module DN1Code
           end
 
           dialog.add_action_callback("saveData", &save_handler)
-          dialog.add_action_callback("autoSave", &save_handler)
-
-          dialog.add_action_callback("testProbe") do |_action_context, data_json|
-            $test_probe_result = data_json
-          end
 
           # Запуск экспорта в PDF
           dialog.add_action_callback("startExport") do |_action_context, data_json|
@@ -649,12 +513,11 @@ module DN1Code
               begin
                 payload = JSON.parse(data_json, symbolize_names: true)
                 model = Sketchup.active_model
-                project_data = Model::ProjectData.new
-                populate_project_data(project_data, payload)
+                project_data = Model::SessionStore.apply(model, payload)
 
                 project_data.sync_with_model_scenes(model)
-                project_data.save_auto(model)
-                project_data.save_program_settings
+                # Принудительная запись на диск перед экспортом (защита от потери данных)
+                Model::SessionStore.flush(model) if defined?(Model::SessionStore)
 
                 controller = Controller::ExportController.new(project_data, model)
 
@@ -716,17 +579,18 @@ module DN1Code
             end
           end
 
-          # Импорт настроек из YAML
+          # Импорт данных проекта из YAML (в память; запись на диск — принудительным сохранением)
           dialog.add_action_callback("importYaml") do |_action_context|
             yaml_file = UI.openpanel("Открыть файл YAML конфигурации", "", "YAML Files|*.yaml;*.yml||")
             if yaml_file && File.exist?(yaml_file)
-              project_data = Model::ProjectData.new
-              if project_data.load_from_yaml(yaml_file)
-                model = Sketchup.active_model
-                project_data.sync_with_model_scenes(model)
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.import_project_yaml(model, yaml_file) if defined?(Model::SessionStore)
+              if project_data
                 json_str = JSON.generate(project_data.to_h)
                 dialog.execute_script("window.app && window.app.loadData(#{json_str});")
-                dialog.execute_script("window.app && window.app.showNotification('Настройки загружены из YAML', 'success');")
+                dialog.execute_script("window.app && window.app.showNotification('Данные проекта импортированы в память из #{File.basename(yaml_file.to_s.tr("\\", "/"))}. Запись на диск — кнопкой «Принудительно сохранить»', 'success');")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Не удалось прочитать YAML файл: #{File.basename(yaml_file.to_s)}', 'error');")
               end
             end
           end

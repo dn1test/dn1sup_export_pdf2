@@ -17,3 +17,6 @@ test_output*.pdf
 vendor/bundle/
 .ruby-lsp/
 .solargraph/
+
+# Локальные настройки плагина (содержат личные API-токены, в git не попадают)
+dn1c_export_pdf2/config/settings.yaml

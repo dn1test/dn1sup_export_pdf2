@@ -6,8 +6,9 @@
   <title>DN1C Export PDF 2</title>
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="app.css?v=20260908_223800">
+  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="modus-bootstrap.min.css">
+  <link rel="stylesheet" href="app.css?v=20260915_roboto">
 </head>
 <body>
   <div class="app-container">
@@ -21,13 +22,16 @@
         </div>
       </div>
       <div class="header-status-group">
-        <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
-          <span class="autosave-dot" id="autosaveDot"></span>
-          <span class="autosave-text" id="autosaveText">YAML сохранен</span>
-        </div>
         <div class="header-articul" id="headerArticulBlock">
           <span class="header-articul-label">АРТИКУЛ</span>
-          <span class="header-articul-value empty" id="headerProjectArticul">—</span>
+          <div class="header-articul-controls">
+            <input type="text" id="inputArticul" class="form-control font-mono header-articul-input" placeholder="CF#260905_142650">
+            <label class="articul-lock-label" for="chkArticulLocked" title="Заблокировано — артикул защищён от изменений. Снимите галочку, чтобы пересоздать.">
+              <input type="checkbox" id="chkArticulLocked">
+              🔒
+            </label>
+            <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул">⚡ Создать</button>
+          </div>
         </div>
       </div>
     </header>
@@ -76,15 +80,6 @@
                 <div class="segmented-control" id="tradeToggleGroup">
                   <button type="button" class="segmented-btn active" data-value="0" id="btnTradeHF">🏠 Бытовой (HF#)</button>
                   <button type="button" class="segmented-btn" data-value="1" id="btnTradeCF">🏢 Коммерческий (CF#)</button>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="inputArticul">Артикул проекта *</label>
-                <div class="input-action-group articul-action-group">
-                  <input type="text" id="inputArticul" class="form-control font-mono" placeholder="CF#260905_142650_01">
-                  <input type="text" id="inputArticulSuffix" class="form-control articul-suffix-input font-mono" placeholder="01" value="01" title="Суффикс / дополнительное обозначение (например: 01, Кухня)">
-                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул с суффиксом">⚡ Создать</button>
                 </div>
               </div>
 
@@ -293,10 +288,20 @@
                 <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
                   ✏️ Переименовать
                 </button>
-                <span class="layout-page-info" id="layoutPageInfoBadge">A4 Альбомная</span>
+                <span class="layout-page-info" id="layoutPageInfoBadge">A3 Альбомная</span>
               </div>
 
               <div class="toolbar-group">
+                <div class="toolbar-font-control">
+                  <label for="selectLayoutFontFamily" class="toolbar-label-sub" title="Шрифт текста страниц">Шрифт:</label>
+                  <select id="selectLayoutFontFamily" class="form-control toolbar-select-sm" title="Шрифт текста страниц документа">
+                    <option value="Sofia Sans Condensed">Sofia Sans Condensed</option>
+                    <option value="Sofia Sans Extra Condensed">Sofia Sans Extra Condensed</option>
+                    <option value="Oswald">Oswald</option>
+                    <option value="Roboto Condensed">Roboto Condensed</option>
+                    <option value="Ubuntu Condensed">Ubuntu Condensed</option>
+                  </select>
+                </div>
                 <div class="toolbar-margin-control">
                   <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
                   <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
@@ -375,16 +380,13 @@
             <span class="card-header-title">Параметры SketchUp LayOut API</span>
           </div>
           <div class="form-grid">
-            <input type="hidden" id="selectExportEngine" value="layout">
             <div class="form-group" id="layoutRenderModeGroup">
               <label for="selectLayoutRenderMode">Режим отображения видовых экранов LayOut</label>
               <select id="selectLayoutRenderMode" class="form-control">
-                <option value="raster" selected>Растровый (Raster, видовой экран LayOut)</option>
-                <option value="image">Растровый GPU (Ambient Occlusion, мягкие тени)</option>
-                <option value="vector">Векторный (Vector, четкие линии)</option>
+                <option value="image" selected>Растровый GPU (Ambient Occlusion, мягкие тени)</option>
                 <option value="hybrid">Гибридный (Hybrid, растр + вектор)</option>
               </select>
-              <span class="field-hint">Режим GPU рендерит тени Ambient Occlusion напрямую через графический ускоритель SketchUp. Векторный и гибридный — для четких CAD линий.</span>
+              <span class="field-hint">Режим GPU рендерит тени Ambient Occlusion напрямую. Гибрид совмещает растровую заливку и векторные линии в одном видовом экране LayOut.</span>
             </div>
 
             <div class="form-group" id="compressionGroup" style="display: none;">
@@ -427,20 +429,6 @@
               <span class="field-hint">Толщина линий 3D-модели в видовом экране LayOut и рендере (0.25–1.50 pt или Авто).</span>
             </div>
 
-            <div class="form-group" id="annotationFontSizeGroup">
-              <label for="selectAnnotationFontSize">Размер шрифта выносок и размеров</label>
-              <select id="selectAnnotationFontSize" class="form-control">
-                <option value="auto" selected>Авто (исходный из модели SketchUp)</option>
-                <option value="8">8 pt (мелкий)</option>
-                <option value="10">10 pt</option>
-                <option value="12">12 pt</option>
-                <option value="14">14 pt (стандартный)</option>
-                <option value="16">16 pt</option>
-                <option value="18">18 pt (крупный)</option>
-                <option value="20">20 pt (очень крупный)</option>
-              </select>
-              <span class="field-hint">Размер шрифта выносок, сносок и надписей модели (размеры Dimension настраиваются в SketchUp: Окно &rarr; Данные модели &rarr; Размеры &rarr; Обновить).</span>
-            </div>
 
             <div class="form-group" id="layoutSaveFileGroup">
               <label class="checkbox-label" style="margin-top: 26px;">
@@ -462,8 +450,7 @@
             <div class="form-group">
               <label for="selectPageSize">Формат листа</label>
               <select id="selectPageSize" class="form-control">
-                <option value="A4" selected>A4 (210 x 297 мм)</option>
-                <option value="A3">A3 (297 x 420 мм)</option>
+                <option value="A3" selected>A3 (297 x 420 мм)</option>
               </select>
             </div>
 
@@ -479,6 +466,18 @@
               <label for="inputPageMargin">Отступ по периметру страницы (мм)</label>
               <input type="number" id="inputPageMargin" class="form-control" min="0" max="100" step="1" value="5">
               <span class="field-hint">Поля от края листа (в мм) для всех страниц при экспорте</span>
+            </div>
+
+            <div class="form-group" id="fontFamilyGroup">
+              <label for="selectFontFamily">Шрифт текста на странице (font_family)</label>
+              <select id="selectFontFamily" class="form-control">
+                <option value="Sofia Sans Condensed" selected>Sofia Sans Condensed (стандарт)</option>
+                <option value="Sofia Sans Extra Condensed">Sofia Sans Extra Condensed (сверхсжатый)</option>
+                <option value="Oswald">Oswald</option>
+                <option value="Roboto Condensed">Roboto Condensed</option>
+                <option value="Ubuntu Condensed">Ubuntu Condensed</option>
+              </select>
+              <span class="field-hint">Основной шрифт для штампа, таблиц и текстовых блоков страниц документа LayOut / PDF.</span>
             </div>
 
             <div class="form-group full-width">
@@ -656,11 +655,13 @@
     <!-- Footer Action Bar -->
     <footer class="app-footer">
       <div class="footer-left">
-        <button class="btn btn-secondary" id="btnSaveYaml" title="Сохранить данные проекта в YAML рядом с .skp и в атрибуты модели">💾 Сохранить в YAML</button>
-        <button class="btn btn-secondary" id="btnSaveSkp" title="Записать данные проекта в атрибуты модели (.skp сохраняется через Ctrl+S)">🗄 Сохранить в SketchUp</button>
-        <button class="btn btn-secondary" id="btnRefreshData" title="Обновить все данные во всех хранилищах (модель, сцены, YAML)">🔄 Обновить</button>
-        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать настройки из YAML">📥 Импорт YAML</button>
+        <button class="btn btn-secondary" id="btnSaveYaml" title="Принудительно сохранить: YAML проекта рядом с .skp + настройки PDF и шаблоны в YAML расширения (также сохраняется при экспорте PDF и закрытии SketchUp)">💾 Принудительно сохранить</button>
+        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)">📥 Импорт YAML</button>
         <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML">📤 Экспорт YAML</button>
+        <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
+          <span class="autosave-dot" id="autosaveDot"></span>
+          <span class="autosave-text" id="autosaveText">YAML сохранен</span>
+        </div>
       </div>
       <div class="footer-right">
         <label class="footer-checkbox-label" title="Автоматически открыть созданный PDF в программе по умолчанию">

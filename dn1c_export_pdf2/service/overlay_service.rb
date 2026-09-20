@@ -225,17 +225,9 @@ module DN1Code
           pdata = nil
           if override_settings && (override_settings[:project_data] || override_settings["project_data"])
             pdata = override_settings[:project_data] || override_settings["project_data"]
-          elsif model && defined?(Model::ProjectData)
-            pdata = Model::ProjectData.new
-            pdata.load_program_settings
-            # Безопасное чтение без изменения модели во время колбэков оверлея
-            yaml_file = Model::ProjectData.find_yaml_path_for_model(model)
-            if yaml_file && File.exist?(yaml_file)
-              pdata.load_from_yaml(yaml_file)
-            end
-            if model.respond_to?(:get_attribute)
-              pdata.load_from_model(model)
-            end
+          elsif model && defined?(Model::SessionStore)
+            # Быстрое чтение из сессии памяти (без обращения к диску и атрибутам модели)
+            pdata = Model::SessionStore.data(model)
           end
 
           base_settings = {}
@@ -686,9 +678,8 @@ module DN1Code
           @current_settings = nil
 
           pdata = project_data
-          if pdata.nil? && m && defined?(Model::ProjectData)
-            pdata = Model::ProjectData.new
-            pdata.load_auto(m)
+          if pdata.nil? && m && defined?(Model::SessionStore)
+            pdata = Model::SessionStore.data(m)
           end
 
           info = calculate_target_info(m, pdata ? pdata.pdf_settings : nil)

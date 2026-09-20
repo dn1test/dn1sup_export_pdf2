@@ -158,7 +158,7 @@
         return d ? String(d).trim() : new Date().toLocaleDateString();
       }
     },
-    { key: "articul",          group: "project",  label: "Артикул",                 icon: "🔖", getVal: (info, wf) => (info.articul || "").trim() || "CF#260905_160129_01" },
+    { key: "articul",          group: "project",  label: "Артикул",                 icon: "🔖", getVal: (info, wf) => (info.articul || "").trim() || "CF#260905_160129" },
     { key: "furniture_name",   group: "project",  label: "Название мебели",         icon: "🪑", getVal: (info, wf) => (info.furniture_name || info.name_product || "").trim() || "Шкаф, Тумба, Зеркало" },
     { key: "place_address",    group: "project",  label: "Место установки | Адрес установки", icon: "📍", getVal: (info, wf) => [info.room_name || info.name_place, info.address || info.adress].filter(Boolean).map(s => s.trim()).join(" | ") || "Санузел у бани | г. Москва" },
     { key: "customer_or_company", group: "customer", label: "Имя заказчика или Название компании", icon: "👤", getVal: (info, wf) => [info.name_customer || info.customer, info.company || info.name_company].filter(Boolean).map(s => s.trim()).join(" | ") || "Смирнов С.С. | ООО «МебельПроект»" },
@@ -176,7 +176,7 @@
       }
     },
     { key: "footer_articul",   group: "system",   label: "Артикул",                 icon: "🔖", getVal: (info, wf) => {
-        const art = (info.articul || '').trim() || 'CF#260905_160129_01';
+        const art = (info.articul || '').trim() || 'CF#260905_160129';
         return art.toLowerCase().startsWith("артикул") ? art : `Артикул: ${art}`;
       }
     },
@@ -189,7 +189,7 @@
     { key: "footer_rev_ver_date", group: "system", label: "Ревизия # Версия | Артикул | Дата", icon: "🗓️", getVal: (info, wf) => {
         const rev = wf.revision || info.revision || '001';
         const ver = wf.version || info.version || '01';
-        const art = (info.articul || '').trim() || 'CF#260905_160129_01';
+        const art = (info.articul || '').trim() || 'CF#260905_160129';
         return `Ревизия ${rev} # Версия ${ver} | ${art} | ${new Date().toLocaleDateString()}`;
       }
     },
@@ -532,7 +532,6 @@
     // Header Titles
     headerProjectTitle: document.getElementById("headerProjectTitle"),
     headerProjectSubtitle: document.getElementById("headerProjectSubtitle"),
-    headerProjectArticul: document.getElementById("headerProjectArticul"),
 
     // Tab 1 Inputs (Modular Project, Customer, Workflow)
     inputRoomName: document.getElementById("inputRoomName"),
@@ -543,8 +542,8 @@
     inputCompany: document.getElementById("inputCompany"),
     companyFieldGroup: document.getElementById("companyFieldGroup"),
     inputArticul: document.getElementById("inputArticul"),
-    inputArticulSuffix: document.getElementById("inputArticulSuffix"),
     btnGenerateArticul: document.getElementById("btnGenerateArticul"),
+    chkArticulLocked: document.getElementById("chkArticulLocked"),
     tradeToggleGroup: document.getElementById("tradeToggleGroup"),
     btnTradeHF: document.getElementById("btnTradeHF"),
     btnTradeCF: document.getElementById("btnTradeCF"),
@@ -611,8 +610,6 @@
     btnResetLayout: document.getElementById("btnResetLayout"),
 
     // Tab 3 Inputs
-    selectExportEngine: document.getElementById("selectExportEngine"),
-    engineHintText: document.getElementById("engineHintText"),
     layoutRenderModeGroup: document.getElementById("layoutRenderModeGroup"),
     selectLayoutRenderMode: document.getElementById("selectLayoutRenderMode"),
     compressionGroup: document.getElementById("compressionGroup"),
@@ -624,6 +621,8 @@
     selectPageSize: document.getElementById("selectPageSize"),
     selectPageLayout: document.getElementById("selectPageLayout"),
     inputPageMargin: document.getElementById("inputPageMargin"),
+    selectFontFamily: document.getElementById("selectFontFamily"),
+    selectLayoutFontFamily: document.getElementById("selectLayoutFontFamily"),
     selectImageAspect: document.getElementById("selectImageAspect"),
     customAspectGroup: document.getElementById("customAspectGroup"),
     inputAspectCustomW: document.getElementById("inputAspectCustomW"),
@@ -653,9 +652,7 @@
     btnAddHistoryEntry: document.getElementById("btnAddHistoryEntry"),
 
     // Global Actions
-    btnRefreshData: document.getElementById("btnRefreshData"),
     btnSaveYaml: document.getElementById("btnSaveYaml"),
-    btnSaveSkp: document.getElementById("btnSaveSkp"),
     btnStartExport: document.getElementById("btnStartExport"),
     btnImportYaml: document.getElementById("btnImportYaml"),
     btnExportYaml: document.getElementById("btnExportYaml"),
@@ -718,7 +715,7 @@
   function getEffectiveRenderWidth() {
     if (els.selectQuality) {
       const val = (els.selectQuality.value || "").toLowerCase().trim();
-      const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A4")).toUpperCase().trim();
+      const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A3")).toUpperCase().trim();
       const pageLay = (els.selectPageLayout ? els.selectPageLayout.value : (state.pdf_settings?.page_layout || "landscape")).toLowerCase().trim();
 
       let dpi = 150;
@@ -740,10 +737,10 @@
     if (els.selectScaleMultiplier) {
       const raw = els.selectScaleMultiplier.value;
       if (raw === "auto") {
-        const renderMode = (els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : (state.pdf_settings?.layout_render_mode || "raster")).toLowerCase();
-        const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A4")).toUpperCase().trim();
-        if (renderMode === "vector" || renderMode === "hybrid") {
-          // Для векторного и гибридного режимов подстраиваемся под растр по формату листа (с уменьшением на 30%)
+        const renderMode = (els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : (state.pdf_settings?.layout_render_mode || "image")).toLowerCase();
+        const pageSz = (els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A3")).toUpperCase().trim();
+        if (renderMode === "hybrid") {
+          // Для гибридного (векторного) режима подстраиваемся под формат листа (с уменьшением на 30%)
           if (pageSz === "A3") return 0.63;
           return 0.42;
         } else {
@@ -1896,7 +1893,7 @@
 
     if (!isUserAction) return;
 
-    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
+    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A3").toUpperCase();
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
     const baseWidth = getEffectiveRenderWidth();
 
@@ -1982,7 +1979,7 @@
       return;
     }
 
-    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
+    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A3").toUpperCase();
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
     const baseWidth = getEffectiveRenderWidth();
 
@@ -2033,7 +2030,7 @@
 
     // Page format badge
     const isPortrait = (els.selectPageLayout ? els.selectPageLayout.value : state.pdf_settings?.page_layout) === "portrait";
-    const pageSize = (els.selectPageSize ? els.selectPageSize.value : state.pdf_settings?.page_size) || "A4";
+    const pageSize = (els.selectPageSize ? els.selectPageSize.value : state.pdf_settings?.page_size) || "A3";
     if (els.layoutPageInfoBadge) {
       els.layoutPageInfoBadge.textContent = `${pageSize} ${isPortrait ? "Книжная" : "Альбомная"}`;
     }
@@ -3821,7 +3818,7 @@
     els.companyFieldGroup.style.display = isCommercial ? "flex" : "none";
   }
 
-  function generateArticulLocal(isCommercial, suffix = "01") {
+  function generateArticulLocal(isCommercial) {
     const prefix = isCommercial ? "CF#" : "HF#";
     const now = new Date();
     const yy = String(now.getFullYear()).slice(-2);
@@ -3830,8 +3827,7 @@
     const hh = String(now.getHours()).padStart(2, '0');
     const mi = String(now.getMinutes()).padStart(2, '0');
     const ss = String(now.getSeconds()).padStart(2, '0');
-    const suf = String(suffix || "01").trim() || "01";
-    return `${prefix}${yy}${mm}${dd}_${hh}${mi}${ss}_${suf}`;
+    return `${prefix}${yy}${mm}${dd}_${hh}${mi}${ss}`;
   }
 
   function generateCustomerIdLocal() {
@@ -3878,6 +3874,13 @@
     updateCompanyVisibility();
 
     if (els.inputArticul) els.inputArticul.value = prj.articul || info.articul || "";
+    // Блокировка артикула: флаг из состояния; без флага — непустой артикул считается заблокированным
+    if (els.chkArticulLocked) {
+      const artVal = (prj.articul || info.articul || "").trim();
+      const lockFlag = prj.articul_locked !== undefined ? prj.articul_locked : info.articul_locked;
+      els.chkArticulLocked.checked = lockFlag === true || lockFlag === "true" || (lockFlag === undefined && artVal !== "");
+    }
+    applyArticulLockState();
     if (els.inputCompany) els.inputCompany.value = prj.name_company || info.company || "";
     if (els.inputFurnitureName) {
       const pTags = prj.product_tags || info.product_tags;
@@ -3924,9 +3927,7 @@
     if (els.inputNotes) els.inputNotes.value = info.notes || "";
 
     // LayOut PDF Settings
-    const engine = "layout";
-    if (els.selectExportEngine) els.selectExportEngine.value = engine;
-    if (els.selectLayoutRenderMode) els.selectLayoutRenderMode.value = settings.layout_render_mode || "raster";
+    if (els.selectLayoutRenderMode) els.selectLayoutRenderMode.value = settings.layout_render_mode || "image";
     if (els.selectCompression) {
       els.selectCompression.value = (settings.compress_pdf === true || settings.compress_pdf === "compress") ? "compress" : "none";
     }
@@ -3934,11 +3935,9 @@
       els.selectImageFormat.value = (settings.image_format || "png").toLowerCase();
     }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
-    updateEngineUI();
 
     if (els.selectPageSize) {
-      const ps = (settings.page_size || "A4").toUpperCase().trim();
-      els.selectPageSize.value = (ps === "A3") ? "A3" : "A4";
+      els.selectPageSize.value = "A3";
     }
     if (els.selectPageLayout) els.selectPageLayout.value = settings.page_layout || "landscape";
     const marginMm = settings.margin_mm !== undefined && settings.margin_mm !== null
@@ -3946,6 +3945,13 @@
       : (settings.margin !== undefined && settings.margin !== null ? Math.round((parseFloat(settings.margin) * 25.4) / 72.0) : 5);
     if (els.inputPageMargin) els.inputPageMargin.value = marginMm;
     if (els.inputLayoutMargin) els.inputLayoutMargin.value = marginMm;
+    let curFontFamily = (settings.font_family || "Sofia Sans Condensed").trim();
+    if (curFontFamily.toLowerCase().includes("din")) {
+      curFontFamily = "Oswald";
+    }
+    if (els.selectFontFamily) els.selectFontFamily.value = curFontFamily;
+    if (els.selectLayoutFontFamily) els.selectLayoutFontFamily.value = curFontFamily;
+    document.documentElement.style.setProperty("--page-font-family", `"${curFontFamily}", sans-serif`);
     const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
     let initialAspect = settings.image_aspect_ratio;
     if (!VALID_ASPECT_RATIOS.includes(initialAspect)) {
@@ -4237,28 +4243,13 @@
         showNotification(`Раздел «${moved.title || "Папка"}» перемещен на позицию #${dropIndex + 1}`, "info");
       });
 
-      // 1. HEADER (Ручка перетаскивания, Номер раздела, Заголовок, Кнопки порядка и Удаления)
+      // 1. HEADER — порядок по макету: заголовок, путь (клик — выбрать папку),
+      // Обновить; справа — стрелки порядка, ручка перетаскивания и удаление
       const headerDiv = document.createElement("div");
       headerDiv.className = "dir-card-header";
 
       const headerLeft = document.createElement("div");
       headerLeft.className = "dir-header-left";
-
-      // Ручка для перетаскивания мышкой
-      const dragHandle = document.createElement("div");
-      dragHandle.className = "dir-drag-handle";
-      dragHandle.innerHTML = "&#x283F;"; // ⠿
-      dragHandle.title = "Потяните мышкой для изменения порядка разделов";
-      dragHandle.addEventListener("mousedown", () => {
-        card.setAttribute("draggable", "true");
-      });
-      dragHandle.addEventListener("mouseup", () => {
-        card.setAttribute("draggable", "false");
-      });
-
-      const idxBadge = document.createElement("span");
-      idxBadge.className = "dir-idx-badge";
-      idxBadge.textContent = `📁 #${index + 1}`;
 
       const titleInput = document.createElement("input");
       titleInput.type = "text";
@@ -4274,12 +4265,61 @@
         notifyChange();
       });
 
-      headerLeft.appendChild(dragHandle);
-      headerLeft.appendChild(idxBadge);
+      // Путь — мелкий текст справа от заголовка; клик открывает проводник для выбора
+      // папки, заголовок при выборе берется из имени конечного каталога (onDirectorySelected)
+      const pathText = document.createElement("span");
+      pathText.className = "dir-path-text" + (d.path ? "" : " empty");
+      pathText.textContent = d.path || "выбрать папку…";
+      pathText.title = d.path
+        ? `${d.path}\nНажмите, чтобы выбрать другую папку`
+        : "Нажмите, чтобы выбрать папку на диске";
+      pathText.addEventListener("click", () => {
+        callRuby("selectDirectory", index.toString());
+      });
+
+      const btnRefresh = document.createElement("button");
+      btnRefresh.type = "button";
+      btnRefresh.className = "btn btn-xs btn-secondary";
+      btnRefresh.textContent = "🔄 Обновить";
+      btnRefresh.title = "Пересканировать файлы в папке";
+      btnRefresh.addEventListener("click", () => {
+        if (d.path) {
+          const badge = document.getElementById(`dirFileBadge_${index}`);
+          const grid = document.getElementById(`dirPreviewGrid_${index}`);
+          if (badge) {
+            badge.textContent = "Сканирование...";
+            badge.className = "badge badge-tag badge-grid";
+          }
+          if (grid) {
+            grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
+          }
+          if (state.folderFiles) delete state.folderFiles[index];
+          if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
+          scheduleScanTimeout(index, d.path);
+          callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
+        } else {
+          showNotification("Укажите путь к папке", "warning");
+        }
+      });
+
       headerLeft.appendChild(titleInput);
+      headerLeft.appendChild(pathText);
+      headerLeft.appendChild(btnRefresh);
 
       const headerRight = document.createElement("div");
       headerRight.className = "dir-header-right";
+
+      // Ручка перетаскивания мышкой — в правой группе, после стрелок
+      const dragHandle = document.createElement("div");
+      dragHandle.className = "dir-drag-handle";
+      dragHandle.innerHTML = "&#x283F;"; // ⠿
+      dragHandle.title = "Потяните мышкой для изменения порядка разделов";
+      dragHandle.addEventListener("mousedown", () => {
+        card.setAttribute("draggable", "true");
+      });
+      dragHandle.addEventListener("mouseup", () => {
+        card.setAttribute("draggable", "false");
+      });
 
       // Кнопка перемещения вверх
       const btnUp = document.createElement("button");
@@ -4326,119 +4366,16 @@
 
       headerRight.appendChild(btnUp);
       headerRight.appendChild(btnDown);
+      headerRight.appendChild(dragHandle);
       headerRight.appendChild(btnDelete);
 
       headerDiv.appendChild(headerLeft);
       headerDiv.appendChild(headerRight);
       card.appendChild(headerDiv);
 
-      // 2. PATH SECTION (Блок пути к рабочей папке)
-      const pathSection = document.createElement("div");
-      pathSection.className = "dir-section-box dir-section-path";
-
-      const pathHeader = document.createElement("div");
-      pathHeader.className = "dir-section-header";
-      pathHeader.innerHTML = `
-        <div class="dir-section-title">
-          <span>📂 Расположение рабочей папки:</span>
-        </div>
-        <span class="dir-section-hint">Каталог на диске с файлами чертежей, замеров и спецификаций</span>`;
-      pathSection.appendChild(pathHeader);
-
-      const pathRow = document.createElement("div");
-      pathRow.className = "dir-path-row";
-
-      const pathInput = document.createElement("input");
-      pathInput.type = "text";
-      pathInput.className = "form-control font-mono";
-      pathInput.style.flex = "1";
-      pathInput.value = d.path || "";
-      pathInput.placeholder = "Путь к папке (например: !_материалы_фурнитура или C:/Projects/...)";
-      pathInput.addEventListener("input", (e) => {
-        d.path = e.target.value;
-        const autoName = getFolderName(d.path);
-        if (autoName) {
-          d.title = autoName;
-          titleInput.value = autoName;
-        }
-      });
-      pathInput.addEventListener("change", (e) => {
-        d.path = e.target.value.trim();
-        const autoName = getFolderName(d.path);
-        if (autoName) {
-          d.title = autoName;
-          titleInput.value = autoName;
-        }
-        callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
-        notifyChange();
-      });
-
-      const btnBrowse = document.createElement("button");
-      btnBrowse.type = "button";
-      btnBrowse.className = "btn btn-xs btn-secondary";
-      btnBrowse.textContent = "📂 Обзор";
-      btnBrowse.title = "Выбрать существующую папку через проводник";
-      btnBrowse.addEventListener("click", () => {
-        callRuby("selectDirectory", index.toString());
-      });
-
-      const btnOpen = document.createElement("button");
-      btnOpen.type = "button";
-      btnOpen.className = "btn btn-xs btn-secondary";
-      btnOpen.textContent = "↗ Открыть";
-      btnOpen.title = "Открыть папку в проводнике Windows";
-      btnOpen.addEventListener("click", () => {
-        if (d.path) {
-          callRuby("openDirectoryPath", d.path);
-        } else {
-          showNotification("Укажите путь к папке", "warning");
-        }
-      });
-
-      const btnRefresh = document.createElement("button");
-      btnRefresh.type = "button";
-      btnRefresh.className = "btn btn-xs btn-secondary";
-      btnRefresh.textContent = "🔄 Обновить";
-      btnRefresh.title = "Пересканировать файлы в папке";
-      btnRefresh.addEventListener("click", () => {
-        if (d.path) {
-          const badge = document.getElementById(`dirFileBadge_${index}`);
-          const grid = document.getElementById(`dirPreviewGrid_${index}`);
-          if (badge) {
-            badge.textContent = "Сканирование...";
-            badge.className = "badge badge-tag badge-grid";
-          }
-          if (grid) {
-            grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
-          }
-          if (state.folderFiles) delete state.folderFiles[index];
-          if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
-          scheduleScanTimeout(index, d.path);
-          callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
-        } else {
-          showNotification("Укажите путь к папке", "warning");
-        }
-      });
-
-      pathRow.appendChild(pathInput);
-      pathRow.appendChild(btnBrowse);
-      pathRow.appendChild(btnOpen);
-      pathRow.appendChild(btnRefresh);
-      pathSection.appendChild(pathRow);
-      card.appendChild(pathSection);
-
-      // 3. DESCRIPTION SECTION (Блок описания и спецификации)
+      // 2. DESCRIPTION SECTION (Описание и спецификация — сразу поле, без шапки)
       const descSection = document.createElement("div");
-      descSection.className = "dir-section-box dir-section-desc";
-
-      const descHeader = document.createElement("div");
-      descHeader.className = "dir-section-header";
-      descHeader.innerHTML = `
-        <div class="dir-section-title">
-          <span>📝 Описание и спецификация раздела:</span>
-        </div>
-        <span class="dir-section-hint">Сохраняется в YAML и попадает в страницы/спецификации PDF</span>`;
-      descSection.appendChild(descHeader);
+      descSection.className = "dir-section-desc";
 
       const descTextarea = document.createElement("textarea");
       descTextarea.className = "form-control dir-desc-textarea";
@@ -4464,18 +4401,74 @@
       previewSection.className = "dir-section-box dir-section-previews";
       previewSection.id = `dirPreviewBlock_${index}`;
 
+      // Размер эскизов папки: small / medium / large (сохраняется в directories[].thumb_size)
+      const thumbSize = ["small", "medium", "large"].includes(d.thumb_size) ? d.thumb_size : "medium";
+      d.thumb_size = thumbSize;
+
       const previewHeader = document.createElement("div");
       previewHeader.className = "dir-preview-header";
-      previewHeader.innerHTML = `
-        <div class="dir-section-title">
-          <span>🖼️ Файлы и предпросмотр в папке:</span>
-          <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>
-        </div>
-        <span class="badge badge-tag badge-grid" id="dirFileBadge_${index}">Сканирование...</span>`;
+
+      const previewTitle = document.createElement("div");
+      previewTitle.className = "dir-section-title";
+      previewTitle.innerHTML = `
+        <span>🖼️ Файлы и предпросмотр в папке:</span>
+        <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>`;
+
+      const sizeGroup = document.createElement("div");
+      sizeGroup.className = "dir-thumb-size-group";
+      [
+        { key: "small", label: "S", title: "Мелкие эскизы" },
+        { key: "medium", label: "M", title: "Средние эскизы" },
+        { key: "large", label: "L", title: "Крупные эскизы" }
+      ].forEach((variant) => {
+        const sizeBtn = document.createElement("button");
+        sizeBtn.type = "button";
+        sizeBtn.className = "dir-thumb-size-btn" + (variant.key === thumbSize ? " active" : "");
+        sizeBtn.textContent = variant.label;
+        sizeBtn.title = variant.title;
+        sizeBtn.addEventListener("click", () => {
+          if (d.thumb_size === variant.key) return;
+          d.thumb_size = variant.key;
+          sizeGroup.querySelectorAll(".dir-thumb-size-btn").forEach((b) => b.classList.remove("active"));
+          sizeBtn.classList.add("active");
+          const gridForSize = document.getElementById(`dirPreviewGrid_${index}`);
+          if (gridForSize) {
+            gridForSize.classList.remove("thumb-small", "thumb-medium", "thumb-large");
+            gridForSize.classList.add(`thumb-${variant.key}`);
+          }
+          notifyChange();
+        });
+        sizeGroup.appendChild(sizeBtn);
+      });
+
+      const previewRight = document.createElement("div");
+      previewRight.className = "dir-preview-header-right";
+      const btnOpenFolder = document.createElement("button");
+      btnOpenFolder.type = "button";
+      btnOpenFolder.className = "dir-open-folder-btn";
+      btnOpenFolder.textContent = "↗";
+      btnOpenFolder.title = "Открыть папку в проводнике Windows";
+      btnOpenFolder.addEventListener("click", () => {
+        if (d.path) {
+          callRuby("openDirectoryPath", d.path);
+        } else {
+          showNotification("Папка не выбрана", "warning");
+        }
+      });
+      previewRight.appendChild(btnOpenFolder);
+      const previewBadge = document.createElement("span");
+      previewBadge.className = "badge badge-tag badge-grid";
+      previewBadge.id = `dirFileBadge_${index}`;
+      previewBadge.textContent = "Сканирование...";
+      previewRight.appendChild(sizeGroup);
+      previewRight.appendChild(previewBadge);
+
+      previewHeader.appendChild(previewTitle);
+      previewHeader.appendChild(previewRight);
       previewSection.appendChild(previewHeader);
 
       const previewGrid = document.createElement("div");
-      previewGrid.className = "dir-preview-grid";
+      previewGrid.className = `dir-preview-grid thumb-${thumbSize}`;
       previewGrid.id = `dirPreviewGrid_${index}`;
       previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
       previewSection.appendChild(previewGrid);
@@ -4669,13 +4662,6 @@
     });
   }
 
-  // Update LayOut Engine UI State
-  function updateEngineUI() {
-    if (els.layoutRenderModeGroup) els.layoutRenderModeGroup.style.display = "flex";
-    if (els.layoutSaveFileGroup) els.layoutSaveFileGroup.style.display = "flex";
-    notifyChange();
-  }
-
   // Update Aspect Ratio UI & SketchUp Overlay state
   function updateAspectUI(isUserAction = false) {
     let aspectMode = els.selectImageAspect ? els.selectImageAspect.value : "4:3";
@@ -4688,12 +4674,12 @@
       els.customAspectGroup.style.display = (aspectMode === "custom") ? "block" : "none";
     }
 
-    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A4").toUpperCase();
+    const pageSize = (els.selectPageSize ? els.selectPageSize.value : "A3").toUpperCase();
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
     const baseWidth = getEffectiveRenderWidth();
 
     let ratio = 1.4142;
-    let label = "A4 Альбомный";
+    let label = "A3 Альбомный";
 
     if (aspectMode === "16:9") {
       ratio = 16.0 / 9.0;
@@ -4762,18 +4748,8 @@
     const subParts = [customer, address].filter(Boolean);
     const subText = subParts.length ? subParts.join(" — ") : "Заказчик — Адрес объекта";
 
-    const articul = (els.inputArticul ? els.inputArticul.value : "").trim();
-
     if (els.headerProjectTitle) els.headerProjectTitle.textContent = pTitle;
     if (els.headerProjectSubtitle) els.headerProjectSubtitle.textContent = subText;
-    if (els.headerProjectArticul) {
-      els.headerProjectArticul.textContent = articul || "—";
-      if (!articul) {
-        els.headerProjectArticul.classList.add("empty");
-      } else {
-        els.headerProjectArticul.classList.remove("empty");
-      }
-    }
 
     // Refresh previews in layout canvas
     const tplTab = document.getElementById("tab-templates");
@@ -5716,6 +5692,7 @@
 
     state.project = {
       articul: articulVal,
+      articul_locked: isArticulLocked(),
       product_tags: productTags,
       product: furniture,
       place: room,
@@ -5758,6 +5735,7 @@
     // Фасад project_info для 100% обратной совместимости
     state.project_info = {
       articul:          articulVal,
+      articul_locked:   isArticulLocked(),
       name_product:     furniture,
       name_place:       room,
       adress:           addrVal,
@@ -5812,12 +5790,11 @@
     ensureCustomLayouts();
 
     state.pdf_settings = {
-      export_engine: "layout",
-      layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "raster",
+      layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "image",
       compress_pdf: els.selectCompression ? (els.selectCompression.value === "compress") : (state.pdf_settings?.compress_pdf === true),
       image_format: els.selectImageFormat ? els.selectImageFormat.value : (state.pdf_settings?.image_format || "png"),
       save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
-      page_size: (els.selectPageSize && els.selectPageSize.value === "A3") ? "A3" : "A4",
+      page_size: "A3",
       page_layout: els.selectPageLayout.value,
       margin_mm: els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5),
       margin: Math.round((((els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5)) * 72.0) / 25.4) * 10) / 10,
@@ -5858,6 +5835,11 @@
       annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value : (state.pdf_settings?.annotation_font_size || "auto"),
       stamp_type: els.selectStamp ? els.selectStamp.value : (state.pdf_settings?.stamp_type || "none"),
       stamp_custom: els.inputCustomStamp ? els.inputCustomStamp.value.trim() : (state.pdf_settings?.stamp_custom || ""),
+      font_family: (els.selectFontFamily && els.selectFontFamily.value)
+        ? els.selectFontFamily.value
+        : (els.selectLayoutFontFamily && els.selectLayoutFontFamily.value
+          ? els.selectLayoutFontFamily.value
+          : (state.pdf_settings?.font_family || "Sofia Sans Condensed")),
       primary_color: els.inputPrimaryColor ? els.inputPrimaryColor.value.replace("#", "") : (state.pdf_settings?.primary_color || "005EB0"),
       stamp_color: els.inputStampColor ? els.inputStampColor.value.replace("#", "") : (state.pdf_settings?.stamp_color || "D32F2F"),
       auto_open_pdf: els.chkAutoOpen.checked,
@@ -5877,18 +5859,53 @@
     return state;
   }
 
+  // --- Блокировка артикула ---
+  // Артикул создаётся один раз и сразу блокируется; пересоздать можно,
+  // только сняв галочку «Заблокировано»
+
+  function isArticulLocked() {
+    return !!(els.chkArticulLocked && els.chkArticulLocked.checked);
+  }
+
+  // Применяет состояние блокировки к полю артикула и кнопке генерации
+  function applyArticulLockState() {
+    const locked = isArticulLocked();
+    if (els.inputArticul) els.inputArticul.disabled = locked;
+    if (els.btnGenerateArticul) {
+      els.btnGenerateArticul.disabled = locked;
+      els.btnGenerateArticul.title = locked
+        ? "Артикул заблокирован — снимите галочку «Заблокировано», чтобы пересоздать"
+        : "Сгенерировать уникальный артикул";
+    }
+    const controls = document.querySelector(".header-articul-controls");
+    if (controls) controls.classList.toggle("articul-locked", locked);
+  }
+
+  // Блокирует артикул после генерации нового значения
+  function lockArticulAfterGeneration() {
+    if (els.chkArticulLocked && !els.chkArticulLocked.checked) {
+      els.chkArticulLocked.checked = true;
+      applyArticulLockState();
+      notifyChange();
+    }
+  }
+
   // Trigger Articul Generation
   function triggerGenerateArticul() {
+    if (isArticulLocked()) {
+      showNotification("Артикул заблокирован. Снимите галочку «Заблокировано», чтобы пересоздать.", "warning");
+      return;
+    }
     const isCommercial = getTradeValue() === "1";
-    const suffix = (els.inputArticulSuffix ? els.inputArticulSuffix.value : "").trim() || "01";
     if (window.sketchup && typeof window.sketchup.generateArticul === "function") {
-      callRuby("generateArticul", JSON.stringify({ commercial: isCommercial, index: suffix, suffix: suffix }));
+      callRuby("generateArticul", JSON.stringify({ commercial: isCommercial }));
     } else {
-      const newArt = generateArticulLocal(isCommercial, suffix);
+      const newArt = generateArticulLocal(isCommercial);
       if (els.inputArticul) {
         els.inputArticul.value = newArt;
         updateHeaderTitles();
         showNotification(`Сгенерирован артикул: ${newArt}`, "info");
+        lockArticulAfterGeneration();
       }
     }
   }
@@ -5921,6 +5938,16 @@
     if (els.btnGenerateCustomerId) {
       els.btnGenerateCustomerId.addEventListener("click", triggerGenerateCustomerId);
     }
+    // Галочка блокировки артикула: снята — поля открыты для пересоздания
+    if (els.chkArticulLocked) {
+      els.chkArticulLocked.addEventListener("change", () => {
+        applyArticulLockState();
+        if (!isArticulLocked()) {
+          showNotification("Артикул разблокирован — можно изменить или пересоздать.", "info");
+        }
+        notifyChange();
+      });
+    }
 
     // Segmented toggle for project type (trade)
     const tradeBtns = document.querySelectorAll("#tradeToggleGroup .segmented-btn");
@@ -5930,7 +5957,9 @@
         setTradeValue(val);
         const isComm = val === "1";
         const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
-        if (curArt.startsWith("CF#") && !isComm) {
+        if (isArticulLocked()) {
+          // Заблокированный артикул не изменяется при смене типа проекта
+        } else if (curArt.startsWith("CF#") && !isComm) {
           els.inputArticul.value = curArt.replace(/^CF#/, "HF#");
           updateHeaderTitles();
         } else if (curArt.startsWith("HF#") && isComm) {
@@ -5945,6 +5974,10 @@
       els.selectTrade.addEventListener("change", () => {
         setTradeValue(els.selectTrade.value);
         const isComm = els.selectTrade.value === "1";
+        if (isArticulLocked()) {
+          // Заблокированный артикул не изменяется при смене типа проекта
+          return;
+        }
         const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
         if (curArt.startsWith("CF#") && !isComm) {
           els.inputArticul.value = curArt.replace(/^CF#/, "HF#");
@@ -5973,26 +6006,24 @@
       els.btnAddDirectory.addEventListener("click", () => {
         if (!Array.isArray(state.directories)) state.directories = [];
         const nextNum = state.directories.length + 1;
-        const newPath = "!_новые_материалы";
         state.directories.push({
-          path: newPath,
+          path: "",
           title: `Раздел #${nextNum}`,
           description: "Дополнительное описание"
         });
         renderDirectories();
         notifyChange();
+        const newIndex = state.directories.length - 1;
         if (els.directoriesCardsContainer) {
           const cards = els.directoriesCardsContainer.querySelectorAll(".directory-card");
           if (cards.length > 0) {
             const lastCard = cards[cards.length - 1];
             lastCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
-            const titleInp = lastCard.querySelector(".dir-title-input");
-            if (titleInp) {
-              titleInp.focus();
-              titleInp.select();
-            }
           }
         }
+        // Сразу открываем проводник для выбора папки у новой карточки:
+        // после выбора путь и заголовок из имени папки придут в onDirectorySelected
+        callRuby("selectDirectory", newIndex.toString());
       });
     }
 
@@ -6017,11 +6048,6 @@
     if (els.inputAppliances) els.inputAppliances.addEventListener("input", updateHeaderTitles);
     if (els.inputLighting) els.inputLighting.addEventListener("input", updateHeaderTitles);
     if (els.inputNotes) els.inputNotes.addEventListener("input", updateHeaderTitles);
-
-    // Export engine select change
-    if (els.selectExportEngine) {
-      els.selectExportEngine.addEventListener("change", updateEngineUI);
-    }
 
     // Page orientation / size change updates layout canvas sheet and aspect overlay
     if (els.selectPageLayout) {
@@ -6083,6 +6109,27 @@
     }
     if (els.inputLayoutMargin) {
       els.inputLayoutMargin.addEventListener("input", (e) => handleMarginChange(e.target.value));
+    }
+
+    const handleFontFamilyChange = (val) => {
+      let family = (val || "Sofia Sans Condensed").trim();
+      if (family.toLowerCase().includes("din")) {
+        family = "Oswald";
+      }
+      if (els.selectFontFamily && els.selectFontFamily.value !== family) els.selectFontFamily.value = family;
+      if (els.selectLayoutFontFamily && els.selectLayoutFontFamily.value !== family) els.selectLayoutFontFamily.value = family;
+      if (state.pdf_settings) {
+        state.pdf_settings.font_family = family;
+      }
+      document.documentElement.style.setProperty("--page-font-family", `"${family}", sans-serif`);
+      notifyChange();
+    };
+
+    if (els.selectFontFamily) {
+      els.selectFontFamily.addEventListener("change", (e) => handleFontFamilyChange(e.target.value));
+    }
+    if (els.selectLayoutFontFamily) {
+      els.selectLayoutFontFamily.addEventListener("change", (e) => handleFontFamilyChange(e.target.value));
     }
 
     // Stamp select change
@@ -6324,7 +6371,7 @@
       });
     }
 
-    // Save project data to YAML next to .skp (+ model attributes)
+    // Forced save: project YAML next to .skp + program settings/layout YAML
     if (els.btnSaveYaml) {
       els.btnSaveYaml.addEventListener("click", () => {
         const data = collectFormData();
@@ -6332,27 +6379,12 @@
       });
     }
 
-    // Save project data to SketchUp model attributes only
-    if (els.btnSaveSkp) {
-      els.btnSaveSkp.addEventListener("click", () => {
-        const data = collectFormData();
-        callRuby("saveProjectToSkp", JSON.stringify(data));
-      });
-    }
-
-    // Refresh Data (all storages, scenes & YAML)
-    if (els.btnRefreshData) {
-      els.btnRefreshData.addEventListener("click", () => {
-        const data = collectFormData();
-        callRuby("refreshData", JSON.stringify(data));
-      });
-    }
-
-    // Import / Export YAML
+    // Import: load project data from YAML into in-memory session
     els.btnImportYaml.addEventListener("click", () => {
       callRuby("importYaml");
     });
 
+    // Export: save a full YAML copy to a chosen location
     els.btnExportYaml.addEventListener("click", () => {
       const data = collectFormData();
       callRuby("exportYaml", JSON.stringify(data));
@@ -6372,17 +6404,18 @@
     // Auto-save listeners for all dialog input fields across tabs
     const autoSaveInputIds = [
       "inputRoomName", "inputFurnitureName", "inputCustomer", "inputCustomerId",
-      "inputCompany", "inputArticul", "inputArticulSuffix", "selectTrade", "inputTags",
+      "inputCompany", "inputArticul", "selectTrade", "inputTags",
       "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
       "inputTotalDuration", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
-      "selectExportEngine", "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
-      "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin",
+      "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
+      "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
-      "selectQuality", "selectScaleMultiplier", "selectAnnotationFontSize", "selectStamp", "inputCustomStamp",
-      "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias"
+      "selectQuality", "selectScaleMultiplier", "selectStamp", "inputCustomStamp",
+      "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias",
+      "chkArticulLocked"
     ];
     autoSaveInputIds.forEach((id) => {
       const el = (els && els[id]) || document.getElementById(id);
@@ -6420,6 +6453,8 @@
         els.inputArticul.value = newArticul;
         updateHeaderTitles();
         showNotification(`Сгенерирован артикул: ${newArticul}`, "info");
+        // Созданный артикул сразу блокируется
+        lockArticulAfterGeneration();
       }
     },
 

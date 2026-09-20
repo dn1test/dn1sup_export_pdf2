@@ -1,14 +1,13 @@
 # frozen_string_literal: true
 
 require_relative "../model/project_data"
+require_relative "../model/session_store"
 
 module DN1Code
   module ExportPdf2
     module Service
       module ObserverService
         @app_observer          = nil
-        @model_observer        = nil
-        @attached_models       = {}
         @session_opened_models = {}
 
         class << self
@@ -17,7 +16,6 @@ module DN1Code
 
         class AppObserverHandler < (defined?(Sketchup::AppObserver) ? Sketchup::AppObserver : Object)
           def onNewModel(model)
-            ObserverService.attach_model_observer(model)
             if defined?(OverlayService)
               OverlayService.on_model_opened(model)
             end
@@ -25,7 +23,6 @@ module DN1Code
           end
 
           def onOpenModel(model)
-            ObserverService.attach_model_observer(model)
             # Сбрасываем кэш сессии для только что открытой модели, чтобы повторная обработка не блокировалась
             if model && model.respond_to?(:path) && !model.path.to_s.empty?
               clean_p = model.path.to_s.tr("\\", "/").downcase
@@ -43,42 +40,9 @@ module DN1Code
             end
           end
 
-          def onActivateModel(model)
-            ObserverService.attach_model_observer(model)
-            if defined?(UI) && UI.respond_to?(:start_timer)
-              UI.start_timer(0.05, false) do
-                active = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? (Sketchup.active_model || model) : model
-                ObserverService.handle_model_opened(active, false)
-              end
-            else
-              ObserverService.handle_model_opened(model, false)
-            end
-          end
-
-          def onPreSaveModel(model)
-            ObserverService.handle_pre_save(model)
-          end
-
-          def onPostSaveModel(model)
-            ObserverService.handle_post_save(model)
-          end
-
-          def onSaveModel(model)
-            ObserverService.handle_post_save(model)
-          end
-        end
-
-        class ModelObserverHandler < (defined?(Sketchup::ModelObserver) ? Sketchup::ModelObserver : Object)
-          def onPreSaveModel(model)
-            ObserverService.handle_pre_save(model)
-          end
-
-          def onPostSaveModel(model)
-            ObserverService.handle_post_save(model)
-          end
-
-          def onSaveModel(model)
-            ObserverService.handle_post_save(model)
+          # Закрытие SketchUp: принудительная запись всех измененных сессий в YAML
+          def onQuit
+            ObserverService.handle_quit
           end
         end
 
@@ -92,27 +56,14 @@ module DN1Code
               Sketchup.add_observer(@app_observer)
             end
 
-            # Прикрепление к текущей активной модели и инициализация сессии открытия
+            # Инициализация сессии для текущей активной модели
             if Sketchup.respond_to?(:active_model) && Sketchup.active_model
               model = Sketchup.active_model
-              attach_model_observer(model)
               handle_model_opened(model, false) if model.respond_to?(:path) && !model.path.to_s.empty?
             end
           end
 
-          def attach_model_observer(model)
-            return unless model && model.respond_to?(:add_observer)
-
-            # Предотвращение повторного прикрепления наблюдателя к одной и той же модели
-            model_id = model.object_id
-            return if @attached_models[model_id]
-
-            @model_observer ||= ModelObserverHandler.new
-            model.add_observer(@model_observer)
-            @attached_models[model_id] = true
-          end
-
-          # Обработка открытия модели: загрузка настроек проекта и синхронизация данных.
+          # Обработка открытия модели: загрузка данных проекта из YAML в сессию памяти.
           # Параметр force позволяет принудительно повторить обработку для уже открытой в сессии модели.
           def handle_model_opened(model, force = false)
             return unless model
@@ -126,10 +77,9 @@ module DN1Code
 
             @session_opened_models[norm_path] = true
 
-            project_data = Model::ProjectData.new
-            project_data.load_auto(model)
+            project_data = Model::SessionStore.on_model_opened(model)
 
-            # Актуализация оверлея с открытой моделью (4:3 если в файле не сохранено другое)
+            # Актуализация оверлея с открытой моделью
             if defined?(OverlayService)
               OverlayService.on_model_opened(model, project_data)
             end
@@ -146,37 +96,12 @@ module DN1Code
             warn "[DN1C Export PDF] Ошибка при автозагрузке проекта: #{e.message}"
           end
 
-          # Обработка перед сохранением: сохранение в словарь атрибутов модели
-          def handle_pre_save(model)
-            return unless model
-
-            project_data = Model::ProjectData.new
-            has_data = project_data.load_from_model(model)
-            project_data.load_auto(model) unless has_data
-            project_data.sync_with_model_scenes(model)
-            project_data.save_to_model(model)
+          # Закрытие SketchUp: запись всех измененных сессий в YAML файлы
+          def handle_quit
+            saved = Model::SessionStore.flush_all
+            warn "[DN1C Export PDF] При закрытии сохранено сессий: #{saved}" if saved.positive?
           rescue StandardError => e
-            warn "[DN1C Export PDF] Ошибка при pre-save синхронизации: #{e.message}"
-          end
-
-          # Обработка после сохранения: сохранение YAML рядом с файлом SketchUp
-          def handle_post_save(model)
-            return unless model && model.respond_to?(:path) && !model.path.to_s.empty?
-
-            project_data = Model::ProjectData.new
-            # Загружаем текущие атрибуты модели
-            project_data.load_from_model(model)
-            project_data.sync_with_model_scenes(model)
-
-            # Сохраняем в библиотеку модели и в YAML файл рядом с SKP
-            project_data.save_auto(model)
-
-            yaml_name = project_data.yaml_filename(model)
-            if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
-              Sketchup.status_text = "DN1C Export PDF: Конфигурация сохранена (#{yaml_name})"
-            end
-          rescue StandardError => e
-            warn "[DN1C Export PDF] Ошибка при автосохранении YAML: #{e.message}"
+            warn "[DN1C Export PDF] Ошибка сохранения при закрытии: #{e.message}"
           end
         end
       end

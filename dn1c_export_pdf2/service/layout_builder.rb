@@ -4,6 +4,7 @@ require "fileutils"
 require_relative "render_service"
 require_relative "info_line_resolver"
 require_relative "font_service"
+require_relative "pdf_font_audit"
 
 module DN1Code
   module ExportPdf2
@@ -17,11 +18,11 @@ module DN1Code
       #   footer    — нижний колонтитул в 3 колонки,
       #   stamp     — повернутый полупрозрачный водяной знак/штамп.
       #
-      # Документ формируется в многослойной структуре (Viewports, Graphics, Content, Annotations)
-      # с возможностью выбора режима рендера видовых экранов (Raster, Vector, Hybrid)
-      # и сохранения редактируемого файла .layout.
-      module LayoutBuilder
-        extend self
+        # Документ формируется в многослойной структуре (Viewports, Graphics, Content, Annotations)
+        # с возможностью выбора режима рендера видовых экранов (Растровый GPU или Гибридный)
+        # и сохранения редактируемого файла .layout.
+        module LayoutBuilder
+          extend self
 
         PAGE_SIZES_INCHES = {
           "A4"     => { w: 11.6929, h: 8.2677 },
@@ -56,7 +57,7 @@ module DN1Code
           model        = controller.model
           settings     = project_data.pdf_settings
 
-          enabled_scenes = project_data.scenes.select { |s| s.enabled && s.page_type != :skip }
+          enabled_scenes = project_data.scenes.select(&:enabled)
           if enabled_scenes.empty?
             raise "Не выбрано ни одной сцены для экспорта в LayOut / PDF!"
           end
@@ -69,8 +70,8 @@ module DN1Code
             total_pages = enabled_scenes.size
             progress_block&.call(0, total_pages, "Инициализация документа LayOut...")
 
-            # Установка DIN Condensed в систему
-            font_family = FontService.layout_font_family
+            # Установка шрифта (по умолчанию Sofia Sans Condensed) в систему
+            font_family = FontService.layout_font_family(settings)
 
             # 1. Создание нового документа LayOut
             doc = ::Layout::Document.new
@@ -183,6 +184,12 @@ module DN1Code
               doc.export(pdf_path)
             end
 
+            # Аудит встроенных шрифтов: warn, если запрошенный шрифт из
+            # config/fonts заменен LayOut на системный фолбэк
+            if File.exist?(pdf_path)
+              PdfFontAudit.audit_exported_pdf!(pdf_path, font_family) rescue nil
+            end
+
             # 5. Сохранение файла .layout если включено
             if settings[:save_layout_file]
               layout_path = pdf_path.sub(/\.pdf$/i, ".layout")
@@ -194,8 +201,13 @@ module DN1Code
               controller.send(:save_skp_backup)
             end
 
-            # 7. Сохранение атрибутов и YAML (история правок формируется только пользователем)
-            project_data.save_auto(model) if model
+            # 7. Запись данных в YAML (проект + настройки/шаблоны расширения)
+            if defined?(Model::SessionStore)
+              Model::SessionStore.flush(model) if model
+            elsif project_data.respond_to?(:save_project_yaml)
+              project_data.save_project_yaml(model) if model
+              project_data.save_program_settings
+            end
 
             progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")
 
@@ -391,7 +403,7 @@ module DN1Code
 
         def apply_text_style!(style, opts)
           style.font_family = opts[:font] if opts[:font] && style.respond_to?(:font_family=)
-          style.font_size   = opts[:size].to_f if style.respond_to?(:font_size=)
+          style.font_size   = opts[:size].to_f if opts[:size] && style.respond_to?(:font_size=)
           if opts[:color_obj].is_a?(::Sketchup::Color)
             style.text_color = opts[:color_obj] if style.respond_to?(:text_color=)
           elsif opts[:color]
@@ -422,7 +434,9 @@ module DN1Code
         def add_bounded_text(ctx, doc, page, layer, text, box, opts = {})
           return if text.to_s.empty?
 
-          text_ent = ::Layout::FormattedText.new(text.to_s, make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height]))
+          # Запас высоты (+1.5 pt) гарантирует, что LayOut не обрежет нижние выносные элементы
+          extra_h = 1.5
+          text_ent = ::Layout::FormattedText.new(text.to_s, make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height] + extra_h))
           text_ent.grow_mode = ::Layout::FormattedText::GROW_MODE_BOUNDED
           style = text_ent.style(0)
           apply_text_style!(style, opts)
@@ -488,9 +502,17 @@ module DN1Code
           rtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 #{font};}}{\\colortbl;#{colortbl}}" \
                 "\\pard\\#{align_code}\\f0 #{runs.join}\\par}"
 
-          text_ent = ::Layout::FormattedText.new(" ", make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height]))
+          extra_h = 1.5
+          text_ent = ::Layout::FormattedText.new(" ", make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height] + extra_h))
           text_ent.grow_mode = ::Layout::FormattedText::GROW_MODE_BOUNDED
           text_ent.rtf = rtf
+          # LayOut игнорирует \fonttbl из RTF, поэтому семейство/кегль дополнительно
+          # задаются стилем entity — иначе заголовок печатается дефолтным шрифтом
+          # (Microsoft Sans Serif), игнорируя выбор пользователя.
+          base_size = fragments.map { |f| f[:size].to_f }.max
+          style = text_ent.style(0)
+          apply_text_style!(style, size: base_size, align: opts[:align], font: font)
+          text_ent.apply_style(style)
           doc.add_entity(text_ent, layer, page)
           text_ent
         rescue StandardError => e
@@ -556,6 +578,13 @@ module DN1Code
             w:    in2pt(page_w_in) - (margin_pt * 2),
             h:    in2pt(page_h_in) - (margin_pt * 2)
           }
+          
+          full_page_content = {
+            left: 0.0,
+            top:  in2pt(page_h_in),
+            w:    in2pt(page_w_in),
+            h:    in2pt(page_h_in)
+          }
 
           rctx = resolver_context(ctx, scene_item, page_index, total_pages)
 
@@ -574,27 +603,34 @@ module DN1Code
 
           if is_viewport_on
             img_cfg = get_block_config(ctx, pt, :image_4_3)
-            render_image_block(doc, page, vp_layer, scene_item, content, img_cfg, ctx, temp_images, pt)
+            render_image_block(doc, page, layer, scene_item, full_page_content, img_cfg, ctx, temp_images, pt)
           end
+
+          page_font = if page_cfg[:font_family] && !page_cfg[:font_family].to_s.strip.empty?
+                        FontService.layout_font_family(page_cfg[:font_family])
+                      else
+                        ctx[:font]
+                      end
+          page_ctx = (page_font != ctx[:font]) ? ctx.merge(font: page_font) : ctx
 
           # 2. Верхний заголовок (Header)
           if block_visible?(page_cfg, :header)
             hdr_box = get_block_box(content, page_cfg, :header, 0.0, 0.0, 100.0, 30.0)
-            render_modular_header(doc, page, cnt_layer, hdr_box, page_cfg, ctx, rctx, gfx_layer)
+            render_modular_header(doc, page, cnt_layer, hdr_box, page_cfg, page_ctx, rctx, gfx_layer)
           end
 
           # 3. Информационные слоты поверх видового экрана
-          render_modular_slots(doc, page, cnt_layer, content, page_cfg, pt, ctx, rctx, gfx_layer)
+          render_modular_slots(doc, page, cnt_layer, content, page_cfg, pt, page_ctx, rctx, gfx_layer)
 
           # 4. Нижний колонтитул (Footer)
           if block_visible?(page_cfg, :footer)
-            ftr_cfg = get_block_config(ctx, pt, :footer)
+            ftr_cfg = get_block_config(page_ctx, pt, :footer)
             ftr_box = get_block_box(content, page_cfg, :footer, 0.0, 94.0, 100.0, 6.0)
-            render_modular_footer(doc, page, cnt_layer, ftr_box, ftr_cfg, ctx, rctx)
+            render_modular_footer(doc, page, cnt_layer, ftr_box, ftr_cfg, page_ctx, rctx)
           end
 
           # 5. Штамп/водяной знак
-          render_stamp(doc, page, ann_layer, content, ctx)
+          render_stamp(doc, page, ann_layer, content, page_ctx)
         end
 
         # ------------------------------------------------------------------
@@ -639,25 +675,17 @@ module DN1Code
           img_x = content[:left] + ((content[:w] - img_w) / 2.0)
           img_y = content[:top] - ((content[:h] - img_h) / 2.0)
 
-          # 1. Проверяем наличие прямого пользовательского оверрайда сцены (готовый рендер из файла)
-          if scene_item.respond_to?(:image_override) && scene_item.image_override && File.exist?(scene_item.image_override.to_s)
-            image_path = scene_item.image_override.to_s
-            draw_w, draw_h = fit_image_size(image_path, img_w, img_h)
-            if draw_w > 0 && draw_h > 0
-              bounds = ::Geom::Bounds2d.new(pt2in(img_x), pt2in(lay_y(ctx, img_y)), pt2in(draw_w), pt2in(draw_h))
-              img = ::Layout::Image.new(image_path, bounds)
-              doc.add_entity(img, layer, page)
-              return
-            end
-          end
+          vp_layer = layer.is_a?(Hash) ? (layer[:viewport] || layer[:default]) : layer
 
-          # 2. Создание живого видового экрана SketchUp (Layout::SketchUpModel)
-          # Используется для всех режимов рендеринга видового экрана (Raster, Vector, Hybrid)
-          mode_str = (ctx[:settings][:layout_render_mode] || "raster").to_s.downcase
-          use_skp_viewport = (mode_str == "vector" || mode_str == "hybrid" || mode_str == "raster" || mode_str == "model" || mode_str == "viewport")
+          mode_str = (ctx[:settings][:layout_render_mode] || "image").to_s.downcase
+
+          # 1. Создание живого видового экрана SketchUp (Layout::SketchUpModel)
+          #    Используется для гибридного режима рендеринга видового экрана (Hybrid)
+          use_skp_viewport = (mode_str == "hybrid")
 
           if use_skp_viewport && defined?(::Layout::SketchUpModel) && ctx[:model]
             skp_path = nil
+
             if ctx[:temp_skp_path] && File.exist?(ctx[:temp_skp_path])
               skp_path = ctx[:temp_skp_path]
             else
@@ -668,7 +696,7 @@ module DN1Code
 
               # Если в модели есть несохраненные изменения в SketchUp или задан кастомный размер шрифта выносок,
               # создаем временную копию save_copy, чтобы LayOut увидел актуальное состояние, а не старый файл с диска
-              if is_modified && ctx[:model].respond_to?(:save_copy)
+              if (is_modified || !has_disk_path) && ctx[:model].respond_to?(:save_copy)
                 temp_skp = File.join(Dir.tmpdir, "dn1c_model_#{$$}_#{Time.now.to_i}.skp")
                 begin
                   RenderService.with_temporary_annotation_font_size(ctx[:model], afs_setting) do
@@ -684,23 +712,7 @@ module DN1Code
                 end
               end
 
-              if skp_path.nil? && has_disk_path && !has_custom_font
-                skp_path = ctx[:model].path.to_s
-              elsif skp_path.nil? && ctx[:model].respond_to?(:save_copy)
-                temp_skp = File.join(Dir.tmpdir, "dn1c_model_#{$$}_#{Time.now.to_i}.skp")
-                begin
-                  RenderService.with_temporary_annotation_font_size(ctx[:model], afs_setting) do
-                    ctx[:model].save_copy(temp_skp)
-                  end
-                  if File.exist?(temp_skp)
-                    ctx[:temp_skp_path] = temp_skp
-                    temp_images << temp_skp
-                    skp_path = temp_skp
-                  end
-                rescue StandardError
-                  skp_path = nil
-                end
-              end
+              skp_path ||= ctx[:model].path.to_s if has_disk_path
             end
 
             if skp_path && File.exist?(skp_path)
@@ -724,17 +736,9 @@ module DN1Code
                   skp_model.reset_style rescue nil
                 end
 
-                # Установка режима рендеринга видового экрана (Raster / Vector / Hybrid)
-                mode_str = (ctx[:settings][:layout_render_mode] || ctx[:settings]["layout_render_mode"] || "raster").to_s.downcase
+                # Установка режима рендеринга видового экрана (Гибридный)
                 if skp_model.respond_to?(:render_mode=)
-                  case mode_str
-                  when "vector"
-                    skp_model.render_mode = ::Layout::SketchUpModel::VECTOR_RENDER if defined?(::Layout::SketchUpModel::VECTOR_RENDER)
-                  when "hybrid"
-                    skp_model.render_mode = ::Layout::SketchUpModel::HYBRID_RENDER if defined?(::Layout::SketchUpModel::HYBRID_RENDER)
-                  else
-                    skp_model.render_mode = ::Layout::SketchUpModel::RASTER_RENDER if defined?(::Layout::SketchUpModel::RASTER_RENDER)
-                  end
+                  skp_model.render_mode = ::Layout::SketchUpModel::HYBRID_RENDER if defined?(::Layout::SketchUpModel::HYBRID_RENDER)
                 end
 
                 # Установка масштаба толщины линий (Line Scale Multiplier)
@@ -743,7 +747,7 @@ module DN1Code
                 # В режиме "auto" (с уменьшением на 40%):
                 # - Растр (Raster): расчет от разрешения (1200px=0.60->0.30pt, 1800px=0.90->0.45pt, 2400px=1.20->0.60pt, 3000px=1.50->0.75pt, 3840px=1.80->0.90pt)
                 #   с защитным порогом для больших форматов A3 (min 0.90) и A2 (min 1.20)
-                # - Вектор и Гибрид (Vector, Hybrid): подстроены под растр по формату листа (A4=0.60->0.30pt, A3=0.90->0.45pt, A2=1.20->0.60pt)
+                # - Гибрид (Hybrid): подстроен под растр по формату листа (A4=0.60->0.30pt, A3=0.90->0.45pt, A2=1.20->0.60pt)
                 sm_setting = ctx[:settings][:scale_multiplier] || ctx[:settings]["scale_multiplier"]
                 sf_setting = ctx[:settings][:scale_factor] || ctx[:settings]["scale_factor"]
                 page_sz = (ctx[:settings][:page_size] || ctx[:settings]["page_size"] || "A4").to_s.upcase.strip
@@ -751,7 +755,7 @@ module DN1Code
                 line_mult = if sm_setting
                               case sm_setting.to_s.downcase.strip
                               when "auto"
-                                base_val = if mode_str == "vector" || mode_str == "hybrid"
+                                base_val = if mode_str == "hybrid"
                                              case page_sz
                                              when "A2" then 1.20
                                              when "A3" then 0.90
@@ -799,7 +803,8 @@ module DN1Code
                   skp_model.render rescue nil
                 end
 
-                doc.add_entity(skp_model, layer, page)
+                doc.add_entity(skp_model, vp_layer, page)
+
                 return
               rescue StandardError => e
                 warn "Предупреждение: создание Layout::SketchUpModel (#{e.message}), используется растровый вывод"
@@ -807,7 +812,8 @@ module DN1Code
             end
           end
 
-          # 3. Резервный растровый рендер высокого разрешения через RenderService
+          # 2. Резервный растровый рендер высокого разрешения через RenderService
+          #    (режим "image": Растровый GPU с Ambient Occlusion и мягкими тенями)
           render_opts = {
             image_width:        ctx[:settings][:image_width],
             render_quality:     ctx[:settings][:render_quality] || "medium",
@@ -843,7 +849,7 @@ module DN1Code
 
           bounds = ::Geom::Bounds2d.new(pt2in(img_x), pt2in(lay_y(ctx, img_y)), pt2in(draw_w), pt2in(draw_h))
           img = ::Layout::Image.new(image_path, bounds)
-          doc.add_entity(img, layer, page)
+          doc.add_entity(img, vp_layer, page)
         rescue StandardError => e
           warn "Ошибка вставки изображения LayOut: #{e.message}"
         end
@@ -920,6 +926,11 @@ module DN1Code
           content_type = (cfg[:content] || cfg["content"] || "header_title").to_s
           valign = (cfg[:valign] || cfg["valign"] || "top").to_s.to_sym
           font_size = (cfg[:font_size] || cfg["font_size"] || 11.0).to_f
+          hdr_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
+                       FontService.layout_font_family(cfg[:font_family])
+                     else
+                       ctx[:font]
+                     end
           lines = cfg[:lines] || cfg["lines"]
           if lines.nil?
             lines = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"]
@@ -930,7 +941,7 @@ module DN1Code
             txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
             add_bounded_text(ctx, doc, page, layer, txt,
                              { x: hdr_box[:x], y: hdr_box[:y], width: hdr_box[:width], height: hdr_box[:height] },
-                             size: font_size, color: HEADER_TEXT_COLOR, bold: true, align: :center, anchor: valign, font: ctx[:font])
+                             size: font_size, color: HEADER_TEXT_COLOR, bold: true, align: :center, anchor: valign, font: hdr_font)
             return
           end
 
@@ -981,9 +992,10 @@ module DN1Code
           # Расчет высоты строк и отступов (увеличенные промежутки между строками)
           item_gap = active_rows.size > 1 ? (active_rows.size > 3 ? 5.5 : 7.5) : 0.0
           row_heights = {}
+          pitch = font_line_pitch_ratio(hdr_font)
           active_rows.each do |r|
             max_item_sz = grouped_rows[r].map { |it| it[:size] }.max || font_size
-            row_heights[r] = [max_item_sz * 1.3, max_item_sz + 4.0].max
+            row_heights[r] = [(max_item_sz * pitch).round(2) + 2.0, max_item_sz + 4.0].max
           end
           raw_total_h = row_heights.values.sum + ((active_rows.size - 1) * item_gap)
 
@@ -1032,7 +1044,7 @@ module DN1Code
 
             add_rtf_text(ctx, doc, page, layer, fragments,
                          { x: hdr_box[:x] + 4, y: cur_y, width: hdr_box[:width] - 8, height: r_h },
-                         align: align, font: ctx[:font])
+                         align: align, font: hdr_font)
             cur_y -= r_h
 
             if idx < active_rows.size - 1
@@ -1184,6 +1196,12 @@ module DN1Code
           in_w = [slot_box[:width] - (pad * 2), 10.0].max
           in_h = [slot_box[:height] - (pad * 2), 10.0].max
 
+          slot_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
+                        FontService.layout_font_family(cfg[:font_family])
+                      else
+                        ctx[:font]
+                      end
+
           is_right_slot = [:slot_3, :slot_4, "slot_3", "slot_4"].include?(slot_id)
           default_align = is_right_slot ? :right : :left
           raw_align = cfg[:align] || cfg["align"]
@@ -1210,20 +1228,20 @@ module DN1Code
 
           if content_type == "custom_text"
             txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
-            txt_h = estimate_text_height(txt, font_size, in_w)
+            txt_h = estimate_text_height(txt, font_size, in_w, slot_font)
             txt_box_h = [txt_h + 2.0, in_h].min
             if valign == :bottom
               target_top_y = [in_bottom_y + txt_box_h, in_y].min
               add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: target_top_y, width: in_w, height: txt_box_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :bottom, font: ctx[:font])
+                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :bottom, font: slot_font)
             elsif valign == :center
               offset = [(in_h - txt_box_h) / 2.0, 0.0].max
               target_top_y = in_y - offset
               add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: target_top_y, width: in_w, height: txt_box_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :top, font: ctx[:font])
+                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :top, font: slot_font)
             else
               add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: in_y, width: in_w, height: in_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: valign, font: ctx[:font])
+                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: valign, font: slot_font)
             end
             return
           end
@@ -1308,7 +1326,7 @@ module DN1Code
                        6.0
                      end
           item_heights = items.map do |it|
-            [estimate_text_height(it[:text], it[:size], in_w) + 1.0, it[:size] + 2.0].max
+            estimate_text_height(it[:text], it[:size], in_w, slot_font)
           end
           total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
 
@@ -1318,9 +1336,19 @@ module DN1Code
             item_gap = (item_gap * slot_scale).round(2)
             item_heights = items.map do |it|
               sc_sz = (it[:size] * slot_scale).round(2)
-              [estimate_text_height(it[:text], sc_sz, in_w) + 1.0, sc_sz + 2.0].max
+              estimate_text_height(it[:text], sc_sz, in_w, slot_font)
             end
             total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
+          end
+
+          # Если даже после масштабирования суммарная высота превышает доступную, уменьшаем межстрочные интервалы
+          if total_items_h > in_h && items.size > 1
+            excess = total_items_h - in_h
+            gap_reduction = [excess / (items.size - 1), [item_gap - 1.0, 0.0].max].min
+            if gap_reduction > 0
+              item_gap = (item_gap - gap_reduction).round(2)
+              total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
+            end
           end
 
           cur_y = if valign == :bottom
@@ -1335,7 +1363,7 @@ module DN1Code
           items.each_with_index do |it, idx|
             h = item_heights[idx]
             add_bounded_text(ctx, doc, page, layer, it[:text], { x: in_x, y: cur_y, width: in_w, height: h },
-                             size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: ctx[:font])
+                             size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: slot_font)
             cur_y -= h
 
             if idx < items.size - 1
@@ -1355,11 +1383,52 @@ module DN1Code
           end
         end
 
-        # Приблизительная высота многострочного текста в pt (DIN Condensed узкий, средняя ширина глифа ~0.45 кегля)
-        def estimate_text_height(text, size_pt, width_pt)
-          cpl = [(width_pt / (size_pt * 0.45)).floor, 1].max
+        # Отношение высоты строки (line pitch) к кеглю шрифта в LayOut с запасом для предотвращения обрезания
+        def font_line_pitch_ratio(font_name)
+          f = font_name.to_s.downcase
+          if f.include?("oswald") || f.include?("din")
+            1.75
+          elsif f.include?("sofia")
+            1.38
+          elsif f.include?("roboto")
+            1.28
+          elsif f.include?("ubuntu")
+            1.25
+          else
+            1.35
+          end
+        end
+
+        # Отношение средней ширины символа к кеглю шрифта
+        def font_char_width_ratio(font_name)
+          f = font_name.to_s.downcase
+          if f.include?("extra")
+            0.38
+          elsif f.include?("sofia")
+            0.43
+          elsif f.include?("ubuntu") || f.include?("oswald") || f.include?("din")
+            0.45
+          elsif f.include?("roboto")
+            0.48
+          else
+            0.50
+          end
+        end
+
+        # Точный расчет высоты многострочного текста в pt для LayOut FormattedText
+        def estimate_text_height(text, size_pt, width_pt, font_name = nil)
+          return 0.0 if text.to_s.empty?
+
+          char_ratio = font_char_width_ratio(font_name)
+          pitch_ratio = font_line_pitch_ratio(font_name)
+
+          # Учитываем перенос по словам: эффективная ширина ~90% от геометрической границы
+          cpl = [((width_pt.to_f * 0.90) / (size_pt.to_f * char_ratio)).floor, 1].max
           lines = text.to_s.split("\n", -1).sum { |seg| [(seg.length.to_f / cpl).ceil, 1].max }
-          [lines, 1].max * size_pt * 1.25
+          lines_count = [lines, 1].max
+
+          # Высота строк + базовый вертикальный запас (+2.5 pt на внутренние отступы блока и выносные элементы шрифта)
+          ((lines_count * size_pt.to_f * pitch_ratio) + 2.5).round(2)
         end
 
         # ------------------------------------------------------------------
@@ -1370,6 +1439,11 @@ module DN1Code
           raw_valign = (cfg[:valign] || cfg["valign"] || "bottom").to_s
           valign = (raw_valign == "top") ? :top : :bottom
           font_size = (cfg[:font_size] || cfg["font_size"] || 8.5).to_f
+          footer_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
+                          FontService.layout_font_family(cfg[:font_family])
+                        else
+                          ctx[:font]
+                        end
 
           raw_lines = cfg[:lines] || cfg["lines"]
           lines = if raw_lines.is_a?(Array) && !raw_lines.empty?
@@ -1436,7 +1510,7 @@ module DN1Code
           has_center = !center_text.empty?
           has_right = !right_text.empty?
 
-          footer_opts = { size: font_size, color: FOOTER_COLOR, font: ctx[:font], anchor: valign }
+          footer_opts = { size: font_size, color: FOOTER_COLOR, font: footer_font, anchor: valign }
 
           if has_left && has_center && has_right
             w_left = (w_total * 0.35).round(2)

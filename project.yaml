@@ -97,6 +97,7 @@ scenes:
 
 # API Targets для отправки данных проекта в базу данных
 # Это те адреса куда данные проекта будут отправляться по нажатию кнопки "Отправить"
+# (токены — плейсхолдеры, реальные значения хранятся в локальных, не попадающих в git, YAML)
 api_targets:
-- https://list.prodmd.top/api/projects?token=c2fc6e6bd272b4f9688656a7c4fcf6b9aa13ccdf7da077d53bf56e4afcf29a58
-- http://localhost:3000/api/projects?token=b9fdaae8ca52a355df78d12f9bde54236200d366caf4af9350d8d934d83a9fba
+- https://list.prodmd.top/api/projects?token=YOUR_TOKEN_HERE
+- http://localhost:3000/api/projects?token=YOUR_LOCAL_TOKEN

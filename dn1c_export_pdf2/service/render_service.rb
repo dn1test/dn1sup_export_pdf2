@@ -197,16 +197,19 @@ module DN1Code
             end
 
             afs_setting = options[:annotation_font_size] || options["annotation_font_size"]
-            with_temporary_annotation_font_size(model, afs_setting) do
-              begin
-                view.write_image(write_options)
-                rendered = File.exist?(temp_file)
-              rescue StandardError => e
-                warn "[DN1C Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
-              ensure
-                # Восстановление исходных параметров отрисовки линий
-                if ro && !orig_widths.empty?
-                  orig_widths.each { |k, v| ro[k] = v }
+            hide_annot = options[:hide_annotations] == true || options["hide_annotations"] == true
+            with_temporary_hidden_annotations(model, hide_annot) do
+              with_temporary_annotation_font_size(model, afs_setting) do
+                begin
+                  view.write_image(write_options)
+                  rendered = File.exist?(temp_file)
+                rescue StandardError => e
+                  warn "[DN1C Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
+                ensure
+                  # Восстановление исходных параметров отрисовки линий
+                  if ro && !orig_widths.empty?
+                    orig_widths.each { |k, v| ro[k] = v }
+                  end
                 end
               end
             end
@@ -365,6 +368,42 @@ module DN1Code
           ensure
             orig_fonts.each do |t, f|
               t.font = f if t.respond_to?(:font=) rescue nil
+            end
+          end
+        end
+
+        # Временно скрывает отображение размеров и выносок/текста модели
+        # на время выполнения блока (для чистого растрового рендера с тенями).
+        # @param model [Sketchup::Model]
+        # @param enabled [Boolean]
+        def self.with_temporary_hidden_annotations(model, enabled = true)
+          return yield unless enabled && model && model.respond_to?(:rendering_options)
+
+          ro = model.rendering_options
+          orig_model_dims = ro["DisplayDims"] rescue nil
+          orig_model_text = ro["DisplayText"] rescue nil
+
+          orig_page_dims = nil
+          orig_page_text = nil
+          active_page = model.respond_to?(:pages) ? (model.pages.selected_page rescue nil) : nil
+          if active_page && active_page.respond_to?(:rendering_options) && active_page.rendering_options
+            orig_page_dims = active_page.rendering_options["DisplayDims"] rescue nil
+            orig_page_text = active_page.rendering_options["DisplayText"] rescue nil
+            active_page.rendering_options["DisplayDims"] = false rescue nil
+            active_page.rendering_options["DisplayText"] = false rescue nil
+          end
+
+          ro["DisplayDims"] = false rescue nil
+          ro["DisplayText"] = false rescue nil
+
+          begin
+            yield
+          ensure
+            ro["DisplayDims"] = orig_model_dims unless orig_model_dims.nil? rescue nil
+            ro["DisplayText"] = orig_model_text unless orig_model_text.nil? rescue nil
+            if active_page && active_page.respond_to?(:rendering_options) && active_page.rendering_options
+              active_page.rendering_options["DisplayDims"] = orig_page_dims unless orig_page_dims.nil? rescue nil
+              active_page.rendering_options["DisplayText"] = orig_page_text unless orig_page_text.nil? rescue nil
             end
           end
         end

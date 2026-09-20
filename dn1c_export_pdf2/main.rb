@@ -14,15 +14,12 @@ end
 require_relative "version"
 
 # Загрузка сервисов (генерация PDF через SketchUp LayOut Ruby API)
-require_relative "service/font_service"
-require_relative "service/render_service"
-require_relative "service/layout_builder"
 require_relative "service/observer_service"
 require_relative "service/overlay_service"
 
 # Загрузка моделей данных
-require_relative "model/scene_item"
 require_relative "model/project_data"
+require_relative "model/session_store"
 
 # Загрузка контроллера экспорта
 require_relative "controller/export_controller"
@@ -47,7 +44,7 @@ module DN1Code
     def toggle_aspect_overlay
       model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
       new_state = Service::OverlayService.toggle(model)
-      Model::ProjectData.save_default_frame_settings(show_aspect_overlay: new_state) if defined?(Model::ProjectData)
+      Model::SessionStore.update_frame_settings(model, { show_aspect_overlay: new_state }) if defined?(Model::SessionStore)
       new_state
     end
 
@@ -61,10 +58,9 @@ module DN1Code
         return
       end
 
-      project_data = Model::ProjectData.new
-      project_data.load_auto(model)
+      project_data = Model::SessionStore.data(model)
 
-      enabled = project_data.scenes.select { |s| s.enabled && s.page_type != :skip }
+      enabled = project_data.scenes.select(&:enabled)
       if enabled.empty?
         UI.messagebox("В модели не найдено активных сцен для экспорта. Откройте диалог для настройки сцен.", defined?(MB_OK) ? MB_OK : 0)
         open_export_dialog
@@ -74,9 +70,9 @@ module DN1Code
       controller = Controller::ExportController.new(project_data, model)
       begin
         pdf_path = controller.export
-        UI.messagebox("PDF успешно создан:\n#{pdf_path}", MB_OK)
+        UI.messagebox("PDF успешно создан:\n#{pdf_path}", defined?(MB_OK) ? MB_OK : 0)
       rescue StandardError => e
-        UI.messagebox("Ошибка экспорта PDF:\n#{e.message}", MB_OK)
+        UI.messagebox("Ошибка экспорта PDF:\n#{e.message}", defined?(MB_OK) ? MB_OK : 0)
       end
     end
 

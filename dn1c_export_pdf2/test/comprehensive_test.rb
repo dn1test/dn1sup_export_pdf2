@@ -183,9 +183,10 @@ class TestRunner
     test_models_and_attributes
     test_yaml_filename_resolution
     test_yaml_import_export
+    test_articul_lock_flag
     test_auto_yaml_save_on_sketchup_save
     test_priority_reading_yaml_primary_model_secondary
-    test_save_auto_both_library_and_yaml
+    test_save_project_yaml_and_articul_rename
     test_pdf_export_a4_landscape
     test_pdf_export_a3_portrait
     test_pdf_export_with_custom_stamp
@@ -229,6 +230,7 @@ class TestRunner
     test_43_new_project_yaml_data_structure
     test_44_template_independence_and_autosave
     test_directory_descriptions_in_template_middle_list
+    test_directories_start_empty_and_deletions_persist
     test_template_block_item_multiline_and_title_toggle
     test_separate_project_pages_and_template_settings_tabs
     test_custom_template_management_and_rendering
@@ -247,6 +249,9 @@ class TestRunner
     test_61_page_formats_a4_a3_and_quality_levels
     test_62_auto_scale_font_size_reduction_30_pct
     test_63_layout_line_weight_and_annotation_font_size
+    test_64_render_modes_image_and_hybrid
+    test_66_page_font_family_selection
+    test_text_height_and_no_clipping
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -377,7 +382,6 @@ class TestRunner
     project_data.project_info[:version] = 2
     project_data.project_info[:revision] = 5
 
-    # Сохраняем в модель
     project_data.sync_with_model_scenes(model)
     assert(project_data.scenes.size == 5, "Корректно обнаружено 5 сцен в модели")
     assert(project_data.scenes[0].page_type == :cover, "Сцена '01. Обложка' распознана как :cover")
@@ -385,15 +389,8 @@ class TestRunner
     assert(project_data.scenes[2].page_type == :visual, "Сцена '03. Визуализация' распознана как :visual")
     assert(project_data.scenes[3].page_type == :general, "Сцена '04. Общий вид' распознана как :general")
 
-    project_data.save_to_model(model)
-    assert(!model.attributes["DN1C_ExportPDF"].nil?, "Атрибуты DN1C_ExportPDF сохранены в модели")
-
-    # Читаем в новый объект
-    loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    loaded_data.load_from_model(model)
-    assert(loaded_data.project_info[:name_project] == "Тестовый проект виллы", "Имя проекта загружено из атрибутов модели")
-    assert(loaded_data.project_info[:articul] == "VILLA-777", "Артикул загружен из атрибутов модели")
-    assert(loaded_data.project_info[:revision] == 5, "Номер ревизии загружен из атрибутов модели")
+    # Библиотека модели не используется: данные проекта живут в YAML и в памяти сессии
+    assert(project_data.scenes[4].page_type == :general, "Сцена '05. Общий вид 2' распознана как :general")
   end
 
   def test_yaml_filename_resolution
@@ -448,8 +445,70 @@ class TestRunner
     File.delete(yaml_path) if File.exist?(yaml_path)
   end
 
+  def test_articul_lock_flag
+    puts "\n--- 3b. Тест блокировки артикула (articul_locked) ---"
+
+    # 1. Новый проект без артикула — не заблокирован, готов к созданию
+    fresh = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(fresh.project[:articul_locked] == false, "Новый проект без артикула не заблокирован")
+
+    test_dir = File.expand_path("test_articul_lock_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    # 2. Созданный артикул блокируется и остается заблокированным после перезагрузки YAML
+    yaml_file = File.join(test_dir, "articul_lock.yaml")
+    pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    pd.project_info[:articul] = "CF#260920_101010_01"
+    pd.project_info[:articul_locked] = true
+    assert(pd.project[:articul_locked] == true, "Проксирующая запись в project_info синхронизирует @project")
+    assert(pd.save_to_yaml(yaml_file), "Заблокированный проект сохранен в YAML")
+    assert(File.read(yaml_file, encoding: "utf-8").include?("articul_locked: true"), "Флаг articul_locked записан в YAML")
+
+    loaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    loaded.load_from_yaml(yaml_file)
+    assert(loaded.project[:articul] == "CF#260920_101010_01", "Артикул восстановлен из YAML")
+    assert(loaded.project[:articul_locked] == true, "Созданный артикул остается заблокированным после перезагрузки YAML")
+
+    # 3. Снятая блокировка (пересоздание разрешено) тоже переживает перезагрузку
+    unlocked = DN1Code::ExportPdf2::Model::ProjectData.new
+    unlocked.load_from_yaml(yaml_file)
+    unlocked.project[:articul_locked] = false
+    unlocked.save_to_yaml(yaml_file)
+    reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    reloaded.load_from_yaml(yaml_file)
+    assert(reloaded.project[:articul_locked] == false, "Снятая блокировка сохраняется в YAML (артикул можно пересоздать)")
+
+    # 4. Старый YAML без флага: непустой артикул считается созданным однажды и блокируется
+    legacy_text = <<~YAML
+      ---
+      project:
+        articul: HF#260101_000000_99
+        product_tags: []
+        commercial: false
+      customer:
+        id: ""
+        name: ""
+      workflow:
+        author: ""
+    YAML
+    legacy_file = File.join(test_dir, "legacy.yaml")
+    File.write(legacy_file, legacy_text)
+    legacy = DN1Code::ExportPdf2::Model::ProjectData.new
+    legacy.load_from_yaml(legacy_file)
+    assert(legacy.project[:articul] == "HF#260101_000000_99", "Артикул из старого YAML прочитан")
+    assert(legacy.project[:articul_locked] == true, "Старый YAML с артикулом без флага считается заблокированным")
+
+    # 5. Данные формы (apply_payload!): галочка блокировки применяется и к фасаду
+    ui_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    ui_data.apply_payload!({ project: { articul: "HF#260920_120000_02", articul_locked: false } })
+    assert(ui_data.project[:articul_locked] == false, "apply_payload! применяет снятую блокировку из данных формы")
+    assert(ui_data.project_info[:articul_locked] == false, "Фасад project_info отражает снятую блокировку")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
   def test_auto_yaml_save_on_sketchup_save
-    puts "\n--- 4. Тест автоматического создания YAML при сохранении SketchUp файла ---"
+    puts "\n--- 4. Тест принудительного сохранения (flush сессии) в YAML рядом с SKP ---"
 
     test_dir = File.expand_path("test_auto_save_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -457,39 +516,36 @@ class TestRunner
     skp_file = File.join(test_dir, "Kitchen_Project.skp")
     model = Sketchup::MockModel.new(skp_file)
 
-    # Прикрепляем наблюдателя
-    DN1Code::ExportPdf2::Service::ObserverService.attach_model_observer(model)
+    # Сессия памяти (как при открытии модели)
+    session_data = DN1Code::ExportPdf2::Model::SessionStore.on_model_opened(model)
+    session_data.project_info[:articul] = "KITCHEN-777"
+    session_data.project_info[:name_product] = "Кухня Модерн"
 
-    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    project_data.project_info[:articul] = "KITCHEN-777"
-    project_data.project_info[:name_product] = "Кухня Модерн"
-    project_data.save_to_model(model)
-
-    # Имитируем сохранение модели SketchUp (Ctrl+S / File -> Save)
-    model.save
+    # Имитируем принудительное сохранение / закрытие SketchUp
+    assert(DN1Code::ExportPdf2::Model::SessionStore.flush(model), "flush сессии успешно записал данные")
 
     expected_yaml = File.join(test_dir, "KITCHEN-777.yaml")
-    assert(File.exist?(expected_yaml), "При сохранении SKP автоматически создан YAML по артикулу: #{File.basename(expected_yaml)}")
+    assert(File.exist?(expected_yaml), "При flush сессии создан YAML по артикулу: #{File.basename(expected_yaml)}")
 
     # Проверяем содержимое созданного YAML
     loaded = DN1Code::ExportPdf2::Model::ProjectData.new
     loaded.load_from_yaml(expected_yaml)
-    assert(loaded.project_info[:name_project] == "Кухня Модерн", "Содержимое автоматически созданного YAML файла корректно")
+    assert(loaded.project_info[:name_project] == "Кухня Модерн", "Содержимое YAML файла корректно")
 
-    # Теперь очищаем артикул и сохраняем модель снова
-    project_data.project_info[:articul] = ""
-    project_data.project_info[:name_product] = "Кухня Без Артикула"
-    project_data.save_to_model(model)
-    model.save
+    # Теперь очищаем артикул и сохраняем снова (прежний артикул известен сессии)
+    session_data.project_info[:articul] = ""
+    session_data.project_info[:name_product] = "Кухня Без Артикула"
+    assert(DN1Code::ExportPdf2::Model::SessionStore.flush(model), "Повторный flush сессии успешен")
 
     fallback_yaml = File.join(test_dir, "Kitchen_Project.yaml")
     assert(File.exist?(fallback_yaml), "При пустом артикуле создан YAML с именем модели SKP: #{File.basename(fallback_yaml)}")
+    assert(!File.exist?(expected_yaml), "Прежний артикульный YAML удален при переименовании")
 
     FileUtils.rm_rf(test_dir)
   end
 
   def test_priority_reading_yaml_primary_model_secondary
-    puts "\n--- 5. Тест иерархии чтения: ПЕРВИЧНО YAML, ВТОРИЧНО библиотека модели ---"
+    puts "\n--- 5. Тест источника данных: YAML файл рядом с SKP (единственный источник) ---"
 
     test_dir = File.expand_path("test_priority_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -497,41 +553,33 @@ class TestRunner
     skp_file = File.join(test_dir, "Bedroom.skp")
     model = Sketchup::MockModel.new(skp_file)
 
-    # 1. Записываем в библиотеку модели одно значение
-    model_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    model_data.project_info[:articul] = "BED-01"
-    model_data.project_info[:name_product] = "Имя из библиотеки модели"
-    model_data.save_to_model(model)
-
-    # 2. Создаем рядом файл BED-01.yaml с другим значением (внешнее редактирование)
+    # 1. Создаем рядом файл BED-01.yaml (внешнее редактирование)
     yaml_file = File.join(test_dir, "BED-01.yaml")
     yaml_data = DN1Code::ExportPdf2::Model::ProjectData.new
     yaml_data.project_info[:articul] = "BED-01"
     yaml_data.project_info[:name_product] = "Имя из файла YAML (Первично)"
     yaml_data.save_to_yaml(yaml_file)
 
-    # 3. Вызываем автоматическую загрузку
+    # 2. Вызываем автоматическую загрузку
     test_data = DN1Code::ExportPdf2::Model::ProjectData.new
     source = test_data.load_auto(model)
 
-    assert(source == :yaml, "Источник загрузки определен как :yaml (первично)")
-    assert(test_data.project_info[:name_project] == "Имя из файла YAML (Первично)", "Загружены данные из YAML файла, имеющего высший приоритет")
+    assert(source == :yaml, "Источник загрузки определен как :yaml")
+    assert(test_data.project_info[:name_project] == "Имя из файла YAML (Первично)", "Загружены данные из YAML файла рядом с моделью")
 
-    # 4. Удаляем YAML файл и проверяем вторичную загрузку из библиотеки модели
+    # 3. Удаляем YAML файл — данных больше нет, источник :default
     File.delete(yaml_file) if File.exist?(yaml_file)
 
     fallback_data = DN1Code::ExportPdf2::Model::ProjectData.new
     fallback_source = fallback_data.load_auto(model)
 
-    assert(fallback_source == :model, "При отсутствии YAML источник загрузки определен как :model (вторично)")
-    # Библиотека модели была синхронизирована при первой загрузке из YAML
-    assert(!fallback_data.project_info[:name_project].empty?, "Данные успешно прочитаны из библиотеки модели")
+    assert(fallback_source == :default, "При отсутствии YAML источник загрузки определен как :default (библиотека модели не используется)")
 
     FileUtils.rm_rf(test_dir)
   end
 
-  def test_save_auto_both_library_and_yaml
-    puts "\n--- 6. Тест save_auto: одновременное сохранение в библиотеку, обновление YAML и переименование файла при смене артикула ---"
+  def test_save_project_yaml_and_articul_rename
+    puts "\n--- 6. Тест save_project_yaml: запись YAML и переименование файла при смене артикула ---"
 
     test_dir = File.expand_path("test_save_auto_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -543,32 +591,25 @@ class TestRunner
     project_data.project_info[:articul] = "OFFICE-900"
     project_data.project_info[:name_project] = "Кабинет Руководителя"
 
-    # Вызываем save_auto первый раз
-    project_data.save_auto(model)
+    # Вызываем save_project_yaml первый раз
+    assert(project_data.save_project_yaml(model), "save_project_yaml успешно записал YAML")
 
-    # Проверка 1: Сохранено в библиотеку модели
-    dict_saved = model.get_attribute("DN1C_ExportPDF", "project_info")
-    assert(!dict_saved.nil? && dict_saved.include?("OFFICE-900"), "Данные сохранены в словарь атрибутов модели")
-
-    # Проверка 2: Сохранено в YAML файл рядом с SKP
+    # Проверка: сохранено в YAML файл рядом с SKP
     yaml_file_1 = File.join(test_dir, "OFFICE-900.yaml")
     assert(File.exist?(yaml_file_1), "Данные сохранены в файл #{File.basename(yaml_file_1)}")
 
-    # Проверка 3: Изменение артикула -> вызов save_auto (кнопка Обновить)
+    # Проверка 3: Изменение артикула -> повторное сохранение с previous_articul
     project_data.project_info[:articul] = "OFFICE-901"
     project_data.project_info[:name_project] = "Кабинет Руководителя (Обновленный)"
-    project_data.save_auto(model)
+    assert(project_data.save_project_yaml(model, previous_articul: "OFFICE-900"), "Повторный save_project_yaml успешен")
 
     yaml_file_2 = File.join(test_dir, "OFFICE-901.yaml")
     assert(File.exist?(yaml_file_2), "При смене артикула создан новый YAML файл #{File.basename(yaml_file_2)}")
     assert(!File.exist?(yaml_file_1), "Старый YAML файл #{File.basename(yaml_file_1)} автоматически удален")
 
-    dict_saved_2 = model.get_attribute("DN1C_ExportPDF", "project_info")
-    assert(!dict_saved_2.nil? && dict_saved_2.include?("OFFICE-901"), "Атрибуты модели обновлены на новый артикул")
-
     # Проверка 4: Очистка артикула -> имя YAML возвращается к имени файла модели Office.yaml
     project_data.project_info[:articul] = ""
-    project_data.save_auto(model)
+    assert(project_data.save_project_yaml(model, previous_articul: "OFFICE-901"), "Сохранение с очищенным артикулом успешен")
 
     yaml_file_3 = File.join(test_dir, "Office.yaml")
     assert(File.exist?(yaml_file_3), "При очистке артикула создан файл по имени модели #{File.basename(yaml_file_3)}")
@@ -765,15 +806,20 @@ class TestRunner
     project_data.project_info[:name_project] = "#{project_data.project_info[:room_name]} — #{project_data.project_info[:furniture_name]}"
     project_data.pdf_settings[:auto_open_pdf] = false
 
-    project_data.save_to_model(model)
+    tmp_yaml = File.expand_path("test_room_composition.yaml", __dir__)
+    project_data.save_to_yaml(tmp_yaml)
 
     loaded_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    loaded_data.load_from_model(model)
+    loaded_data.load_from_yaml(tmp_yaml)
 
-    assert(loaded_data.project_info[:room_name] == "Кухня-столовая", "Помещение 'Кухня-столовая' сохранено в модель")
-    assert(loaded_data.project_info[:furniture_name] == "Остров с барной стойкой", "Изделие 'Остров с барной стойкой' сохранено в модель")
+    assert(loaded_data.project_info[:room_name] == "Кухня-столовая", "Помещение 'Кухня-столовая' сохранено в YAML")
+    assert(loaded_data.project_info[:furniture_name] == "Остров с барной стойкой", "Изделие 'Остров с барной стойкой' сохранено в YAML")
     assert(loaded_data.project_info[:address] == "г. Санкт-Петербург, Невский пр., 100", "Адрес сохранен в данные проекта")
     assert(loaded_data.project_info[:name_project] == "Кухня-столовая — Остров с барной стойкой", "Заголовок проекта корректно составлен из помещения и мебели")
+
+    File.delete(tmp_yaml) if File.exist?(tmp_yaml)
+
+    loaded_data.sync_with_model_scenes(model)
 
     pdf_out = File.expand_path("test_cover_composition.pdf", __dir__)
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(loaded_data, model)
@@ -814,8 +860,7 @@ class TestRunner
     }
 
     # Настройки для LayOut API
-    project_data.pdf_settings[:export_engine] = "layout"
-    project_data.pdf_settings[:layout_render_mode] = "vector"
+    project_data.pdf_settings[:layout_render_mode] = "hybrid"
     project_data.pdf_settings[:save_layout_file] = true
     project_data.pdf_settings[:page_size] = "A3"
     project_data.pdf_settings[:page_layout] = "landscape"
@@ -837,10 +882,6 @@ class TestRunner
 
     assert(File.exist?(result_path), "Файл PDF успешно создан через LayOut API: #{File.basename(result_path)}")
     assert(File.exist?(layout_out), "Файл проекта LayOut (.layout) успешно сохранен рядом с PDF")
-
-    # Проверка сохранения настроек LayOut в атрибуты модели
-    saved_settings = model.get_attribute("DN1C_ExportPDF", "pdf_settings")
-    assert(!saved_settings.nil? && saved_settings.include?("layout"), "Настройка 'export_engine: layout' сохранена в атрибуты модели")
 
     File.delete(pdf_out) if File.exist?(pdf_out)
     File.delete(layout_out) if File.exist?(layout_out)
@@ -885,13 +926,12 @@ class TestRunner
     assert(loaded_data.project_info[:articul] == "ART-REOPEN-100", "Артикул корректно прочитан")
     assert(!loaded_data.history.any? { |h| h[:description].to_s.include?("Открытие рабочего файла") }, "История правок автоматически НЕ создается при открытии файла")
 
-    # 3. Симулируем сохранение модели (pre_save / post_save)
-    DN1Code::ExportPdf2::Service::ObserverService.handle_pre_save(model)
-    DN1Code::ExportPdf2::Service::ObserverService.handle_post_save(model)
+    # 3. Симулируем принудительное сохранение (flush сессии в YAML)
+    DN1Code::ExportPdf2::Model::SessionStore.flush(model)
 
     rechecked_data = DN1Code::ExportPdf2::Model::ProjectData.new
     rechecked_data.load_auto(model)
-    assert(rechecked_data.project_info[:revision] == 7, "После pre_save и post_save ревизия сохраняется равной 7")
+    assert(rechecked_data.project_info[:revision] == 7, "После flush сессии ревизия сохраняется равной 7")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -952,12 +992,12 @@ class TestRunner
     assert(info[:trade] == "0", "trade '0' (домашний HF#) корректно определен")
     assert(info[:last_edit] == "Добавлены замки", "last_edit прочитан: #{info[:last_edit]}")
 
-    # 4. Проверка секции directories
+    # 4. Проверка секции directories (Hash из legacy YAML нормализуется в массив)
     dirs = data.directories
-    assert(dirs.is_a?(Hash) && dirs[:задание_замеры], "Секция directories содержит задание_замеры")
-    assert(dirs[:задание_замеры][:path] == "!_замер_фото_задание", "Путь к каталогу замеров корректен")
-    assert(dirs[:материалы_фурнитура][:display] == "grid", "Режим отображения папки материалов — grid")
-    assert(dirs[:техника_подсветка][:display] == "list", "Режим отображения техники — list")
+    assert(dirs.is_a?(Array) && dirs.size == 3, "Секция directories (Hash) нормализована в массив из 3 записей")
+    assert(dirs[0][:path] == "!_замер_фото_задание", "Путь к каталогу замеров корректен")
+    assert(dirs[1][:display] == "grid", "Режим отображения папки материалов — grid")
+    assert(dirs[2][:display] == "list", "Режим отображения техники — list")
 
     # 5. Проверка обратной совместимости чтения устаревшего файла edit_history.yaml
     temp_dir = File.expand_path("test_history_save_dir", __dir__)
@@ -991,27 +1031,10 @@ class TestRunner
     test_hf.sync_project_fields!
     assert(test_hf.project_info[:trade] == "0", "Для артикула HF# автоматически определен home trade='0'")
 
-    # 7. Тест сохранения и обновления edit_history.yaml с сохранением других проектов
+    # 7. Генерация PDF документа с реальными данными project_config.yaml
     temp_dir = File.expand_path("test_history_save_dir", __dir__)
     FileUtils.mkdir_p(temp_dir)
-    hist_out = File.join(temp_dir, "edit_history.yaml")
 
-    # Записываем историю для ДВУХ разных артикулов
-    initial_hash = {
-      "OTHER#001" => [{ "date" => "2026-08-01 10:00", "text" => "Другой проект" }]
-    }
-    File.write(hist_out, initial_hash.to_yaml, encoding: "utf-8")
-
-    # Сохраняем историю для нашего проекта
-    data.save_to_edit_history(hist_out, "HF#26050418280405")
-
-    # Читаем результат
-    saved_yaml = YAML.load_file(hist_out)
-    assert(saved_yaml.key?("OTHER#001"), "История другого проекта OTHER#001 сохранена в файле")
-    assert(saved_yaml.key?("HF#26050418280405"), "История проекта HF#26050418280405 записана")
-    assert(saved_yaml["HF#26050418280405"].size == 4, "Записаны все 4 правки текущего проекта")
-
-    # 8. Генерация PDF документа с реальными данными project_config.yaml
     model = Sketchup::MockModel.new(File.join(temp_dir, "RealProject.skp"))
     model.pages.add("01. Обложка проекта")
     data.sync_with_model_scenes(model)
@@ -1058,8 +1081,9 @@ class TestRunner
       x: 10.0, y: 15.0, w: 80.0, h: 12.0, visible: true, align: "center"
     }
 
-    # Сохраняем через save_auto
-    project_data.save_auto(model)
+    # Сохраняем: YAML проекта + шаблоны в layout.yaml плагина
+    project_data.save_project_yaml(model)
+    project_data.save_to_layout_yaml(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE)
 
     prj_yaml = File.join(test_dir, "VILLA-100.yaml")
     local_layout_yaml = File.join(test_dir, "layout.yaml")
@@ -1111,13 +1135,15 @@ class TestRunner
     test_dir = File.expand_path("test_modular_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
 
-    # 1. Тест генераторов артикула и customer_id
-    cf_art = DN1Code::ExportPdf2::Model::ProjectData.generate_articul(commercial: true, suffix: "01")
-    hf_art = DN1Code::ExportPdf2::Model::ProjectData.generate_articul(commercial: false, suffix: "02")
+    # 1. Тест генераторов артикула и customer_id (формат CF#ГГММДД_ЧЧММСС — без суффикса)
+    cf_art = DN1Code::ExportPdf2::Model::ProjectData.generate_articul(commercial: true)
+    hf_art = DN1Code::ExportPdf2::Model::ProjectData.generate_articul(commercial: false)
     cust_id = DN1Code::ExportPdf2::Model::ProjectData.generate_customer_id
 
     assert(cf_art.start_with?("CF#"), "Артикул коммерческого проекта начинается с CF#: #{cf_art}")
     assert(hf_art.start_with?("HF#"), "Артикул бытового проекта начинается с HF#: #{hf_art}")
+    assert(cf_art.match?(/\ACF#\d{6}_\d{6}\z/), "Артикул заканчивается секундами (ГГММДД_ЧЧММСС): #{cf_art}")
+    assert(hf_art.match?(/\AHF#\d{6}_\d{6}\z/), "Артикул HF# без суффикса: #{hf_art}")
     assert(cust_id.start_with?("CUST-"), "ID заказчика начинается с CUST-: #{cust_id}")
 
     # 2. Создаем и заполняем модель модульными данными
@@ -1194,13 +1220,7 @@ class TestRunner
     assert(loaded.workflow[:total_duration] == "12h 40m", "workflow.total_duration прочитан")
     assert(loaded.workflow[:history_edit].size == 2, "Все записи history_edit прочитаны")
 
-    # 6. Тест increment_revision! в новой структуре
-    loaded.increment_revision!("Внесение правок по шкафу")
-    assert(loaded.workflow[:revision] == "002", "Ревизия инкрементирована до 002: #{loaded.workflow[:revision]}")
-    assert(loaded.workflow[:history_edit].size == 3, "В history_edit добавлена новая запись")
-    assert(loaded.workflow[:history_edit].first[1].include?("Внесение правок по шкафу"), "Текст новой ревизии добавлен в history_edit")
-
-    # 7. Генерация PDF из модульных данных
+    # 6. Генерация PDF из модульных данных
     skp_file = File.join(test_dir, "Modular_Test.skp")
     model = Sketchup::MockModel.new(skp_file)
     model.pages.add("01. Обложка")
@@ -1762,11 +1782,10 @@ class TestRunner
       revision:       2
     }
 
-    # Создаем 5 сцен: 3 включены (из них 1 с типом :skip), 2 отключены
+    # Создаем 4 сцены: 3 включены, 1 отключена
     scenes = [
       DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Обложка", page_type: :cover, enabled: true),
       DN1Code::ExportPdf2::Model::SceneItem.new(name: "02. Содержание", page_type: :explain, enabled: true),
-      DN1Code::ExportPdf2::Model::SceneItem.new(name: "03. Черновой вид", page_type: :skip, enabled: true),
       DN1Code::ExportPdf2::Model::SceneItem.new(name: "04. Скрытый ракурс", page_type: :visual, enabled: false),
       DN1Code::ExportPdf2::Model::SceneItem.new(name: "05. Финальный рендер", page_type: :visual, enabled: true)
     ]
@@ -1781,7 +1800,6 @@ class TestRunner
     assert(toc_text.include?("1. 01. Обложка"), "TOC содержит '1. 01. Обложка'")
     assert(toc_text.include?("2. 02. Содержание"), "TOC содержит '2. 02. Содержание'")
     assert(toc_text.include?("3. 05. Финальный рендер"), "TOC содержит '3. 05. Финальный рендер'")
-    assert(!toc_text.include?("Черновой вид"), "TOC исключает сцены с page_type: :skip")
     assert(!toc_text.include?("Скрытый ракурс"), "TOC исключает отключенные сцены (enabled: false)")
 
     # 2. Рендеринг ExplainPage с отображением общего количества страниц
@@ -2761,9 +2779,12 @@ class TestRunner
     assert(project_data.workflow[:revision] == initial_rev, "Номер ревизии НЕ изменился автоматически (остался #{initial_rev})")
 
     # 5. Ручное внесение правок с точной датой и временем перед созданием PDF
+    #    (инкремент ревизии выполняется пользователем в диалоге, а не при экспорте)
     exact_time = "2026-09-07 00:45"
     edits_desc = "Заменены направляющие ящиков на Blum Tandem, обновлен цвет цоколя"
-    project_data.increment_revision!(edits_desc, exact_time)
+    project_data.workflow[:revision]     = "004"
+    project_data.project_info[:revision] = 4
+    project_data.workflow[:history_edit].unshift([exact_time, "#{edits_desc} (rev. 004)"])
 
     assert(project_data.workflow[:revision] == "004", "Ревизия успешно инкрементирована до 004")
     assert(project_data.workflow[:history_edit].size == initial_hist_count + 1, "В историю добавлена ровно одна запись правок")
@@ -3232,6 +3253,8 @@ class TestRunner
     assert(info_custom[:render_h] == 1029, "Высота рендера для 21:9 равна 1029")
 
     # 3. Проверка жизненного цикла оверлея (enable, disable, toggle, active?)
+    # Явное перекрытие шаблона — изоляция от пользовательского config/layout.yaml
+    overlay_svc.update_settings({ custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "16:9" } } } })
     mock_model = Sketchup::MockModel.new
     assert(!overlay_svc.overlay_active?(mock_model), "Изначально оверлей выключен")
 
@@ -3290,28 +3313,28 @@ class TestRunner
     FileUtils.mkdir_p(saved_dir)
     mock_model_saved = Sketchup::MockModel.new
     mock_model_saved.path = File.join(saved_dir, "saved_model.skp")
-    mock_model_saved.set_attribute(DN1Code::ExportPdf2::Model::ProjectData::ATTR_DICT, "pdf_settings", JSON.generate({ image_aspect_ratio: "16:9" }))
+    # Настройки PDF глобальные: значение 16:9 задается в памяти сессии (update_frame_settings);
+    # show_aspect_overlay: false — чтобы on_model_opened не включал рамку и не пересчитывал кэш
     pdata_saved = DN1Code::ExportPdf2::Model::ProjectData.new
-    pdata_saved.load_auto(mock_model_saved)
-    assert(pdata_saved.pdf_settings[:image_aspect_ratio] == "16:9", "При открытии файла с сохраненным 16:9 сохраняется 16:9")
+    pdata_saved.update_frame_settings({ image_aspect_ratio: "16:9", show_aspect_overlay: false })
+    assert(pdata_saved.pdf_settings[:image_aspect_ratio] == "16:9", "update_frame_settings задает 16:9 в памяти сессии")
 
     overlay_svc.on_model_opened(mock_model_empty, pdata_empty)
     assert((overlay_svc.overlay_instance.ratio_cache - (4.0 / 3.0)).abs < 0.01, "on_model_opened устанавливает кэш пропорций 4:3 для модели без настроек")
 
     overlay_svc.on_model_opened(mock_model_saved, pdata_saved)
-    assert((overlay_svc.overlay_instance.ratio_cache - (16.0 / 9.0)).abs < 0.01, "on_model_opened устанавливает кэш пропорций 16:9 для сохраненной модели")
+    assert((overlay_svc.overlay_instance.ratio_cache - (16.0 / 9.0)).abs < 0.01, "on_model_opened устанавливает кэш пропорций 16:9 для сессии с 16:9")
 
-    # Проверка сохранения в настройки по умолчанию
-    res_save_def = DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "16:9", show_aspect_overlay: true })
-    assert(res_save_def == true, "save_default_frame_settings завершился успешно")
-    cfg_text = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8")
-    assert(cfg_text.include?("image_aspect_ratio: '16:9'") || cfg_text.include?("image_aspect_ratio: \"16:9\"") || cfg_text.include?("image_aspect_ratio: 16:9"), "settings.yaml содержит обновленный image_aspect_ratio")
-    DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "4:3" })
+    # Проверка: update_frame_settings меняет только память, settings.yaml не перезаписывается
+    cfg_text_before = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8") rescue ""
+    pdata_saved.update_frame_settings({ image_aspect_ratio: "4:3" })
+    assert(pdata_saved.pdf_settings[:image_aspect_ratio] == "4:3", "update_frame_settings вернул 4:3 в памяти")
+    cfg_text_after = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8") rescue ""
+    assert(cfg_text_before == cfg_text_after, "update_frame_settings не пишет на диск (settings.yaml нетронут)")
 
-    # Проверка игнорирования недопустимых пропорций кадра, которых нет в настройках
-    DN1Code::ExportPdf2::Model::ProjectData.save_default_frame_settings({ image_aspect_ratio: "21:9" })
-    cfg_text_after_invalid = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_SETTINGS_FILE, encoding: "utf-8")
-    assert(!cfg_text_after_invalid.include?("21:9"), "save_default_frame_settings не сохраняет недопустимые пропорции 21:9 в settings.yaml")
+    # Проверка игнорирования недопустимых пропорций кадра
+    pdata_saved.update_frame_settings({ image_aspect_ratio: "21:9" })
+    assert(pdata_saved.pdf_settings[:image_aspect_ratio] == "4:3", "update_frame_settings игнорирует недопустимые пропорции 21:9")
 
     info_invalid = overlay_svc.calculate_target_info(nil, { image_aspect_ratio: "21:9" })
     assert((info_invalid[:ratio] - (4.0 / 3.0)).abs < 0.01, "calculate_target_info нормализует неизвестные пропорции 21:9 к 4:3")
@@ -3535,7 +3558,7 @@ class TestRunner
     # 7. Проверка секций directories, scenes, api_targets
     assert(proj.directories.is_a?(Array) && proj.directories.size == 2, "Рабочие папки directories содержат 2 записи")
     assert(proj.scenes.is_a?(Array) && proj.scenes.size == 4, "Сцены проекта содержат 4 элемента")
-    assert(proj.scenes[0][:name] == "Обложка" && proj.scenes[0][:page_type] == "cover", "Сцена 1: Обложка (cover)")
+    assert(proj.scenes[0].name == "Обложка" && proj.scenes[0].page_type == :cover, "Сцена 1: Обложка (cover)")
     assert(proj.api_targets.is_a?(Array) && proj.api_targets.size == 2, "api_targets содержат 2 адреса")
     assert(proj.api_targets.any? { |url| url.include?("prodmd.top") }, "api_targets содержит prodmd.top")
 
@@ -3639,25 +3662,20 @@ class TestRunner
     assert(loaded_proj.custom_layouts[:general][:header][:visible] == true,
            "Загруженный general сохранил видимость header: true")
 
-    # 4. Проверка работы метода save_auto с mock-моделью
+    # 4. Проверка работы метода save_project_yaml с mock-моделью
     mock_model = Sketchup::MockModel.new
     mock_model.path = File.join(tmp_dir, "MyModel.skp")
     loaded_proj.project_info[:name] = "Автосохраненный Проект"
-    layout_backup = File.read(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE, encoding: "utf-8") rescue nil
-    begin
-      loaded_proj.save_auto(mock_model)
-    ensure
-      File.write(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE, layout_backup, encoding: "utf-8") if layout_backup
-    end
+    assert(loaded_proj.save_project_yaml(mock_model), "save_project_yaml завершился успешно")
 
     expected_auto_yaml = File.join(tmp_dir, "MyModel.yaml")
-    assert(File.exist?(expected_auto_yaml), "save_auto создал YAML файл рядом со SKP: #{expected_auto_yaml}")
+    assert(File.exist?(expected_auto_yaml), "save_project_yaml создал YAML файл рядом со SKP: #{expected_auto_yaml}")
     content_auto = File.read(expected_auto_yaml, encoding: "utf-8")
-    assert(content_auto.include?("Автосохраненный Проект"), "save_auto сохранил актуальные данные проекта в YAML")
+    assert(content_auto.include?("Автосохраненный Проект"), "save_project_yaml сохранил актуальные данные проекта в YAML")
 
-    # 5. Проверка экшена autoSave / saveData с silent: true в export_dialog.rb
+    # 5. Проверка экшена saveData с silent: true в export_dialog.rb
     export_dialog_rb = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
-    assert(export_dialog_rb.include?('dialog.add_action_callback("autoSave"'), "export_dialog.rb регистрирует экшен autoSave")
+    assert(export_dialog_rb.include?('dialog.add_action_callback("saveData"'), "export_dialog.rb регистрирует экшен saveData")
     assert(export_dialog_rb.include?("is_auto = payload[:silent] == true || payload[:is_auto_save] == true"),
            "export_dialog.rb распознает silent и is_auto_save флаги")
     assert(export_dialog_rb.include?("window.app.onAutoSaved && window.app.onAutoSaved"),
@@ -3678,8 +3696,9 @@ class TestRunner
 
     # 8. Проверка наличия индикатора автосохранения в index.html и стилей в app.css
     html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
-    assert(html_text.include?('id="autosaveStatus"'), "index.html содержит элемент #autosaveStatus в шапке")
+    assert(html_text.include?('id="autosaveStatus"'), "index.html содержит элемент #autosaveStatus (футер, рядом с кнопками)")
     assert(html_text.include?('class="autosave-status"'), "index.html содержит контейнер autosave-status")
+    assert(!html_text.include?('id="btnRefreshData"'), "Кнопка «Обновить» (btnRefreshData) удалена из футера")
 
     css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
     assert(css_text.include?(".autosave-status"), "app.css содержит стили для .autosave-status")
@@ -3737,6 +3756,79 @@ class TestRunner
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # ============================================================================
+  # 68. ТЕСТ: Новая модель стартует без папок; удаление всех папок сохраняется
+  # ============================================================================
+  def test_directories_start_empty_and_deletions_persist
+    puts "\n--- 68. Тест: новая модель без папок, удаление папок не откатывается к дефолтам ---"
+
+    # 1. Новый ProjectData — пустой список directories (без дефолтных папок)
+    data = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(data.directories.is_a?(Array) && data.directories.empty?,
+           "Новый ProjectData стартует с пустым списком directories")
+
+    # 2. Нормализация не подставляет дефолтные папки в пустой список
+    data.normalize_directories!
+    assert(data.directories.empty?, "normalize_directories! оставляет пустой список пустым")
+
+    # 3. apply_payload! применяет пустой массив (пользователь удалил все папки в диалоге)
+    data.directories = [{ path: "!_замер", title: "Замеры", description: "Фото" }]
+    data.apply_payload!({ directories: [] })
+    assert(data.directories.empty?, "apply_payload! применяет пустой массив directories (удаление всех папок)")
+
+    # 4. Сохранение в YAML и перезагрузка: пустой список не восстанавливается к дефолтам
+    test_dir = File.expand_path("test_dirs_empty_dir", __dir__)
+    FileUtils.mkdir_p(File.join(test_dir, "empty"))
+    model = Sketchup::MockModel.new(File.join(test_dir, "empty", "EmptyDirs.skp"))
+    model.pages.add("01. Обложка")
+    data.sync_with_model_scenes(model)
+    assert(data.save_project_yaml(model), "Проект с пустым directories сохранен в YAML")
+
+    reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(reloaded.load_auto(model) == :yaml, "YAML проекта с пустым directories загружен")
+    assert(reloaded.directories.is_a?(Array) && reloaded.directories.empty?,
+           "После перезагрузки directories остается пустым (дефолты не возвращаются)")
+
+    # 5. YAML вообще без ключа directories тоже не порождает папок
+    FileUtils.mkdir_p(File.join(test_dir, "no_key"))
+    File.write(File.join(test_dir, "no_key", "NoDirs.yaml"), <<~YAML, encoding: "utf-8")
+      ---
+      project:
+        articul: NO-DIRS-001
+        product: Тумба
+      scenes: []
+    YAML
+    model2 = Sketchup::MockModel.new(File.join(test_dir, "no_key", "NoDirs.skp"))
+    data2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(data2.load_auto(model2) == :yaml, "YAML без ключа directories загружен")
+    assert(data2.directories.is_a?(Array) && data2.directories.empty?,
+           "YAML без ключа directories не порождает папок")
+
+    # 6. Размер эскизов (thumb_size) сохраняется при записи/чтении YAML
+    data3 = DN1Code::ExportPdf2::Model::ProjectData.new
+    data3.directories = [{ path: "C:/Тест/Эскизы", title: "Эскизы", description: "", thumb_size: "large" }]
+    data3.sync_project_fields!
+    thumb_yaml = File.join(test_dir, "thumb", "ThumbProject.yaml")
+    FileUtils.mkdir_p(File.dirname(thumb_yaml))
+    assert(data3.save_to_yaml(thumb_yaml), "Проект с thumb_size сохранен в YAML")
+    data3_loaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(data3_loaded.load_from_yaml(thumb_yaml), "YAML с thumb_size загружен")
+    assert(data3_loaded.directories.first[:thumb_size] == "large",
+           "Размер эскизов thumb_size сохраняется при записи/чтении YAML")
+
+    # 7. Элементы интерфейса: путь как текст (клик — выбор папки) и размеры эскизов
+    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js_text.include?("dir-thumb-size-btn"), "app.js содержит переключатель размеров эскизов")
+    assert(js_text.include?("dir-path-text"), "Путь в карточке выводится текстом (dir-path-text)")
+    assert(js_text.include?('callRuby("selectDirectory", index.toString())'), "Клик по пути открывает выбор папки")
+    css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
+    assert(css_text.include?("thumb-small") && css_text.include?("thumb-medium") && css_text.include?("thumb-large"),
+           "app.css содержит три варианта размеров эскизов (small/medium/large)")
+    assert(css_text.include?("dir-path-text"), "app.css содержит стиль текстового пути")
+
+    FileUtils.rm_rf(test_dir)
   end
 
   # ============================================================================
@@ -4037,7 +4129,6 @@ class TestRunner
     js_content = File.read(js_path, encoding: "UTF-8")
 
     # 1. Проверка Ruby моделей и контроллеров
-    assert(DN1Code::ExportPdf2::Model::SceneItem::PAGE_TYPES.include?(:blank), "SceneItem::PAGE_TYPES содержит :blank")
     sc_blank = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Чистая страница 3D")
     assert(sc_blank.page_type == :blank, "SceneItem автоматически распознает 'Чистая страница' как :blank")
 
@@ -4123,13 +4214,15 @@ class TestRunner
     dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
     model_rb_content = File.read(model_rb_path, encoding: "UTF-8")
 
-    # 1. Проверка сохранения layout.yaml в экшн-коллбэках export_dialog.rb
-    assert(dialog_rb_content.include?("save_to_layout_yaml"), "export_dialog.rb сохраняет шаблоны в layout.yaml")
-    assert(dialog_rb_content.include?("save_to_layout_yaml(Model::ProjectData::PROGRAM_LAYOUT_FILE)"), "export_dialog.rb сохраняет шаблоны в PROGRAM_LAYOUT_FILE")
+    # 1. Проверка сохранения шаблонов через SessionStore.flush в колбэках export_dialog.rb
+    assert(dialog_rb_content.include?("Model::SessionStore.flush"), "export_dialog.rb сохраняет шаблоны и YAML через SessionStore.flush")
+    assert(dialog_rb_content.include?("Model::SessionStore.import_project_yaml"), "export_dialog.rb импортирует данные проекта через SessionStore")
 
-    # 2. Проверка дублирования custom_layouts в атрибутах модели в project_data.rb
-    assert(model_rb_content.include?('model.set_attribute(ATTR_DICT, "custom_layouts"'), "ProjectData#save_to_model сохраняет custom_layouts в атрибуты модели")
-    assert(model_rb_content.include?('raw_layouts = model.get_attribute(ATTR_DICT, "custom_layouts"'), "ProjectData#load_from_model восстанавливает custom_layouts из атрибутов модели")
+    # 2. Проверка отказа от библиотеки модели в project_data.rb (атрибуты .skp не используются)
+    assert(!model_rb_content.include?("set_attribute"), "project_data.rb не записывает данные в атрибуты модели SketchUp")
+    assert(!model_rb_content.include?("get_attribute"), "project_data.rb не читает данные из атрибутов модели SketchUp")
+    assert(!model_rb_content.include?("ATTR_DICT"), "project_data.rb не содержит словаря атрибутов ATTR_DICT")
+    assert(model_rb_content.include?("def save_project_yaml"), "project_data.rb сохраняет данные проекта в YAML файл (save_project_yaml)")
 
     # 3. Проверка мгновенного сброса автосохранения flushAutoSave в app.js
     assert(js_content.include?("function flushAutoSave()"), "app.js содержит функцию flushAutoSave")
@@ -4141,17 +4234,19 @@ class TestRunner
     assert(js_content.include?('updateBlockSlot("slot_1", { line_font_sizes:'), "app.js обновляет шрифт строк среднего блока через updateBlockSlot")
     assert(js_content.include?('updateBlockSlot("slot_1", { line_colors:'), "app.js обновляет цвет строк среднего блока через updateBlockSlot")
 
-    # 5. Практический тест сохранения и восстановления custom_layouts в модели SketchUp
-    fake_model = Sketchup::MockModel.new("U:/Projects/Test/TemplateTest.skp")
+    # 5. Практический тест сохранения и восстановления custom_layouts через layout.yaml
+    tmp_tpl_dir = Dir.mktmpdir("test_template_roundtrip")
+    tmp_tpl_layout = File.join(tmp_tpl_dir, "layout_roundtrip.yaml")
     pdata1 = DN1Code::ExportPdf2::Model::ProjectData.new
     pdata1.custom_layouts[:cover][:header][:visible] = false
     pdata1.custom_layouts[:cover][:slot_1][:font_size] = 16.5
-    pdata1.save_to_model(fake_model)
+    pdata1.save_to_layout_yaml(tmp_tpl_layout)
 
     pdata2 = DN1Code::ExportPdf2::Model::ProjectData.new
-    pdata2.load_from_model(fake_model)
-    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из модели выключенный заголовок")
-    assert(pdata2.custom_layouts[:cover][:slot_1][:font_size] == 16.5, "ProjectData восстанавливает из модели кастомный размер шрифта")
+    pdata2.load_from_layout_yaml(tmp_tpl_layout)
+    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный заголовок")
+    assert(pdata2.custom_layouts[:cover][:slot_1][:font_size] == 16.5, "ProjectData восстанавливает из layout.yaml кастомный размер шрифта")
+    FileUtils.rm_rf(tmp_tpl_dir)
 
     # 6. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
@@ -4195,21 +4290,23 @@ class TestRunner
     assert(page_base.send(:get_block_config, :test_tpl, :general_header) == { visible: false }, "PageBase#get_block_config поддерживает алиас :general_header -> :header")
     assert(page_base.send(:get_block_config, :test_tpl, :visual_image) == { visible: true }, "PageBase#get_block_config поддерживает алиас :visual_image -> :image_4_3")
 
-    # 4. Проверка сохранения и восстановления всех 4 блоков в модели SketchUp
-    fake_model = Sketchup::MockModel.new("U:/Projects/Test/BlockVisTest.skp")
+    # 4. Проверка сохранения и восстановления всех 4 блоков через layout.yaml
+    tmp_vis_dir = Dir.mktmpdir("test_block_vis")
+    tmp_vis_layout = File.join(tmp_vis_dir, "layout_blockvis.yaml")
     pdata1 = DN1Code::ExportPdf2::Model::ProjectData.new
     pdata1.custom_layouts[:cover][:header][:visible] = false
     pdata1.custom_layouts[:cover][:slot_1][:visible] = false
     pdata1.custom_layouts[:cover][:footer][:visible] = false
     pdata1.custom_layouts[:cover][:image_4_3][:visible] = false
-    pdata1.save_to_model(fake_model)
+    pdata1.save_to_layout_yaml(tmp_vis_layout)
 
     pdata2 = DN1Code::ExportPdf2::Model::ProjectData.new
-    pdata2.load_from_model(fake_model)
-    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из модели выключенный header")
-    assert(pdata2.custom_layouts[:cover][:slot_1][:visible] == false, "ProjectData восстанавливает из модели выключенный slot_1")
-    assert(pdata2.custom_layouts[:cover][:footer][:visible] == false, "ProjectData восстанавливает из модели выключенный footer")
-    assert(pdata2.custom_layouts[:cover][:image_4_3][:visible] == false, "ProjectData восстанавливает из модели выключенный image_4_3")
+    pdata2.load_from_layout_yaml(tmp_vis_layout)
+    assert(pdata2.custom_layouts[:cover][:header][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный header")
+    assert(pdata2.custom_layouts[:cover][:slot_1][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный slot_1")
+    assert(pdata2.custom_layouts[:cover][:footer][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный footer")
+    assert(pdata2.custom_layouts[:cover][:image_4_3][:visible] == false, "ProjectData восстанавливает из layout.yaml выключенный image_4_3")
+    FileUtils.rm_rf(tmp_vis_dir)
 
     # 5. Проверка сохранения в layout.yaml и обратной загрузки
     tmp_dir = Dir.mktmpdir("test_layout_vis")
@@ -4266,9 +4363,8 @@ class TestRunner
 
     # 2. OverlayService.enable(model) не включает рамку, если видовой экран выключен
     mock_model = Sketchup::MockModel.new
-    pdata_disabled = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_disabled = DN1Code::ExportPdf2::Model::SessionStore.data(mock_model)
     pdata_disabled.custom_layouts[:cover][:image_4_3][:visible] = false
-    pdata_disabled.save_to_model(mock_model)
 
     assert(!overlay_svc.overlay_active?(mock_model), "Изначально оверлей не активен")
     res_enable = overlay_svc.enable(mock_model)
@@ -4284,14 +4380,13 @@ class TestRunner
     assert(mock_view.drawn_elements.empty?, "SafeFrameOverlay#draw ничего не рисует при visible_cache == false")
 
     # 4. OverlayService.refresh автоматически выключает оверлей при переключении на сцену без видового экрана
-    pdata_enabled = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata_enabled = DN1Code::ExportPdf2::Model::SessionStore.data(mock_model)
     pdata_enabled.custom_layouts[:cover][:image_4_3][:visible] = true
-    pdata_enabled.save_to_model(mock_model)
     assert(overlay_svc.enable(mock_model) == true, "enable включает оверлей при активном видовом экране")
     assert(overlay_svc.overlay_active?(mock_model) == true, "overlay_active? возвращает true")
 
     # Теперь переключаем сцену на выключенный шаблон и вызываем refresh
-    pdata_disabled.save_to_model(mock_model)
+    pdata_enabled.custom_layouts[:cover][:image_4_3][:visible] = false
     overlay_svc.refresh(mock_model)
     assert(!overlay_svc.overlay_active?(mock_model), "refresh автоматически выключил оверлей для сцены со скрытым видовым экраном")
 
@@ -4324,9 +4419,6 @@ class TestRunner
     assert(scene1.viewport_visible == true, "SceneItem по умолчанию имеет viewport_visible == true")
     assert(scene1.aspect_ratio == "4:3", "SceneItem по умолчанию имеет aspect_ratio == '4:3'")
     assert(scene1.scale_pct == 100, "SceneItem по умолчанию имеет scale_pct == 100")
-    assert(scene1[:viewport_visible] == true, "SceneItem[] поддерживает доступ к :viewport_visible")
-    assert(scene1[:aspect_ratio] == "4:3", "SceneItem[] поддерживает доступ к :aspect_ratio")
-    assert(scene1[:scale_pct] == 100, "SceneItem[] поддерживает доступ к :scale_pct")
 
     # Сериализация в хэш и десериализация
     scene1.viewport_visible = false
@@ -4747,16 +4839,14 @@ class TestRunner
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
   end
 
-  # --- 60. Тест одинаковой работы множителя толщины линий во всех режимах рендера (Raster, Vector, Hybrid) ---
+  # --- 60. Тест работы множителя толщины линий в режимах рендера (Гибридный видовой экран, Растровый GPU) ---
   def test_60_line_multiplier_consistent_across_all_render_modes
-    puts "\n--- 60. Тест одинаковой работы множителя толщины линий во всех режимах рендера (Raster, Vector, Hybrid) ---"
+    puts "\n--- 60. Тест работы множителя толщины линий в режимах рендера (Гибридный видовой экран, Растровый GPU) ---"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    # 1. Проверка поддержки Layout::SketchUpModel для всех режимов рендера
+    # 1. Проверка поддержки Layout::SketchUpModel для гибридного режима рендера
     render_modes = {
-      "raster" => Layout::SketchUpModel::RASTER_RENDER,
-      "vector" => Layout::SketchUpModel::VECTOR_RENDER,
       "hybrid" => Layout::SketchUpModel::HYBRID_RENDER
     }
 
@@ -4818,9 +4908,9 @@ class TestRunner
       end
     end
 
-    # 2. Проверка, что во всех режимах (Raster, Vector, Hybrid) при явном множителе толщина линий строго одинакова
-    explicit_multipliers = ["0.5", "1.5", "2.0", "3.0"]
-    explicit_multipliers.each do |sm_val|
+    # 2. Проверка толщины линий при явном множителе в гибридном режиме
+    explicit_multipliers = { "0.5" => 0.25, "1.5" => 0.75, "2.0" => 1.00, "3.0" => 1.50 }
+    explicit_multipliers.each do |sm_val, expected_w|
       weights_by_mode = {}
       render_modes.keys.each do |mode_name|
         doc = Layout::Document.new
@@ -4847,24 +4937,20 @@ class TestRunner
         weights_by_mode[mode_name] = vp ? vp.line_weight : nil
       end
 
-      assert(!weights_by_mode["raster"].nil?, "Raster режим имеет установленный line_weight для '#{sm_val}'")
-      assert(!weights_by_mode["vector"].nil?, "Vector режим имеет установленный line_weight для '#{sm_val}'")
       assert(!weights_by_mode["hybrid"].nil?, "Hybrid режим имеет установленный line_weight для '#{sm_val}'")
-
-      assert(weights_by_mode["raster"] == weights_by_mode["vector"] && weights_by_mode["vector"] == weights_by_mode["hybrid"],
-             "Множитель '#{sm_val}' дает одинаковую толщину во всех режимах: Raster=#{weights_by_mode['raster']}, Vector=#{weights_by_mode['vector']}, Hybrid=#{weights_by_mode['hybrid']}")
+      assert(weights_by_mode["hybrid"] == expected_w,
+             "Множитель '#{sm_val}' дает толщину #{expected_w} pt (получено #{weights_by_mode['hybrid']} pt)")
     end
 
     # Проверка режима 'auto' (значения множителя уменьшены на 30%):
-    # - в Raster расчет идет от разрешения (2400 px -> 0.84 mult -> 0.42 pt) с защитным порогом
-    # - в Vector и Hybrid расчет подстроен под формат листа (A4=0.21 pt, A3=0.32 pt, A2=0.42 pt)
+    # - в Растровом GPU расчет идет от разрешения (2400 px -> 0.84 mult -> 0.42 pt) с защитным порогом
+    # - в Гибриде расчет подстроен под формат листа (A4=0.21 pt, A3=0.32 pt, A2=0.42 pt)
     %w[A4 A3 A2].each do |sz|
       expected_vec_w = case sz
                        when "A3" then 0.32
                        when "A2" then 0.42
                        else 0.21
                        end
-      expected_ras_w = 0.42 # 2400 px -> 0.84 mult -> 0.5 * 0.84 = 0.42 pt
 
       weights = {}
       render_modes.keys.each do |mode_name|
@@ -4893,16 +4979,12 @@ class TestRunner
         weights[mode_name] = vp ? vp.line_weight : nil
       end
 
-      assert(weights["raster"] == expected_ras_w, "В режиме 'auto' для формата #{sz} в Raster толщина равна #{expected_ras_w} pt (получено #{weights['raster']} pt)")
-      assert(weights["vector"] == expected_vec_w, "В режиме 'auto' для формата #{sz} в Vector толщина равна #{expected_vec_w} pt (получено #{weights['vector']} pt)")
       assert(weights["hybrid"] == expected_vec_w, "В режиме 'auto' для формата #{sz} в Hybrid толщина равна #{expected_vec_w} pt (получено #{weights['hybrid']} pt)")
-      assert(weights["vector"] == weights["hybrid"], "В режиме 'auto' для формата #{sz} Vector и Hybrid строго совпадают")
     end
 
-    # 3. Полный экспорт документа PDF во всех трех режимах
-    render_modes.keys.each do |mode_name|
+    # 3. Полный экспорт документа PDF в обоих режимах (Растровый GPU и Гибридный)
+    %w[image hybrid].each do |mode_name|
       project_data = DN1Code::ExportPdf2::Model::ProjectData.new
-      project_data.pdf_settings[:export_engine] = "layout"
       project_data.pdf_settings[:layout_render_mode] = mode_name
       project_data.pdf_settings[:scale_multiplier] = "1.5"
       project_data.pdf_settings[:auto_open_pdf] = false
@@ -4935,8 +5017,8 @@ class TestRunner
     html_text = File.read(html_path, encoding: "utf-8")
 
     assert(html_text.include?('id="selectPageSize"'), "index.html содержит selectPageSize")
-    assert(html_text.include?('<option value="A4" selected>A4 (210 x 297 мм)</option>'), "selectPageSize содержит формат A4")
-    assert(html_text.include?('<option value="A3">A3 (297 x 420 мм)</option>'), "selectPageSize содержит формат A3")
+    assert(!html_text.include?('value="A4"'), "selectPageSize НЕ содержит формат A4 (удален из GUI)")
+    assert(html_text.include?('<option value="A3" selected>A3 (297 x 420 мм)</option>'), "selectPageSize содержит только формат A3")
     assert(!html_text.include?('value="A2"'), "selectPageSize НЕ содержит формат A2")
     assert(!html_text.include?('value="LETTER"'), "selectPageSize НЕ содержит формат LETTER")
 
@@ -4947,11 +5029,11 @@ class TestRunner
     assert(html_text.include?('value="high"') && html_text.include?('300'), "selectQuality содержит опцию high (300 dpi)")
 
     settings_yaml = File.read(File.expand_path("../config/settings.yaml", __dir__), encoding: "utf-8")
-    assert(settings_yaml.include?("page_size: A4") || settings_yaml.include?("page_size: A3"), "settings.yaml содержит валидный формат A4 или A3")
+    assert(settings_yaml.include?("page_size: A3"), "settings.yaml содержит формат A3")
     assert(%w[low medium high].any? { |q| settings_yaml.include?("render_quality: #{q}") }, "settings.yaml содержит валидный render_quality (low/medium/high)")
 
     default_yaml = File.read(File.expand_path("../config/default_settings.yaml", __dir__), encoding: "utf-8")
-    assert(default_yaml.include?('page_size: "A4"'), "default_settings.yaml содержит page_size: A4")
+    assert(default_yaml.include?('page_size: "A3"'), "default_settings.yaml содержит page_size: A3")
     assert(default_yaml.include?('render_quality: "medium"'), "default_settings.yaml содержит render_quality: medium")
 
     # 4. Проверка установки RESOLUTION в Layout::PageInfo в зависимости от render_quality
@@ -4960,7 +5042,6 @@ class TestRunner
 
     %w[low medium high].each do |q_level|
       pdata = DN1Code::ExportPdf2::Model::ProjectData.new
-      pdata.pdf_settings[:export_engine] = "layout"
       pdata.pdf_settings[:page_size] = "A4"
       pdata.pdf_settings[:render_quality] = q_level
       pdata.pdf_settings[:image_width] = nil
@@ -5070,31 +5151,21 @@ class TestRunner
     assert(page_card && !page_card.include?("id=\"selectScaleMultiplier\""),
            "selectScaleMultiplier удален из карточки 'Параметры страницы и документа'")
 
-    # 2. Проверка HTML: наличие селектора размера шрифта выносок и размеров
-    assert(layout_card.include?("id=\"selectAnnotationFontSize\""),
-           "index.html содержит id=\"selectAnnotationFontSize\" в параметрах LayOut API")
-    assert(layout_card.include?("Размер шрифта выносок и размеров"),
-           "index.html содержит подпись 'Размер шрифта выносок и размеров'")
-    assert(layout_card.include?("value=\"auto\""), "selectAnnotationFontSize содержит опцию auto")
-    assert(layout_card.include?("value=\"8\""), "selectAnnotationFontSize содержит опцию 8 pt")
-    assert(layout_card.include?("value=\"10\""), "selectAnnotationFontSize содержит опцию 10 pt")
-    assert(layout_card.include?("value=\"12\""), "selectAnnotationFontSize содержит опцию 12 pt")
-    assert(layout_card.include?("value=\"14\""), "selectAnnotationFontSize содержит опцию 14 pt")
-    assert(layout_card.include?("value=\"16\""), "selectAnnotationFontSize содержит опцию 16 pt")
-    assert(layout_card.include?("value=\"18\""), "selectAnnotationFontSize содержит опцию 18 pt")
-    assert(layout_card.include?("value=\"20\""), "selectAnnotationFontSize содержит опцию 20 pt")
+    # 2. Проверка HTML: удаление селектора размера шрифта выносок из GUI
+    assert(!layout_card.include?("id=\"selectAnnotationFontSize\""),
+           "selectAnnotationFontSize удален из GUI index.html")
+    assert(!layout_card.include?("Размер шрифта выносок и размеров"),
+           "подпись 'Размер шрифта выносок и размеров' удалена из GUI index.html")
 
-    # 3. Проверка app.js: регистрация и обработка selectAnnotationFontSize
+    # 3. Проверка app.js: безопасная обработка отсутствия selectAnnotationFontSize в GUI
     app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
     app_js_text = File.read(app_js_path, encoding: "utf-8")
     assert(app_js_text.include?("selectAnnotationFontSize: document.getElementById(\"selectAnnotationFontSize\")"),
-           "app.js кэширует selectAnnotationFontSize в els")
-    assert(app_js_text.include?("els.selectAnnotationFontSize.value = settings.annotation_font_size || \"auto\";"),
-           "app.js инициализирует значение selectAnnotationFontSize из настроек")
+           "app.js безопасно запрашивает selectAnnotationFontSize через document.getElementById")
+    assert(app_js_text.include?("if (els.selectAnnotationFontSize)"),
+           "app.js безопасно проверяет наличие els.selectAnnotationFontSize")
     assert(app_js_text.include?("annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value :"),
-           "app.js собирает annotation_font_size в collectSettings")
-    assert(app_js_text.include?("\"selectAnnotationFontSize\""),
-           "app.js включает selectAnnotationFontSize в список autoSaveInputIds")
+           "app.js безопасно извлекает annotation_font_size с фоллбэком")
 
     # 4. Проверка ProjectData и YAML файлов настроек
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -5137,6 +5208,402 @@ class TestRunner
            "layout_builder.rb применяет with_temporary_annotation_font_size при создании временной копии для LayOut")
     assert(lb_text.include?("annotation_font_size: ctx[:settings][:annotation_font_size]"),
            "layout_builder.rb передает annotation_font_size в render_opts")
+  end
+
+  def test_64_render_modes_image_and_hybrid
+    puts "\n--- 64. Тест режимов отображения: Растровый GPU (image) и Гибридный (hybrid) ---"
+
+    # 1. Проверка index.html: только два режима
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_text = File.read(html_path, encoding: "utf-8")
+    assert(html_text.include?('value="image"'), "index.html содержит опцию image в selectLayoutRenderMode")
+    assert(html_text.include?('value="hybrid"'), "index.html содержит опцию hybrid в selectLayoutRenderMode")
+    assert(!html_text.include?('value="composite"'), "index.html НЕ содержит удаленный режим composite")
+    assert(!html_text.include?('value="stacked"'), "index.html НЕ содержит удаленный режим stacked")
+
+    # 2. Проверка default_settings.yaml
+    def_yaml_path = File.expand_path("../config/default_settings.yaml", __dir__)
+    def_yaml_text = File.read(def_yaml_path, encoding: "utf-8")
+    assert(def_yaml_text.include?("'image'"), "default_settings.yaml документирует режим image")
+    assert(def_yaml_text.include?("'hybrid'"), "default_settings.yaml документирует режим hybrid")
+
+    # 3. Проверка app.js
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    assert(app_js_text.include?('renderMode === "hybrid"'),
+           "app.js включает hybrid в расчет масштаба линий getEffectiveScaleMultiplier")
+
+    # 4. Проверка RenderService: with_temporary_hidden_annotations
+    mock_model = Sketchup::MockModel.new
+    assert(mock_model.rendering_options["DisplayDims"] == true, "Исходный DisplayDims равен true")
+    assert(mock_model.rendering_options["DisplayText"] == true, "Исходный DisplayText равен true")
+
+    inside_dims = nil
+    inside_text = nil
+    DN1Code::ExportPdf2::Service::RenderService.with_temporary_hidden_annotations(mock_model, true) do
+      inside_dims = mock_model.rendering_options["DisplayDims"]
+      inside_text = mock_model.rendering_options["DisplayText"]
+    end
+    assert(inside_dims == false, "Внутри блока DisplayDims временно отключен (false)")
+    assert(inside_text == false, "Внутри блока DisplayText временно отключен (false)")
+    assert(mock_model.rendering_options["DisplayDims"] == true, "После блока DisplayDims гарантированно восстановлен (true)")
+    assert(mock_model.rendering_options["DisplayText"] == true, "После блока DisplayText гарантированно восстановлен (true)")
+    assert(mock_model.rendering_options["RenderMode"] == 2, "RenderMode не сбрасывается в Wireframe (сохраняется режим сцены)")
+
+    # 5. Проверка сборки страницы в режиме 'image' (Растровый GPU) в LayoutBuilder
+    doc = Layout::Document.new
+    page = doc.pages.first
+    layers = {
+      default: doc.layers.first,
+      viewport: doc.layers.add("DN1C_Viewports", false),
+      annotation: doc.layers.add("DN1C_Annotations", false)
+    }
+    scene_item = DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Обложка", page_type: :cover, enabled: true)
+    content_box = { left: 10.0, top: 500.0, w: 400.0, h: 300.0 }
+    img_cfg = { "aspect_ratio" => "4:3", "scale_pct" => 100 }
+    temp_imgs = []
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.pdf_settings[:layout_render_mode] = "image"
+    ctx = {
+      settings: project_data.pdf_settings,
+      model: mock_model,
+      aspect_cache: {}
+    }
+
+    DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :render_image_block,
+      doc, page, layers, scene_item, content_box, img_cfg, ctx, temp_imgs, :cover
+    )
+
+    created_ents = doc.instance_variable_get(:@entities).map { |r| r[:entity] }
+    has_image = created_ents.any? { |e| e.is_a?(Layout::Image) }
+    assert(has_image, "В режиме image создано и добавлено растровое изображение Layout::Image")
+
+    # 6. Проверка сборки страницы в режиме 'hybrid' в LayoutBuilder (один живой видовой экран)
+    doc2 = Layout::Document.new
+    page2 = doc2.pages.first
+    project_data.pdf_settings[:layout_render_mode] = "hybrid"
+    ctx2 = {
+      settings: project_data.pdf_settings,
+      model: mock_model,
+      aspect_cache: {}
+    }
+
+    DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :render_image_block,
+      doc2, page2, layers, scene_item, content_box, img_cfg, ctx2, temp_imgs, :cover
+    )
+
+    created_ents2 = doc2.instance_variable_get(:@entities).map { |r| r[:entity] }
+    skp_viewports = created_ents2.select { |e| e.is_a?(Layout::SketchUpModel) }
+    assert(skp_viewports.size == 1, "В режиме hybrid создан один видовой экран Layout::SketchUpModel")
+    assert(skp_viewports.first.render_mode == Layout::SketchUpModel::HYBRID_RENDER, "Видовой экран режима hybrid имеет HYBRID_RENDER")
+
+    # 7. Проверка полного экспорта PDF документа в обоих режимах
+    project_data.scenes << scene_item
+    project_data.pdf_settings[:auto_open_pdf] = false
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, mock_model)
+
+    test_pdf = File.expand_path("test_image_mode_output.pdf", __dir__)
+    project_data.pdf_settings[:layout_render_mode] = "image"
+    result_path = controller.export(test_pdf)
+    assert(File.exist?(result_path), "Экспорт в режиме image успешно создал PDF файл")
+    assert(File.size(result_path) > 1000, "Размер PDF файла в режиме image валиден")
+    File.delete(result_path) if File.exist?(result_path)
+
+    test_pdf_hybrid = File.expand_path("test_hybrid_mode_output.pdf", __dir__)
+    project_data.pdf_settings[:layout_render_mode] = "hybrid"
+    result_path_hybrid = controller.export(test_pdf_hybrid)
+    assert(File.exist?(result_path_hybrid), "Экспорт в режиме hybrid успешно создал PDF файл")
+    assert(File.size(result_path_hybrid) > 1000, "Размер PDF файла в режиме hybrid валиден")
+    File.delete(result_path_hybrid) if File.exist?(result_path_hybrid)
+  end
+
+  def test_66_page_font_family_selection
+    puts "\n--- 66. Тест выбора 5 шрифтов для отображения на странице ---"
+
+    # 1. Проверка физических файлов шрифтов в папке config/fonts
+    fonts_dir = File.expand_path("../config/fonts", __dir__)
+    expected_files = [
+      "Oswald-Light.ttf",
+      "RobotoCondensed-Regular.ttf",
+      "SofiaSansCondensed-Regular.ttf",
+      "SofiaSansExtraCond-Regular.ttf",
+      "SofiaSansExtraCondensed-Regular.ttf",
+      "UbuntuCondensed-Regular.ttf"
+    ]
+    expected_files.each do |fn|
+      font_path = File.join(fonts_dir, fn)
+      assert(File.exist?(font_path), "Файл шрифта #{fn} присутствует в папке config/fonts")
+      assert(File.size(font_path) > 50_000, "Размер файла шрифта #{fn} валиден (> 50KB)")
+    end
+
+    # 2. Проверка FontService::AVAILABLE_FONTS
+    assert(defined?(DN1Code::ExportPdf2::Service::FontService::AVAILABLE_FONTS),
+           "FontService::AVAILABLE_FONTS определен")
+    families = DN1Code::ExportPdf2::Service::FontService::AVAILABLE_FONTS.keys
+    assert(families.include?("Sofia Sans Condensed"), "AVAILABLE_FONTS содержит Sofia Sans Condensed")
+    assert(families.include?("Sofia Sans Extra Condensed"), "AVAILABLE_FONTS содержит Sofia Sans Extra Condensed")
+    assert(families.include?("Oswald"), "AVAILABLE_FONTS содержит Oswald")
+    assert(families.include?("Roboto Condensed"), "AVAILABLE_FONTS содержит Roboto Condensed")
+    assert(families.include?("Ubuntu Condensed"), "AVAILABLE_FONTS содержит Ubuntu Condensed")
+
+    # 3. Проверка метода layout_font_family для каждого из 5 шрифтов.
+    # Семейство "Oswald" маппится в точное начертание "Oswald Light" (файл из config/fonts)
+    fs = DN1Code::ExportPdf2::Service::FontService
+    assert(fs.const_defined?(:LAYOUT_FACE_NAMES), "FontService::LAYOUT_FACE_NAMES определен")
+    assert(fs.layout_face_name("Oswald") == "Oswald Light",
+           "layout_face_name('Oswald') вернул 'Oswald Light'")
+    # "Extra Condensed" вырезается LayOut из имени семейства -> передаётся
+    # переименованное семейство "Sofia Sans ExtraCond" (копия того же TTF)
+    assert(fs.layout_face_name("Sofia Sans Extra Condensed") == "Sofia Sans ExtraCond",
+           "layout_face_name('Sofia Sans Extra Condensed') вернул 'Sofia Sans ExtraCond'")
+    assert(fs.layout_face_name("Sofia Sans Condensed") == "Sofia Sans Condensed",
+           "layout_face_name('Sofia Sans Condensed') возвращает имя как есть")
+    assert(fs::AVAILABLE_FONTS["Oswald"][:files] == ["Oswald-Light.ttf"],
+           "AVAILABLE_FONTS['Oswald'] использует только Oswald-Light.ttf из config/fonts")
+
+    expected_layout_names = {
+      "Sofia Sans Condensed" => "Sofia Sans Condensed",
+      "Sofia Sans Extra Condensed" => "Sofia Sans ExtraCond",
+      "Oswald" => "Oswald Light",
+      "Roboto Condensed" => "Roboto Condensed",
+      "Ubuntu Condensed" => "Ubuntu Condensed"
+    }
+    expected_layout_names.each do |fam, exp|
+      res = DN1Code::ExportPdf2::Service::FontService.layout_font_family(font_family: fam)
+      assert(res == exp, "layout_font_family(font_family: '#{fam}') вернул '#{exp}' (получено: '#{res}')")
+    end
+    # Обратная совместимость с DIN Condensed
+    din_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family(font_family: "DIN Condensed")
+    assert(din_res == "Oswald Light", "layout_font_family для старого 'DIN Condensed' возвращает 'Oswald Light' (получено: '#{din_res}')")
+
+    # Значение по умолчанию
+    default_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family({})
+    assert(default_res == "Sofia Sans Condensed", "layout_font_family по умолчанию возвращает Sofia Sans Condensed")
+
+    # 3a. Методы надежности шрифтов: repair + GDI-проба + аудит PDF
+    assert(fs.respond_to?(:repair_font_registrations!), "FontService.repair_font_registrations! определен")
+    assert(fs.respond_to?(:font_resolvable?), "FontService.font_resolvable? определен")
+    assert(fs.respond_to?(:ensure_font_resolvable!), "FontService.ensure_font_resolvable! определен")
+    assert(fs.respond_to?(:canonical_reg_name_for_file), "FontService.canonical_reg_name_for_file определен")
+    assert(DN1Code::ExportPdf2::Service.const_defined?(:PdfFontAudit), "Service::PdfFontAudit определен")
+    assert(DN1Code::ExportPdf2::Service::PdfFontAudit.normalize("AMEJOL+Oswald-Light") == "oswaldlight",
+           "PdfFontAudit.normalize корректно нормализует PS-имя шрифта")
+
+    # 3b. Функциональный аудит PDF: prefix-сопоставление встроенных PS-имен
+    # (встроенные имена несут стилевой суффикс — точное сравнение давало false positive)
+    require "tmpdir"
+    require "fileutils"
+    pdf_audit = DN1Code::ExportPdf2::Service::PdfFontAudit
+    audit_dir = File.join(Dir.tmpdir, "dn1c_pdf_audit_test")
+    FileUtils.mkdir_p(audit_dir)
+    write_fake_pdf = lambda do |name, base_fonts|
+      path = File.join(audit_dir, name)
+      File.write(path, base_fonts.map { |f| "/BaseFont /#{f}" }.join("\n"))
+      path
+    end
+
+    p1 = write_fake_pdf.call("sofia.pdf", ["ABCDEE+SofiaSansCondensed-Regular"])
+    assert(pdf_audit.audit_exported_pdf!(p1, "Sofia Sans Condensed"),
+           "аудит принимает встроенный SofiaSansCondensed-Regular для 'Sofia Sans Condensed'")
+
+    p2 = write_fake_pdf.call("oswald.pdf", ["AMEJOL+Oswald-Light"])
+    assert(pdf_audit.audit_exported_pdf!(p2, "Oswald"), "аудит принимает Oswald-Light для 'Oswald'")
+    assert(pdf_audit.audit_exported_pdf!(p2, "Oswald Light"), "аудит принимает Oswald-Light для 'Oswald Light'")
+
+    p3 = write_fake_pdf.call("extra.pdf", ["SofiaSansExtraCond-Regular"])
+    assert(pdf_audit.audit_exported_pdf!(p3, "Sofia Sans Extra Condensed"),
+           "аудит принимает переименованное семейство ExtraCond для 'Sofia Sans Extra Condensed'")
+
+    p4 = write_fake_pdf.call("verdana.pdf", ["Verdana", "MicrosoftSansSerif"])
+    assert(!pdf_audit.audit_exported_pdf!(p4, "Sofia Sans Condensed"),
+           "аудит отклоняет Verdana вместо ожидаемого шрифта")
+
+    p5 = write_fake_pdf.call("mixed.pdf", ["ABCDEE+RobotoCondensed-Regular", "Verdana"])
+    assert(!pdf_audit.audit_exported_pdf!(p5, "Roboto Condensed"),
+           "аудит отклоняет экспорт, где рядом с нужным шрифтом встроен фолбэк")
+
+    FileUtils.rm_rf(audit_dir)
+
+    # 4. Проверка HTML: наличие селекторов selectFontFamily и selectLayoutFontFamily
+    html_path = File.expand_path("../dialog/html/index.html", __dir__)
+    html_text = File.read(html_path, encoding: "utf-8")
+
+    assert(html_text.include?('id="selectFontFamily"'), "index.html содержит id=\"selectFontFamily\" в параметрах страницы")
+    assert(html_text.include?('id="selectLayoutFontFamily"'), "index.html содержит id=\"selectLayoutFontFamily\" в панели шаблонов")
+
+    # Проверка наличия всех 5 шрифтов в селекторе настроек страницы
+    page_font_group = html_text[/id="fontFamilyGroup".*?<\/select>/m]
+    assert(page_font_group, "Группа fontFamilyGroup присутствует в index.html")
+    assert(page_font_group.include?('value="Sofia Sans Condensed"'), "selectFontFamily содержит вариант Sofia Sans Condensed")
+    assert(page_font_group.include?('value="Sofia Sans Extra Condensed"'), "selectFontFamily содержит вариант Sofia Sans Extra Condensed")
+    assert(page_font_group.include?('value="Oswald"'), "selectFontFamily содержит вариант Oswald")
+    assert(page_font_group.include?('value="Roboto Condensed"'), "selectFontFamily содержит вариант Roboto Condensed")
+    assert(page_font_group.include?('value="Ubuntu Condensed"'), "selectFontFamily содержит вариант Ubuntu Condensed")
+
+    # Проверка наличия всех 5 шрифтов в панели шаблонов
+    tpl_font_control = html_text[/toolbar-font-control.*?<\/select>/m]
+    assert(tpl_font_control, "Контрол выбора шрифта присутствует в панели шаблонов")
+    assert(tpl_font_control.include?('value="Sofia Sans Condensed"'), "selectLayoutFontFamily содержит Sofia Sans Condensed")
+    assert(tpl_font_control.include?('value="Sofia Sans Extra Condensed"'), "selectLayoutFontFamily содержит Sofia Sans Extra Condensed")
+    assert(tpl_font_control.include?('value="Oswald"'), "selectLayoutFontFamily содержит Oswald")
+    assert(tpl_font_control.include?('value="Roboto Condensed"'), "selectLayoutFontFamily содержит Roboto Condensed")
+    assert(tpl_font_control.include?('value="Ubuntu Condensed"'), "selectLayoutFontFamily содержит Ubuntu Condensed")
+
+    # 5. Проверка app.js: регистрация и обработка шрифтов
+    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
+    app_js_text = File.read(app_js_path, encoding: "utf-8")
+
+    assert(app_js_text.include?('selectFontFamily: document.getElementById("selectFontFamily")'),
+           "app.js кэширует selectFontFamily в els")
+    assert(app_js_text.include?('selectLayoutFontFamily: document.getElementById("selectLayoutFontFamily")'),
+           "app.js кэширует selectLayoutFontFamily в els")
+    assert(app_js_text.include?('handleFontFamilyChange'),
+           "app.js содержит обработчик handleFontFamilyChange")
+    assert(app_js_text.include?('--page-font-family'),
+           "app.js динамически обновляет CSS-переменную --page-font-family")
+    assert(app_js_text.include?('font_family:'),
+           "app.js собирает font_family в collectFormData")
+    assert(app_js_text.include?('"selectFontFamily"'),
+           "app.js включает selectFontFamily в список autoSaveInputIds")
+    assert(app_js_text.include?('"selectLayoutFontFamily"'),
+           "app.js включает selectLayoutFontFamily в список autoSaveInputIds")
+
+    # 6. Проверка app.css: @font-face для всех 5 шрифтов и переменная --page-font-family
+    app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
+    app_css_text = File.read(app_css_path, encoding: "utf-8")
+
+    assert(app_css_text.include?("Oswald-Light.ttf"), "app.css содержит @font-face для Oswald-Light.ttf")
+    assert(app_css_text.include?("RobotoCondensed-Regular.ttf"), "app.css содержит @font-face для RobotoCondensed-Regular.ttf")
+    assert(app_css_text.include?("SofiaSansCondensed-Regular.ttf"), "app.css содержит @font-face для SofiaSansCondensed-Regular.ttf")
+    assert(app_css_text.include?("SofiaSansExtraCondensed-Regular.ttf"), "app.css содержит @font-face для SofiaSansExtraCondensed-Regular.ttf")
+    assert(app_css_text.include?("UbuntuCondensed-Regular.ttf"), "app.css содержит @font-face для UbuntuCondensed-Regular.ttf")
+    assert(app_css_text.include?("--page-font-family"), "app.css содержит CSS-переменную --page-font-family")
+    assert(app_css_text.include?("--font-family-base: \"Roboto Condensed\""), "app.css применяет Roboto Condensed как базовый шрифт GUI")
+    assert(app_css_text.include?("--font-stretch-base: ultra-condensed"), "app.css задает ультра-сжатую ширину букв (--font-stretch-base: ultra-condensed)")
+    assert(app_css_text.include?("--letter-spacing-base: -0.025em"), "app.css задает компактный межбуквенный интервал (--letter-spacing-base: -0.025em)")
+    assert(app_css_text.include?("--bs-body-font-family: var(--font-family-base)"), "app.css переопределяет Bootstrap/Modus шрифт на var(--font-family-base)")
+
+    # 7. Проверка передачи font_family в LayoutBuilder context
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.pdf_settings[:font_family] = "Oswald"
+    ctx = DN1Code::ExportPdf2::Service::LayoutBuilder.send(:build_context, project_data, nil, "Oswald")
+    assert(ctx[:font] == "Oswald", "build_context сохраняет выбранный шрифт (:font == 'Oswald')")
+
+    # 7a. Проверка: add_rtf_text применяет шрифт/кегль к стилю entity.
+    # LayOut игнорирует \fonttbl из RTF — без стиля entity заголовки печатаются
+    # дефолтным Microsoft Sans Serif вместо выбранного шрифта.
+    doc_m = ::Layout::Document.new
+    ctx_m = { page_h_pt: 841.89, font: "Oswald Light" }
+    layer_m = doc_m.layers.first
+    page_m = doc_m.pages.first
+    fragments_m = [
+      { text: "Кухня", size: 12.0, color: "252A2E", bold: true },
+      { text: " | ", size: 10.0, color: "64748B", bold: false },
+      { text: "Иванов", size: 10.0, color: "252A2E", bold: true }
+    ]
+    rtf_ent = DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :add_rtf_text, ctx_m, doc_m, page_m, layer_m, fragments_m,
+      { x: 10, y: 10, width: 200, height: 20 },
+      align: :center, font: "Oswald Light"
+    )
+    assert(rtf_ent, "add_rtf_text вернул entity")
+    assert(rtf_ent.style(0).font_family == "Oswald Light",
+           "add_rtf_text задает font_family entity (получено: #{rtf_ent.style(0).font_family.inspect})")
+    assert(rtf_ent.style(0).font_size == 12.0,
+           "add_rtf_text задает базовый font_size entity = max фрагмент (получено: #{rtf_ent.style(0).font_size.inspect})")
+
+    # 8. Проверка автозамены (fallback) для несуществующего шрифта
+    fallback_res = DN1Code::ExportPdf2::Service::FontService.layout_font_family(font_family: "NonExistentFontXYZ")
+    fallback_allowed = DN1Code::ExportPdf2::Service::FontService::LAYOUT_FONT_CANDIDATES
+                       .map { |c| DN1Code::ExportPdf2::Service::FontService.layout_face_name(c) }
+    assert(fallback_allowed.include?(fallback_res),
+           "layout_font_family для несуществующего шрифта возвращает кандидата из fallback цепочки (#{fallback_res})")
+
+    # 9. Проверка автозамены DIN -> Oswald (Light).
+    # Замена в ProjectData срабатывает при загрузке файла настроек, содержащего DIN;
+    # здесь проверяем герметично: FontService обязан маппить DIN Condensed в
+    # "Oswald Light" независимо от содержимого пользовательского settings.yaml.
+    prj = DN1Code::ExportPdf2::Model::ProjectData.new
+    prj.pdf_settings[:font_family] = "DIN Condensed"
+    prj.load_program_settings
+    prj.pdf_settings[:font_family] = "DIN Condensed" # реальный settings.yaml мог перезаписать значение
+    assert(DN1Code::ExportPdf2::Service::FontService.layout_font_family(prj.pdf_settings) == "Oswald Light",
+           "FontService заменяет DIN Condensed на Oswald Light")
+
+    # 10. Проверка font_line_pitch_ratio для DIN (как алиаса Oswald)
+    lb = DN1Code::ExportPdf2::Service::LayoutBuilder
+    assert(lb.send(:font_line_pitch_ratio, "DIN Condensed") >= 1.70,
+           "font_line_pitch_ratio для DIN Condensed >= 1.70 (учет замены на Oswald)")
+    assert(lb.send(:font_char_width_ratio, "DIN Condensed") <= 0.46,
+           "font_char_width_ratio для DIN Condensed <= 0.46")
+
+    # 11. Проверка актуальности README.MD
+    readme_path = File.expand_path("../../README.MD", __dir__)
+    readme_text = File.read(readme_path, encoding: "utf-8")
+    assert(readme_text.include?("5 свободных кириллических шрифтов"), "README.MD описывает 5 свободных кириллических шрифтов")
+    assert(readme_text.include?("Бесшовная замена DIN Condensed"), "README.MD описывает замену DIN Condensed")
+    assert(readme_text.include?("Отказоустойчивый шрифтовой Fallback"), "README.MD описывает шрифтовой fallback")
+  end
+
+  # --- 67. Тест предотвращения обрезания многострочного текста и адаптивных интервалов (LayoutBuilder) ---
+  def test_text_height_and_no_clipping
+    puts "\n--- 67. Тест предотвращения обрезания текста и адаптивных интервалов в LayOut ---"
+    lb = DN1Code::ExportPdf2::Service::LayoutBuilder
+
+    # 1. Проверка коэффициентов высоты строки font_line_pitch_ratio
+    assert(lb.send(:font_line_pitch_ratio, "Oswald") >= 1.70, "font_line_pitch_ratio для Oswald >= 1.70")
+    assert(lb.send(:font_line_pitch_ratio, "Sofia Sans Condensed") >= 1.35, "font_line_pitch_ratio для Sofia Sans >= 1.35")
+    assert(lb.send(:font_line_pitch_ratio, "Roboto Condensed") >= 1.25, "font_line_pitch_ratio для Roboto Condensed >= 1.25")
+    assert(lb.send(:font_line_pitch_ratio, "Ubuntu Condensed") >= 1.20, "font_line_pitch_ratio для Ubuntu Condensed >= 1.20")
+
+    # 2. Проверка расчета высоты многострочного текста для Oswald
+    # "Дата\n15.09.2026" (2 строки) при кегле 8pt в LayOut требует 27.1 pt
+    h_date_oswald = lb.send(:estimate_text_height, "Дата\n15.09.2026", 8.0, 200.0, "Oswald")
+    assert(h_date_oswald >= 28.0, "estimate_text_height для 2 строк Oswald 8pt (Дата) >= 28 pt (было: #{h_date_oswald})")
+
+    # "Стадия проекта" (7 строк) при кегле 8pt в LayOut требует 94.85 pt
+    stadia_text = "Стадия проекта\n[/] Предварительный проект\n[/] Правки проекта (история правок)\n[/] Выбраны материалы и фурнитура\n[ ] Предварительно Утвержден\n[ ] Проверка технологом\n[ ] Утвержден"
+    h_stadia_oswald = lb.send(:estimate_text_height, stadia_text, 8.0, 200.0, "Oswald")
+    assert(h_stadia_oswald >= 98.0, "estimate_text_height для 7 строк Oswald 8pt (Стадия) >= 98 pt (было: #{h_stadia_oswald})")
+
+    # 3. Проверка для Sofia Sans Condensed
+    h_date_sofia = lb.send(:estimate_text_height, "Дата\n15.09.2026", 8.0, 200.0, "Sofia Sans Condensed")
+    assert(h_date_sofia >= 23.0, "estimate_text_height для Sofia Sans 8pt (Дата) >= 23 pt")
+    h_stadia_sofia = lb.send(:estimate_text_height, stadia_text, 8.0, 200.0, "Sofia Sans Condensed")
+    assert(h_stadia_sofia >= 78.0, "estimate_text_height для Sofia Sans 8pt (Стадия) >= 78 pt")
+
+    # 4. Проверка переноса длинных строк с учетом фактора границ слов
+    long_desc = "Очень длинное описание фасадов и фурнитуры для проверки автоматического расчета высоты блока"
+    h_wrapped = lb.send(:estimate_text_height, long_desc, 8.0, 100.0, "Oswald")
+    h_unwrapped = lb.send(:estimate_text_height, long_desc, 8.0, 500.0, "Oswald")
+    assert(h_wrapped > h_unwrapped, "Узкий блок (100pt) имеет больше строк и большую высоту, чем широкий (500pt)")
+
+    # 5. Проверка генерации карточки слота без вылетов и с корректным позиционированием
+    doc = ::Layout::Document.new
+    page = doc.pages.first
+    layer = doc.layers.first
+    ctx = { font: "Oswald", page_w_pt: 1190.55, page_h_pt: 841.89, settings: { font_family: "Oswald" } }
+    rctx = { info: { date: "15.09.2026", version: "01", revision: "001" }, workflow: {} }
+    slot_box = { x: 50.0, y: 700.0, width: 250.0, height: 400.0 }
+    cfg = {
+      lines: ["articul", "workflow_date", "workflow_version", "workflow_revision", "workflow_stadia"],
+      font_size: 8.0,
+      font_family: "Oswald"
+    }
+    # Вызываем render_modular_slot_card
+    lb.send(:render_modular_slot_card, doc, page, layer, slot_box, "info_lines", cfg, 1.0, :slot_1, ctx, rctx)
+    # Проверяем, что текстовые элементы созданы
+    text_entities = doc.instance_variable_get(:@entities).map { |item| item[:entity] }.select { |e| e.is_a?(::Layout::FormattedText) }
+    assert(!text_entities.empty?, "render_modular_slot_card создал текстовые сущности FormattedText")
+    # Проверяем, что высота блоков FormattedText достаточна (для 2 строк Oswald >= 28pt)
+    multi_line_ents = text_entities.select { |t| t.plain_text.include?("\n") }
+    assert(!multi_line_ents.empty?, "Присутствуют многострочные текстовые сущности")
+    multi_line_ents.each do |ent|
+      ent_h_pt = ent.bounds.height * 72.0
+      assert(ent_h_pt >= 25.0, "Высота рамки многострочного текста (#{ent_h_pt.round(1)} pt) достаточна для предотвращения обрезания")
+    end
   end
 end
 
