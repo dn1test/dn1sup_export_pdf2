@@ -214,13 +214,13 @@ module DN1Code
               doc.save(layout_path) rescue nil
             end
 
-            # 5b. PNG-снимки последних сцен в папку артикула (<Артикул>/png/).
+            # 5b. Снимки последних сцен в папку артикула (<Артикул>/images/, PNG или WebP).
             # Сбой снимков не должен валить PDF-экспорт.
-            if controller.respond_to?(:export_scene_pngs) && controller.scene_png_dir
+            if controller.respond_to?(:export_scene_snapshots) && controller.scene_images_dir
               begin
-                controller.export_scene_pngs(reusable: ctx[:rendered_scene_images], &progress_block)
+                controller.export_scene_snapshots(reusable: ctx[:rendered_scene_images], &progress_block)
               rescue StandardError => e
-                warn "Предупреждение: не удалось сохранить PNG-снимки сцен: #{e.message}"
+                warn "Предупреждение: не удалось сохранить снимки сцен: #{e.message}"
               end
             end
 

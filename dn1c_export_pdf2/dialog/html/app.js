@@ -618,6 +618,9 @@
     selectCompression: document.getElementById("selectCompression"),
     imageFormatGroup: document.getElementById("imageFormatGroup"),
     selectImageFormat: document.getElementById("selectImageFormat"),
+    webpQualityGroup: document.getElementById("webpQualityGroup"),
+    selectSnapshotFormat: document.getElementById("selectSnapshotFormat"),
+    selectWebpQuality: document.getElementById("selectWebpQuality"),
     layoutSaveFileGroup: document.getElementById("layoutSaveFileGroup"),
     chkSaveLayoutFile: document.getElementById("chkSaveLayoutFile"),
     selectPageSize: document.getElementById("selectPageSize"),
@@ -3992,6 +3995,13 @@
     if (els.selectImageFormat) {
       els.selectImageFormat.value = (settings.image_format || "png").toLowerCase();
     }
+    if (els.selectSnapshotFormat) {
+      els.selectSnapshotFormat.value = (settings.snapshot_format || "png").toLowerCase();
+    }
+    if (els.selectWebpQuality) {
+      const webpQ = String(settings.webp_quality ?? "85").toLowerCase();
+      els.selectWebpQuality.value = ["75", "85", "95", "lossless"].includes(webpQ) ? webpQ : "85";
+    }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
 
     if (els.selectPageSize) {
@@ -5907,6 +5917,8 @@
       layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "image",
       compress_pdf: els.selectCompression ? (els.selectCompression.value === "compress") : (state.pdf_settings?.compress_pdf === true),
       image_format: els.selectImageFormat ? els.selectImageFormat.value : (state.pdf_settings?.image_format || "png"),
+      snapshot_format: els.selectSnapshotFormat ? els.selectSnapshotFormat.value : (state.pdf_settings?.snapshot_format || "png"),
+      webp_quality: els.selectWebpQuality ? els.selectWebpQuality.value : (state.pdf_settings?.webp_quality ?? 85),
       save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
       page_size: "A3",
       page_layout: els.selectPageLayout.value,
@@ -6575,6 +6587,7 @@
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
       "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
+      "selectSnapshotFormat", "selectWebpQuality",
       "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily", "selectFontWeight", "selectFontWidth",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
       "selectQuality", "selectScaleMultiplier", "selectStamp", "inputCustomStamp",

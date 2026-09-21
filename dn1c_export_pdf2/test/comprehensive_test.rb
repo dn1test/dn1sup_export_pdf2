@@ -257,6 +257,7 @@ class TestRunner
     test_articul_folder_export_structure
     test_last_pdf_copy_next_to_skp_and_history_link
     test_png_snapshots_respect_viewport_background
+    test_scene_snapshots_webp_format_and_fallback
     test_path_util_file_url_encoding
     test_history_rev_ver_fields_and_migration
 
@@ -4472,7 +4473,7 @@ class TestRunner
     assert(js_content.include?("function updateSceneTableAspectCell"), "app.js содержит функцию updateSceneTableAspectCell")
     assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
     assert(js_content.include?('id="chk_viewport_background"'), "app.js содержит чекбокс фона chk_viewport_background в карточке видового экрана")
-    assert(js_content.include?("scene.viewport_background = bgOn"), "app.js сохраняет viewport_background при переключении чекбокса фона")
+    assert(js_content.include?("s.viewport_background = bgOn"), "app.js сохраняет viewport_background при переключении чекбокса фона")
     assert(js_content.include?('updateBlockSlot("image_4_3", { show_background: bgOn })'), "app.js синхронизирует show_background в слоте шаблона")
 
     # Проверка, что из шаблонов карточка удалена
@@ -5863,9 +5864,9 @@ class TestRunner
     assert(File.expand_path(result_path) == File.expand_path(expected_pdf), "export вернул путь папки артикула (#{result_path})")
     assert(File.exist?(expected_skp), "Резервная копия SKP в папке артикула: #{expected_skp}")
 
-    png_dir = File.join(art_dir, "png")
-    pngs = Dir.glob(File.join(png_dir, "*.png")).map { |f| File.basename(f) }.sort
-    assert(pngs.size == 3, "PNG-снимки всех 3 сцен в папке png/ (найдено: #{pngs.size}: #{pngs.join(', ')})")
+    images_dir = File.join(art_dir, "images")
+    pngs = Dir.glob(File.join(images_dir, "*.png")).map { |f| File.basename(f) }.sort
+    assert(pngs.size == 3, "PNG-снимки всех 3 сцен в папке images/ (найдено: #{pngs.size}: #{pngs.join(', ')})")
     assert(pngs.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
 
     # Якорь-YAML рядом с .skp для повторного открытия модели.
@@ -5978,22 +5979,78 @@ class TestRunner
 
     begin
       # Сцены без изменений флага: фон включен (поведение по умолчанию)
-      written_on = controller.export_scene_pngs
-      assert(written_on.size == 2, "PNG обеих сцен записаны при включенном фоне (#{written_on.size})")
+      written_on = controller.export_scene_snapshots
+      assert(written_on.size == 2, "Снимки обеих сцен записаны при включенном фоне (#{written_on.size})")
+      assert(written_on.all? { |p| File.extname(p).downcase == ".png" && File.basename(File.dirname(p)) == "images" },
+             "PNG-снимки по умолчанию лежат в <Артикул>/images (#{written_on.inspect})")
       assert(captured.all? { |o| o[:show_background] == true },
              "Без флага render_scene_temp получает show_background=true (#{captured.map { |o| o[:show_background] }.inspect})")
 
       # Выключаем фон всем сценам (чекбокс «фон видового экрана» в диалоге)
       captured.clear
       project_data.scenes.each { |s| s.viewport_background = false }
-      written_off = controller.export_scene_pngs
-      assert(written_off.size == 2, "PNG обеих сцен записаны при выключенном фоне (#{written_off.size})")
+      written_off = controller.export_scene_snapshots
+      assert(written_off.size == 2, "Снимки обеих сцен записаны при выключенном фоне (#{written_off.size})")
       assert(captured.all? { |o| o[:show_background] == false },
              "При viewport_background=false render_scene_temp получает show_background=false (#{captured.map { |o| o[:show_background] }.inspect})")
     ensure
       rs.singleton_class.send(:remove_method, :render_scene_temp)
       rs.singleton_class.send(:alias_method, :render_scene_temp, :render_scene_temp_bg_probe)
       rs.singleton_class.send(:remove_method, :render_scene_temp_bg_probe)
+    end
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_scene_snapshots_webp_format_and_fallback
+    puts "\n--- 71b. Тест формата снимков сцен (WebP/libvips и фолбэк PNG) ---"
+
+    test_dir = File.expand_path("test_snapshot_webp", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    model = Sketchup::MockModel.new(File.join(skp_dir, "Desk.skp"))
+    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Вид 1")])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.sync_with_model_scenes(model)
+    project_data.pdf_settings[:snapshot_format] = "webp"
+    project_data.pdf_settings[:webp_quality]    = 85
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    vips = DN1Code::ExportPdf2::Service::VipsService
+
+    # Чистая логика: строка опций libvips в расширенном имени файла
+    assert(vips.webp_target_string("C:/out/a.webp", quality: 85) == "C:/out/a.webp[Q=85]",
+           "Опция качества добавлена (#{vips.webp_target_string('C:/out/a.webp', quality: 85).inspect})")
+    assert(vips.webp_target_string("C:/out/a.webp", quality: 85, lossless: true) == "C:/out/a.webp[Q=85,lossless=true]",
+           "Опции перечисляются через запятую")
+    assert(vips.webp_target_string("C:/out/a.webp", quality: nil) == "C:/out/a.webp",
+           "Без качества опции не добавляются")
+
+    # Нормализация настроек формата и качества
+    assert(controller.send(:snapshot_format, {}) == "png", "Пустые настройки дают PNG")
+    assert(controller.send(:snapshot_format, { snapshot_format: "WEBP" }) == "webp", "Формат нормализуется в нижний регистр")
+    assert(controller.send(:snapshot_format, { snapshot_format: "jpg" }) == "png", "Неизвестный формат -> PNG")
+    assert(controller.send(:webp_quality_setting, {}) == { quality: 85, lossless: false }, "Умолчание качества WebP — 85")
+    assert(controller.send(:webp_quality_setting, { webp_quality: "lossless" }) == { quality: nil, lossless: true }, "lossless распознан")
+    assert(controller.send(:webp_quality_setting, { webp_quality: 150 }) == { quality: 85, lossless: false }, "Некорректное качество -> 85")
+
+    written = controller.export_scene_snapshots
+    assert(written.size == 1, "Снимок сцены записан (#{written.inspect})")
+    images_dir = File.dirname(written.first)
+    assert(File.basename(images_dir) == "images", "Снимки пишутся в папку images (#{written.first.inspect})")
+
+    if vips.available?
+      # libvips установлена: проверяем реальную конвертацию в WebP (RIFF/WEBP-заголовок)
+      assert(written.first.end_with?(".webp"), "Расширение снимка .webp (#{written.first.inspect})")
+      assert(File.binread(written.first, 12)[8, 4] == "WEBP", "Файл содержит RIFF/WEBP-заголовок")
+      # Имя файла сохранило имя сцены
+      assert(File.basename(written.first).start_with?("01_"), "Имя снимка с номером сцены (#{File.basename(written.first).inspect})")
+    else
+      # Фолбэк: без libvips снимок сохраняется как PNG (снимки не теряются)
+      assert(written.first.end_with?(".png"), "Без libvips снимок сохранен как PNG (#{written.first.inspect})")
+      assert(Dir.glob(File.join(images_dir, "*.webp")).empty?, "WebP-файлы при фолбэке не создаются")
     end
 
     FileUtils.rm_rf(test_dir)

@@ -16,6 +16,7 @@ require_relative "version"
 # Загрузка сервисов (генерация PDF через SketchUp LayOut Ruby API)
 require_relative "service/observer_service"
 require_relative "service/overlay_service"
+require_relative "service/vips_service"
 
 # Загрузка моделей данных
 require_relative "model/path_util"

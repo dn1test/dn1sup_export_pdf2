@@ -593,6 +593,8 @@ module DN1Code
             save_layout_file:   true,
             compress_pdf:       true,
             image_format:       "png",
+            snapshot_format:    "png",
+            webp_quality:       85,
             render_quality:     "medium",
             page_size:          "A3",
             page_layout:        "landscape",

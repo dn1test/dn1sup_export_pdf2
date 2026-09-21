@@ -95,52 +95,114 @@ module DN1Code
           end
         end
 
-        # Экспорт PNG-снимков включенных сцен в папку артикула: <Артикул>/png/.
+        # Экспорт снимков включенных сцен в папку артикула: <Артикул>/images/.
         # Набор «последних сцен»: папка очищается и перезаписывается при каждом экспорте.
+        # Формат снимков задается pdf_settings[:snapshot_format]: 'png' или 'webp' (конвертация
+        # PNG->WebP через libvips, при недоступной библиотеке — фолбэк на PNG).
         # Разрешение и пропорции берутся из pdf_settings (image_width / render_quality,
         # image_aspect_ratio / custom_ratio, наценка — aspect_ratio конкретной сцены).
         # @param reusable [Hash] { имя сцены => путь к уже отрендеренному временному изображению }
         # @param progress_block [Proc, nil] блок (current, total, message)
-        # @return [Array<String>] пути к записанным PNG файлам
-        def export_scene_pngs(reusable: {}, &progress_block)
+        # @return [Array<String>] пути к записанным файлам снимков
+        def export_scene_snapshots(reusable: {}, &progress_block)
           scenes = @project_data.scenes.select(&:enabled)
-          png_dir = scene_png_dir
-          return [] if scenes.empty? || png_dir.nil?
+          images_dir = scene_images_dir
+          return [] if scenes.empty? || images_dir.nil?
 
-          FileUtils.mkdir_p(png_dir)
+          FileUtils.mkdir_p(images_dir)
           # «Только последние»: снимки удаленных/переименованных сцен не должны оставаться
-          Dir.glob(File.join(png_dir, "*.png")).each { |f| File.delete(f) rescue nil }
+          Dir.glob(File.join(images_dir, "*.{png,webp}")).each { |f| File.delete(f) rescue nil }
 
-          settings = @project_data.pdf_settings
-          written  = []
+          settings  = @project_data.pdf_settings
+          webp_mode = snapshot_format(settings) == "webp"
+          webp_opts = webp_quality_setting(settings)
+          written   = []
           scenes.each_with_index do |scene_item, idx|
-            progress_block&.call(idx + 1, scenes.size, "PNG-снимок сцены #{idx + 1}/#{scenes.size}: #{scene_item.name}")
+            label = webp_mode ? "WebP" : "PNG"
+            progress_block&.call(idx + 1, scenes.size, "#{label}-снимок сцены #{idx + 1}/#{scenes.size}: #{scene_item.name}")
 
-            target = File.join(png_dir, scene_png_filename(scene_item, idx))
-            src    = reusable_source(reusable, scene_item) || render_scene_png(scene_item, settings)
+            src = reusable_source(reusable, scene_item) || render_scene_png(scene_item, settings)
             next unless src && File.exist?(src)
 
-            if File.expand_path(src) != File.expand_path(target)
-              FileUtils.mv(src, target) rescue (FileUtils.cp(src, target) rescue nil)
-            end
-            written << target if File.exist?(target)
+            target = if webp_mode
+                       write_scene_webp(src, scene_item, idx, images_dir, webp_opts)
+                     else
+                       png_target = File.join(images_dir, scene_snapshot_filename(scene_item, idx, ".png"))
+                       write_snapshot_png(src, png_target)
+                       png_target
+                     end
+            # Темп PNG уже сконвертирован в WebP — временный файл больше не нужен
+            File.delete(src) if target && File.extname(target).downcase == ".webp" && File.exist?(src)
+            written << target if target && File.exist?(target)
           end
           written
         end
 
-        # Папка PNG-снимков сцен: <Артикул>/png (или nil, если модель не сохранена)
+        # Папка снимков сцен: <Артикул>/images (или nil, если модель не сохранена)
         # @return [String, nil]
-        def scene_png_dir
+        def scene_images_dir
           art_dir = @project_data.articul_dir_for_model(@model)
-          art_dir ? File.join(art_dir, "png") : nil
+          art_dir ? File.join(art_dir, "images") : nil
         end
 
         private
 
-        # Имя файла снимка сцены: "<NN>_<санитизированное имя>.png"
-        def scene_png_filename(scene_item, index)
+        # Формат снимков сцен из настроек: 'png' (по умолчанию) или 'webp'
+        def snapshot_format(settings)
+          fmt = settings[:snapshot_format].to_s.downcase.strip
+          fmt == "webp" ? "webp" : "png"
+        end
+
+        # Качество WebP из настроек: 'lossless' -> сжатие без потерь, иначе целое 1..100 (умолчание 85)
+        def webp_quality_setting(settings)
+          raw = settings[:webp_quality].to_s.downcase.strip
+          return { quality: nil, lossless: true } if raw == "lossless"
+
+          q = raw.to_i
+          q = 85 if q <= 0 || q > 100
+          { quality: q, lossless: false }
+        end
+
+        # Конвертация временного PNG сцены в WebP-снимок. При недоступном libvips или ошибке
+        # конвертации — фолбэк на PNG-снимок (снимки сцены не теряются), предупреждение — один раз.
+        # @return [String, nil] путь к записанному файлу (.webp либо .png при фолбэке)
+        def write_scene_webp(src, scene_item, index, images_dir, webp_opts)
+          target = File.join(images_dir, scene_snapshot_filename(scene_item, index, ".webp"))
+          if defined?(Service::VipsService) &&
+             Service::VipsService.png_to_webp(src, target, quality: webp_opts[:quality], lossless: webp_opts[:lossless])
+            return target
+          end
+
+          warn_webp_unavailable_once
+          png_target = File.join(images_dir, scene_snapshot_filename(scene_item, index, ".png"))
+          write_snapshot_png(src, png_target)
+          png_target
+        end
+
+        def warn_webp_unavailable_once
+          return if @webp_warned
+
+          @webp_warned = true
+          if defined?(Service::VipsService) && Service::VipsService.available?
+            warn "Предупреждение: конвертация WebP не удалась, снимок сохранен как PNG."
+          else
+            warn "Предупреждение: libvips не найдена (vendor/libvips) — снимки сохраняются как PNG."
+          end
+        end
+
+        # Имя файла снимка сцены: "<NN>_<санитизированное имя><ext>"
+        def scene_snapshot_filename(scene_item, index, ext)
           name = @project_data.class.sanitize_filename(scene_item.respond_to?(:name) ? scene_item.name : "scene")
-          "#{format('%02d', index + 1)}_#{name}.png"
+          "#{format('%02d', index + 1)}_#{name}#{ext}"
+        end
+
+        # Перемещение (или копирование) временного PNG в целевой PNG-снимок
+        def write_snapshot_png(src, target)
+          return unless File.exist?(src)
+
+          if File.expand_path(src) != File.expand_path(target)
+            FileUtils.mv(src, target) rescue (FileUtils.cp(src, target) rescue nil)
+          end
         end
 
         # Уже отрендеренное в image-режиме изображение сцены (избегаем повторного рендера).
