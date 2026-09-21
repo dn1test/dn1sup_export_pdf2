@@ -342,6 +342,7 @@ module DN1Code
           {
             articul:      "",
             articul_locked: false,
+            base_dir:     "",
             product_tags: [],
             product:      "",
             place:        "",
@@ -1022,6 +1023,32 @@ module DN1Code
           "project_config.yaml"
         end
 
+        # Суффикс версии и ревизии для имен файлов истории ("01#001")
+        # @param project_info [Hash] метаданные проекта
+        # @return [String]
+        def self.version_rev_suffix(project_info)
+          sprintf("%02d#%03d", project_info[:version] || 1, project_info[:revision] || 1)
+        end
+
+        # Имя папки артикула: санитизированный артикул, фолбэк — имя файла модели
+        # @param project_info [Hash] метаданные проекта
+        # @param model [Sketchup::Model, nil] модель SketchUp
+        # @return [String, nil] имя папки или nil, если определить невозможно
+        def self.articul_folder_name(project_info, model = nil)
+          articul = project_info && project_info[:articul] ? project_info[:articul].to_s.strip : ""
+          unless articul.empty?
+            clean_name = sanitize_filename(articul)
+            return clean_name unless clean_name.empty?
+          end
+
+          if model && model.respond_to?(:path) && !model.path.to_s.empty?
+            clean_base = sanitize_filename(File.basename(model.path.to_s.tr("\\", "/"), ".*"))
+            return clean_base unless clean_base.empty?
+          end
+
+          nil
+        end
+
         # Ищет существующий YAML файл конфигурации рядом с файлом модели SketchUp
         # @param model [Sketchup::Model] модель SketchUp
         # @return [String, nil] абсолютный путь к существующему YAML файлу или nil
@@ -1073,11 +1100,32 @@ module DN1Code
           self.class.resolve_yaml_filename(@project_info, model)
         end
 
-        # Возвращает полный путь к целевому YAML файлу рядом с файлом модели SketchUp
+        # Папка артикула проекта: <base_dir>/<Артикул>, при пустом base_dir — рядом с .skp
+        # @param model [Sketchup::Model, nil] модель SketchUp
+        # @return [String, nil] абсолютный путь к папке артикула или nil
+        def articul_dir_for_model(model)
+          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
+
+          folder_name = self.class.articul_folder_name(@project_info, model)
+          return nil if folder_name.nil? || folder_name.empty?
+
+          base = @project[:base_dir].to_s.strip
+          base = File.dirname(model.path.to_s.tr("\\", "/")) if base.empty?
+          File.expand_path(File.join(base, folder_name))
+        end
+
+        # Возвращает полный путь к целевому YAML файлу: внутри папки артикула
+        # (при заданном base_dir) либо рядом с файлом модели SketchUp
         # @param model [Sketchup::Model] модель SketchUp
         # @return [String, nil] путь к файлу YAML или nil, если модель не сохранена
         def yaml_path_for_model(model)
           return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
+
+          if !@project[:base_dir].to_s.strip.empty?
+            art_dir = articul_dir_for_model(model)
+            folder_name = self.class.articul_folder_name(@project_info, model)
+            return File.join(art_dir, "#{folder_name}.yaml") if art_dir && folder_name
+          end
 
           clean_path = model.path.to_s.tr("\\", "/")
           dir = File.dirname(clean_path)
@@ -1101,6 +1149,19 @@ module DN1Code
           yaml_file = self.class.find_yaml_path_for_model(model)
           if yaml_file && File.exist?(yaml_file)
             loaded_from = :yaml if load_from_yaml(yaml_file, include_settings: false)
+          end
+
+          # 1b. Если якорь задает базовую папку артикула, канонический YAML ищем
+          # внутри папки <base_dir>/<Артикул>/ — он приоритетен перед якорем
+          if !@project[:base_dir].to_s.strip.empty? && model
+            art_dir = articul_dir_for_model(model)
+            folder_name = self.class.articul_folder_name(@project_info, model)
+            if art_dir && folder_name
+              canonical_yaml = File.join(art_dir, "#{folder_name}.yaml")
+              if File.exist?(canonical_yaml) && File.expand_path(canonical_yaml) != File.expand_path(yaml_file.to_s)
+                loaded_from = :yaml if load_from_yaml(canonical_yaml, include_settings: false)
+              end
+            end
           end
 
           if model && model.respond_to?(:path) && !model.path.to_s.empty?
@@ -1130,11 +1191,12 @@ module DN1Code
           loaded_from || :default
         end
 
-        # Сохранение данных проекта в YAML файл рядом с .skp (только данные проекта, без pdf_settings).
-        # Настройки PDF и шаблоны пишутся отдельно через save_program_settings.
+        # Сохранение данных проекта в YAML: канонический файл внутри папки артикула
+        # (при заданном base_dir) и служебный якорь-копия рядом с .skp — по ней модель
+        # повторно находит папку артикула после перезапуска SketchUp.
         # @param model [Sketchup::Model] модель SketchUp
         # @param previous_articul [String, nil] артикул, сохраненный в сессии до текущих правок;
-        #   при смене артикула прежний <артикул>.yaml удаляется во избежание дубликатов
+        #   при смене артикула прежний <артикул>.yaml-якорь удаляется во избежание дубликатов
         # @return [Boolean] true в случае успешного сохранения
         def save_project_yaml(model, previous_articul: nil)
           return false unless model
@@ -1145,17 +1207,25 @@ module DN1Code
           target_yaml = yaml_path_for_model(model)
           return false unless target_yaml
 
+          FileUtils.mkdir_p(File.dirname(target_yaml)) rescue nil
           return false unless save_to_yaml(target_yaml, include_settings: false)
 
+          # Якорь рядом с .skp нужен только когда канонический YAML лежит в базовой папке
+          model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
+          anchor_yaml = File.join(model_dir, yaml_filename(model))
+          if File.expand_path(target_yaml) != File.expand_path(anchor_yaml)
+            save_to_yaml(anchor_yaml, include_settings: false) rescue nil
+          end
+
           # Если YAML переименован (смена или очистка артикула), удаляем прежний
-          # артикульный YAML. Общие файлы (project_config.yaml, <имя модели>.yaml,
+          # артикульный якорь. Папка прежнего артикула не трогается — в ней остается
+          # история PDF/SKP/PNG. Общие файлы (project_config.yaml, <имя модели>.yaml,
           # найденные эвристикой) не трогаем — это шаблоны и данные других проектов.
           old_art = previous_articul.to_s.strip
           unless old_art.empty?
-            dir = File.dirname(model.path.to_s.tr("\\", "/"))
             target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
             [".yaml", ".yml"].each do |ext|
-              old_yaml = File.join(dir, "#{self.class.sanitize_filename(old_art)}#{ext}")
+              old_yaml = File.join(model_dir, "#{self.class.sanitize_filename(old_art)}#{ext}")
               next unless File.exist?(old_yaml)
 
               old_norm = File.expand_path(old_yaml).tr("\\", "/").downcase
@@ -1726,6 +1796,7 @@ module DN1Code
           prj_out = {
             articul:      @project[:articul].to_s,
             articul_locked: @project[:articul_locked] == true,
+            base_dir:     @project[:base_dir].to_s,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,

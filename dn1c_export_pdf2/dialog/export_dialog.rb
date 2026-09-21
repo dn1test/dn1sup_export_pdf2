@@ -177,6 +177,25 @@ module DN1Code
             end
           end
 
+          # Выбор базовой папки артикула (в ней создаются папки <Артикул> с YAML/PDF/SKP/PNG)
+          dialog.add_action_callback("selectBaseDir") do |_action_context, _param|
+            model = Sketchup.active_model
+            default_dir = ""
+            if model && model.respond_to?(:path) && !model.path.to_s.empty?
+              default_dir = File.dirname(model.path)
+            end
+
+            chosen_folder = UI.select_directory(
+              title:     "Выберите базовую папку для папок артикулов",
+              directory: default_dir
+            )
+
+            if chosen_folder && !chosen_folder.to_s.empty?
+              abs_path = File.expand_path(chosen_folder.to_s)
+              dialog.execute_script("window.app && window.app.onBaseDirSelected(#{JSON.generate(abs_path)});")
+            end
+          end
+
           # Получить список файлов и превью для заданной папки
           dialog.add_action_callback("getFolderFiles") do |_action_context, params_json|
             idx = 0

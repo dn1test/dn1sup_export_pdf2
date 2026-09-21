@@ -253,6 +253,8 @@ class TestRunner
     test_64_render_modes_image_and_hybrid
     test_66_page_font_family_selection
     test_text_height_and_no_clipping
+    test_articul_folder_yaml_canonical_and_anchor
+    test_articul_folder_export_structure
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -743,7 +745,7 @@ class TestRunner
   end
 
   def test_default_pdf_path_next_to_skp
-    puts "\n--- 7. Тест сохранения PDF по умолчанию рядом с файлом SKP ---"
+    puts "\n--- 7. Тест сохранения PDF по умолчанию в папку артикула рядом с SKP ---"
 
     model_file = "U:/Projects/Interior/Kitchen_Design.skp"
     model = Sketchup::MockModel.new(model_file)
@@ -757,8 +759,9 @@ class TestRunner
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     default_path = controller.send(:resolve_default_pdf_path)
 
-    expected_path = "U:/Projects/Interior/Kitchen_Design_v01_r004.pdf"
-    assert(default_path == expected_path, "Путь по умолчанию '#{default_path}' находится рядом с SKP файлом ('#{expected_path}')")
+    # base_dir не задан: папка артикула (по имени модели) создается рядом с .skp
+    expected_path = "U:/Projects/Interior/Kitchen_Design/pdf/Kitchen_Design_01#004.pdf"
+    assert(default_path == expected_path, "Путь по умолчанию '#{default_path}' указывает в папку артикула ('#{expected_path}')")
   end
 
   def test_pdf_export_description_page
@@ -5771,6 +5774,103 @@ class TestRunner
       ent_h_pt = ent.bounds.height * 72.0
       assert(ent_h_pt >= 25.0, "Высота рамки многострочного текста (#{ent_h_pt.round(1)} pt) достаточна для предотвращения обрезания")
     end
+  end
+
+  def test_articul_folder_yaml_canonical_and_anchor
+    puts "\n--- 68. Тест папки артикула: канонический YAML + якорь рядом с SKP ---"
+
+    test_dir = File.expand_path("test_articul_dir_root", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    base_dir = File.join(test_dir, "base")
+    FileUtils.mkdir_p(skp_dir)
+
+    skp_file = File.join(skp_dir, "Wardrobe.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "ART-100"
+    project_data.project_info[:description] = "CANONICAL_DESC"
+    project_data.project[:base_dir] = base_dir
+
+    assert(project_data.save_project_yaml(model), "save_project_yaml успешно записал YAML")
+
+    canon_yaml  = File.join(base_dir, "ART-100", "ART-100.yaml")
+    anchor_yaml = File.join(skp_dir, "ART-100.yaml")
+    assert(File.exist?(canon_yaml), "Канонический YAML записан в папку артикула: #{canon_yaml}")
+    assert(File.exist?(anchor_yaml), "Якорь-YAML записан рядом с SKP: #{anchor_yaml}")
+
+    # Канонический файл приоритетен при повторной загрузке модели
+    content = File.read(canon_yaml, encoding: "utf-8").sub("CANONICAL_DESC", "CHANGED_IN_CANON")
+    File.write(canon_yaml, content, encoding: "utf-8")
+
+    fresh = DN1Code::ExportPdf2::Model::ProjectData.new
+    fresh.load_auto(model)
+    assert(fresh.project_info[:articul].to_s == "ART-100", "Артикул загружен")
+    assert(fresh.project_info[:description].to_s.include?("CHANGED_IN_CANON"),
+           "load_auto прочитал канонический YAML из папки артикула (получено: #{fresh.project_info[:description].inspect})")
+    assert(fresh.project[:base_dir].to_s.tr("\\", "/").downcase == base_dir.tr("\\", "/").downcase,
+           "base_dir загружен из YAML")
+
+    # Смена артикула: старый якорь удаляется, папка прежнего артикула сохраняется (история)
+    project_data.project_info[:articul] = "ART-101"
+    assert(project_data.save_project_yaml(model, previous_articul: "ART-100"), "Сохранение после смены артикула")
+    assert(!File.exist?(anchor_yaml), "Старый якорь ART-100.yaml удален")
+    assert(File.exist?(File.join(skp_dir, "ART-101.yaml")), "Новый якорь ART-101.yaml создан")
+    assert(File.exist?(File.join(base_dir, "ART-100", "ART-100.yaml")), "Папка прежнего артикула сохранена (история)")
+    assert(File.exist?(File.join(base_dir, "ART-101", "ART-101.yaml")), "Создан YAML нового артикула")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_articul_folder_export_structure
+    puts "\n--- 69. Тест экспорта в папку артикула: yaml, pdf/, skp/, png/ ---"
+
+    test_dir = File.expand_path("test_articul_export", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    base_dir = File.join(test_dir, "base")
+    FileUtils.mkdir_p(skp_dir)
+
+    skp_file = File.join(skp_dir, "Table.skp")
+    model = Sketchup::MockModel.new(skp_file)
+    model.pages = Sketchup::MockPages.new([
+                                            Sketchup::MockPage.new("Обложка"),
+                                            Sketchup::MockPage.new("Вид 1"),
+                                            Sketchup::MockPage.new("Вид 2")
+                                          ])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "EXP-200"
+    project_data.project_info[:version] = 2
+    project_data.project_info[:revision] = 5
+    project_data.project[:base_dir] = base_dir
+    project_data.pdf_settings[:auto_open_pdf] = false
+    project_data.pdf_settings[:save_skp_backup] = true
+    project_data.pdf_settings[:save_layout_file] = false
+    project_data.sync_with_model_scenes(model)
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    result_path = controller.export(nil)
+
+    art_dir      = File.join(base_dir, "EXP-200")
+    expected_pdf = File.join(art_dir, "pdf", "EXP-200_02#005.pdf")
+    expected_skp = File.join(art_dir, "skp", "EXP-200_02#005.skp")
+
+    assert(File.exist?(expected_pdf), "PDF записан в папку артикула: #{expected_pdf}")
+    assert(File.expand_path(result_path) == File.expand_path(expected_pdf), "export вернул путь папки артикула (#{result_path})")
+    assert(File.exist?(expected_skp), "Резервная копия SKP в папке артикула: #{expected_skp}")
+
+    png_dir = File.join(art_dir, "png")
+    pngs = Dir.glob(File.join(png_dir, "*.png")).map { |f| File.basename(f) }.sort
+    assert(pngs.size == 3, "PNG-снимки всех 3 сцен в папке png/ (найдено: #{pngs.size}: #{pngs.join(', ')})")
+    assert(pngs.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
+
+    # Якорь-YAML рядом с .skp для повторного открытия модели.
+    # В SketchUp сессия пишется через SessionStore.flush(model); здесь контроллер
+    # создан напрямую, поэтому yaml сохраняем явно (та же запись, что делает flush).
+    assert(project_data.save_project_yaml(model), "save_project_yaml записал yaml папки артикула и якорь")
+    assert(File.exist?(File.join(skp_dir, "EXP-200.yaml")), "Якорь-YAML создан рядом с .skp")
+
+    FileUtils.rm_rf(test_dir)
   end
 end
 

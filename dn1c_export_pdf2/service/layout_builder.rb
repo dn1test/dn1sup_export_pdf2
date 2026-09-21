@@ -149,6 +149,8 @@ module DN1Code
             ctx = build_context(project_data, model, font_family)
             ctx[:page_w_pt] = in2pt(page_w_in)
             ctx[:page_h_pt] = in2pt(page_h_in)
+            # Кэш уже отрендеренных растровых изображений сцен (для повторного использования в PNG-снимках)
+            ctx[:rendered_scene_images] = {}
 
             # 3. Построение страниц по модульной сетке
             enabled_scenes.each_with_index do |scene_item, idx|
@@ -194,6 +196,16 @@ module DN1Code
             if settings[:save_layout_file]
               layout_path = pdf_path.sub(/\.pdf$/i, ".layout")
               doc.save(layout_path) rescue nil
+            end
+
+            # 5b. PNG-снимки последних сцен в папку артикула (<Артикул>/png/).
+            # Сбой снимков не должен валить PDF-экспорт.
+            if controller.respond_to?(:export_scene_pngs) && controller.scene_png_dir
+              begin
+                controller.export_scene_pngs(reusable: ctx[:rendered_scene_images], &progress_block)
+              rescue StandardError => e
+                warn "Предупреждение: не удалось сохранить PNG-снимки сцен: #{e.message}"
+              end
             end
 
             # 6. Резервная копия .skp
@@ -864,6 +876,10 @@ module DN1Code
           end
           image_path = RenderService.render_scene_temp(ctx[:model], scene_obj, render_opts)
           temp_images << image_path if image_path
+          # Запоминаем растр сцены: PNG-снимок в папку артикула переиспользует его без повторного рендера
+          if image_path && scene_item.respond_to?(:name) && ctx[:rendered_scene_images].is_a?(Hash)
+            ctx[:rendered_scene_images][scene_item.name] = image_path
+          end
 
           return unless image_path && File.exist?(image_path)
 

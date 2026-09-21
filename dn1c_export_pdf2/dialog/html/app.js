@@ -544,6 +544,8 @@
     inputArticul: document.getElementById("inputArticul"),
     btnGenerateArticul: document.getElementById("btnGenerateArticul"),
     chkArticulLocked: document.getElementById("chkArticulLocked"),
+    inputBaseDir: document.getElementById("inputBaseDir"),
+    btnSelectBaseDir: document.getElementById("btnSelectBaseDir"),
     tradeToggleGroup: document.getElementById("tradeToggleGroup"),
     btnTradeHF: document.getElementById("btnTradeHF"),
     btnTradeCF: document.getElementById("btnTradeCF"),
@@ -3896,6 +3898,7 @@
     updateCompanyVisibility();
 
     if (els.inputArticul) els.inputArticul.value = prj.articul || info.articul || "";
+    if (els.inputBaseDir) els.inputBaseDir.value = prj.base_dir || "";
     // Блокировка артикула: флаг из состояния; без флага — непустой артикул считается заблокированным
     if (els.chkArticulLocked) {
       const artVal = (prj.articul || info.articul || "").trim();
@@ -5756,6 +5759,7 @@
     state.project = {
       articul: articulVal,
       articul_locked: isArticulLocked(),
+      base_dir: (els.inputBaseDir ? els.inputBaseDir.value : "").trim(),
       product_tags: productTags,
       product: furniture,
       place: room,
@@ -5799,6 +5803,7 @@
     state.project_info = {
       articul:          articulVal,
       articul_locked:   isArticulLocked(),
+      base_dir:         (els.inputBaseDir ? els.inputBaseDir.value : "").trim(),
       name_product:     furniture,
       name_place:       room,
       adress:           addrVal,
@@ -6094,6 +6099,16 @@
         // после выбора путь и заголовок из имени папки придут в onDirectorySelected
         callRuby("selectDirectory", newIndex.toString());
       });
+    }
+
+    // Base articul dir browse button (path comes back in onBaseDirSelected)
+    if (els.btnSelectBaseDir) {
+      els.btnSelectBaseDir.addEventListener("click", () => {
+        callRuby("selectBaseDir");
+      });
+    }
+    if (els.inputBaseDir) {
+      els.inputBaseDir.addEventListener("input", notifyChange);
     }
 
     // API Targets Add button
@@ -6578,6 +6593,15 @@
         notifyChange();
         showNotification(`Выбрана папка: ${chosenPath}`, "info");
       }
+    },
+
+    onBaseDirSelected: function (chosenPath) {
+      if (!chosenPath) return;
+      if (els.inputBaseDir) {
+        els.inputBaseDir.value = chosenPath;
+        notifyChange();
+      }
+      showNotification(`Базовая папка артикула: ${chosenPath}`, "info");
     },
 
     onFolderFilesLoaded: function (data) {
