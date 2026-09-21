@@ -4996,8 +4996,8 @@
               <span id="tplAspectOverlayText">📐 Рамка: ${displayAspect}</span>
             </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
-              <input type="checkbox" id="chk_viewport_background" ${isBgOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} title="Отображать фон сцены (небо/земля/водяные знаки) в видовом экране на странице">
-              <span>Фон</span>
+              <input type="checkbox" id="chk_viewport_background" ${isBgOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах">
+              <span>Фон (все)</span>
             </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
               <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
@@ -5110,7 +5110,7 @@
     if (chkBg) {
       chkBg.addEventListener("change", (e) => {
         const bgOn = e.target.checked;
-        scene.viewport_background = bgOn;
+        (state.scenes || []).forEach((s) => { s.viewport_background = bgOn; });
         updateBlockSlot("image_4_3", { show_background: bgOn });
         notifyChange();
       });
