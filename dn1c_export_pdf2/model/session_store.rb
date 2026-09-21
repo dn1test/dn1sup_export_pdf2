@@ -15,7 +15,7 @@ module DN1Code
 
         class << self
           # Возвращает объект данных проекта для модели из памяти.
-          # При первом обращении данные загружаются из YAML рядом с .skp.
+          # При первом обращении данные загружаются из project.yaml в папке артикула.
           # @param model [Sketchup::Model, nil]
           # @return [Model::ProjectData]
           def data(model)
@@ -75,8 +75,8 @@ module DN1Code
             pd
           end
 
-          # Записывает на диск сессию модели: YAML проекта рядом с .skp +
-          # settings.yaml + layout.yaml расширения.
+          # Записывает на диск сессию модели: project.yaml в папке артикула
+          # (без артикула проект не пишется) + settings.yaml + layout.yaml расширения.
           # @param model [Sketchup::Model, nil]
           # @return [Boolean]
           def flush(model)

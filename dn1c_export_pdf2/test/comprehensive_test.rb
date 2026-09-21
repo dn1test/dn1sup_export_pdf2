@@ -260,6 +260,11 @@ class TestRunner
     test_scene_snapshots_webp_format_and_fallback
     test_path_util_file_url_encoding
     test_history_rev_ver_fields_and_migration
+    test_74_save_without_articul_writes_no_yaml
+    test_75_legacy_yaml_migration_to_project_yaml
+    test_76_discovery_multiple_articul_folders_ambiguous
+    test_77_edit_history_in_articul_folder_with_fallback
+    test_78_articul_offer_on_dialog_open_and_folder_creation
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -402,10 +407,16 @@ class TestRunner
   end
 
   def test_yaml_filename_resolution
-    puts "\n--- 2. Тест правил именования YAML (Артикул / Имя файла SKP) ---"
+    puts "\n--- 2. Тест правил именования YAML (project.yaml / legacy имена) ---"
 
     model = Sketchup::MockModel.new("U:/Projects/Villa/Apartment_Final.skp")
 
+    # Актуальное имя файла данных проекта — всегда project.yaml (внутри папки артикула)
+    pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(pd.yaml_filename == "project.yaml", "yaml_filename без модели возвращает project.yaml")
+    assert(pd.yaml_filename(model) == "project.yaml", "yaml_filename с моделью возвращает project.yaml")
+
+    # Legacy-резолвер имен (схема до 2.1) сохранен: обнаружение и миграция старых проектов
     # Вариант 1: Артикул указан
     info_with_art = { articul: "PRJ-2026-X" }
     resolved_1 = DN1Code::ExportPdf2::Model::ProjectData.resolve_yaml_filename(info_with_art, model)
@@ -516,7 +527,7 @@ class TestRunner
   end
 
   def test_auto_yaml_save_on_sketchup_save
-    puts "\n--- 4. Тест принудительного сохранения (flush сессии) в YAML рядом с SKP ---"
+    puts "\n--- 4. Тест принудительного сохранения (flush сессии) в папку артикула ---"
 
     test_dir = File.expand_path("test_auto_save_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -532,28 +543,28 @@ class TestRunner
     # Имитируем принудительное сохранение / закрытие SketchUp
     assert(DN1Code::ExportPdf2::Model::SessionStore.flush(model), "flush сессии успешно записал данные")
 
-    expected_yaml = File.join(test_dir, "KITCHEN-777.yaml")
-    assert(File.exist?(expected_yaml), "При flush сессии создан YAML по артикулу: #{File.basename(expected_yaml)}")
+    expected_yaml = File.join(test_dir, "KITCHEN-777", "project.yaml")
+    assert(File.exist?(expected_yaml), "При flush сессии создан project.yaml в папке артикула: #{expected_yaml}")
+    assert(!File.exist?(File.join(test_dir, "KITCHEN-777.yaml")), "Якорь-YAML рядом с .skp больше не создается")
 
     # Проверяем содержимое созданного YAML
     loaded = DN1Code::ExportPdf2::Model::ProjectData.new
     loaded.load_from_yaml(expected_yaml)
     assert(loaded.project_info[:name_project] == "Кухня Модерн", "Содержимое YAML файла корректно")
 
-    # Теперь очищаем артикул и сохраняем снова (прежний артикул известен сессии)
+    # Теперь очищаем артикул и сохраняем снова: без артикула данные проекта не пишутся
     session_data.project_info[:articul] = ""
     session_data.project_info[:name_product] = "Кухня Без Артикула"
-    assert(DN1Code::ExportPdf2::Model::SessionStore.flush(model), "Повторный flush сессии успешен")
+    assert(DN1Code::ExportPdf2::Model::SessionStore.flush(model), "Повторный flush сессии успешен (настройки расширения записаны)")
 
-    fallback_yaml = File.join(test_dir, "Kitchen_Project.yaml")
-    assert(File.exist?(fallback_yaml), "При пустом артикуле создан YAML с именем модели SKP: #{File.basename(fallback_yaml)}")
-    assert(!File.exist?(expected_yaml), "Прежний артикульный YAML удален при переименовании")
+    assert(!File.exist?(File.join(test_dir, "Kitchen_Project.yaml")), "Без артикула YAML по имени модели не создается")
+    assert(File.exist?(expected_yaml), "Прежний project.yaml в папке артикула не перезаписан пустыми данными")
 
     FileUtils.rm_rf(test_dir)
   end
 
   def test_priority_reading_yaml_primary_model_secondary
-    puts "\n--- 5. Тест источника данных: YAML файл рядом с SKP (единственный источник) ---"
+    puts "\n--- 5. Тест источника данных: project.yaml в папке артикула (единственный источник) ---"
 
     test_dir = File.expand_path("test_priority_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -561,33 +572,34 @@ class TestRunner
     skp_file = File.join(test_dir, "Bedroom.skp")
     model = Sketchup::MockModel.new(skp_file)
 
-    # 1. Создаем рядом файл BED-01.yaml (внешнее редактирование)
-    yaml_file = File.join(test_dir, "BED-01.yaml")
+    # 1. Создаем папку артикула с project.yaml (внешнее редактирование)
+    art_yaml = File.join(test_dir, "BED-01", "project.yaml")
+    FileUtils.mkdir_p(File.dirname(art_yaml))
     yaml_data = DN1Code::ExportPdf2::Model::ProjectData.new
     yaml_data.project_info[:articul] = "BED-01"
     yaml_data.project_info[:name_product] = "Имя из файла YAML (Первично)"
-    yaml_data.save_to_yaml(yaml_file)
+    yaml_data.save_to_yaml(art_yaml)
 
     # 2. Вызываем автоматическую загрузку
     test_data = DN1Code::ExportPdf2::Model::ProjectData.new
     source = test_data.load_auto(model)
 
     assert(source == :yaml, "Источник загрузки определен как :yaml")
-    assert(test_data.project_info[:name_project] == "Имя из файла YAML (Первично)", "Загружены данные из YAML файла рядом с моделью")
+    assert(test_data.project_info[:name_project] == "Имя из файла YAML (Первично)", "Загружены данные из project.yaml папки артикула")
 
-    # 3. Удаляем YAML файл — данных больше нет, источник :default
-    File.delete(yaml_file) if File.exist?(yaml_file)
+    # 3. Удаляем project.yaml — данных больше нет, источник :default
+    File.delete(art_yaml) if File.exist?(art_yaml)
 
     fallback_data = DN1Code::ExportPdf2::Model::ProjectData.new
     fallback_source = fallback_data.load_auto(model)
 
-    assert(fallback_source == :default, "При отсутствии YAML источник загрузки определен как :default (библиотека модели не используется)")
+    assert(fallback_source == :default, "При отсутствии project.yaml источник загрузки определен как :default")
 
     FileUtils.rm_rf(test_dir)
   end
 
   def test_save_project_yaml_and_articul_rename
-    puts "\n--- 6. Тест save_project_yaml: запись YAML и переименование файла при смене артикула ---"
+    puts "\n--- 6. Тест save_project_yaml: project.yaml в папке артикула, смена артикула, запрет без артикула ---"
 
     test_dir = File.expand_path("test_save_auto_dir", __dir__)
     FileUtils.mkdir_p(test_dir)
@@ -602,26 +614,26 @@ class TestRunner
     # Вызываем save_project_yaml первый раз
     assert(project_data.save_project_yaml(model), "save_project_yaml успешно записал YAML")
 
-    # Проверка: сохранено в YAML файл рядом с SKP
-    yaml_file_1 = File.join(test_dir, "OFFICE-900.yaml")
-    assert(File.exist?(yaml_file_1), "Данные сохранены в файл #{File.basename(yaml_file_1)}")
+    # Проверка: сохранено в project.yaml внутри папки артикула, якоря рядом с .skp нет
+    yaml_file_1 = File.join(test_dir, "OFFICE-900", "project.yaml")
+    assert(File.exist?(yaml_file_1), "Данные сохранены в #{yaml_file_1}")
+    assert(!File.exist?(File.join(test_dir, "OFFICE-900.yaml")), "Якорь-YAML рядом с .skp не создается")
 
     # Проверка 3: Изменение артикула -> повторное сохранение с previous_articul
     project_data.project_info[:articul] = "OFFICE-901"
     project_data.project_info[:name_project] = "Кабинет Руководителя (Обновленный)"
     assert(project_data.save_project_yaml(model, previous_articul: "OFFICE-900"), "Повторный save_project_yaml успешен")
 
-    yaml_file_2 = File.join(test_dir, "OFFICE-901.yaml")
-    assert(File.exist?(yaml_file_2), "При смене артикула создан новый YAML файл #{File.basename(yaml_file_2)}")
-    assert(!File.exist?(yaml_file_1), "Старый YAML файл #{File.basename(yaml_file_1)} автоматически удален")
+    yaml_file_2 = File.join(test_dir, "OFFICE-901", "project.yaml")
+    assert(File.exist?(yaml_file_2), "При смене артикула создана новая папка с project.yaml")
+    assert(File.exist?(yaml_file_1), "Папка прежнего артикула сохранена (история)")
+    assert(!File.exist?(File.join(test_dir, "OFFICE-900.yaml")), "Якорь прежнего артикула рядом с .skp отсутствует")
 
-    # Проверка 4: Очистка артикула -> имя YAML возвращается к имени файла модели Office.yaml
+    # Проверка 4: Очистка артикула -> сохранение отклоняется
     project_data.project_info[:articul] = ""
-    assert(project_data.save_project_yaml(model, previous_articul: "OFFICE-901"), "Сохранение с очищенным артикулом успешен")
-
-    yaml_file_3 = File.join(test_dir, "Office.yaml")
-    assert(File.exist?(yaml_file_3), "При очистке артикула создан файл по имени модели #{File.basename(yaml_file_3)}")
-    assert(!File.exist?(yaml_file_2), "Предыдущий файл артикула #{File.basename(yaml_file_2)} удален")
+    assert(!project_data.save_project_yaml(model, previous_articul: "OFFICE-901"), "Сохранение без артикула отклонено")
+    assert(!File.exist?(File.join(test_dir, "Office.yaml")), "Файл по имени модели без артикула не создается")
+    assert(File.exist?(yaml_file_2), "Данные прежнего артикула остались на диске")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -1094,10 +1106,11 @@ class TestRunner
     project_data.save_project_yaml(model)
     project_data.save_to_layout_yaml(DN1Code::ExportPdf2::Model::ProjectData::PROGRAM_LAYOUT_FILE)
 
-    prj_yaml = File.join(test_dir, "VILLA-100.yaml")
+    prj_yaml = File.join(test_dir, "VILLA-100", "project.yaml")
     local_layout_yaml = File.join(test_dir, "layout.yaml")
 
-    assert(File.exist?(prj_yaml), "Файл проекта VILLA-100.yaml создан в папке проекта")
+    assert(File.exist?(prj_yaml), "project.yaml создан в папке артикула (#{prj_yaml})")
+    assert(!File.exist?(File.join(test_dir, "VILLA-100.yaml")), "Якорь-YAML рядом с .skp не создается")
     assert(!File.exist?(local_layout_yaml), "Файл layout.yaml НЕ создается в папке проекта (сохранен в плагине)")
 
     # 3. Проверяем, что в VILLA-100.yaml НЕТ настроек программы (pdf_settings / custom_layouts / layout)
@@ -3674,11 +3687,12 @@ class TestRunner
     # 4. Проверка работы метода save_project_yaml с mock-моделью
     mock_model = Sketchup::MockModel.new
     mock_model.path = File.join(tmp_dir, "MyModel.skp")
+    loaded_proj.project_info[:articul] = "AUTO-SAVE-44"
     loaded_proj.project_info[:name] = "Автосохраненный Проект"
     assert(loaded_proj.save_project_yaml(mock_model), "save_project_yaml завершился успешно")
 
-    expected_auto_yaml = File.join(tmp_dir, "MyModel.yaml")
-    assert(File.exist?(expected_auto_yaml), "save_project_yaml создал YAML файл рядом со SKP: #{expected_auto_yaml}")
+    expected_auto_yaml = File.join(tmp_dir, "AUTO-SAVE-44", "project.yaml")
+    assert(File.exist?(expected_auto_yaml), "save_project_yaml создал project.yaml в папке артикула: #{expected_auto_yaml}")
     content_auto = File.read(expected_auto_yaml, encoding: "utf-8")
     assert(content_auto.include?("Автосохраненный Проект"), "save_project_yaml сохранил актуальные данные проекта в YAML")
 
@@ -3792,6 +3806,7 @@ class TestRunner
     FileUtils.mkdir_p(File.join(test_dir, "empty"))
     model = Sketchup::MockModel.new(File.join(test_dir, "empty", "EmptyDirs.skp"))
     model.pages.add("01. Обложка")
+    data.project_info[:articul] = "EMPTY-DIRS-1"
     data.sync_with_model_scenes(model)
     assert(data.save_project_yaml(model), "Проект с пустым directories сохранен в YAML")
 
@@ -5782,7 +5797,7 @@ class TestRunner
   end
 
   def test_articul_folder_yaml_canonical_and_anchor
-    puts "\n--- 68. Тест папки артикула: канонический YAML + якорь рядом с SKP ---"
+    puts "\n--- 68. Тест папки артикула: project.yaml — единственный файл данных проекта ---"
 
     test_dir = File.expand_path("test_articul_dir_root", __dir__)
     skp_dir  = File.join(test_dir, "models")
@@ -5792,37 +5807,41 @@ class TestRunner
     skp_file = File.join(skp_dir, "Wardrobe.skp")
     model = Sketchup::MockModel.new(skp_file)
 
+    # base_dir не задан: папка артикула создается рядом с .skp
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     project_data.project_info[:articul] = "ART-100"
     project_data.project_info[:description] = "CANONICAL_DESC"
-    project_data.project[:base_dir] = base_dir
 
     assert(project_data.save_project_yaml(model), "save_project_yaml успешно записал YAML")
 
-    canon_yaml  = File.join(base_dir, "ART-100", "ART-100.yaml")
-    anchor_yaml = File.join(skp_dir, "ART-100.yaml")
-    assert(File.exist?(canon_yaml), "Канонический YAML записан в папку артикула: #{canon_yaml}")
-    assert(File.exist?(anchor_yaml), "Якорь-YAML записан рядом с SKP: #{anchor_yaml}")
+    canon_yaml = File.join(skp_dir, "ART-100", "project.yaml")
+    assert(File.exist?(canon_yaml), "project.yaml записан в папку артикула: #{canon_yaml}")
+    assert(!File.exist?(File.join(skp_dir, "ART-100.yaml")), "Якорь-YAML рядом с SKP не создается")
 
-    # Канонический файл приоритетен при повторной загрузке модели
+    # Файл в папке артикула приоритетен: внешняя правка читается при загрузке модели
     content = File.read(canon_yaml, encoding: "utf-8").sub("CANONICAL_DESC", "CHANGED_IN_CANON")
     File.write(canon_yaml, content, encoding: "utf-8")
 
     fresh = DN1Code::ExportPdf2::Model::ProjectData.new
     fresh.load_auto(model)
-    assert(fresh.project_info[:articul].to_s == "ART-100", "Артикул загружен")
+    assert(fresh.project_info[:articul].to_s == "ART-100", "Артикул загружен из project.yaml")
     assert(fresh.project_info[:description].to_s.include?("CHANGED_IN_CANON"),
-           "load_auto прочитал канонический YAML из папки артикула (получено: #{fresh.project_info[:description].inspect})")
-    assert(fresh.project[:base_dir].to_s.tr("\\", "/").downcase == base_dir.tr("\\", "/").downcase,
-           "base_dir загружен из YAML")
+           "load_auto прочитал project.yaml из папки артикула (получено: #{fresh.project_info[:description].inspect})")
 
-    # Смена артикула: старый якорь удаляется, папка прежнего артикула сохраняется (история)
+    # base_dir задан: project.yaml пишется в <base_dir>/<Артикул>/project.yaml
+    project_data.project[:base_dir] = base_dir
+    assert(project_data.save_project_yaml(model), "Сохранение с заданным base_dir")
+    base_yaml = File.join(base_dir, "ART-101", "project.yaml")
+    assert(File.exist?(File.join(base_dir, "ART-100", "project.yaml")), "project.yaml записан в <base_dir>/<Артикул>/")
+    assert(!File.exist?(File.join(base_dir, "ART-100", "ART-100.yaml")), "Старое имя <Артикул>.yaml в базовой папке не создается")
+
+    # Смена артикула: новая папка, прежняя сохраняется (история PDF/SKP/PNG)
     project_data.project_info[:articul] = "ART-101"
     assert(project_data.save_project_yaml(model, previous_articul: "ART-100"), "Сохранение после смены артикула")
-    assert(!File.exist?(anchor_yaml), "Старый якорь ART-100.yaml удален")
-    assert(File.exist?(File.join(skp_dir, "ART-101.yaml")), "Новый якорь ART-101.yaml создан")
-    assert(File.exist?(File.join(base_dir, "ART-100", "ART-100.yaml")), "Папка прежнего артикула сохранена (история)")
-    assert(File.exist?(File.join(base_dir, "ART-101", "ART-101.yaml")), "Создан YAML нового артикула")
+    assert(File.exist?(base_yaml), "Создан project.yaml нового артикула в базовой папке")
+    assert(!File.exist?(File.join(base_dir, "ART-101.yaml")), "Якорь нового артикула в базовой папке не создается")
+    assert(!File.exist?(File.join(skp_dir, "ART-101.yaml")), "Якорь нового артикула рядом с .skp не создается")
+    assert(File.exist?(File.join(base_dir, "ART-100", "project.yaml")), "Папка прежнего артикула сохранена (история)")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -5869,11 +5888,12 @@ class TestRunner
     assert(pngs.size == 3, "PNG-снимки всех 3 сцен в папке images/ (найдено: #{pngs.size}: #{pngs.join(', ')})")
     assert(pngs.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
 
-    # Якорь-YAML рядом с .skp для повторного открытия модели.
+    # project.yaml в папке артикула — для повторного открытия модели.
     # В SketchUp сессия пишется через SessionStore.flush(model); здесь контроллер
     # создан напрямую, поэтому yaml сохраняем явно (та же запись, что делает flush).
-    assert(project_data.save_project_yaml(model), "save_project_yaml записал yaml папки артикула и якорь")
-    assert(File.exist?(File.join(skp_dir, "EXP-200.yaml")), "Якорь-YAML создан рядом с .skp")
+    assert(project_data.save_project_yaml(model), "save_project_yaml записал project.yaml в папку артикула")
+    assert(File.exist?(File.join(art_dir, "project.yaml")), "project.yaml создан в папке артикула")
+    assert(!File.exist?(File.join(skp_dir, "EXP-200.yaml")), "Якорь-YAML рядом с .skp больше не создается")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -6133,6 +6153,190 @@ class TestRunner
            "rev и чистый текст переживают запись/чтение YAML (#{r_first.inspect})")
     r_third = reloaded.history[2]
     assert(r_third[:ver] == "02" && r_third[:rev] == "003", "ver/rev явно сохраняются в YAML")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_74_save_without_articul_writes_no_yaml
+    puts "\n--- 74. Тест запрета записи YAML проекта без артикула ---"
+
+    test_dir = File.expand_path("test_no_articul_guard", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Sofa.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    pd.project_info[:name_product] = "Диван без артикула"
+
+    # Прямой вызов save_project_yaml без артикула отклоняется
+    assert(!pd.save_project_yaml(model), "save_project_yaml без артикула вернул false")
+    assert(pd.project_info[:articul].to_s.strip.empty?, "Артикул остался пустым")
+
+    # Путь к файлу данных без артикула не определен
+    assert(pd.yaml_path_for_model(model).nil?, "yaml_path_for_model без артикула вернул nil")
+
+    # Ни один YAML проекта не появился (ни по артикулу, ни по имени модели, ни project.yaml)
+    yamls = Dir.glob(File.join(test_dir, "**", "*.{yaml,yml}"))
+    assert(yamls.empty?, "На диске нет YAML файлов проекта (найдено: #{yamls.join(', ')})")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_75_legacy_yaml_migration_to_project_yaml
+    puts "\n--- 75. Тест миграции старых YAML (якорь + <Артикул>.yaml) в project.yaml ---"
+
+    test_dir = File.expand_path("test_legacy_migration", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Wardrobe.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    # Старая схема (до 2.1): якорь <Артикул>.yaml рядом с .skp и прежний канонический
+    # <Артикул>.yaml внутри папки артикула; рядом — общий файл-шаблон project_config.yaml
+    legacy_pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    legacy_pd.project_info[:articul] = "OLD-100"
+    legacy_pd.project_info[:description] = "LEGACY_DATA"
+
+    art_dir       = File.join(test_dir, "OLD-100")
+    anchor_yaml   = File.join(test_dir, "OLD-100.yaml")
+    old_canon     = File.join(art_dir, "OLD-100.yaml")
+    template_cfg  = File.join(test_dir, "project_config.yaml")
+    FileUtils.mkdir_p(art_dir)
+    legacy_pd.save_to_yaml(old_canon, include_settings: false)
+    legacy_pd.save_to_yaml(anchor_yaml, include_settings: false)
+    legacy_pd.save_to_yaml(template_cfg, include_settings: false)
+
+    # 1. Открытие модели: данные найдены через legacy-якорь и файл в папке артикула
+    fresh = DN1Code::ExportPdf2::Model::ProjectData.new
+    source = fresh.load_auto(model)
+    assert(source == :yaml, "Legacy-файлы найдены, источник :yaml")
+    assert(fresh.project_info[:articul].to_s == "OLD-100", "Артикул восстановлен из старого YAML")
+    assert(fresh.project_info[:description].to_s == "LEGACY_DATA", "Данные прочитаны из файла в папке артикула")
+
+    # 2. Первое сохранение: создается project.yaml, старые дубликаты удаляются, шаблон цел
+    assert(fresh.save_project_yaml(model), "Сохранение мигрировало проект в project.yaml")
+
+    new_yaml = File.join(art_dir, "project.yaml")
+    assert(File.exist?(new_yaml), "project.yaml создан в папке артикула")
+    assert(!File.exist?(anchor_yaml), "Якорь OLD-100.yaml рядом с .skp удален после миграции")
+    assert(!File.exist?(old_canon), "Старый канонический OLD-100.yaml удален после миграции")
+    assert(File.exist?(template_cfg), "Общий шаблон project_config.yaml не тронут")
+
+    migrated = DN1Code::ExportPdf2::Model::ProjectData.new
+    migrated.load_auto(model)
+    assert(migrated.project_info[:articul].to_s == "OLD-100", "Мигрированный проект снова открывается")
+    assert(migrated.project_info[:description].to_s == "LEGACY_DATA", "Данные не потеряны при миграции")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_76_discovery_multiple_articul_folders_ambiguous
+    puts "\n--- 76. Тест обнаружения: несколько папок артикулов — автозагрузка не выполняется ---"
+
+    test_dir = File.expand_path("test_discovery_multi", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Showcase.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    ["PRJ-A", "PRJ-B"].each do |art|
+      pd = DN1Code::ExportPdf2::Model::ProjectData.new
+      pd.project_info[:articul] = art
+      pd.project_info[:description] = "DATA_#{art}"
+      assert(pd.save_project_yaml(model), "Сохранен #{art}/project.yaml")
+    end
+
+    # Две папки артикулов рядом с моделью: однозначный выбор невозможен —
+    # проект не загружается автоматически (пользователь выбирает через «Импорт YAML»)
+    fresh = DN1Code::ExportPdf2::Model::ProjectData.new
+    source = fresh.load_auto(model)
+    assert(source == :default, "При двух папках артикулов автозагрузка не выполняется (получено: #{source})")
+    assert(fresh.project_info[:articul].to_s.empty?, "Артикул не выбран автоматически")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_77_edit_history_in_articul_folder_with_fallback
+    puts "\n--- 77. Тест журнала правок: edit_history.yaml в папке артикула, фолбэк рядом с .skp ---"
+
+    test_dir = File.expand_path("test_edit_history_articul", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Bed.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    # 1. Legacy: якорь рядом с .skp задает артикул, журнал правок лежит рядом с .skp
+    anchor = DN1Code::ExportPdf2::Model::ProjectData.new
+    anchor.project_info[:articul] = "BED-01"
+    anchor.save_to_yaml(File.join(test_dir, "BED-01.yaml"), include_settings: false)
+    legacy_hist = { "BED-01" => [{ "date" => "2026-08-01 09:00", "text" => "Правка из корня модели" }] }
+    File.write(File.join(test_dir, "edit_history.yaml"), YAML.dump(legacy_hist))
+
+    pd1 = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(pd1.load_auto(model) == :yaml, "Данные проекта найдены через legacy-якорь")
+    assert(pd1.history.first[:text] == "Правка из корня модели", "Legacy-журнал рядом с .skp прочитан")
+
+    # 2. Журнал в папке артикула: приоритетен перед файлом рядом с .skp
+    art_dir = File.join(test_dir, "BED-01")
+    FileUtils.mkdir_p(art_dir)
+    File.write(File.join(art_dir, "edit_history.yaml"),
+               YAML.dump({ "BED-01" => [{ "date" => "2026-09-01 10:00", "text" => "Правка из папки артикула" }] }))
+    project = DN1Code::ExportPdf2::Model::ProjectData.new
+    project.project_info[:articul] = "BED-01"
+    assert(project.save_project_yaml(model), "Сохранен project.yaml в папке артикула")
+
+    pd2 = DN1Code::ExportPdf2::Model::ProjectData.new
+    pd2.load_auto(model)
+    assert(pd2.project_info[:articul].to_s == "BED-01", "Артикул загружен из project.yaml")
+    assert(pd2.history.first[:text] == "Правка из папки артикула", "Журнал из папки артикула приоритетен")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_78_articul_offer_on_dialog_open_and_folder_creation
+    puts "\n--- 78. Тест предложения артикула при открытии панели и создания папки проекта ---"
+
+    # 1. Разметка и JS: модалка выбора типа проекта показывается при открытии панели
+    html = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html.include?('id="articulTypeModal"'), "index.html содержит модальное окно articulTypeModal")
+    assert(html.include?('id="btnArticulTypeCommercial"'), "index.html содержит кнопку коммерческого проекта")
+    assert(html.include?('id="btnArticulTypeHousehold"'), "index.html содержит кнопку бытового проекта")
+
+    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js.include?("function maybeOfferArticulCreation"), "app.js содержит maybeOfferArticulCreation (предложение при открытии)")
+    assert(js.include?("setTimeout(maybeOfferArticulCreation"), "app.js вызывает maybeOfferArticulCreation после loadData")
+    assert(js.include?("function createProjectArticul"), "app.js содержит createProjectArticul (выбор типа)")
+    assert(js.include?('callRuby("createProjectFolder"'), "app.js вызывает Ruby-колбэк createProjectFolder")
+    assert(js.include?("onProjectFolderCreated"), "app.js содержит обработчик onProjectFolderCreated")
+
+    rb = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
+    assert(rb.include?('add_action_callback("createProjectFolder")'), "export_dialog.rb регистрирует колбэк createProjectFolder")
+    assert(rb.include?("save_project_yaml"), "export_dialog.rb записывает project.yaml при создании папки")
+
+    # 2. Функционально: последовательность колбэка — артикул в сессию, папка рядом с .skp,
+    #    project.yaml внутри (то же, что делает createProjectFolder)
+    test_dir = File.expand_path("test_articul_offer_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    skp_file = File.join(test_dir, "Shelf.skp")
+    model = Sketchup::MockModel.new(skp_file)
+
+    session_pd = DN1Code::ExportPdf2::Model::SessionStore.on_model_opened(model)
+    session_pd.project_info[:articul] = "CF#260922_100000"
+    art_dir = session_pd.articul_dir_for_model(model)
+    assert(art_dir.to_s.tr("\\", "/").downcase == File.join(test_dir, "CF#260922_100000").tr("\\", "/").downcase,
+           "Папка проекта размещается рядом с рабочим файлом (#{art_dir})")
+
+    FileUtils.mkdir_p(art_dir)
+    assert(session_pd.save_project_yaml(model), "project.yaml записан в новую папку проекта")
+    assert(File.exist?(File.join(art_dir, "project.yaml")), "project.yaml создан в папке <Артикул>")
+    assert(Dir.exist?(art_dir), "Папка проекта создана рядом с рабочим файлом")
+
+    # 3. После создания папки предложение больше не показывается (артикул не пуст)
+    reopened = DN1Code::ExportPdf2::Model::ProjectData.new
+    reopened.load_auto(model)
+    assert(reopened.project_info[:articul].to_s == "CF#260922_100000", "Проект с папкой открывается повторно")
 
     FileUtils.rm_rf(test_dir)
   end

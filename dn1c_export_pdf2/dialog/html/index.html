@@ -608,6 +608,57 @@
       </div>
     </div>
 
+    <!-- Articul Type Modal: предложение создать артикул при открытии панели -->
+    <div id="articulTypeModal" class="modal-overlay hidden">
+      <div class="modal-card revision-modal-card">
+        <div class="modal-header-with-icon">
+          <div class="modal-badge-icon">🏷️</div>
+          <div class="modal-header-text">
+            <h3 class="modal-title">Создать артикул проекта</h3>
+            <p class="modal-subtitle">Выберите тип проекта — артикул будет сгенерирован автоматически</p>
+          </div>
+        </div>
+
+        <div class="revision-modal-body">
+          <div class="rev-input-hint">Рядом с рабочим файлом .skp будет создана папка по имени артикула. В ней хранятся все данные проекта: project.yaml, PDF, резервные копии SKP и снимки сцен.</div>
+        </div>
+
+        <div class="modal-actions revision-modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnArticulTypeLater">Позже</button>
+          <div class="rev-modal-action-group">
+            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС">💼 Коммерческий проект</button>
+            <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС">🏠 Бытовой проект</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Articul Prompt Modal: сохранение/экспорт невозможны без артикула -->
+    <div id="articulPromptModal" class="modal-overlay hidden">
+      <div class="modal-card revision-modal-card">
+        <div class="modal-header-with-icon">
+          <div class="modal-badge-icon">🏷️</div>
+          <div class="modal-header-text">
+            <h3 class="modal-title">Не указан артикул проекта</h3>
+            <p class="modal-subtitle">Без артикула данные проекта не сохраняются — нельзя создать папку проекта</p>
+          </div>
+        </div>
+
+        <div class="revision-modal-body">
+          <div class="rev-input-wrapper">
+            <label for="inputArticulPrompt" class="rev-input-label">Артикул проекта:</label>
+            <input type="text" id="inputArticulPrompt" class="form-control font-mono" placeholder="Например: CF#260921_153000" autocomplete="off" />
+            <span class="rev-input-hint">Предложен сгенерированный артикул — можно вписать свой. «Создать и сохранить» создаст папку проекта и запишет данные.</span>
+          </div>
+        </div>
+
+        <div class="modal-actions revision-modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt">Отмена (не сохранять)</button>
+          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула">✅ Создать и сохранить</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Export Success Modal -->
     <div id="successModal" class="modal-overlay hidden">
       <div class="modal-card">

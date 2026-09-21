@@ -684,7 +684,19 @@
     inputRevisionNote: document.getElementById("inputRevisionNote"),
     btnConfirmRevisionExport: document.getElementById("btnConfirmRevisionExport"),
     btnSkipRevisionExport: document.getElementById("btnSkipRevisionExport"),
-    btnCancelExportModal: document.getElementById("btnCancelExportModal")
+    btnCancelExportModal: document.getElementById("btnCancelExportModal"),
+
+    // Articul Prompt Modal (сохранение/экспорт без артикула)
+    articulPromptModal: document.getElementById("articulPromptModal"),
+    inputArticulPrompt: document.getElementById("inputArticulPrompt"),
+    btnConfirmArticulSave: document.getElementById("btnConfirmArticulSave"),
+    btnCancelArticulPrompt: document.getElementById("btnCancelArticulPrompt"),
+
+    // Articul Type Modal (предложение создать артикул при открытии панели)
+    articulTypeModal: document.getElementById("articulTypeModal"),
+    btnArticulTypeCommercial: document.getElementById("btnArticulTypeCommercial"),
+    btnArticulTypeHousehold: document.getElementById("btnArticulTypeHousehold"),
+    btnArticulTypeLater: document.getElementById("btnArticulTypeLater")
   };
 
   // SketchUp Bridge Helper
@@ -6022,6 +6034,36 @@
     }
   }
 
+  // Текущее значение артикула из формы
+  function articulValue() {
+    return (els.inputArticul ? els.inputArticul.value : "").trim();
+  }
+
+  // --- Предложение создать артикул при открытии панели экспорта ---
+  // Показывается, если проект еще без артикула; выбор типа (коммерческий/бытовой)
+  // генерирует артикул и сразу создает папку проекта рядом с рабочим файлом
+  function maybeOfferArticulCreation() {
+    if (!els.articulTypeModal) return;
+    if (!els.articulTypeModal.classList.contains("hidden")) return;
+    if (articulValue()) return;
+    els.articulTypeModal.classList.remove("hidden");
+  }
+
+  function closeArticulTypeModal() {
+    if (els.articulTypeModal) els.articulTypeModal.classList.add("hidden");
+  }
+
+  // Генерирует артикул выбранного типа и создает папку проекта (Ruby-колбэк)
+  function createProjectArticul(isCommercial) {
+    const newArt = generateArticulLocal(isCommercial);
+    if (els.inputArticul) els.inputArticul.value = newArt;
+    setTradeValue(isCommercial ? "1" : "0");
+    updateHeaderTitles();
+    lockArticulAfterGeneration();
+    closeArticulTypeModal();
+    callRuby("createProjectFolder", JSON.stringify({ articul: newArt, commercial: isCommercial }));
+  }
+
   // Trigger Articul Generation
   function triggerGenerateArticul() {
     if (isArticulLocked()) {
@@ -6426,8 +6468,17 @@
       callRuby("startExport", JSON.stringify(data));
     }
 
-    // Start Export: prompt user for revision notes before export
+    // Start Export: без артикула сначала модалка его создания, затем промпт ревизии
     els.btnStartExport.addEventListener("click", () => {
+      if (!articulValue()) {
+        openArticulPrompt("export");
+        return;
+      }
+      beginExportFlow();
+    });
+
+    // Промпт ревизии перед экспортом (вызывается после проверки артикула)
+    function beginExportFlow() {
       const data = collectFormData();
       const enabledScenes = (data.scenes || []).filter((s) => s.enabled && s.page_type !== "skip");
       if (enabledScenes.length === 0) {
@@ -6467,7 +6518,7 @@
       } else {
         executeExport();
       }
-    });
+    }
 
     // Revision Prompt Modal: Cancel
     if (els.btnCancelExportModal) {
@@ -6547,12 +6598,99 @@
       });
     }
 
-    // Forced save: project YAML next to .skp + program settings/layout YAML
+    // --- Обязательный артикул: модалка перед сохранением/экспортом ---
+    // Без артикула проект не сохраняется: нет папки проекта (<Артикул>/project.yaml)
+    let articulPromptAction = null; // "save" | "export"
+
+    function openArticulPrompt(action) {
+      articulPromptAction = action;
+      if (els.inputArticulPrompt) {
+        els.inputArticulPrompt.value = generateArticulLocal(getTradeValue() === "1");
+      }
+      if (els.articulPromptModal) {
+        els.articulPromptModal.classList.remove("hidden");
+        setTimeout(() => {
+          if (els.inputArticulPrompt) els.inputArticulPrompt.focus();
+        }, 50);
+      } else {
+        // Модалки нет в разметке — сохранение/экспорт без артикула не выполняем
+        showNotification("Укажите артикул проекта — без него данные не сохраняются.", "error");
+        articulPromptAction = null;
+      }
+    }
+
+    // Переносит артикул из модалки в форму; false — значение пустое
+    function applyArticulFromPrompt() {
+      const val = (els.inputArticulPrompt ? els.inputArticulPrompt.value : "").trim();
+      if (!val) {
+        showNotification("Введите артикул проекта", "warning");
+        if (els.inputArticulPrompt) els.inputArticulPrompt.focus();
+        return false;
+      }
+      if (els.inputArticul) els.inputArticul.value = val;
+      updateHeaderTitles();
+      lockArticulAfterGeneration();
+      return true;
+    }
+
+    function closeArticulPrompt() {
+      if (els.articulPromptModal) els.articulPromptModal.classList.add("hidden");
+      articulPromptAction = null;
+    }
+
+    if (els.btnConfirmArticulSave) {
+      els.btnConfirmArticulSave.addEventListener("click", () => {
+        if (!applyArticulFromPrompt()) return;
+        const action = articulPromptAction;
+        closeArticulPrompt();
+        if (action === "export") {
+          beginExportFlow();
+        } else if (action === "save") {
+          executeForcedSave();
+        }
+      });
+    }
+
+    if (els.btnCancelArticulPrompt) {
+      els.btnCancelArticulPrompt.addEventListener("click", closeArticulPrompt);
+    }
+
+    if (els.inputArticulPrompt) {
+      els.inputArticulPrompt.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (els.btnConfirmArticulSave) els.btnConfirmArticulSave.click();
+        } else if (e.key === "Escape") {
+          closeArticulPrompt();
+        }
+      });
+    }
+
+    // Forced save: project.yaml в папке артикула + program settings/layout YAML
+    function executeForcedSave() {
+      const data = collectFormData();
+      callRuby("saveProjectYaml", JSON.stringify(data));
+    }
+
     if (els.btnSaveYaml) {
       els.btnSaveYaml.addEventListener("click", () => {
-        const data = collectFormData();
-        callRuby("saveProjectYaml", JSON.stringify(data));
+        if (!articulValue()) {
+          openArticulPrompt("save");
+          return;
+        }
+        executeForcedSave();
       });
+    }
+
+    // Предложение создать артикул: выбор типа проекта (коммерческий/бытовой)
+    if (els.btnArticulTypeCommercial) {
+      els.btnArticulTypeCommercial.addEventListener("click", () => createProjectArticul(true));
+    }
+    if (els.btnArticulTypeHousehold) {
+      els.btnArticulTypeHousehold.addEventListener("click", () => createProjectArticul(false));
+    }
+    if (els.btnArticulTypeLater) {
+      els.btnArticulTypeLater.addEventListener("click", closeArticulTypeModal);
     }
 
     // Import: load project data from YAML into in-memory session
@@ -6621,9 +6759,22 @@
       if (scenesPane && scenesPane.classList.contains("active")) {
         refreshScenesFromModel();
       }
+      // При открытии панели предлагаем создать артикул (если проект еще без артикула)
+      setTimeout(maybeOfferArticulCreation, 300);
     },
 
     showNotification: showNotification,
+
+    // Папка проекта <Артикул> создана рядом с рабочим файлом (ответ Ruby-колбэка createProjectFolder)
+    onProjectFolderCreated: function (folderPath, yamlSaved) {
+      if (!folderPath) return;
+      showNotification(
+        yamlSaved
+          ? `Папка проекта создана: ${folderPath} (project.yaml записан)`
+          : `Папка проекта создана: ${folderPath}`,
+        "success"
+      );
+    },
 
     onAutoSaved: function (yamlName) {
       const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });

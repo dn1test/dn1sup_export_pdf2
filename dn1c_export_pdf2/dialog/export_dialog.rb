@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require "fileutils"
 require_relative "../model/path_util"
 require_relative "../model/project_data"
 require_relative "../controller/export_controller"
@@ -140,6 +141,43 @@ module DN1Code
             end
             art = Model::ProjectData.generate_articul(commercial: commercial)
             dialog.execute_script("window.app && window.app.onArticulGenerated(#{JSON.generate(art)});")
+          end
+
+          # Создание папки проекта по артикулу рядом с рабочим файлом .skp и первичная
+          # запись project.yaml. Вызывается после выбора типа проекта при открытии панели
+          # (см. articulTypeModal): { articul: "CF#..." }
+          dialog.add_action_callback("createProjectFolder") do |_action_context, params_json|
+            begin
+              params = begin
+                JSON.parse(params_json.to_s, symbolize_names: true)
+              rescue StandardError
+                {}
+              end
+              articul = params[:articul].to_s.strip
+              if articul.empty?
+                dialog.execute_script("window.app && window.app.showNotification('Артикул не передан — папка проекта не создана', 'error');")
+              else
+                model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+                project_data = Model::SessionStore.data(model)
+                project_data.project_info[:articul] = articul if project_data.project_info[:articul].to_s.strip.empty?
+                project_data.sync_with_model_scenes(model) if model
+
+                art_dir = project_data.articul_dir_for_model(model)
+                if art_dir.nil? || art_dir.to_s.empty?
+                  dialog.execute_script("window.app && window.app.showNotification('Сначала сохраните модель SketchUp (Ctrl+S) — папка проекта создается рядом с рабочим файлом', 'error');")
+                else
+                  begin
+                    FileUtils.mkdir_p(art_dir)
+                  rescue StandardError => e
+                    puts "[createProjectFolder] mkdir_p: #{e.message}"
+                  end
+                  yaml_ok = project_data.save_project_yaml(model)
+                  dialog.execute_script("window.app && window.app.onProjectFolderCreated(#{JSON.generate(art_dir)}, #{yaml_ok});")
+                end
+              end
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка создания папки проекта: #{e.message}', 'error');")
+            end
           end
 
           # Генератор идентификатора заказчика (CUST-...)
@@ -495,6 +533,8 @@ module DN1Code
                 if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
                   Sketchup.status_text = "DN1C Export PDF: Данные сохранены (#{yaml_name} + settings.yaml + layout.yaml)"
                 end
+              elsif project_data.project_info[:articul].to_s.strip.empty?
+                dialog.execute_script("window.app && window.app.showNotification('Артикул не указан — данные проекта не сохранены. Создайте артикул и повторите сохранение.', 'error');")
               else
                 dialog.execute_script("window.app && window.app.showNotification('Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML', 'error');")
               end
@@ -523,6 +563,8 @@ module DN1Code
                 yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
                 if ok
                   dialog.execute_script("window.app && window.app.showNotification('Сохранено в YAML (#{yaml_name}) + настройки расширения', 'success');")
+                elsif project_data.project_info[:articul].to_s.strip.empty?
+                  dialog.execute_script("window.app && window.app.showNotification('Артикул не указан — данные проекта не сохранены. Создайте артикул и повторите сохранение.', 'error');")
                 else
                   dialog.execute_script("window.app && window.app.showNotification('Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML', 'error');")
                 end
@@ -619,7 +661,7 @@ module DN1Code
 
           # Экспорт настроек в YAML
           dialog.add_action_callback("exportYaml") do |_action_context, data_json|
-            save_path = UI.savepanel("Экспортировать настройки в YAML", "", "project_config.yaml")
+            save_path = UI.savepanel("Экспортировать настройки в YAML", "", "project.yaml")
             if save_path
               begin
                 payload = JSON.parse(data_json, symbolize_names: true)
