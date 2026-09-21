@@ -255,6 +255,10 @@ class TestRunner
     test_text_height_and_no_clipping
     test_articul_folder_yaml_canonical_and_anchor
     test_articul_folder_export_structure
+    test_last_pdf_copy_next_to_skp_and_history_link
+    test_png_snapshots_respect_viewport_background
+    test_path_util_file_url_encoding
+    test_history_rev_ver_fields_and_migration
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -5869,6 +5873,209 @@ class TestRunner
     # создан напрямую, поэтому yaml сохраняем явно (та же запись, что делает flush).
     assert(project_data.save_project_yaml(model), "save_project_yaml записал yaml папки артикула и якорь")
     assert(File.exist?(File.join(skp_dir, "EXP-200.yaml")), "Якорь-YAML создан рядом с .skp")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_last_pdf_copy_next_to_skp_and_history_link
+    puts "\n--- 70. Тест копии _last.pdf рядом с .skp и привязки pdf_link в истории ---"
+
+    test_dir = File.expand_path("test_last_pdf_export", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    skp_file = File.join(skp_dir, "Chair.skp")
+    model = Sketchup::MockModel.new(skp_file)
+    model.pages = Sketchup::MockPages.new([
+                                            Sketchup::MockPage.new("Обложка"),
+                                            Sketchup::MockPage.new("Вид 1")
+                                          ])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.project_info[:articul] = "EXP-300"
+    project_data.project_info[:version] = 1
+    project_data.project_info[:revision] = 7
+    project_data.pdf_settings[:auto_open_pdf] = true
+    project_data.pdf_settings[:save_layout_file] = false
+    project_data.sync_with_model_scenes(model)
+
+    # История изменений: две записи без ссылок (как после ввода правок пользователем)
+    project_data.history << { date: "2026-09-20 10:00", text: "Изменен фасад", description: "Изменен фасад" }
+    project_data.history << { date: "2026-09-19 12:30", text: "Старт проекта", description: "Старт проекта" }
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    expected_last = File.expand_path(File.join(skp_dir, "Chair_last.pdf"))
+    assert(File.expand_path(controller.resolve_last_pdf_path.to_s) == expected_last,
+           "resolve_last_pdf_path указывает рядом с .skp (#{controller.resolve_last_pdf_path.inspect})")
+
+    # Несохраненная модель — копия _last не создаётся
+    unsaved = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, Sketchup::MockModel.new(""))
+    assert(unsaved.resolve_last_pdf_path.nil?, "Для несохраненной модели resolve_last_pdf_path вернул nil")
+
+    # Экспорт: перехватываем stdout, чтобы проверить, что auto-open получил именно _last
+    require "stringio"
+    captured   = StringIO.new
+    orig_stdout = $stdout
+    $stdout = captured
+    begin
+      result_path = controller.export(nil)
+    ensure
+      $stdout = orig_stdout
+    end
+
+    expected_pdf = File.join(skp_dir, "EXP-300", "pdf", "EXP-300_01#007.pdf")
+    assert(File.exist?(expected_pdf), "Версионированный PDF в папке артикула создан: #{expected_pdf}")
+    assert(File.exist?(expected_last), "Копия _last.pdf создана рядом с .skp: #{expected_last}")
+    assert(File.expand_path(controller.last_pdf_path.to_s) == expected_last, "controller.last_pdf_path указывает на копию _last")
+    assert(captured.string.include?("file:///" + expected_last.tr("\\", "/")),
+           "Автооткрытие получилo URL копии _last (#{captured.string[/\[UI::openURL\][^\n]*/]})")
+
+    # Привязка pdf_link: заполняется только самая свежая пустая запись, повтор не затирает
+    assert(project_data.stamp_history_pdf_link!(result_path.to_s), "stamp_history_pdf_link! проставил ссылку")
+    assert(project_data.history.first[:pdf_link] == result_path.to_s, "Самая свежая запись истории содержит путь PDF")
+    assert(project_data.history.last[:pdf_link].to_s.empty?, "Старые записи истории не тронуты")
+    assert(!project_data.stamp_history_pdf_link!("other.pdf"), "Повторный штамп не перезаписывает существующую ссылку")
+    assert(project_data.history.first[:pdf_link] == result_path.to_s, "Ссылка первой записи сохранена после повторного штампа")
+
+    # Ссылка переживает запись/чтение YAML (корневая секция history_edit)
+    yaml_temp = File.join(test_dir, "EXP-300.yaml")
+    project_data.save_to_yaml(yaml_temp)
+    reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(reloaded.load_from_yaml(yaml_temp), "YAML с pdf_link прочитан обратно")
+    assert(reloaded.history.first[:pdf_link].to_s == result_path.to_s, "pdf_link сохраняется в YAML и читается из него")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_png_snapshots_respect_viewport_background
+    puts "\n--- 71. Тест фона видового экрана в PNG-снимках сцен ---"
+
+    test_dir = File.expand_path("test_png_bg", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    model = Sketchup::MockModel.new(File.join(skp_dir, "Desk.skp"))
+    model.pages = Sketchup::MockPages.new([
+                                            Sketchup::MockPage.new("Обложка"),
+                                            Sketchup::MockPage.new("Вид 1")
+                                          ])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.sync_with_model_scenes(model)
+    project_data.pdf_settings[:auto_open_pdf] = false
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+    # Перехватываем опции render_scene_temp, вызов проксируем в оригинал
+    rs = DN1Code::ExportPdf2::Service::RenderService
+    captured = []
+    rs.singleton_class.send(:alias_method, :render_scene_temp_bg_probe, :render_scene_temp)
+    rs.define_singleton_method(:render_scene_temp) do |m, scene, opts = {}|
+      captured << (opts || {})
+      rs.send(:render_scene_temp_bg_probe, m, scene, opts)
+    end
+
+    begin
+      # Сцены без изменений флага: фон включен (поведение по умолчанию)
+      written_on = controller.export_scene_pngs
+      assert(written_on.size == 2, "PNG обеих сцен записаны при включенном фоне (#{written_on.size})")
+      assert(captured.all? { |o| o[:show_background] == true },
+             "Без флага render_scene_temp получает show_background=true (#{captured.map { |o| o[:show_background] }.inspect})")
+
+      # Выключаем фон всем сценам (чекбокс «фон видового экрана» в диалоге)
+      captured.clear
+      project_data.scenes.each { |s| s.viewport_background = false }
+      written_off = controller.export_scene_pngs
+      assert(written_off.size == 2, "PNG обеих сцен записаны при выключенном фоне (#{written_off.size})")
+      assert(captured.all? { |o| o[:show_background] == false },
+             "При viewport_background=false render_scene_temp получает show_background=false (#{captured.map { |o| o[:show_background] }.inspect})")
+    ensure
+      rs.singleton_class.send(:remove_method, :render_scene_temp)
+      rs.singleton_class.send(:alias_method, :render_scene_temp, :render_scene_temp_bg_probe)
+      rs.singleton_class.send(:remove_method, :render_scene_temp_bg_probe)
+    end
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_path_util_file_url_encoding
+    puts "\n--- 72. Тест file_url: процентное кодирование пути для UI.openURL ---"
+
+    pu = DN1Code::ExportPdf2::Model::PathUtil
+
+    # '#' в артикуле и в суффиксе версии/ревизии не должен обрезаться как фрагмент URL
+    assert(pu.file_url("U:/desktop/su_ai/HF#26092/pdf/HF#26092_01#001.pdf") ==
+           "file:///U:/desktop/su_ai/HF%2326092/pdf/HF%2326092_01%23001.pdf",
+           "Символ '#' кодируется как %23 (#{pu.file_url('U:/desktop/su_ai/HF#26092/pdf/HF#26092_01#001.pdf').inspect})")
+
+    # Обратные слэши нормализуются
+    assert(pu.file_url('U:\desktop\su_ai\HF#26092\HF#26092_01#007.pdf') ==
+           "file:///U:/desktop/su_ai/HF%2326092/HF%2326092_01%23007.pdf",
+           "Обратные слэши заменяются на прямые")
+
+    # Пробелы и спецсимволы
+    assert(pu.file_url("U:/desk top/a&b (1).pdf") == "file:///U:/desk%20top/a%26b%20%281%29.pdf",
+           "Пробелы, '&' и скобки кодируются")
+
+    # Кириллица кодируется побайтово в UTF-8
+    cyr = pu.file_url("U:/Стол/тумба.pdf")
+    assert(cyr.start_with?("file:///U:/%D0%A1") && !cyr.include?("т"),
+           "Кириллица кодируется в UTF-8 процентах (#{cyr.inspect})")
+
+    # Простые пути без спецсимволов не меняются
+    assert(pu.file_url("C:/models/Chair_last.pdf") == "file:///C:/models/Chair_last.pdf",
+           "Простой путь остается читаемым")
+
+    # Пустые и nil-пути
+    assert(pu.file_url("").nil?, "Пустая строка возвращает nil")
+    assert(pu.file_url("   ").nil?, "Строка из пробелов возвращает nil")
+    assert(pu.file_url(nil).nil?, "nil возвращает nil")
+  end
+
+  def test_history_rev_ver_fields_and_migration
+    puts "\n--- 73. Тест ver/rev в записях истории и миграции суффикса (rev. NNN) ---"
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+
+    # Старые записи: ревизия вшита в текст; новая запись: ver/rev отдельными полями
+    project_data.history << { date: "2026-09-21 21:00", text: "Новые правки для проверки 3 (rev. 004)",
+                              description: "Новые правки для проверки 3 (rev. 004)" }
+    project_data.history << { date: "2026-09-20 10:00", text: "Правка без ревизии", description: "Правка без ревизии" }
+    project_data.history << { date: "2026-09-19 12:30", text: "Старт проекта", ver: "02", rev: "003" }
+
+    project_data.sync_history_entries!
+
+    first = project_data.history.first
+    assert(first[:text] == "Новые правки для проверки 3",
+           "Суффикс '(rev. 004)' вычищен из текста (#{first[:text].inspect})")
+    assert(first[:rev] == "004", "Вшитая ревизия перенесена в поле rev (#{first[:rev].inspect})")
+    assert(first[:ver].to_s.empty?, "Версия старой записи без суффикса остается пустой")
+
+    second = project_data.history[1]
+    assert(second[:text] == "Правка без ревизии" && second[:rev].to_s.empty?,
+           "Запись без суффикса не получает ревизию")
+
+    third = project_data.history[2]
+    assert(third[:text] == "Старт проекта" && third[:rev] == "003" && third[:ver] == "02",
+           "Явные ver/rev сохраняются, текст не меняется")
+
+    pairs = project_data.workflow[:history_edit]
+    assert(pairs.first[1] == "Новые правки для проверки 3",
+           "Пары workflow.history_edit содержат чистый текст (#{pairs.first[1].inspect})")
+
+    # Roundtrip через YAML: ver/rev сохраняются и читаются
+    test_dir = File.expand_path("test_history_rev_ver", __dir__)
+    FileUtils.mkdir_p(test_dir)
+    yaml_temp = File.join(test_dir, "EXP-REV.yaml")
+    project_data.save_to_yaml(yaml_temp)
+    reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(reloaded.load_from_yaml(yaml_temp), "YAML с ver/rev прочитан обратно")
+    r_first = reloaded.history.first
+    assert(r_first[:rev] == "004" && r_first[:text] == "Новые правки для проверки 3",
+           "rev и чистый текст переживают запись/чтение YAML (#{r_first.inspect})")
+    r_third = reloaded.history[2]
+    assert(r_third[:ver] == "02" && r_third[:rev] == "003", "ver/rev явно сохраняются в YAML")
 
     FileUtils.rm_rf(test_dir)
   end

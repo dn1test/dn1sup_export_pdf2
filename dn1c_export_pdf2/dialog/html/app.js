@@ -3865,6 +3865,35 @@
     return `CUST-${yy}${mm}${dd}-${hh}${mi}${ss}`;
   }
 
+  // Суффикс ревизии, вшитый в текст старых записей истории: "Текст правки (rev. 004)"
+  const HISTORY_REV_SUFFIX_RE = /\s*\(rev\.?\s*(\d{1,})\)\s*$/i;
+
+  // Отделяет вшитый номер ревизии от текста правки: { text, rev } (rev — "004")
+  function splitRevSuffix(text) {
+    const raw = String(text || "");
+    const m = raw.match(HISTORY_REV_SUFFIX_RE);
+    if (!m) return { text: raw.trim(), rev: "" };
+    return { text: raw.replace(HISTORY_REV_SUFFIX_RE, "").trim(), rev: m[1].padStart(3, "0") };
+  }
+
+  // Приводит записи истории к канону: чистый текст + отдельные поля ver/rev.
+  // Старые записи хранят ревизию в тексте ("... (rev. 004)") — переносим её в поле rev.
+  function migrateHistoryEntries(history) {
+    (history || []).forEach((item) => {
+      if (!item || typeof item !== "object") return;
+      item.ver = String(item.ver || "").trim();
+      item.rev = String(item.rev || "").trim();
+      const clean = splitRevSuffix(item.text || item.edit || item.description || "");
+      if (!item.rev && clean.rev) item.rev = clean.rev;
+      if (clean.rev) {
+        item.text = clean.text;
+        item.edit = clean.text;
+        item.description = clean.text;
+      }
+    });
+    return history;
+  }
+
   // Populate UI from State
   function renderUI() {
     const prj = state.project || {};
@@ -3873,20 +3902,24 @@
     const info = state.project_info || {};
     const settings = state.pdf_settings || {};
 
-    // Синхронизация истории правок workflow.history_edit <-> state.history
-    if (Array.isArray(wf.history_edit) && wf.history_edit.length > 0) {
+    // Синхронизация истории правок: state.history — основной источник (приходит
+    // из Ruby с pdf_link/ver/rev), пары workflow.history_edit — только fallback.
+    if ((!Array.isArray(state.history) || state.history.length === 0)
+        && Array.isArray(wf.history_edit) && wf.history_edit.length > 0) {
       state.history = wf.history_edit.map((item) => {
         if (Array.isArray(item)) {
-          return { date: item[0] || "", text: item[1] || "", description: item[1] || "" };
+          return { date: item[0] || "", text: item[1] || "", description: item[1] || "", pdf_link: item[2] || "", ver: "", rev: "" };
         } else if (item && typeof item === "object") {
-          return { date: item.date || "", text: item.text || item.description || "", description: item.text || item.description || "" };
+          const t = item.text || item.description || "";
+          return { date: item.date || "", text: t, description: t, pdf_link: item.pdf_link || "", ver: item.ver || item.version || "", rev: item.rev || item.revision || "" };
         }
-        return { date: "", text: String(item || ""), description: String(item || "") };
+        return { date: "", text: String(item || ""), description: String(item || ""), ver: "", rev: "" };
       });
-    } else if (Array.isArray(state.history) && state.history.length > 0) {
-      if (!wf.history_edit) {
-        wf.history_edit = state.history.map((item) => [item.date || "", item.text || item.description || ""]);
-      }
+    }
+    if (Array.isArray(state.history) && state.history.length > 0) {
+      migrateHistoryEntries(state.history);
+      // Пары для PDF-инфолиний: чистый текст без номера ревизии
+      wf.history_edit = state.history.map((item) => [item.date || "", item.text || item.description || ""]);
     }
 
     // 1. Паспорт объекта (Project)
@@ -5636,7 +5669,7 @@
       const tdDate = document.createElement("td");
       const inputDate = document.createElement("input");
       inputDate.type = "text";
-      inputDate.className = "table-input font-mono";
+      inputDate.className = "table-input history-date-input font-mono";
       inputDate.value = item.data || item.date || "";
       inputDate.placeholder = "ГГГГ-ММ-ДД ЧЧ:ММ";
       inputDate.addEventListener("input", (e) => {
@@ -5650,7 +5683,17 @@
       });
       tdDate.appendChild(inputDate);
 
-      // 2. Комментарий к правке (edit / text)
+      // 2. Версия # Ревизия (ver / rev) — только чтение
+      const tdRev = document.createElement("td");
+      tdRev.className = "history-rev-cell font-mono";
+      const verStr = String(item.ver || "").trim();
+      const revStr = String(item.rev || "").trim();
+      tdRev.textContent = `${verStr || "—"} # ${revStr || "—"}`;
+      tdRev.title = revStr
+        ? `Версия ${verStr || "—"} # Ревизия ${revStr}`
+        : "Ревизия не назначена (запись без экспорта)";
+
+      // 3. Название правки (edit / text)
       const tdDesc = document.createElement("td");
       const inputDesc = document.createElement("input");
       inputDesc.type = "text";
@@ -5677,27 +5720,27 @@
       });
       tdDesc.appendChild(inputDesc);
 
-      // 3. Файл PDF (pdf_link)
-      const tdPdfLink = document.createElement("td");
-      const inputPdfLink = document.createElement("input");
-      inputPdfLink.type = "text";
-      inputPdfLink.className = "table-input font-mono";
-      inputPdfLink.value = item.pdf_link || "";
-      inputPdfLink.placeholder = "HF#..._version_revision.pdf";
-      inputPdfLink.addEventListener("input", (e) => {
-        item.pdf_link = e.target.value;
+      // 4. Открыть привязанный PDF (виден путь в подсказке; активна, когда ссылка есть)
+      const tdOpen = document.createElement("td");
+      tdOpen.className = "history-action-cell";
+      const btnOpenPdf = document.createElement("button");
+      btnOpenPdf.className = "btn btn-xs btn-secondary";
+      btnOpenPdf.textContent = "Открыть";
+      const pdfLink = (item.pdf_link || "").trim();
+      btnOpenPdf.disabled = !pdfLink;
+      btnOpenPdf.title = pdfLink ? `Открыть PDF: ${pdfLink}` : "PDF ещё не создан для этой правки";
+      btnOpenPdf.addEventListener("click", () => {
+        const link = (item.pdf_link || "").trim();
+        if (link) callRuby("openFile", link);
       });
-      inputPdfLink.addEventListener("change", (e) => {
-        item.pdf_link = e.target.value;
-        notifyChange();
-      });
-      tdPdfLink.appendChild(inputPdfLink);
+      tdOpen.appendChild(btnOpenPdf);
 
-      // 4. Удаление
+      // 5. Удаление
       const tdDelete = document.createElement("td");
+      tdDelete.className = "history-action-cell";
       const btnDel = document.createElement("button");
-      btnDel.className = "btn-icon btn-delete";
-      btnDel.textContent = "✕";
+      btnDel.className = "btn btn-xs btn-danger";
+      btnDel.textContent = "Удалить";
       btnDel.title = "Удалить запись";
       btnDel.addEventListener("click", () => {
         state.history.splice(index, 1);
@@ -5707,8 +5750,9 @@
       tdDelete.appendChild(btnDel);
 
       tr.appendChild(tdDate);
+      tr.appendChild(tdRev);
       tr.appendChild(tdDesc);
-      tr.appendChild(tdPdfLink);
+      tr.appendChild(tdOpen);
       tr.appendChild(tdDelete);
 
       els.historyTableBody.appendChild(tr);
@@ -5792,11 +5836,13 @@
       history_edit: historyEditPairs
     };
 
-    // Модуль 4: Корневой history_edit (project.yaml)
+    // Модуль 4: Корневой history_edit (project.yaml) — с версией/ревизией записи
     state.history_edit = (state.history || []).map((item) => ({
       data: item.data || item.date || "",
       edit: item.edit || item.text || item.description || "",
-      pdf_link: item.pdf_link || ""
+      pdf_link: item.pdf_link || "",
+      ver: item.ver || "",
+      rev: item.rev || ""
     }));
 
     // Фасад project_info для 100% обратной совместимости
@@ -6347,7 +6393,9 @@
         edit: defaultText,
         text: defaultText,
         description: defaultText,
-        pdf_link: ""
+        pdf_link: "",
+        ver: "",
+        rev: ""
       });
 
       if (els.inputLastEdit) els.inputLastEdit.value = defaultText;
@@ -6448,13 +6496,19 @@
         const currRevNum = parseInt(els.inputRevision ? els.inputRevision.value : 1, 10) || 1;
         const nextRevNum = currRevNum + 1;
         const nextRevStr = String(nextRevNum).padStart(3, '0');
-        const entryText = `${note} (rev. ${nextRevStr})`;
+        const currVerNum = parseInt(els.inputVersion ? els.inputVersion.value : 1, 10) || 1;
+        const currVerStr = String(currVerNum).padStart(2, '0');
 
-        // Добавляем новую запись в историю проекта
+        // Добавляем новую запись в историю проекта (ревизия — отдельным полем, не в тексте)
         state.history.unshift({
+          data: exactTime,
           date: exactTime,
-          text: entryText,
-          description: entryText
+          edit: note,
+          text: note,
+          description: note,
+          pdf_link: "",
+          ver: currVerStr,
+          rev: nextRevStr
         });
 
         // Синхронизируем состояние и форму
@@ -6619,11 +6673,20 @@
       }
     },
 
-    onExportSuccess: function (pdfPath, newRevision) {
+    onExportSuccess: function (pdfPath, newRevision, lastPdfPath) {
       els.progressOverlay.classList.add("hidden");
-      state.lastExportedPdf = pdfPath;
-      els.successPdfPath.textContent = pdfPath;
+      // Открыта копия «_last» рядом с .skp — она первична для пользователя
+      state.lastExportedPdf = lastPdfPath || pdfPath;
+      els.successPdfPath.textContent = state.lastExportedPdf;
       els.successModal.classList.remove("hidden");
+
+      // Привязываем PDF этого экспорта к самой свежей записи истории
+      // (зеркало Ruby-штампа stamp_history_pdf_link!)
+      if (state.history && state.history[0] && !(state.history[0].pdf_link || "").trim()) {
+        state.history[0].pdf_link = pdfPath;
+        renderHistoryTable();
+        notifyChange();
+      }
 
       // Update revision locally from backend if provided
       if (els.inputRevision && newRevision !== undefined && newRevision !== null) {

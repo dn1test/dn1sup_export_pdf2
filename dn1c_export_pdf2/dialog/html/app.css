@@ -867,6 +867,42 @@ tr:hover td {
   color: #94a3b8;
 }
 
+/* Дата/время в журнале правок: без «окошка» — плоский текст, рамка только при правке */
+.history-date-input {
+  background-color: transparent;
+  border: 1px solid transparent;
+  padding: 5px 0;
+}
+
+.history-date-input:hover {
+  background-color: transparent;
+  border-color: transparent;
+}
+
+.history-date-input:focus {
+  background-color: #ffffff;
+  border-color: #005eb0;
+  outline: none;
+  box-shadow: none;
+}
+
+/* Ячейка «Версия # Ревизия» в таблице истории: моноширинный номер по центру */
+.history-rev-cell {
+  text-align: center;
+  white-space: nowrap;
+  color: var(--text-muted);
+}
+
+/* Ячейки действий («Открыть» / «Удалить») в таблице истории */
+.history-action-cell {
+  text-align: center;
+  white-space: nowrap;
+}
+
+.history-action-cell .btn {
+  min-width: 64px;
+}
+
 .btn-delete {
   color: var(--danger);
 }

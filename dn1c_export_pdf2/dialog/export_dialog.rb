@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "json"
+require_relative "../model/path_util"
 require_relative "../model/project_data"
 require_relative "../controller/export_controller"
 
@@ -465,7 +466,7 @@ module DN1Code
               folder_abs = candidates.find { |p| Dir.exist?(p) }
 
               if folder_abs && File.exist?(folder_abs)
-                UI.openURL("file:///#{folder_abs.tr('\\', '/')}")
+                UI.openURL(Model::PathUtil.file_url(folder_abs))
               else
                 UI.messagebox("Папка не найдена на диске:\n#{folder_raw}")
               end
@@ -562,9 +563,15 @@ module DN1Code
                   dialog.execute_script("window.app && window.app.updateProgress(#{percent}, #{JSON.generate(msg)});")
                 end
 
+                # Привязываем PDF этого экспорта к самой свежей записи истории изменений
+                if project_data.respond_to?(:stamp_history_pdf_link!) && project_data.stamp_history_pdf_link!(pdf_file.to_s)
+                  Model::SessionStore.flush(model) if defined?(Model::SessionStore)
+                end
+
+                last_pdf  = controller.respond_to?(:last_pdf_path) ? controller.last_pdf_path : nil
                 escaped_path = JSON.generate(pdf_file)
                 new_rev = project_data.project_info[:revision] || 1
-                dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev});")
+                dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev}, #{JSON.generate(last_pdf)});")
               rescue StandardError => e
                 dialog.execute_script("window.app && window.app.onExportError(#{JSON.generate(e.message)});")
               end
@@ -580,9 +587,17 @@ module DN1Code
 
           # Открыть папку с PDF
           dialog.add_action_callback("openFolder") do |_action_context, file_path|
-            if file_path && File.exist?(file_path)
-              folder = File.dirname(file_path.to_s.tr("\\", "/"))
-              UI.openURL("file:///" + folder)
+            begin
+              clean_path = file_path.to_s.strip.tr("\\", "/")
+              if clean_path.empty?
+                # Пустая ссылка — открывать нечего
+              elsif File.exist?(clean_path)
+                UI.openURL(Model::PathUtil.file_url(File.dirname(clean_path)))
+              else
+                UI.messagebox("Папка не найдена на диске:\n#{clean_path}")
+              end
+            rescue StandardError => e
+              puts "[openFolder error]: #{e.message}"
             end
           end
 
@@ -590,8 +605,12 @@ module DN1Code
           dialog.add_action_callback("openFile") do |_action_context, file_path|
             begin
               clean_path = file_path.to_s.strip.tr("\\", "/")
-              if !clean_path.empty? && File.exist?(clean_path)
-                UI.openURL("file:///" + clean_path)
+              if clean_path.empty?
+                # Пустая ссылка — открывать нечего
+              elsif File.exist?(clean_path)
+                UI.openURL(Model::PathUtil.file_url(clean_path))
+              else
+                UI.messagebox("Файл не найден на диске:\n#{clean_path}")
               end
             rescue StandardError => e
               puts "[openFile error]: #{e.message}"

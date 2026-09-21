@@ -870,50 +870,56 @@ module DN1Code
           end
         end
 
+        # Отделяет вшитый номер ревизии от текста правки ("Текст правки (rev. 004)").
+        # @return [Array<String, String>] [чистый текст, ревизия "004" или ""]
+        def split_history_rev(text)
+          raw = text.to_s
+          m = raw.match(/\(rev\.?\s*(\d{1,})\)\s*\z/i)
+          return [raw, ""] unless m
+          [raw.sub(/\s*\(rev\.?\s*\d{1,}\)\s*\z/i, "").strip, format("%03d", m[1].to_i)]
+        end
+
+        # Приводит запись истории (массив/хэш/строка) к канонической форме:
+        # чистый текст без вшитой ревизии + отдельные поля ver/rev записи.
+        # @return [Hash]
+        def normalize_history_entry(item)
+          if item.is_a?(Array)
+            d   = item[0].to_s
+            t   = item[1].to_s
+            lnk = item[2].to_s
+            ver = ""
+            rev = ""
+          elsif item.is_a?(Hash)
+            d   = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
+            t   = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
+            lnk = (item[:pdf_link] || item["pdf_link"]).to_s
+            ver = (item[:ver] || item["ver"] || item[:version] || item["version"]).to_s
+            rev = (item[:rev] || item["rev"]).to_s
+          else
+            d   = ""
+            t   = item.to_s
+            lnk = ""
+            ver = ""
+            rev = ""
+          end
+          # Миграция старых записей: "(rev. 004)" из текста переносится в поле rev
+          t, rev = split_history_rev(t) if rev.empty?
+          { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk, ver: ver, rev: rev }
+        end
+
         # Синхронизирует кортежи @workflow[:history_edit] и структуру @history
         def sync_history_entries!
           @workflow[:history_edit] ||= []
           @history                 ||= []
 
-          if @workflow[:history_edit].empty? && !@history.empty?
-            @workflow[:history_edit] = @history.map do |h|
-              d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
-              t = (h[:edit] || h[:text] || h["edit"] || h["text"] || h[:description] || h["description"] || "").to_s
-              [d, t]
-            end
-          elsif !@workflow[:history_edit].empty? && @history.empty?
-            @history = @workflow[:history_edit].map do |item|
-              if item.is_a?(Array)
-                d = item[0].to_s
-                t = item[1].to_s
-                lnk = item[2].to_s
-              elsif item.is_a?(Hash)
-                d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
-                t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
-                lnk = (item[:pdf_link] || item["pdf_link"]).to_s
-              else
-                d = ""
-                t = item.to_s
-                lnk = ""
-              end
-              { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
+          if @history.empty?
+            unless @workflow[:history_edit].empty?
+              @history = @workflow[:history_edit].map { |item| normalize_history_entry(item) }
             end
           else
-            @history = @history.map do |item|
-              if item.is_a?(Array)
-                d = item[0].to_s
-                t = item[1].to_s
-                lnk = item[2].to_s
-              elsif item.is_a?(Hash)
-                d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
-                t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
-                lnk = (item[:pdf_link] || item["pdf_link"]).to_s
-              else
-                d = ""
-                t = item.to_s
-                lnk = ""
-              end
-              { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
+            @history = @history.map { |item| normalize_history_entry(item) }
+            if @workflow[:history_edit].empty?
+              @workflow[:history_edit] = @history.map { |n| [n[:data], n[:text]] }
             end
           end
 
@@ -945,6 +951,28 @@ module DN1Code
             end
           end)
           nil
+        end
+
+        # Привязывает путь к PDF-файлу к самой свежей записи истории изменений.
+        # Пустая ссылка заполняется только у одной (самой верхней) записи: повторный
+        # экспорт «без записи правок» не затирает ссылку предыдущей правки.
+        # @param pdf_path [String] путь к версионному PDF этого экспорта
+        # @return [Boolean] true, если ссылка была проставлена
+        def stamp_history_pdf_link!(pdf_path)
+          entry = @history.is_a?(Array) ? @history.find { |h| h.is_a?(Hash) } : nil
+          return false unless entry
+
+          key = if entry.key?(:pdf_link)
+                  :pdf_link
+                elsif entry.key?("pdf_link")
+                  "pdf_link"
+                else
+                  :pdf_link # каноническая форма — всегда пишем символьный ключ
+                end
+          return false unless entry[key].to_s.strip.empty?
+
+          entry[key] = pdf_path.to_s
+          true
         end
 
         # Нормализует каталоги directories: приводит к массиву хэшей.
@@ -1256,9 +1284,9 @@ module DN1Code
           @directories = payload[:directories] if payload[:directories].is_a?(Array)
           @pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
           if payload[:history_edit] && payload[:history_edit].is_a?(Array)
-            @history = payload[:history_edit]
+            @history = payload[:history_edit].map { |item| normalize_history_entry(item) }
           elsif payload[:history]
-            @history = payload[:history]
+            @history = payload[:history].is_a?(Array) ? payload[:history].map { |item| normalize_history_entry(item) } : payload[:history]
           end
 
           if payload[:scenes].is_a?(Array)
@@ -1439,10 +1467,13 @@ module DN1Code
                         d.to_s
                       end
               txt = (item["text"] || item[:text] || item["description"] || item[:description] || "").to_s
+              n = normalize_history_entry({ "date" => d_str, "text" => txt })
               {
-                date:        d_str,
-                text:        txt,
-                description: txt
+                date:        n[:date],
+                text:        n[:text],
+                description: n[:description],
+                ver:         n[:ver],
+                rev:         n[:rev]
               }
             end
 
@@ -1694,22 +1725,7 @@ module DN1Code
               # Загрузка истории изменений из YAML (поддержка root[:history_edit], root[:workflow][:history_edit], root[:history])
               raw_hist = root[:history_edit] || (root[:workflow].is_a?(Hash) && root[:workflow][:history_edit]) || root[:history]
               if raw_hist.is_a?(Array) && !raw_hist.empty?
-                @history = raw_hist.map do |item|
-                  if item.is_a?(Array)
-                    d = item[0].to_s
-                    t = item[1].to_s
-                    lnk = item[2].to_s
-                  elsif item.is_a?(Hash)
-                    d = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
-                    t = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
-                    lnk = (item[:pdf_link] || item["pdf_link"]).to_s
-                  else
-                    d = ""
-                    t = item.to_s
-                    lnk = ""
-                  end
-                  { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk }
-                end
+                @history = raw_hist.map { |item| normalize_history_entry(item) }
                 @workflow[:history_edit] = @history.map { |h| [h[:data], h[:edit]] }
                 sync_history_entries!
               end
@@ -1843,14 +1859,14 @@ module DN1Code
           # 4. Секция history_edit (Корневая, как в project.yaml, хронологический порядок)
           hist_out = (@history || []).reverse.map do |h|
             next unless h.is_a?(Hash)
-            d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
-            t = (h[:edit] || h[:text] || h[:description] || h["edit"] || h["text"] || h["description"] || "").to_s
-            lnk = (h[:pdf_link] || h["pdf_link"] || "").to_s
+            n = normalize_history_entry(h)
             entry = {
-              "data" => d,
-              "edit" => t
+              "data" => n[:data],
+              "edit" => n[:text]
             }
-            entry["pdf_link"] = lnk unless lnk.empty?
+            entry["pdf_link"] = n[:pdf_link] unless n[:pdf_link].empty?
+            entry["ver"]      = n[:ver] unless n[:ver].empty?
+            entry["rev"]      = n[:rev] unless n[:rev].empty?
             entry
           end.compact
 
@@ -1896,15 +1912,15 @@ module DN1Code
 
           hist_out = (@history || []).map do |h|
             next unless h.is_a?(Hash)
-            d = (h[:data] || h[:date] || h["data"] || h["date"] || "").to_s
-            t = (h[:edit] || h[:text] || h[:description] || h["edit"] || h["text"] || h["description"] || "").to_s
-            lnk = (h[:pdf_link] || h["pdf_link"] || "").to_s
+            n = normalize_history_entry(h)
             {
-              data:     d,
-              date:     d,
-              edit:     t,
-              text:     t,
-              pdf_link: lnk
+              data:     n[:data],
+              date:     n[:data],
+              edit:     n[:text],
+              text:     n[:text],
+              pdf_link: n[:pdf_link],
+              ver:      n[:ver],
+              rev:      n[:rev]
             }
           end.compact
 

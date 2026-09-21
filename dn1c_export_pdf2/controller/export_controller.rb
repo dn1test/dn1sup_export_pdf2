@@ -12,6 +12,9 @@ module DN1Code
       class ExportController
         attr_reader :project_data, :model
 
+        # Путь к копии «_last», заполненный LayoutBuilder после успешного экспорта
+        attr_accessor :last_pdf_path
+
         def initialize(project_data, model = nil)
           @project_data = project_data
           @model        = model || (defined?(Sketchup) ? Sketchup.active_model : nil)
@@ -45,6 +48,21 @@ module DN1Code
             # Если модель еще не сохранена на диске
             File.join(Dir.tmpdir, "SU_Export_#{vrs}.pdf")
           end
+        end
+
+        # Путь к «последнему» PDF рядом с рабочим файлом: <dir модели>/<имя>_last.pdf.
+        # Перезаписывается при каждом экспорте. nil — модель не сохранена или папка
+        # модели недоступна (копия не создаётся, открывается версионный PDF)
+        # @return [String, nil]
+        def resolve_last_pdf_path
+          model_path = @model&.respond_to?(:path) ? @model.path.to_s : ""
+          return nil if model_path.empty?
+
+          model_dir  = File.dirname(model_path.tr("\\", "/"))
+          return nil unless File.directory?(model_dir)
+
+          model_base = File.basename(model_path, ".skp")
+          File.join(model_dir, "#{model_base}_last.pdf")
         end
 
         # Резервная копия файла модели (.skp) в папку артикула: <Артикул>/skp/<Артикул>_01#001.skp
@@ -154,6 +172,13 @@ module DN1Code
             image_aspect_ratio: settings[:image_aspect_ratio],
             image_format:       "png"
           }
+          # Фон видового экрана: тот же посценный флаг, что и в PDF-вьюпортах —
+          # при viewport_background=false небо/земля/водяные знаки гасятся (белый фон)
+          opts[:show_background] = if scene_item.respond_to?(:viewport_background) && !scene_item.viewport_background.nil?
+                                     scene_item.viewport_background != false
+                                   else
+                                     true
+                                   end
           # Пропорция конкретной сцены приоритетна; "page"/"4:3"/custom уходят в глобальную логику
           sc_ratio = scene_aspect_ratio(scene_item)
           opts[:aspect_ratio] = sc_ratio if sc_ratio

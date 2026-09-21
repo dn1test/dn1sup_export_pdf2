@@ -18,6 +18,7 @@ require_relative "service/observer_service"
 require_relative "service/overlay_service"
 
 # Загрузка моделей данных
+require_relative "model/path_util"
 require_relative "model/project_data"
 require_relative "model/session_store"
 
@@ -70,6 +71,12 @@ module DN1Code
       controller = Controller::ExportController.new(project_data, model)
       begin
         pdf_path = controller.export
+
+        # Привязываем PDF этого экспорта к самой свежей записи истории изменений
+        if project_data.respond_to?(:stamp_history_pdf_link!) && project_data.stamp_history_pdf_link!(pdf_path.to_s)
+          Model::SessionStore.flush(model) if defined?(Model::SessionStore)
+        end
+
         UI.messagebox("PDF успешно создан:\n#{pdf_path}", defined?(MB_OK) ? MB_OK : 0)
       rescue StandardError => e
         UI.messagebox("Ошибка экспорта PDF:\n#{e.message}", defined?(MB_OK) ? MB_OK : 0)

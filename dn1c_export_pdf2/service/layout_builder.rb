@@ -1,6 +1,7 @@
 # frozen_string_literal: true
 
 require "fileutils"
+require_relative "../model/path_util"
 require_relative "render_service"
 require_relative "info_line_resolver"
 require_relative "font_service"
@@ -192,6 +193,21 @@ module DN1Code
               PdfFontAudit.audit_exported_pdf!(pdf_path, font_family) rescue nil
             end
 
+            # 4b. Копия «_last» рядом с рабочим файлом модели (<имя>_last.pdf),
+            # перезаписывается при каждом экспорте. Сбой копии не валит PDF-экспорт.
+            if controller.respond_to?(:resolve_last_pdf_path)
+              begin
+                last_candidate = controller.resolve_last_pdf_path
+                if last_candidate && File.expand_path(last_candidate) != File.expand_path(pdf_path)
+                  FileUtils.mkdir_p(File.dirname(last_candidate))
+                  FileUtils.cp(pdf_path, last_candidate)
+                  controller.last_pdf_path = last_candidate
+                end
+              rescue StandardError => e
+                warn "Предупреждение: не удалось создать копию _last.pdf (#{last_candidate}): #{e.message}"
+              end
+            end
+
             # 5. Сохранение файла .layout если включено
             if settings[:save_layout_file]
               layout_path = pdf_path.sub(/\.pdf$/i, ".layout")
@@ -224,8 +240,10 @@ module DN1Code
             progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")
 
             # 8. Открытие PDF файла (openURL требует URL-схему file:///)
+            # Открываем именно копию «_last» рядом с .skp, если она создана
             if settings[:auto_open_pdf] && defined?(UI) && UI.respond_to?(:openURL)
-              UI.openURL("file:///" + pdf_path.to_s.tr("\\", "/"))
+              opened = controller.last_pdf_path || pdf_path
+              UI.openURL(Model::PathUtil.file_url(opened))
             end
 
             pdf_path
