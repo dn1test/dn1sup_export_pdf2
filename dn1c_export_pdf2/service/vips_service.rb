@@ -18,6 +18,12 @@ module DN1Code
         # Папка с DLL libvips внутри плагина: dn1c_export_pdf2/vendor/libvips
         VENDOR_DIR = File.expand_path("../vendor/libvips", __dir__).freeze
 
+        # Внутренняя многопоточность libvips на одну операцию. По умолчанию libvips
+        # создает поток на каждое логическое ядро (на 32-поточной машине пул из
+        # 2-4 конвертаций дает до 128 CPU-потоков и «подвешивает» систему), поэтому
+        # каждая конвертация делается одноядерной — параллелизм дает пул SnapshotWorker.
+        VIPS_CONCURRENCY = "1"
+
         @available = nil
         @library = nil
         @init_done = false
@@ -29,6 +35,21 @@ module DN1Code
         def available?
           @available = !find_dll.nil? if @available.nil?
           @available
+        end
+
+        # Прогрев в главном потоке: загрузка DLL и однократный vips_init до старта
+        # фоновых потоков SnapshotWorker, чтобы рабочие потоки не соревновались
+        # за мемоизацию инициализации.
+        # @return [Boolean] true, если конвертация доступна
+        def ensure_started!
+          return false unless available?
+
+          ok = init!
+          # Кап конкурентности — при каждом прогреве: если libvips уже была
+          # инициализирована (в т.ч. до установки ENV при горячей перезагрузке
+          # плагина), понижаем потоки через C-API
+          cap_concurrency! if ok
+          ok
         end
 
         # Конвертация изображения в WebP. Формат чтения libvips определяет по содержимому src,
@@ -157,8 +178,12 @@ module DN1Code
           library
           return false if @init_failed
 
+          # VIPS_CONCURRENCY читается при vips_init; явно заданную пользователем не трогаем
+          ENV["VIPS_CONCURRENCY"] = VIPS_CONCURRENCY if ENV["VIPS_CONCURRENCY"].to_s.strip.empty?
+
           if init_fn.call(utf8_str(dll)).zero?
             @init_done = true
+            cap_concurrency!
           else
             @init_failed = true
             warn_vips_error("libvips: сбой vips_init")
@@ -168,6 +193,16 @@ module DN1Code
           @init_failed = true
           warn "libvips: инициализация не удалась: #{e.message}"
           false
+        end
+
+        # Страховка поверх ENV: если libvips была инициализирована до установки
+        # VIPS_CONCURRENCY, понижаем внутреннюю многопоточность через C-API
+        def cap_concurrency!
+          fn = fns[:set_concurrency]
+          v = ENV["VIPS_CONCURRENCY"].to_i
+          fn.call(v) if fn && v.positive?
+        rescue StandardError
+          nil
         end
 
         # Привязка функций C-API (vips_image_new_from_file и vips_image_write_to_file —
@@ -180,12 +215,14 @@ module DN1Code
           vp  = Fiddle::TYPE_VOIDP
           int = Fiddle::TYPE_INT
           {
-            init:        Fiddle::Function.new(sym("vips_init"), [vp], int),
-            new_file:    Fiddle::Function.new(sym("vips_image_new_from_file"), [vp, vp], vp),
-            write_file:  Fiddle::Function.new(sym("vips_image_write_to_file"), [vp, vp, vp], int),
-            unref:       Fiddle::Function.new(sym("g_object_unref"), [vp], Fiddle::TYPE_VOID),
-            error_buf:   Fiddle::Function.new(sym("vips_error_buffer"), [], vp),
-            error_clear: Fiddle::Function.new(sym("vips_error_clear"), [], Fiddle::TYPE_VOID)
+            init:            Fiddle::Function.new(sym("vips_init"), [vp], int),
+            new_file:        Fiddle::Function.new(sym("vips_image_new_from_file"), [vp, vp], vp),
+            write_file:      Fiddle::Function.new(sym("vips_image_write_to_file"), [vp, vp, vp], int),
+            unref:           Fiddle::Function.new(sym("g_object_unref"), [vp], Fiddle::TYPE_VOID),
+            error_buf:       Fiddle::Function.new(sym("vips_error_buffer"), [], vp),
+            error_clear:     Fiddle::Function.new(sym("vips_error_clear"), [], Fiddle::TYPE_VOID),
+            # необязательная функция старых сборок: отсутствие символа не фатально
+            set_concurrency: (Fiddle::Function.new(sym("vips_concurrency_set"), [int], Fiddle::TYPE_VOID) rescue nil)
           }
         end
 

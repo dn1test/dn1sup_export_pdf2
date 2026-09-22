@@ -17,6 +17,7 @@ require_relative "version"
 require_relative "service/observer_service"
 require_relative "service/overlay_service"
 require_relative "service/vips_service"
+require_relative "service/snapshot_worker"
 
 # Загрузка моделей данных
 require_relative "model/path_util"

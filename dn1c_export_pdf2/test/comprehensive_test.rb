@@ -258,6 +258,8 @@ class TestRunner
     test_last_pdf_copy_next_to_skp_and_history_link
     test_png_snapshots_respect_viewport_background
     test_scene_snapshots_webp_format_and_fallback
+    test_scene_snapshots_reuse_rendered_source
+    test_snapshot_worker_background_pool
     test_path_util_file_url_encoding
     test_history_rev_ver_fields_and_migration
     test_74_save_without_articul_writes_no_yaml
@@ -5864,6 +5866,8 @@ class TestRunner
 
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     result_path = controller.export(nil)
+    # Снимки конвертируются в WebP фоновым пулом — перед проверкой файлов дожидаемся партии
+    DN1Code::ExportPdf2::Service::SnapshotWorker.drain
 
     art_dir      = File.join(skp_dir, "EXP-200")
     expected_pdf = File.join(art_dir, "pdf", "EXP-200_02#005.pdf")
@@ -5938,6 +5942,8 @@ class TestRunner
     ensure
       $stdout = orig_stdout
     end
+    # Фоновая партия снимков не должна писать в папку после ее удаления
+    DN1Code::ExportPdf2::Service::SnapshotWorker.drain
 
     expected_pdf = File.join(skp_dir, "EXP-300", "pdf", "EXP-300_01#007.pdf")
     assert(File.exist?(expected_pdf), "Версионированный PDF в папке артикула создан: #{expected_pdf}")
@@ -5997,6 +6003,7 @@ class TestRunner
       vips_available = DN1Code::ExportPdf2::Service::VipsService.available?
       expected_ext = vips_available ? ".webp" : ".png"
       written_on = controller.export_scene_snapshots
+      DN1Code::ExportPdf2::Service::SnapshotWorker.drain
       assert(written_on.size == 2, "Снимки обеих сцен записаны при включенном фоне (#{written_on.size})")
       assert(written_on.all? { |p| File.extname(p).downcase == expected_ext && File.basename(File.dirname(p)) == "images" },
              "Снимки #{expected_ext} по умолчанию лежат в <Артикул>/images (#{written_on.inspect})")
@@ -6007,6 +6014,7 @@ class TestRunner
       captured.clear
       project_data.scenes.each { |s| s.viewport_background = false }
       written_off = controller.export_scene_snapshots
+      DN1Code::ExportPdf2::Service::SnapshotWorker.drain
       assert(written_off.size == 2, "Снимки обеих сцен записаны при выключенном фоне (#{written_off.size})")
       assert(captured.all? { |o| o[:show_background] == false },
              "При viewport_background=false render_scene_temp получает show_background=false (#{captured.map { |o| o[:show_background] }.inspect})")
@@ -6050,6 +6058,7 @@ class TestRunner
     assert(controller.send(:webp_quality_setting, { webp_quality: 150 }) == { quality: 85, lossless: false }, "Некорректное качество -> 85")
 
     written = controller.export_scene_snapshots
+    DN1Code::ExportPdf2::Service::SnapshotWorker.drain
     assert(written.size == 1, "Снимок сцены записан (#{written.inspect})")
     images_dir = File.dirname(written.first)
     assert(File.basename(images_dir) == "images", "Снимки пишутся в папку images (#{written.first.inspect})")
@@ -6066,6 +6075,186 @@ class TestRunner
       assert(Dir.glob(File.join(images_dir, "*.webp")).empty?, "WebP-файлы при фолбэке не создаются")
     end
 
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_scene_snapshots_reuse_rendered_source
+    puts "\n--- 71b2. Тест переиспользования JPEG-заготовки страницы (без повторного рендера) ---"
+
+    test_dir = File.expand_path("test_snapshot_reuse", __dir__)
+    skp_dir  = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    model = Sketchup::MockModel.new(File.join(skp_dir, "Desk.skp"))
+    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Вид 1")])
+
+    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    project_data.sync_with_model_scenes(model)
+    project_data.pdf_settings[:webp_quality] = 85
+
+    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+    scene_name = project_data.scenes.first.name
+    vips = DN1Code::ExportPdf2::Service::VipsService
+    rs   = DN1Code::ExportPdf2::Service::RenderService
+
+    # JPEG-заготовка, как будто ее отрендерил LayoutBuilder для страницы PDF
+    jpg_src = File.join(test_dir, "scene_cache.jpg")
+    File.binwrite(jpg_src, "\xFF\xD8fake-jpeg")
+
+    # Стабы: счетчик вызовов рендера и детерминированная WebP-конвертация
+    render_calls = []
+    captured_opts = []
+    rs.singleton_class.send(:alias_method, :render_scene_temp_reuse_probe, :render_scene_temp)
+    rs.define_singleton_method(:render_scene_temp) do |m, scene, opts = {}|
+      render_calls << 1
+      captured_opts << (opts || {})
+      rs.send(:render_scene_temp_reuse_probe, m, scene, opts)
+    end
+    vips.singleton_class.send(:alias_method, :available_reuse_probe, :available?)
+    vips.singleton_class.send(:alias_method, :png_to_webp_reuse_probe, :png_to_webp)
+    vips.define_singleton_method(:available?) { true }
+    vips.define_singleton_method(:png_to_webp) do |src, dst, quality: 85, lossless: false|
+      File.binwrite(dst, "RIFF\x00\x00\x00\x00WEBP")
+      File.delete(src) if File.exist?(src)
+      dst
+    end
+
+    begin
+      # 1. lossy WebP: JPEG-заготовка переиспользуется, рендера нет
+      written = controller.export_scene_snapshots(reusable: { scene_name => jpg_src }, async: false)
+      assert(render_calls.empty?, "JPEG-заготовка переиспользована без повторного рендера (рендеров: #{render_calls.size})")
+      assert(written.size == 1 && File.extname(written.first) == ".webp", "Снимок .webp записан (#{written.inspect})")
+      assert(File.binread(written.first, 12)[8, 4] == "WEBP", "Файл содержит RIFF/WEBP-заголовок")
+      assert(!File.exist?(jpg_src), "Временная JPEG-заготовка удалена после раскладки")
+      images_dir = File.dirname(written.first)
+      assert(Dir.glob(File.join(images_dir, "*.{png,jpg,jpeg}")).empty?,
+             "В images остаются только .webp (#{Dir.glob(File.join(images_dir, '*')).inspect})")
+
+      # 2. lossless WebP: JPEG не переиспользуется — нужен PNG-рендер
+      render_calls.clear
+      captured_opts.clear
+      project_data.pdf_settings[:webp_quality] = "lossless"
+      File.binwrite(jpg_src, "\xFF\xD8fake-jpeg")
+      written = controller.export_scene_snapshots(reusable: { scene_name => jpg_src }, async: false)
+      assert(render_calls.size == 1, "Для lossless WebP выполняется PNG-рендер (рендеров: #{render_calls.size})")
+      assert(captured_opts.all? { |o| o[:image_format] == "png" && o[:optimize_png] == false },
+             "PNG-рендер без lossless-переупаковки: промежуточный для WebP (#{captured_opts.inspect})")
+      assert(written.size == 1 && File.extname(written.first) == ".webp", "lossless-снимок .webp записан (#{written.inspect})")
+
+      # 3. libvips недоступна: JPEG не переиспользуется, снимок — PNG
+      render_calls.clear
+      captured_opts.clear
+      project_data.pdf_settings[:webp_quality] = 85
+      File.binwrite(jpg_src, "\xFF\xD8fake-jpeg")
+      vips.define_singleton_method(:available?) { false }
+      written = controller.export_scene_snapshots(reusable: { scene_name => jpg_src }, async: false)
+      assert(render_calls.size == 1, "Без libvips выполняется PNG-рендер (рендеров: #{render_calls.size})")
+      assert(captured_opts.all? { |o| o[:optimize_png] == true },
+             "PNG-снимок (финальный файл) оптимизируется (#{captured_opts.inspect})")
+      assert(written.size == 1 && File.extname(written.first) == ".png", "Фолбэк-снимок .png записан (#{written.inspect})")
+    ensure
+      rs.singleton_class.send(:remove_method, :render_scene_temp)
+      rs.singleton_class.send(:alias_method, :render_scene_temp, :render_scene_temp_reuse_probe)
+      rs.singleton_class.send(:remove_method, :render_scene_temp_reuse_probe)
+      vips.singleton_class.send(:remove_method, :available?)
+      vips.singleton_class.send(:alias_method, :available?, :available_reuse_probe)
+      vips.singleton_class.send(:remove_method, :available_reuse_probe)
+      vips.singleton_class.send(:remove_method, :png_to_webp)
+      vips.singleton_class.send(:alias_method, :png_to_webp, :png_to_webp_reuse_probe)
+      vips.singleton_class.send(:remove_method, :png_to_webp_reuse_probe)
+    end
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  def test_snapshot_worker_background_pool
+    puts "\n--- 71c. Тест фонового пула конвертации SnapshotWorker ---"
+
+    test_dir   = File.expand_path("test_snapshot_worker", __dir__)
+    images_dir = File.join(test_dir, "images")
+    FileUtils.mkdir_p(images_dir)
+
+    worker = DN1Code::ExportPdf2::Service::SnapshotWorker
+    rs     = DN1Code::ExportPdf2::Service::RenderService
+    vips   = DN1Code::ExportPdf2::Service::VipsService
+
+    # Заготовки: валидные PNG + один битый файл (проверка фолбэка)
+    jobs = 3.times.map do |i|
+      src = File.join(images_dir, "#{format('%02d', i + 1)}_src.png")
+      rs.create_fallback_image(src, 64, 64, "s#{i}")
+      { src: src, dst: File.join(images_dir, "#{format('%02d', i + 1)}_shot.webp"), quality: 85, lossless: false }
+    end
+    bad_src = File.join(images_dir, "04_bad.png")
+    File.binwrite(bad_src, "not a png")
+    bad_job = { src: bad_src, dst: File.join(images_dir, "04_bad.webp"), quality: 85, lossless: false }
+
+    if vips.available?
+      st = worker.submit(jobs + [bad_job])
+      assert(st[:total] == 4, "submit принял 4 задания (#{st.inspect})")
+
+      final = worker.drain
+      assert(!final[:running], "После drain партия завершена (#{final.inspect})")
+      assert(final[:done] == 3, "3 снимка сконвертированы (#{final.inspect})")
+      assert(final[:failed] == 1, "Битый исходник дал 1 сбой (#{final.inspect})")
+      assert(final[:errors].size == 1, "Ошибка попала в статус (#{final[:errors].inspect})")
+
+      jobs.each do |j|
+        assert(File.exist?(j[:dst]), "WebP на месте: #{j[:dst]}")
+        assert(File.binread(j[:dst], 12)[8, 4] == "WEBP", "RIFF/WEBP-заголовок (#{File.basename(j[:dst])})")
+        assert(!File.exist?(j[:src]), "PNG-исходник удален после конвертации (#{File.basename(j[:src])})")
+      end
+      assert(Dir.glob(File.join(images_dir, "*.tmp.webp")).empty?, "Временные .tmp.webp переименованы")
+      assert(File.exist?(bad_src), "При сбое PNG-исходник остался (фолбэк)")
+      assert(!File.exist?(bad_job[:dst]), "WebP для битого исходника не создан")
+
+      # Повторные submit/drain идемпотентны, партия без заданий ничего не ломает
+      worker.submit([])
+      worker.drain
+      worker.drain
+      assert(Dir.glob(File.join(images_dir, "*.webp")).size == 3, "После повторных drain снимки на месте")
+
+      # --- Повторный submit поверх идущей партии: поколения отбрасывают старое ---
+      # Большой PNG, чтобы старая партия не успела закончиться до подачи новой
+      require "zlib" unless defined?(::Zlib)
+      w2, h2 = 1600, 1200
+      mk_chunk = ->(t, d) { t = t.b; [d.bytesize].pack("N") + t + d + [Zlib.crc32(t + d)].pack("N") }
+      row = "\x00".b * (1 + w2 * 4)
+      raw_png = String.new("".b)
+      h2.times { raw_png << row }
+      ihdr = [w2, h2, 8, 6, 0, 0, 0].pack("NNCCCCC")
+      big = File.join(images_dir, "big_src.png")
+      File.binwrite(big, "\x89PNG\r\n\x1a\n".b + mk_chunk.("IHDR", ihdr) + mk_chunk.("IDAT", Zlib::Deflate.deflate(raw_png)) + mk_chunk.("IEND", "".b))
+
+      old_jobs = 8.times.map do |i|
+        src = File.join(images_dir, format("old_%02d.png", i))
+        FileUtils.cp(big, src)
+        { src: src, dst: File.join(images_dir, format("old_%02d.webp", i)), quality: 85, lossless: false }
+      end
+      worker.submit(old_jobs)
+
+      new_jobs = 2.times.map do |i|
+        src = File.join(images_dir, format("new_%02d.png", i))
+        rs.create_fallback_image(src, 64, 64, "n#{i}")
+        { src: src, dst: File.join(images_dir, format("new_%02d.webp", i)), quality: 85, lossless: false }
+      end
+      st2 = worker.submit(new_jobs)
+      assert(st2[:total] == 2, "Новая партия принята без ожидания старой (#{st2.inspect})")
+
+      fin2 = worker.drain
+      assert(fin2[:done] == 2 && fin2[:failed].zero?, "Новая партия полностью конвертирована (#{fin2.inspect})")
+      new_jobs.each do |j|
+        assert(File.exist?(j[:dst]), "Свежий снимок новой партии на месте (#{File.basename(j[:dst])})")
+        assert(!File.exist?(j[:src]), "Исходник новой партии удален (#{File.basename(j[:src])})")
+      end
+      assert(Dir.glob(File.join(images_dir, "*.tmp.webp")).empty?, "Устаревшие .tmp.webp не остались")
+    else
+      # Без libvips submit не берет задания — исходники остаются на месте
+      st = worker.submit(jobs + [bad_job])
+      assert(st[:total].zero? || !st[:running], "Без libvips партия не запускается (#{st.inspect})")
+      assert(File.exist?(bad_src), "Без libvips исходники не тронуты")
+    end
+
+    worker.drain # фоновые потоки не должны писать в папку после ее удаления
     FileUtils.rm_rf(test_dir)
   end
 

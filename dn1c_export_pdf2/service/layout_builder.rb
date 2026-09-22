@@ -215,6 +215,8 @@ module DN1Code
             end
 
             # 5b. Снимки последних сцен в папку артикула (<Артикул>/images/, PNG или WebP).
+            # Синхронно только подготовка PNG-исходников; конвертация в WebP уходит в
+            # фоновый пул SnapshotWorker — PDF открывается, не дожидаясь снимков.
             # Сбой снимков не должен валить PDF-экспорт.
             if controller.respond_to?(:export_scene_snapshots) && controller.scene_images_dir
               begin

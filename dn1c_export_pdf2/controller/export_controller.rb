@@ -99,43 +99,80 @@ module DN1Code
         # Набор «последних сцен»: папка очищается и перезаписывается при каждом экспорте.
         # Формат снимков не настраивается: WebP при доступной libvips (конвертация
         # PNG->WebP через libvips, при ошибке конвертации — фолбэк на PNG), иначе PNG.
+        #
+        # Синхронно делается только подготовка: рендер/раскладка растровых исходников
+        # (PNG либо уже отрендеренная JPEG-заготовка страницы PDF) под финальными
+        # именами (рендер обязан идти в главном потоке SketchUp). Сама
+        # конвертация PNG->WebP при async: true уходит в фоновый пул SnapshotWorker —
+        # экспорт и открытие PDF не ждут снимков; при async: false конвертация
+        # выполняется инлайн (тесты/отладка).
         # Разрешение и пропорции берутся из pdf_settings (image_width / render_quality,
         # image_aspect_ratio / custom_ratio, наценка — aspect_ratio конкретной сцены).
         # @param reusable [Hash] { имя сцены => путь к уже отрендеренному временному изображению }
+        # @param async [Boolean] фоновая конвертация WebP через SnapshotWorker
         # @param progress_block [Proc, nil] блок (current, total, message)
-        # @return [Array<String>] пути к записанным файлам снимков
-        def export_scene_snapshots(reusable: {}, &progress_block)
+        # @return [Array<String>] пути к снимкам (при фоновой конвертации — планируемые пути .webp)
+        def export_scene_snapshots(reusable: {}, async: true, &progress_block)
           scenes = @project_data.scenes.select(&:enabled)
           images_dir = scene_images_dir
           return [] if scenes.empty? || images_dir.nil?
 
+          # Прошлая фоновая партия обычно уже закончена (мгновенный возврат). Ждем не дольше
+          # 3 секунд, чтобы не замораживать SketchUp на повторном экспорте; остаток старой
+          # партии отбрасывается по поколениям — свежие файлы она не перезапишет.
+          Service::SnapshotWorker.drain(3.0) if defined?(Service::SnapshotWorker)
           FileUtils.mkdir_p(images_dir)
           # «Только последние»: снимки удаленных/переименованных сцен не должны оставаться
-          Dir.glob(File.join(images_dir, "*.{png,webp}")).each { |f| File.delete(f) rescue nil }
+          Dir.glob(File.join(images_dir, "*.{png,jpg,jpeg,webp}")).each { |f| File.delete(f) rescue nil }
 
           settings  = @project_data.pdf_settings
           webp_mode = defined?(Service::VipsService) && Service::VipsService.available?
           webp_opts = webp_quality_setting(settings)
+          # JPEG-заготовку страницы PDF переиспользуем без повторного рендера только когда
+          # она всё равно конвертируется в lossy WebP; lossless WebP и PNG-фолбэк требуют
+          # полноценный PNG-рендер
+          reuse_jpeg = webp_mode && !webp_opts[:lossless]
+          jobs      = []
           written   = []
+
           scenes.each_with_index do |scene_item, idx|
             label = webp_mode ? "WebP" : "PNG"
             progress_block&.call(idx + 1, scenes.size, "#{label}-снимок сцены #{idx + 1}/#{scenes.size}: #{scene_item.name}")
 
-            src = reusable_source(reusable, scene_item) || render_scene_png(scene_item, settings)
+            src = reusable_source(reusable, scene_item, allow_jpeg: reuse_jpeg) ||
+                  render_scene_png(scene_item, settings, optimize_png: !webp_mode)
             next unless src && File.exist?(src)
 
-            target = if webp_mode
-                       write_scene_webp(src, scene_item, idx, images_dir, webp_opts)
-                     else
-                       png_target = File.join(images_dir, scene_snapshot_filename(scene_item, idx, ".png"))
-                       write_snapshot_png(src, png_target)
-                       png_target
-                     end
-            # Темп PNG уже сконвертирован в WebP — временный файл больше не нужен
-            File.delete(src) if target && File.extname(target).downcase == ".webp" && File.exist?(src)
-            written << target if target && File.exist?(target)
+            # Растровый исходник раскладывается до выхода из экспорта: временные файлы кэша
+            # PDF-страниц удаляются в ensure LayoutBuilder, фоновой партии нужен свой файл
+            ext = File.extname(src).downcase
+            raster_target = File.join(images_dir, scene_snapshot_filename(scene_item, idx, ext))
+            write_snapshot_png(src, raster_target)
+            if File.exist?(src) && File.expand_path(src) != File.expand_path(raster_target)
+              # mv невозможен между томами — после копирования временный файл не нужен
+              File.delete(src) rescue nil
+            end
+            next unless File.exist?(raster_target)
+
+            if webp_mode
+              jobs << { src:      raster_target,
+                        dst:      File.join(images_dir, scene_snapshot_filename(scene_item, idx, ".webp")),
+                        quality:  webp_opts[:quality],
+                        lossless: webp_opts[:lossless] }
+            else
+              written << raster_target
+            end
           end
-          written
+
+          return written if jobs.empty?
+
+          if async && defined?(Service::SnapshotWorker)
+            # Фоновая конвертация: возвращаем планируемые пути, файлы появятся в фоне
+            Service::SnapshotWorker.submit(jobs)
+            jobs.map { |job| job[:dst] }
+          else
+            jobs.map { |job| convert_snapshot_inline(job) }.compact
+          end
         end
 
         # Папка снимков сцен: <Артикул>/images (или nil, если модель не сохранена)
@@ -157,20 +194,20 @@ module DN1Code
           { quality: q, lossless: false }
         end
 
-        # Конвертация временного PNG сцены в WebP-снимок. При недоступном libvips или ошибке
-        # конвертации — фолбэк на PNG-снимок (снимки сцены не теряются), предупреждение — один раз.
-        # @return [String, nil] путь к записанному файлу (.webp либо .png при фолбэке)
-        def write_scene_webp(src, scene_item, index, images_dir, webp_opts)
-          target = File.join(images_dir, scene_snapshot_filename(scene_item, index, ".webp"))
+        # Синхронная конвертация одного снимка (async: false) — тот же результат,
+        # что у фоновой партии SnapshotWorker. При недоступном libvips или ошибке
+        # конвертации PNG-исходник остается на месте (снимок не теряется),
+        # предупреждение — один раз.
+        # @return [String, nil] путь к файлу (.webp либо .png при фолбэке)
+        def convert_snapshot_inline(job)
           if defined?(Service::VipsService) &&
-             Service::VipsService.png_to_webp(src, target, quality: webp_opts[:quality], lossless: webp_opts[:lossless])
-            return target
+             Service::VipsService.png_to_webp(job[:src], job[:dst], quality: job[:quality], lossless: job[:lossless])
+            File.delete(job[:src]) if File.exist?(job[:src]) rescue nil
+            return job[:dst]
           end
 
           warn_webp_unavailable_once
-          png_target = File.join(images_dir, scene_snapshot_filename(scene_item, index, ".png"))
-          write_snapshot_png(src, png_target)
-          png_target
+          job[:src]
         end
 
         def warn_webp_unavailable_once
@@ -200,19 +237,25 @@ module DN1Code
         end
 
         # Уже отрендеренное в image-режиме изображение сцены (избегаем повторного рендера).
-        # В папку артикула пишем только PNG — JPEG-заготовки не переиспользуем.
-        def reusable_source(reusable, scene_item)
+        # JPEG-заготовки страниц PDF переиспользуем только под lossy WebP-конвертацию
+        # (allow_jpeg: true) — итоговый снимок всё равно .webp; иначе требуется PNG.
+        def reusable_source(reusable, scene_item, allow_jpeg: false)
           return nil unless reusable.is_a?(Hash)
 
           src = reusable[scene_item.respond_to?(:name) ? scene_item.name : nil].to_s
           return nil if src.empty? || !File.exist?(src)
-          return nil unless File.extname(src).downcase == ".png"
+
+          ext = File.extname(src).downcase
+          return nil unless ext == ".png" || (allow_jpeg && (ext == ".jpg" || ext == ".jpeg"))
 
           src
         end
 
-        # Рендер сцены во временное изображение с настройками из pdf_settings
-        def render_scene_png(scene_item, settings)
+        # Рендер сцены во временное изображение с настройками из pdf_settings.
+        # optimize_png: false — файл промежуточный (уйдет в WebP-конвертацию), поэтому
+        # lossless-переупаковка PNG пропускается: на больших разрешениях она занимает
+        # секунды главного потока, а пиксели не меняет.
+        def render_scene_png(scene_item, settings, optimize_png: true)
           return nil unless defined?(Service::RenderService)
 
           scene_obj = scene_item.respond_to?(:scene_ref) ? scene_item.scene_ref : nil
@@ -226,7 +269,8 @@ module DN1Code
             page_size:          settings[:page_size] || "A4",
             antialias:          settings.fetch(:antialias, true),
             image_aspect_ratio: settings[:image_aspect_ratio],
-            image_format:       "png"
+            image_format:       "png",
+            optimize_png:       optimize_png
           }
           # Фон видового экрана: тот же посценный флаг, что и в PDF-вьюпортах —
           # при viewport_background=false небо/земля/водяные знаки гасятся (белый фон)

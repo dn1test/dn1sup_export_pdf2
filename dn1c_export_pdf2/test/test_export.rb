@@ -94,3 +94,23 @@ if File.exist?(result_path) && File.size(result_path) > 1000
 else
   abort "\n[ОШИБКА] PDF файл не был создан или имеет нулевой размер!"
 end
+
+# 5. Фоновая конвертация WebP-снимков: экспорт вернулся не дожидаясь снимков,
+# дожидаемся партию и проверяем результат
+snapshot_status = DN1Code::ExportPdf2::Service::SnapshotWorker.drain
+images_dir      = controller.scene_images_dir
+snapshots       = images_dir ? Dir.glob(File.join(images_dir, "*.{png,webp}")) : []
+scene_count     = project_data.scenes.count(&:enabled)
+
+puts "\nСнимки сцен (фоновый пул SnapshotWorker):"
+puts "  Папка: #{images_dir}"
+puts "  Файлов: #{snapshots.size} (done=#{snapshot_status[:done]}, failed=#{snapshot_status[:failed]})"
+
+if DN1Code::ExportPdf2::Service::VipsService.available?
+  webp_count = snapshots.count { |f| f.downcase.end_with?(".webp") }
+  unless snapshot_status[:done] == scene_count && webp_count == scene_count
+    abort "[ОШИБКА] Фоновый пул не создал все WebP-снимки: ожидалось #{scene_count}, готово #{webp_count} (#{snapshot_status.inspect})"
+  end
+  puts "  [УСПЕХ] Все #{webp_count} WebP-снимков созданы фоновым пулом"
+end
+puts "=========================================================="

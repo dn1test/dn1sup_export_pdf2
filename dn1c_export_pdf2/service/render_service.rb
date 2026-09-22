@@ -15,7 +15,8 @@ module DN1Code
         # Выполняет переключение на указанную сцену в SketchUp и экспорт растрового изображения во временный PNG-файл
         # @param model [Sketchup::Model] активная модель SketchUp
         # @param scene [Sketchup::Page, nil] сцена для рендеринга
-        # @param options [Hash] параметры рендера (:image_width, :image_height, :scale_factor, :antialias, :ratio)
+        # @param options [Hash] параметры рендера (:image_width, :image_height, :scale_factor, :antialias, :ratio,
+        #   :optimize_png — false отключает lossless-переупаковку PNG для промежуточных файлов)
         # @return [String] путь к созданному временному файлу PNG
         def self.render_scene_temp(model, scene, options = {})
           q_mode = (options[:render_quality] || options["render_quality"]).to_s.downcase.strip
@@ -239,8 +240,10 @@ module DN1Code
               end
             end
 
-            # Для PNG всегда максимальное сжатие без потерь
-            optimize_png_lossless(temp_file) if rendered && !is_jpeg
+            # Максимальное сжатие PNG без потерь; optimize_png: false — файл промежуточный
+            # (конвертируется в WebP и удаляется), переупаковка уровня 9 на больших
+            # разрешениях занимает секунды главного потока без выигрыша в пикселях
+            optimize_png_lossless(temp_file) if rendered && !is_jpeg && options[:optimize_png] != false
           end
 
           unless rendered
