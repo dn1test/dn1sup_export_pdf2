@@ -376,8 +376,8 @@ module DN1Code
         def default_stadia
           [
             { name: "Предварительный проект", status: true },
-            { name: "Правки проекта (история правок)", status: true },
-            { name: "Выбраны материалы и фурнитура", status: true },
+            { name: "Правки проекта (история правок)", status: false },
+            { name: "Выбраны материалы и фурнитура", status: false },
             { name: "Предварительно Утвержден", status: false },
             { name: "Проверка технологом", status: false },
             { name: "Утвержден", status: false },

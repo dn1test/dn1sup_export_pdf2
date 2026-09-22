@@ -578,6 +578,93 @@ module DN1Code
           nil
         end
 
+        # ------------------------------------------------------------------
+        # Стадии проекта (workflow_stadia): строки с квадратами-чекбоксами.
+        # Квадрат слева от текста при выравнивании влево, справа от текста —
+        # при выравнивании вправо; по центру — слева от текста.
+        # ------------------------------------------------------------------
+        def draw_stadia_check_rows(ctx, doc, page, layer, item, box, font_name, slot_scale, gfx_layer)
+          lines = item[:text].to_s.split("\n", -1)
+          return if lines.empty?
+
+          size  = (item[:size] * slot_scale).round(2)
+          pitch = size * font_line_pitch_ratio(font_name)
+          side  = size * 0.85
+          gap   = size * 0.30
+
+          lines.each_with_index do |ln, i|
+            y_top = box[:y] - i * pitch
+            unless ln.start_with?("[✓]", "[ ]")
+              # Заголовок «Стадия проекта» — обычным текстом без квадрата
+              add_bounded_text(ctx, doc, page, layer, ln, { x: box[:x], y: y_top, width: box[:width], height: pitch },
+                               size: size, color: item[:color], align: item[:align], anchor: :top, font: font_name)
+              next
+            end
+
+            checked = ln.start_with?("[✓]")
+            name = ln.sub(/\A\[[✓ ]\]\s*/, "")
+            case item[:align]
+            when :right
+              sq_x = box[:x] + box[:width] - side
+              text_box = { x: box[:x], y: y_top, width: box[:width] - side - gap, height: pitch }
+              text_align = :right
+            when :center
+              w_est = [name.length * size * font_char_width_ratio(font_name), box[:width] * 0.85].min
+              text_x = box[:x] + (box[:width] - w_est) / 2.0
+              sq_x = [text_x - side - gap, box[:x]].max
+              text_box = { x: text_x, y: y_top, width: [[w_est + size, box[:x] + box[:width] - text_x].min, 1.0].max, height: pitch }
+              text_align = :left
+            else
+              sq_x = box[:x]
+              text_box = { x: box[:x] + side + gap, y: y_top, width: box[:width] - side - gap, height: pitch }
+              text_align = :left
+            end
+
+            add_bounded_text(ctx, doc, page, layer, name, text_box,
+                             size: size, color: item[:color], align: text_align, anchor: :top, font: font_name)
+            add_checkbox(ctx, doc, page, gfx_layer, sq_x, y_top - (pitch - side) / 2.0, side, checked, item[:color])
+          end
+        rescue StandardError => e
+          warn "Ошибка отрисовки стадий с чекбоксами: #{e.message}"
+          add_bounded_text(ctx, doc, page, layer, item[:text], box,
+                           size: (item[:size] * slot_scale).round(2), color: item[:color], align: item[:align], anchor: :top, font: font_name)
+        end
+
+        # Квадрат-чекбокс: пустой или с галкой (checked). Координаты в pt, y — верхняя грань.
+        def add_checkbox(ctx, doc, page, layer, x_pt, y_top_pt, side_pt, checked, color_hex)
+          return if side_pt <= 0
+
+          rect = ::Layout::Rectangle.new(make_bounds_pt(ctx, x_pt, y_top_pt, side_pt, side_pt))
+          style = rect.style
+          style.stroked = true if style.respond_to?(:stroked=)
+          style.stroke_width = pt2in([side_pt * 0.07, 0.4].max) if style.respond_to?(:stroke_width=)
+          style.stroke_color = layout_color(color_hex) if style.respond_to?(:stroke_color=)
+          style.solid_filled = false if style.respond_to?(:solid_filled=)
+          rect.style = style
+          doc.add_entity(rect, layer, page)
+          return unless checked
+
+          # Галка — ломаная из трёх точек (доли стороны квадрата, y_top — верх квадрата).
+          # Путь по умолчанию замыкается и заливается — заливку отключаем, оставляем обводку.
+          p1 = ::Geom::Point2d.new(pt2in(x_pt + side_pt * 0.20), pt2in(lay_y(ctx, y_top_pt - side_pt * 0.52)))
+          p2 = ::Geom::Point2d.new(pt2in(x_pt + side_pt * 0.42), pt2in(lay_y(ctx, y_top_pt - side_pt * 0.74)))
+          p3 = ::Geom::Point2d.new(pt2in(x_pt + side_pt * 0.82), pt2in(lay_y(ctx, y_top_pt - side_pt * 0.28)))
+          path = ::Layout::Path.new(p1, p2)
+          path.append_point(p3)
+          pstyle = path.style
+          pstyle.stroked = true if pstyle.respond_to?(:stroked=)
+          pstyle.solid_filled = false if pstyle.respond_to?(:solid_filled=)
+          pstyle.stroke_width = pt2in([side_pt * 0.09, 0.5].max) if pstyle.respond_to?(:stroke_width=)
+          pstyle.stroke_color = layout_color(color_hex) if pstyle.respond_to?(:stroke_color=)
+          pstyle.stroke_cap_style = ::Layout::Style::CAP_STYLE_ROUND if pstyle.respond_to?(:stroke_cap_style=) && defined?(::Layout::Style::CAP_STYLE_ROUND)
+          pstyle.stroke_join_style = ::Layout::Style::JOIN_STYLE_ROUND if pstyle.respond_to?(:stroke_join_style=) && defined?(::Layout::Style::JOIN_STYLE_ROUND)
+          path.style = pstyle
+          doc.add_entity(path, layer, page)
+        rescue StandardError => e
+          warn "Ошибка отрисовки чекбокса стадии: #{e.message}"
+          nil
+        end
+
         # Повернутый текст (штамп): привязка в точке + поворот вокруг нее.
         # Положительный угол в геометрии — против часовой стрелки;
         # в LayOut y направлен вниз, поэтому знак угла инвертируется.
@@ -1421,8 +1508,13 @@ module DN1Code
 
           items.each_with_index do |it, idx|
             h = item_heights[idx]
-            add_bounded_text(ctx, doc, page, layer, it[:text], { x: in_x, y: cur_y, width: in_w, height: h },
-                             size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: slot_font)
+            if it[:key] == "workflow_stadia" && it[:text].to_s.include?("\n")
+              draw_stadia_check_rows(ctx, doc, page, layer, it, { x: in_x, y: cur_y, width: in_w, height: h },
+                                     slot_font, slot_scale, (gfx_layer || layer))
+            else
+              add_bounded_text(ctx, doc, page, layer, it[:text], { x: in_x, y: cur_y, width: in_w, height: h },
+                               size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: slot_font)
+            end
             cur_y -= h
 
             if idx < items.size - 1
