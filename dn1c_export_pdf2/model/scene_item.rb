@@ -38,10 +38,10 @@ module DN1Code
         # @param order [Integer] порядковый индекс сцены
         # @param enabled [Boolean] включена ли сцена в экспорт
         # @param viewport_visible [Boolean] включен ли 3D видовой экран на этой странице
-        # @param viewport_background [Boolean] отображать ли фон сцены (небо/земля) в видовом экране
+        # @param viewport_background [Boolean] отображать ли фон сцены (небо/земля) в видовом экране (по умолчанию выключен)
         # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 16:9, 1:1, page)
         # @param scale_pct [Integer] масштаб/размещение кадра на листе в % (60-100)
-        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, viewport_background: true, aspect_ratio: "4:3", scale_pct: 100)
+        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100)
           @name             = name.to_s
           @original_name    = (original_name || name).to_s
           @scene_ref        = scene_ref
@@ -49,7 +49,7 @@ module DN1Code
           @order            = order.to_i
           @enabled          = enabled
           @viewport_visible = (viewport_visible != false && viewport_visible.to_s != "false" && viewport_visible != 0 && viewport_visible.to_s != "0")
-          @viewport_background = (viewport_background != false && viewport_background.to_s != "false" && viewport_background != 0 && viewport_background.to_s != "0")
+          @viewport_background = (viewport_background == true || viewport_background.to_s == "true")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
           @scale_pct        = (scale_pct || 100).to_i
           @page_type        = page_type ? page_type.to_sym : detect_page_type(@name)
@@ -107,7 +107,7 @@ module DN1Code
             order:            hash[:order] || hash["order"] || 0,
             enabled:          hash.fetch(:enabled, hash.fetch("enabled", true)),
             viewport_visible: hash.fetch(:viewport_visible, hash.fetch("viewport_visible", true)),
-            viewport_background: hash.fetch(:viewport_background, hash.fetch("viewport_background", true)),
+            viewport_background: hash.fetch(:viewport_background, hash.fetch("viewport_background", false)),
             aspect_ratio:     hash[:aspect_ratio] || hash["aspect_ratio"] || "4:3",
             scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100
           )

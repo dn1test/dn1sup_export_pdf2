@@ -572,7 +572,7 @@
     scenesTableBody: document.getElementById("scenesTableBody"),
     btnSelectAllScenes: document.getElementById("btnSelectAllScenes"),
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
-    btnAutoMapScenes: document.getElementById("btnAutoMapScenes"),
+    chkScenesBackground: document.getElementById("chk_scenes_background"),
     scenesPanel: document.getElementById("scenesPanel"),
     scenesSplitResizer: document.getElementById("scenesSplitResizer"),
 
@@ -3275,16 +3275,6 @@
       });
     }
 
-    const chkBgTpl = document.getElementById("chk_viewport_background");
-    if (chkBgTpl) {
-      chkBgTpl.addEventListener("change", (e) => {
-        const bgOn = Boolean(e.target.checked);
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        updateBlockSlot("image_4_3", { show_background: bgOn }, targetTpl);
-        notifyChange();
-      });
-    }
-
     const grpRatio = document.getElementById("grp_image_aspect_ratio");
     if (grpRatio) {
       grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
@@ -5023,7 +5013,6 @@
     }
 
     const isImageVis = scene.viewport_visible !== false;
-    const isBgOn = scene.viewport_background !== false;
     const VALID_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
     let rawRatio = (scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
     const imageAspectRatio = VALID_ASPECTS.includes(rawRatio) ? rawRatio : "4:3";
@@ -5051,10 +5040,6 @@
             <label class="tpl-overlay-toggle-btn ${isOverlayOn ? 'active' : ''} ${!isImageVis ? 'disabled-overlay' : ''}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin: 0; cursor: pointer;">
               <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="display: none;">
               <span id="tplAspectOverlayText">📐 Рамка: ${displayAspect}</span>
-            </label>
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
-              <input type="checkbox" id="chk_viewport_background" ${isBgOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах">
-              <span>Фон (все)</span>
             </label>
             <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
               <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
@@ -5134,7 +5119,6 @@
         }
         const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
         const tplBadge = document.getElementById("tplAspectOverlayBadge");
-        const chkBg = document.getElementById("chk_viewport_background");
         if (!isVis) {
           if (chkTpl) {
             chkTpl.checked = false;
@@ -5142,9 +5126,6 @@
           }
           if (tplBadge) {
             tplBadge.classList.add("disabled-overlay");
-          }
-          if (chkBg) {
-            chkBg.disabled = true;
           }
           if (state.pdf_settings) {
             state.pdf_settings.show_aspect_overlay = false;
@@ -5155,20 +5136,9 @@
           callRuby("toggleAspectOverlay", false);
         } else {
           if (chkTpl) chkTpl.disabled = false;
-          if (chkBg) chkBg.disabled = false;
           syncCurrentSceneOverlay(scene, null, true);
         }
         updateSceneTableAspectCell(sceneIndex, scene.aspect_ratio, isVis);
-        notifyChange();
-      });
-    }
-
-    const chkBg = document.getElementById("chk_viewport_background");
-    if (chkBg) {
-      chkBg.addEventListener("change", (e) => {
-        const bgOn = e.target.checked;
-        (state.scenes || []).forEach((s) => { s.viewport_background = bgOn; });
-        updateBlockSlot("image_4_3", { show_background: bgOn });
         notifyChange();
       });
     }
@@ -5316,6 +5286,11 @@
     els.scenesTableBody.innerHTML = "";
     const scenes = state.scenes || [];
     updateSceneBadge();
+
+    // Синхронизация глобальной галки фона в тулбаре со состоянием сцен
+    if (els.chkScenesBackground) {
+      els.chkScenesBackground.checked = scenes.some((s) => s.viewport_background === true);
+    }
 
     scenes.forEach((scene, index) => {
       const tr = document.createElement("tr");
@@ -6270,27 +6245,17 @@
       notifyChange();
     });
 
-    els.btnAutoMapScenes.addEventListener("click", () => {
-      state.scenes.forEach((s) => {
-        const lower = s.name.toLowerCase();
-        if (lower.includes("обложк") || lower.includes("cover") || lower.includes("титул")) {
-          s.page_type = "cover";
-        } else if (lower.includes("пояснен") || lower.includes("содержан") || lower.includes("оглавлен") || lower.includes("explain") || lower.includes("toc")) {
-          s.page_type = "explain";
-        } else if (lower.includes("описан") || lower.includes("специфик") || lower.includes("материал") || lower.includes("фурнитур") || lower.includes("электрик") || lower.includes("подсветк") || lower.includes("description") || lower.includes("spec")) {
-          s.page_type = "description";
-        } else if (lower.includes("визуал") || lower.includes("visual") || lower.includes("рендер") || lower.includes("render")) {
-          s.page_type = "visual";
-        } else if (lower.includes("чист") || lower.includes("blank") || lower.includes("пуст")) {
-          s.page_type = "blank";
-        } else {
-          s.page_type = "general";
-        }
+    // Глобальный фон: включается/выключается сразу на всех страницах,
+    // эскизы в таблице перегенерируются с учётом нового состояния
+    if (els.chkScenesBackground) {
+      els.chkScenesBackground.addEventListener("change", (e) => {
+        const bgOn = e.target.checked;
+        (state.scenes || []).forEach((s) => { s.viewport_background = bgOn; });
+        updateBlockSlot("image_4_3", { show_background: bgOn });
+        requestSceneThumbnails(true);
+        notifyChange();
       });
-      renderScenesTable();
-      showNotification("Шаблоны страниц автоматически сопоставлены", "success");
-      notifyChange();
-    });
+    }
 
     // Add History Entry (edit_history.yaml)
     els.btnAddHistoryEntry.addEventListener("click", () => {

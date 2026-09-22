@@ -12,6 +12,46 @@ module DN1Code
         # Соотношение сторон для стандартных печатных листов ISO A (A4, A3, A2) = 1 / sqrt(2) ≈ 0.7071
         DEFAULT_ISO_RATIO = 0.7071
 
+        # Трактовка флага «показывать фон»: nil означает «не трогать» (фон показывается)
+        def self.background_enabled?(value)
+          value.nil? ||
+            (value != false && value.to_s != "false" && value != 0 && value.to_s != "0")
+        end
+
+        # Временное отключение фона сцены (небо/земля/водяные знаки/туман) на rendering_options модели.
+        # Ключа DisplaySky в RenderingOptions нет, поэтому градиент неба гасится принудительно белыми цветами.
+        # @param ro [Sketchup::RenderingOptions, nil] параметры отрисовки модели
+        # @param show_bg [Object] флаг «показывать фон»
+        # @return [Hash] сохранённые исходные значения — передать в restore_background
+        def self.apply_background_override(ro, show_bg)
+          orig_bg = {}
+          return orig_bg if ro.nil? || background_enabled?(show_bg)
+
+          bg_keys = %w[BackgroundColor SkyColor GroundColor DrawGround DrawUnderground DisplayWatermarks DisplayFog]
+          bg_keys.each do |k|
+            has_key = ro.respond_to?(:keys) ? ro.keys.include?(k) : !ro[k].nil?
+            orig_bg[k] = ro[k] if has_key
+          end
+          white = defined?(::Sketchup::Color) ? ::Sketchup::Color.new(255, 255, 255) : "white"
+          orig_bg.each_key do |k|
+            if k == "BackgroundColor" || k == "SkyColor" || k == "GroundColor"
+              ro[k] = white
+            else
+              ro[k] = false
+            end
+          end
+          orig_bg
+        end
+
+        # Восстанавливает параметры фона, изменённые apply_background_override
+        # @param ro [Sketchup::RenderingOptions, nil]
+        # @param orig_bg [Hash] хеш, возвращённый apply_background_override
+        def self.restore_background(ro, orig_bg)
+          return if ro.nil? || orig_bg.nil? || orig_bg.empty?
+
+          orig_bg.each { |k, v| ro[k] = v }
+        end
+
         # Выполняет переключение на указанную сцену в SketchUp и экспорт растрового изображения во временный PNG-файл
         # @param model [Sketchup::Model] активная модель SketchUp
         # @param scene [Sketchup::Page, nil] сцена для рендеринга
@@ -198,26 +238,7 @@ module DN1Code
             end
 
             # Временное отключение фона сцены (небо/земля/водяные знаки/туман) при show_background: false.
-            # Ключа DisplaySky в RenderingOptions нет, поэтому градиент неба гасится принудительно белыми цветами.
-            show_bg = options[:show_background].nil? ||
-                      (options[:show_background] != false && options[:show_background].to_s != "false" &&
-                       options[:show_background] != 0 && options[:show_background].to_s != "0")
-            orig_bg = {}
-            if ro && !show_bg
-              bg_keys = %w[BackgroundColor SkyColor GroundColor DrawGround DrawUnderground DisplayWatermarks DisplayFog]
-              bg_keys.each do |k|
-                has_key = ro.respond_to?(:keys) ? ro.keys.include?(k) : !ro[k].nil?
-                orig_bg[k] = ro[k] if has_key
-              end
-              white = defined?(::Sketchup::Color) ? ::Sketchup::Color.new(255, 255, 255) : "white"
-              orig_bg.each_key do |k|
-                if k == "BackgroundColor" || k == "SkyColor" || k == "GroundColor"
-                  ro[k] = white
-                else
-                  ro[k] = false
-                end
-              end
-            end
+            orig_bg = apply_background_override(ro, options[:show_background])
 
             afs_setting = options[:annotation_font_size] || options["annotation_font_size"]
             hide_annot = options[:hide_annotations] == true || options["hide_annotations"] == true
@@ -233,9 +254,7 @@ module DN1Code
                   if ro && !orig_widths.empty?
                     orig_widths.each { |k, v| ro[k] = v }
                   end
-                  if ro && !orig_bg.empty?
-                    orig_bg.each { |k, v| ro[k] = v }
-                  end
+                  restore_background(ro, orig_bg)
                 end
               end
             end

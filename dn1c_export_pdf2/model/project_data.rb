@@ -543,7 +543,7 @@ module DN1Code
             cover: {
               header:      { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 13.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
               cover_title: { x: 10.0, y: 15.0, w: 80.0, h: 12.0, visible: true, align: "center" },
-              image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: true, aspect_ratio: "4:3", scale_pct: 100 },
+              image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
               slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["articul", "workflow_date", "workflow_version", "workflow_revision", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
@@ -552,7 +552,7 @@ module DN1Code
             },
             description: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: true, aspect_ratio: "4:3", scale_pct: 100 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
               slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["spec_materials", "spec_appliances", "general_notes"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.5, lines: ["spec_materials", "spec_appliances"], opacity: 0.88 },
@@ -561,7 +561,7 @@ module DN1Code
             },
             explain: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: true, aspect_ratio: "4:3", scale_pct: 100 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
               slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["toc_pages", "general_notes", "workflow_history", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "workflow_history"], opacity: 0.88 },
@@ -570,7 +570,7 @@ module DN1Code
             },
             general: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: true, aspect_ratio: "4:3", scale_pct: 100 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
               slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["general_notes", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
@@ -579,7 +579,7 @@ module DN1Code
             },
             visual: {
               header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 10.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: true, aspect_ratio: "4:3", scale_pct: 100 },
+              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
               slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
               slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
               slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
@@ -1361,6 +1361,18 @@ module DN1Code
           self
         end
 
+        # Одноразовый перенос старых проектов: раньше фон видового экрана был
+        # включен по умолчанию и в таком виде сохранялся в сцены. Теперь фон по
+        # умолчанию выключен: при первой загрузке проекта, сохраненного старой
+        # версией, гасим унаследованный true. Явное включение фона пользователем
+        # после миграции сохраняется на диске (маркер в секции project).
+        def migrate_legacy_background_default!
+          return if @project[:background_default_migrated] == true
+
+          @scenes.each { |sc| sc.viewport_background = false }
+          @project[:background_default_migrated] = true
+        end
+
         # Синхронизирует список сцен с активной моделью SketchUp, сохраняя настроенные параметры
         # @param model [Sketchup::Model] модель SketchUp
         # @return [void]
@@ -1806,6 +1818,7 @@ module DN1Code
 
               if root[:scenes].is_a?(Array)
                 @scenes = root[:scenes].map { |h| SceneItem.from_h(h) }
+                migrate_legacy_background_default!
               end
 
               # Проверяем, есть ли рядом файл edit_history.yaml
@@ -1838,6 +1851,7 @@ module DN1Code
             end
             if docs[1].is_a?(Array)
               @scenes = docs[1].map { |h| SceneItem.from_h(h) }
+              migrate_legacy_background_default!
             end
             if docs[2].is_a?(Array)
               @history = docs[2].map do |item|
@@ -1876,6 +1890,7 @@ module DN1Code
           prj_out = {
             articul:      @project[:articul].to_s,
             articul_locked: @project[:articul_locked] == true,
+            background_default_migrated: @project[:background_default_migrated] == true,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,
