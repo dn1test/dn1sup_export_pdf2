@@ -542,14 +542,7 @@
     inputCompany: document.getElementById("inputCompany"),
     companyFieldGroup: document.getElementById("companyFieldGroup"),
     inputArticul: document.getElementById("inputArticul"),
-    btnGenerateArticul: document.getElementById("btnGenerateArticul"),
-    chkArticulLocked: document.getElementById("chkArticulLocked"),
-    inputBaseDir: document.getElementById("inputBaseDir"),
-    btnSelectBaseDir: document.getElementById("btnSelectBaseDir"),
-    tradeToggleGroup: document.getElementById("tradeToggleGroup"),
-    btnTradeHF: document.getElementById("btnTradeHF"),
-    btnTradeCF: document.getElementById("btnTradeCF"),
-    selectTrade: document.getElementById("selectTrade"),
+    headerTradeBadge: document.getElementById("headerTradeBadge"),
     inputTags: document.getElementById("inputTags"),
     inputProjectDescription: document.getElementById("inputProjectDescription"),
     inputPhone: document.getElementById("inputPhone"),
@@ -619,7 +612,7 @@
     imageFormatGroup: document.getElementById("imageFormatGroup"),
     selectImageFormat: document.getElementById("selectImageFormat"),
     webpQualityGroup: document.getElementById("webpQualityGroup"),
-    selectSnapshotFormat: document.getElementById("selectSnapshotFormat"),
+    hintWebpFormat: document.getElementById("hintWebpFormat"),
     selectWebpQuality: document.getElementById("selectWebpQuality"),
     layoutSaveFileGroup: document.getElementById("layoutSaveFileGroup"),
     chkSaveLayoutFile: document.getElementById("chkSaveLayoutFile"),
@@ -3834,21 +3827,31 @@
   // Data Population & Form Handling
   // -----------------------------------------------------------------------------
 
+  // Тип проекта (0 — бытовой, 1 — коммерческий). Выбирается один раз при создании
+  // артикула (модалка при открытии панели) и после этого не меняется.
+  let currentTradeValue = "0";
+
   function getTradeValue() {
-    const activeBtn = document.querySelector("#tradeToggleGroup .segmented-btn.active");
-    if (activeBtn) return activeBtn.getAttribute("data-value") || "0";
-    if (els.selectTrade) return els.selectTrade.value;
-    return "0";
+    return currentTradeValue;
   }
 
   function setTradeValue(val) {
-    const strVal = String(val) === "1" ? "1" : "0";
-    const btns = document.querySelectorAll("#tradeToggleGroup .segmented-btn");
-    btns.forEach(btn => {
-      btn.classList.toggle("active", btn.getAttribute("data-value") === strVal);
-    });
-    if (els.selectTrade) els.selectTrade.value = strVal;
+    currentTradeValue = String(val) === "1" ? "1" : "0";
+    updateTradeBadge();
     updateCompanyVisibility();
+  }
+
+  // Указатель типа в шапке: без артикула тип еще не выбран
+  function updateTradeBadge() {
+    if (!els.headerTradeBadge) return;
+    const hasArticul = articulValue() !== "";
+    const isCommercial = currentTradeValue === "1";
+    els.headerTradeBadge.textContent = !hasArticul
+      ? "Тип не выбран"
+      : (isCommercial ? "🏢 Коммерческий" : "🏠 Бытовой");
+    els.headerTradeBadge.classList.toggle("trade-unset", !hasArticul);
+    els.headerTradeBadge.classList.toggle("trade-commercial", hasArticul && isCommercial);
+    els.headerTradeBadge.classList.toggle("trade-household", hasArticul && !isCommercial);
   }
 
   function updateCompanyVisibility() {
@@ -3946,14 +3949,7 @@
     updateCompanyVisibility();
 
     if (els.inputArticul) els.inputArticul.value = prj.articul || info.articul || "";
-    if (els.inputBaseDir) els.inputBaseDir.value = prj.base_dir || "";
-    // Блокировка артикула: флаг из состояния; без флага — непустой артикул считается заблокированным
-    if (els.chkArticulLocked) {
-      const artVal = (prj.articul || info.articul || "").trim();
-      const lockFlag = prj.articul_locked !== undefined ? prj.articul_locked : info.articul_locked;
-      els.chkArticulLocked.checked = lockFlag === true || lockFlag === "true" || (lockFlag === undefined && artVal !== "");
-    }
-    applyArticulLockState();
+    updateTradeBadge();
     if (els.inputCompany) els.inputCompany.value = prj.name_company || info.company || "";
     if (els.inputFurnitureName) {
       const pTags = prj.product_tags || info.product_tags;
@@ -4007,12 +4003,15 @@
     if (els.selectImageFormat) {
       els.selectImageFormat.value = (settings.image_format || "png").toLowerCase();
     }
-    if (els.selectSnapshotFormat) {
-      els.selectSnapshotFormat.value = (settings.snapshot_format || "png").toLowerCase();
-    }
     if (els.selectWebpQuality) {
       const webpQ = String(settings.webp_quality ?? "85").toLowerCase();
       els.selectWebpQuality.value = ["75", "85", "95", "lossless"].includes(webpQ) ? webpQ : "85";
+    }
+    // Формат снимков не настраивается: WebP при доступной libvips, иначе PNG
+    if (els.hintWebpFormat) {
+      els.hintWebpFormat.textContent = state.vips_available
+        ? "libvips доступна — снимки сцен сохраняются в WebP."
+        : "libvips не найдена (vendor/libvips) — снимки сцен сохраняются как PNG.";
     }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
 
@@ -5687,23 +5686,12 @@
     history.forEach((item, index) => {
       const tr = document.createElement("tr");
 
-      // 1. Дата и время (data / date)
+      // 1. Дата и время (data / date) — только чтение, проставляется автоматически
       const tdDate = document.createElement("td");
-      const inputDate = document.createElement("input");
-      inputDate.type = "text";
-      inputDate.className = "table-input history-date-input font-mono";
-      inputDate.value = item.data || item.date || "";
-      inputDate.placeholder = "ГГГГ-ММ-ДД ЧЧ:ММ";
-      inputDate.addEventListener("input", (e) => {
-        item.data = e.target.value;
-        item.date = e.target.value;
-      });
-      inputDate.addEventListener("change", (e) => {
-        item.data = e.target.value;
-        item.date = e.target.value;
-        notifyChange();
-      });
-      tdDate.appendChild(inputDate);
+      tdDate.className = "history-date-cell font-mono";
+      const dateStr = item.data || item.date || "";
+      tdDate.textContent = dateStr;
+      tdDate.title = "Дата и время проставляются автоматически";
 
       // 2. Версия # Ревизия (ver / rev) — только чтение
       const tdRev = document.createElement("td");
@@ -5824,8 +5812,7 @@
 
     state.project = {
       articul: articulVal,
-      articul_locked: isArticulLocked(),
-      base_dir: (els.inputBaseDir ? els.inputBaseDir.value : "").trim(),
+      articul_locked: articulVal !== "",
       product_tags: productTags,
       product: furniture,
       place: room,
@@ -5870,8 +5857,7 @@
     // Фасад project_info для 100% обратной совместимости
     state.project_info = {
       articul:          articulVal,
-      articul_locked:   isArticulLocked(),
-      base_dir:         (els.inputBaseDir ? els.inputBaseDir.value : "").trim(),
+      articul_locked:   articulVal !== "",
       name_product:     furniture,
       name_place:       room,
       adress:           addrVal,
@@ -5929,7 +5915,6 @@
       layout_render_mode: els.selectLayoutRenderMode ? els.selectLayoutRenderMode.value : "image",
       compress_pdf: els.selectCompression ? (els.selectCompression.value === "compress") : (state.pdf_settings?.compress_pdf === true),
       image_format: els.selectImageFormat ? els.selectImageFormat.value : (state.pdf_settings?.image_format || "png"),
-      snapshot_format: els.selectSnapshotFormat ? els.selectSnapshotFormat.value : (state.pdf_settings?.snapshot_format || "png"),
       webp_quality: els.selectWebpQuality ? els.selectWebpQuality.value : (state.pdf_settings?.webp_quality ?? 85),
       save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
       page_size: "A3",
@@ -6003,36 +5988,9 @@
     return state;
   }
 
-  // --- Блокировка артикула ---
-  // Артикул создаётся один раз и сразу блокируется; пересоздать можно,
-  // только сняв галочку «Заблокировано»
-
-  function isArticulLocked() {
-    return !!(els.chkArticulLocked && els.chkArticulLocked.checked);
-  }
-
-  // Применяет состояние блокировки к полю артикула и кнопке генерации
-  function applyArticulLockState() {
-    const locked = isArticulLocked();
-    if (els.inputArticul) els.inputArticul.disabled = locked;
-    if (els.btnGenerateArticul) {
-      els.btnGenerateArticul.disabled = locked;
-      els.btnGenerateArticul.title = locked
-        ? "Артикул заблокирован — снимите галочку «Заблокировано», чтобы пересоздать"
-        : "Сгенерировать уникальный артикул";
-    }
-    const controls = document.querySelector(".header-articul-controls");
-    if (controls) controls.classList.toggle("articul-locked", locked);
-  }
-
-  // Блокирует артикул после генерации нового значения
-  function lockArticulAfterGeneration() {
-    if (els.chkArticulLocked && !els.chkArticulLocked.checked) {
-      els.chkArticulLocked.checked = true;
-      applyArticulLockState();
-      notifyChange();
-    }
-  }
+  // --- Артикул ---
+  // Артикул создаётся один раз (модалка при открытии панели или ввод перед
+  // сохранением) и дальше не редактируется и не меняется.
 
   // Текущее значение артикула из формы
   function articulValue() {
@@ -6059,29 +6017,8 @@
     if (els.inputArticul) els.inputArticul.value = newArt;
     setTradeValue(isCommercial ? "1" : "0");
     updateHeaderTitles();
-    lockArticulAfterGeneration();
     closeArticulTypeModal();
     callRuby("createProjectFolder", JSON.stringify({ articul: newArt, commercial: isCommercial }));
-  }
-
-  // Trigger Articul Generation
-  function triggerGenerateArticul() {
-    if (isArticulLocked()) {
-      showNotification("Артикул заблокирован. Снимите галочку «Заблокировано», чтобы пересоздать.", "warning");
-      return;
-    }
-    const isCommercial = getTradeValue() === "1";
-    if (window.sketchup && typeof window.sketchup.generateArticul === "function") {
-      callRuby("generateArticul", JSON.stringify({ commercial: isCommercial }));
-    } else {
-      const newArt = generateArticulLocal(isCommercial);
-      if (els.inputArticul) {
-        els.inputArticul.value = newArt;
-        updateHeaderTitles();
-        showNotification(`Сгенерирован артикул: ${newArt}`, "info");
-        lockArticulAfterGeneration();
-      }
-    }
   }
 
   // Trigger Customer ID Generation
@@ -6106,73 +6043,8 @@
     els.inputCustomer.addEventListener("input", updateHeaderTitles);
     els.inputAddress.addEventListener("input", updateHeaderTitles);
 
-    if (els.btnGenerateArticul) {
-      els.btnGenerateArticul.addEventListener("click", triggerGenerateArticul);
-    }
     if (els.btnGenerateCustomerId) {
       els.btnGenerateCustomerId.addEventListener("click", triggerGenerateCustomerId);
-    }
-    // Галочка блокировки артикула: снята — поля открыты для пересоздания
-    if (els.chkArticulLocked) {
-      els.chkArticulLocked.addEventListener("change", () => {
-        applyArticulLockState();
-        if (!isArticulLocked()) {
-          showNotification("Артикул разблокирован — можно изменить или пересоздать.", "info");
-        }
-        notifyChange();
-      });
-    }
-
-    // Segmented toggle for project type (trade)
-    const tradeBtns = document.querySelectorAll("#tradeToggleGroup .segmented-btn");
-    tradeBtns.forEach(btn => {
-      btn.addEventListener("click", () => {
-        const val = btn.getAttribute("data-value");
-        setTradeValue(val);
-        const isComm = val === "1";
-        const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
-        if (isArticulLocked()) {
-          // Заблокированный артикул не изменяется при смене типа проекта
-        } else if (curArt.startsWith("CF#") && !isComm) {
-          els.inputArticul.value = curArt.replace(/^CF#/, "HF#");
-          updateHeaderTitles();
-        } else if (curArt.startsWith("HF#") && isComm) {
-          els.inputArticul.value = curArt.replace(/^HF#/, "CF#");
-          updateHeaderTitles();
-        }
-        notifyChange();
-      });
-    });
-
-    if (els.selectTrade) {
-      els.selectTrade.addEventListener("change", () => {
-        setTradeValue(els.selectTrade.value);
-        const isComm = els.selectTrade.value === "1";
-        if (isArticulLocked()) {
-          // Заблокированный артикул не изменяется при смене типа проекта
-          return;
-        }
-        const curArt = (els.inputArticul ? els.inputArticul.value : "").trim();
-        if (curArt.startsWith("CF#") && !isComm) {
-          els.inputArticul.value = curArt.replace(/^CF#/, "HF#");
-          updateHeaderTitles();
-        } else if (curArt.startsWith("HF#") && isComm) {
-          els.inputArticul.value = curArt.replace(/^HF#/, "CF#");
-          updateHeaderTitles();
-        }
-      });
-    }
-
-    if (els.inputArticul) {
-      els.inputArticul.addEventListener("input", () => {
-        updateHeaderTitles();
-        const val = els.inputArticul.value.trim();
-        if (val.startsWith("CF#")) {
-          setTradeValue("1");
-        } else if (val.startsWith("HF#")) {
-          setTradeValue("0");
-        }
-      });
     }
 
     // Directories Add button
@@ -6199,16 +6071,6 @@
         // после выбора путь и заголовок из имени папки придут в onDirectorySelected
         callRuby("selectDirectory", newIndex.toString());
       });
-    }
-
-    // Base articul dir browse button (path comes back in onBaseDirSelected)
-    if (els.btnSelectBaseDir) {
-      els.btnSelectBaseDir.addEventListener("click", () => {
-        callRuby("selectBaseDir");
-      });
-    }
-    if (els.inputBaseDir) {
-      els.inputBaseDir.addEventListener("input", notifyChange);
     }
 
     // API Targets Add button
@@ -6628,8 +6490,14 @@
         return false;
       }
       if (els.inputArticul) els.inputArticul.value = val;
+      // Тип проекта выводим из префикса артикула: CF# — коммерческий, HF# — бытовой
+      if (val.startsWith("CF#")) {
+        setTradeValue("1");
+      } else if (val.startsWith("HF#")) {
+        setTradeValue("0");
+      }
       updateHeaderTitles();
-      lockArticulAfterGeneration();
+      updateTradeBadge();
       return true;
     }
 
@@ -6718,19 +6586,18 @@
     // Auto-save listeners for all dialog input fields across tabs
     const autoSaveInputIds = [
       "inputRoomName", "inputFurnitureName", "inputCustomer", "inputCustomerId",
-      "inputCompany", "inputArticul", "selectTrade", "inputTags",
+      "inputCompany", "inputArticul", "inputTags",
       "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
       "inputTotalDuration", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
       "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
-      "selectSnapshotFormat", "selectWebpQuality",
+      "selectWebpQuality",
       "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily", "selectFontWeight", "selectFontWidth",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
       "selectQuality", "selectScaleMultiplier", "selectStamp", "inputCustomStamp",
-      "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias",
-      "chkArticulLocked"
+      "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias"
     ];
     autoSaveInputIds.forEach((id) => {
       const el = (els && els[id]) || document.getElementById(id);
@@ -6782,16 +6649,6 @@
       updateAutoSaveIndicator("saved", label);
     },
 
-    onArticulGenerated: function (newArticul) {
-      if (els.inputArticul && newArticul) {
-        els.inputArticul.value = newArticul;
-        updateHeaderTitles();
-        showNotification(`Сгенерирован артикул: ${newArticul}`, "info");
-        // Созданный артикул сразу блокируется
-        lockArticulAfterGeneration();
-      }
-    },
-
     onCustomerIdGenerated: function (newCustomerId) {
       if (els.inputCustomerId && newCustomerId) {
         els.inputCustomerId.value = newCustomerId;
@@ -6811,15 +6668,6 @@
         notifyChange();
         showNotification(`Выбрана папка: ${chosenPath}`, "info");
       }
-    },
-
-    onBaseDirSelected: function (chosenPath) {
-      if (!chosenPath) return;
-      if (els.inputBaseDir) {
-        els.inputBaseDir.value = chosenPath;
-        notifyChange();
-      }
-      showNotification(`Базовая папка артикула: ${chosenPath}`, "info");
     },
 
     onFolderFilesLoaded: function (data) {

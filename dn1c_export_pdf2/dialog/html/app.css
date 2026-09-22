@@ -867,23 +867,16 @@ tr:hover td {
   color: #94a3b8;
 }
 
-/* Дата/время в журнале правок: без «окошка» — плоский текст, рамка только при правке */
-.history-date-input {
-  background-color: transparent;
-  border: 1px solid transparent;
-  padding: 5px 0;
+/* Дата/время в журнале правок: только чтение, плоский текст без поля ввода */
+.history-date-cell {
+  white-space: nowrap;
 }
 
-.history-date-input:hover {
-  background-color: transparent;
-  border-color: transparent;
-}
-
-.history-date-input:focus {
-  background-color: #ffffff;
-  border-color: #005eb0;
-  outline: none;
-  box-shadow: none;
+/* Журнал правок: ужатые колонки — меньший горизонтальный паддинг ячеек */
+.history-table th,
+.history-table td {
+  padding-left: 8px;
+  padding-right: 8px;
 }
 
 /* Ячейка «Версия # Ревизия» в таблице истории: моноширинный номер по центру */
@@ -4106,7 +4099,7 @@ body.is-resizing * {
   box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
 }
 
-/* Articul в шапке: поле + блокировка + кнопка генерации */
+/* Articul в шапке: нередактируемое поле + указатель типа проекта */
 .header-articul-input {
   width: 170px;
   min-width: 0;
@@ -4115,40 +4108,40 @@ body.is-resizing * {
   height: auto;
 }
 
-.header-articul-controls .btn-action {
+/* Указатель типа проекта (тип выбирается при создании артикула и не меняется) */
+.header-trade-badge {
+  display: inline-flex;
+  align-items: center;
   padding: 3px 10px;
   font-size: 11.5px;
+  font-weight: 700;
+  line-height: 1.2;
   white-space: nowrap;
+  border-radius: 10px;
+  background-color: #f1f5f9;
+  color: #475569;
 }
 
-/* Блокировка артикула */
-.articul-lock-label {
-  display: flex;
-  align-items: center;
-  gap: 2px;
-  font-size: 12px;
-  line-height: 1;
-  color: #64748b;
-  cursor: pointer;
-  user-select: none;
+.header-trade-badge.trade-household {
+  background-color: #e8f5e9;
+  color: #2e7d32;
 }
 
-.articul-lock-label input[type="checkbox"] {
-  accent-color: #d32f2f;
-  width: 13px;
-  height: 13px;
-  cursor: pointer;
+.header-trade-badge.trade-commercial {
+  background-color: #e3f2fd;
+  color: #1565c0;
 }
 
+.header-trade-badge.trade-unset {
+  color: #94a3b8;
+  font-weight: 600;
+}
+
+/* Артикул не редактируется */
 .header-articul-controls.articul-locked #inputArticul {
   background-color: #f1f5f9;
   color: #475569;
   opacity: 0.85;
-}
-
-.header-articul-controls.articul-locked .btn-action {
-  opacity: 0.5;
-  cursor: not-allowed;
 }
 
 /* Workflow 2-Column Split Layout */

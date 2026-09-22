@@ -776,7 +776,7 @@ class TestRunner
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     default_path = controller.send(:resolve_default_pdf_path)
 
-    # base_dir не задан: папка артикула (по имени модели) создается рядом с .skp
+    # Папка артикула (по имени модели) создается рядом с .skp
     expected_path = "U:/Projects/Interior/Kitchen_Design/pdf/Kitchen_Design_01#004.pdf"
     assert(default_path == expected_path, "Путь по умолчанию '#{default_path}' указывает в папку артикула ('#{expected_path}')")
   end
@@ -5801,13 +5801,12 @@ class TestRunner
 
     test_dir = File.expand_path("test_articul_dir_root", __dir__)
     skp_dir  = File.join(test_dir, "models")
-    base_dir = File.join(test_dir, "base")
     FileUtils.mkdir_p(skp_dir)
 
     skp_file = File.join(skp_dir, "Wardrobe.skp")
     model = Sketchup::MockModel.new(skp_file)
 
-    # base_dir не задан: папка артикула создается рядом с .skp
+    # Папка артикула создается рядом с .skp
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     project_data.project_info[:articul] = "ART-100"
     project_data.project_info[:description] = "CANONICAL_DESC"
@@ -5828,20 +5827,13 @@ class TestRunner
     assert(fresh.project_info[:description].to_s.include?("CHANGED_IN_CANON"),
            "load_auto прочитал project.yaml из папки артикула (получено: #{fresh.project_info[:description].inspect})")
 
-    # base_dir задан: project.yaml пишется в <base_dir>/<Артикул>/project.yaml
-    project_data.project[:base_dir] = base_dir
-    assert(project_data.save_project_yaml(model), "Сохранение с заданным base_dir")
-    base_yaml = File.join(base_dir, "ART-101", "project.yaml")
-    assert(File.exist?(File.join(base_dir, "ART-100", "project.yaml")), "project.yaml записан в <base_dir>/<Артикул>/")
-    assert(!File.exist?(File.join(base_dir, "ART-100", "ART-100.yaml")), "Старое имя <Артикул>.yaml в базовой папке не создается")
-
     # Смена артикула: новая папка, прежняя сохраняется (история PDF/SKP/PNG)
     project_data.project_info[:articul] = "ART-101"
     assert(project_data.save_project_yaml(model, previous_articul: "ART-100"), "Сохранение после смены артикула")
-    assert(File.exist?(base_yaml), "Создан project.yaml нового артикула в базовой папке")
-    assert(!File.exist?(File.join(base_dir, "ART-101.yaml")), "Якорь нового артикула в базовой папке не создается")
+    assert(File.exist?(File.join(skp_dir, "ART-101", "project.yaml")), "Создан project.yaml нового артикула рядом с .skp")
     assert(!File.exist?(File.join(skp_dir, "ART-101.yaml")), "Якорь нового артикула рядом с .skp не создается")
-    assert(File.exist?(File.join(base_dir, "ART-100", "project.yaml")), "Папка прежнего артикула сохранена (история)")
+    assert(File.exist?(File.join(skp_dir, "ART-100", "project.yaml")), "Папка прежнего артикула сохранена (история)")
+    assert(!project_data.project.key?(:base_dir), "Ключ base_dir удален из данных проекта")
 
     FileUtils.rm_rf(test_dir)
   end
@@ -5851,7 +5843,6 @@ class TestRunner
 
     test_dir = File.expand_path("test_articul_export", __dir__)
     skp_dir  = File.join(test_dir, "models")
-    base_dir = File.join(test_dir, "base")
     FileUtils.mkdir_p(skp_dir)
 
     skp_file = File.join(skp_dir, "Table.skp")
@@ -5866,7 +5857,6 @@ class TestRunner
     project_data.project_info[:articul] = "EXP-200"
     project_data.project_info[:version] = 2
     project_data.project_info[:revision] = 5
-    project_data.project[:base_dir] = base_dir
     project_data.pdf_settings[:auto_open_pdf] = false
     project_data.pdf_settings[:save_skp_backup] = true
     project_data.pdf_settings[:save_layout_file] = false
@@ -5875,7 +5865,7 @@ class TestRunner
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     result_path = controller.export(nil)
 
-    art_dir      = File.join(base_dir, "EXP-200")
+    art_dir      = File.join(skp_dir, "EXP-200")
     expected_pdf = File.join(art_dir, "pdf", "EXP-200_02#005.pdf")
     expected_skp = File.join(art_dir, "skp", "EXP-200_02#005.skp")
 
@@ -5884,9 +5874,13 @@ class TestRunner
     assert(File.exist?(expected_skp), "Резервная копия SKP в папке артикула: #{expected_skp}")
 
     images_dir = File.join(art_dir, "images")
-    pngs = Dir.glob(File.join(images_dir, "*.png")).map { |f| File.basename(f) }.sort
-    assert(pngs.size == 3, "PNG-снимки всех 3 сцен в папке images/ (найдено: #{pngs.size}: #{pngs.join(', ')})")
-    assert(pngs.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
+    vips = DN1Code::ExportPdf2::Service::VipsService
+    expected_ext = vips.available? ? ".webp" : ".png"
+    snaps = Dir.glob(File.join(images_dir, "*.{png,webp}")).map { |f| File.basename(f) }.sort
+    assert(snaps.size == 3, "Снимки всех 3 сцен в папке images/ (найдено: #{snaps.size}: #{snaps.join(', ')})")
+    assert(snaps.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
+    assert(snaps.all? { |n| n.end_with?(expected_ext) },
+           "Снимки в формате #{expected_ext} при libvips #{vips.available? ? 'доступна' : 'нет'} (#{snaps.join(', ')})")
 
     # project.yaml в папке артикула — для повторного открытия модели.
     # В SketchUp сессия пишется через SessionStore.flush(model); здесь контроллер
@@ -5998,11 +5992,14 @@ class TestRunner
     end
 
     begin
-      # Сцены без изменений флага: фон включен (поведение по умолчанию)
+      # Сцены без изменений флага: фон включен (поведение по умолчанию).
+      # Формат снимков не настраивается: WebP при доступном libvips, иначе PNG.
+      vips_available = DN1Code::ExportPdf2::Service::VipsService.available?
+      expected_ext = vips_available ? ".webp" : ".png"
       written_on = controller.export_scene_snapshots
       assert(written_on.size == 2, "Снимки обеих сцен записаны при включенном фоне (#{written_on.size})")
-      assert(written_on.all? { |p| File.extname(p).downcase == ".png" && File.basename(File.dirname(p)) == "images" },
-             "PNG-снимки по умолчанию лежат в <Артикул>/images (#{written_on.inspect})")
+      assert(written_on.all? { |p| File.extname(p).downcase == expected_ext && File.basename(File.dirname(p)) == "images" },
+             "Снимки #{expected_ext} по умолчанию лежат в <Артикул>/images (#{written_on.inspect})")
       assert(captured.all? { |o| o[:show_background] == true },
              "Без флага render_scene_temp получает show_background=true (#{captured.map { |o| o[:show_background] }.inspect})")
 
@@ -6034,8 +6031,7 @@ class TestRunner
 
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     project_data.sync_with_model_scenes(model)
-    project_data.pdf_settings[:snapshot_format] = "webp"
-    project_data.pdf_settings[:webp_quality]    = 85
+    project_data.pdf_settings[:webp_quality] = 85
 
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     vips = DN1Code::ExportPdf2::Service::VipsService
@@ -6048,10 +6044,7 @@ class TestRunner
     assert(vips.webp_target_string("C:/out/a.webp", quality: nil) == "C:/out/a.webp",
            "Без качества опции не добавляются")
 
-    # Нормализация настроек формата и качества
-    assert(controller.send(:snapshot_format, {}) == "png", "Пустые настройки дают PNG")
-    assert(controller.send(:snapshot_format, { snapshot_format: "WEBP" }) == "webp", "Формат нормализуется в нижний регистр")
-    assert(controller.send(:snapshot_format, { snapshot_format: "jpg" }) == "png", "Неизвестный формат -> PNG")
+    # Нормализация качества WebP (формат снимков не настраивается: WebP при доступном libvips, иначе PNG)
     assert(controller.send(:webp_quality_setting, {}) == { quality: 85, lossless: false }, "Умолчание качества WebP — 85")
     assert(controller.send(:webp_quality_setting, { webp_quality: "lossless" }) == { quality: nil, lossless: true }, "lossless распознан")
     assert(controller.send(:webp_quality_setting, { webp_quality: 150 }) == { quality: 85, lossless: false }, "Некорректное качество -> 85")

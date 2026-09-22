@@ -34,13 +34,6 @@ layout:
         scene_name: "#005EB0"
         scene_description: "#475569"
       opacity: 0.95
-    cover_title:
-      x: 10.0
-      "y": 15.0
-      w: 80.0
-      h: 12.0
-      visible: true
-      align: center
     image_4_3:
       x: 25
       "y": 12

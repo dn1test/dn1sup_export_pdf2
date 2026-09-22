@@ -257,6 +257,8 @@ module DN1Code
                   @pdf_settings[:custom_layouts] = layouts_backup if layouts_backup && !pdf_cfg.key?(:custom_layouts)
                   ratio_str = @pdf_settings[:image_aspect_ratio].to_s.strip
                   @pdf_settings[:image_aspect_ratio] = "4:3" unless VALID_ASPECT_RATIOS.include?(ratio_str)
+                  # Устаревший ключ: формат снимков теперь определяется доступностью libvips
+                  @pdf_settings.delete(:snapshot_format)
                   legacy_font = Service::FontService.legacy_family_for(@pdf_settings[:font_family])
                   @pdf_settings[:font_family] = legacy_font if legacy_font
                 end
@@ -346,7 +348,6 @@ module DN1Code
           {
             articul:      "",
             articul_locked: false,
-            base_dir:     "",
             product_tags: [],
             product:      "",
             place:        "",
@@ -597,7 +598,6 @@ module DN1Code
             save_layout_file:   true,
             compress_pdf:       true,
             image_format:       "png",
-            snapshot_format:    "png",
             webp_quality:       85,
             render_quality:     "medium",
             page_size:          "A3",
@@ -1155,7 +1155,7 @@ module DN1Code
           PROJECT_YAML_NAME
         end
 
-        # Папка артикула проекта: <base_dir>/<Артикул>, при пустом base_dir — рядом с .skp
+        # Папка артикула проекта: <папка .skp>/<Артикул>
         # @param model [Sketchup::Model, nil] модель SketchUp
         # @return [String, nil] абсолютный путь к папке артикула или nil
         def articul_dir_for_model(model)
@@ -1164,9 +1164,7 @@ module DN1Code
           folder_name = self.class.articul_folder_name(@project_info, model)
           return nil if folder_name.nil? || folder_name.empty?
 
-          base = @project[:base_dir].to_s.strip
-          base = File.dirname(model.path.to_s.tr("\\", "/")) if base.empty?
-          File.expand_path(File.join(base, folder_name))
+          File.expand_path(File.join(File.dirname(model.path.to_s.tr("\\", "/")), folder_name))
         end
 
         # Полный путь к файлу данных проекта: <папка артикула>/project.yaml.
@@ -1878,7 +1876,6 @@ module DN1Code
           prj_out = {
             articul:      @project[:articul].to_s,
             articul_locked: @project[:articul_locked] == true,
-            base_dir:     @project[:base_dir].to_s,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,

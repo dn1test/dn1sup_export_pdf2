@@ -52,8 +52,7 @@ pdf_settings:
   save_layout_file: true        # Сохранять файл .layout рядом с PDF (для LayOut API)
   compress_pdf: true            # У самого документа PDF всегда сжатие без потерь (true)
   image_format: "png"           # Лучший формат для картинок: 'png' (lossless) или 'jpg'
-  snapshot_format: "png"        # Формат снимков сцен в <Артикул>/images: 'png' или 'webp' (libvips)
-  webp_quality: 85              # Качество WebP: 1..100 или 'lossless' (сжатие без потерь, требует libvips)
+  webp_quality: 85              # Качество WebP-снимков сцен: 1..100 или 'lossless' (сжатие без потерь)
   render_quality: "medium"      # 'low' (96 dpi), 'medium' (150 dpi), 'high' (300 dpi)
   page_size: "A3"          # Формат листа: 'A3'
   page_layout: "landscape" # 'landscape' или 'portrait'

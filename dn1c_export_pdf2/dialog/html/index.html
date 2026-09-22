@@ -24,13 +24,9 @@
       <div class="header-status-group">
         <div class="header-articul" id="headerArticulBlock">
           <span class="header-articul-label">АРТИКУЛ</span>
-          <div class="header-articul-controls">
-            <input type="text" id="inputArticul" class="form-control font-mono header-articul-input" placeholder="CF#260905_142650">
-            <label class="articul-lock-label" for="chkArticulLocked" title="Заблокировано — артикул защищён от изменений. Снимите галочку, чтобы пересоздать.">
-              <input type="checkbox" id="chkArticulLocked">
-              🔒
-            </label>
-            <button type="button" class="btn btn-secondary btn-action" id="btnGenerateArticul" title="Сгенерировать уникальный артикул">⚡ Создать</button>
+          <div class="header-articul-controls articul-locked">
+            <input type="text" id="inputArticul" class="form-control font-mono header-articul-input" placeholder="CF#260905_142650" readonly title="Артикул создаётся один раз при выборе типа проекта и не изменяется">
+            <span class="header-trade-badge trade-unset" id="headerTradeBadge" title="Тип проекта — выбирается при создании артикула и больше не меняется">Тип не выбран</span>
           </div>
         </div>
       </div>
@@ -75,14 +71,6 @@
               <span class="card-header-title">Паспорт объекта (Project)</span>
             </div>
             <div class="form-grid">
-              <div class="form-group">
-                <label>Тип проекта / Назначение *</label>
-                <div class="segmented-control" id="tradeToggleGroup">
-                  <button type="button" class="segmented-btn active" data-value="0" id="btnTradeHF">🏠 Бытовой (HF#)</button>
-                  <button type="button" class="segmented-btn" data-value="1" id="btnTradeCF">🏢 Коммерческий (CF#)</button>
-                </div>
-              </div>
-
               <div class="form-group" id="companyFieldGroup">
                 <label for="inputCompany">Название компании (для коммерческих)</label>
                 <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
@@ -373,11 +361,11 @@
           <table class="history-table" id="historyTable">
             <thead>
               <tr>
-                <th width="175">Дата - Время (data)</th>
-                <th width="110">Версия # Ревизия</th>
+                <th width="140">Дата - Время (data)</th>
+                <th width="95">Версия # Ревизия</th>
                 <th>Название правки (edit)</th>
-                <th width="90">Открыть</th>
-                <th width="90">Удалить</th>
+                <th width="85">Открыть</th>
+                <th width="85">Удалить</th>
               </tr>
             </thead>
             <tbody id="historyTableBody">
@@ -396,23 +384,6 @@
             <span class="card-header-title">Общие настройки</span>
           </div>
           <div class="form-grid">
-            <div class="form-group full-width">
-              <label for="inputBaseDir">Базовая папка артикула (YAML / PDF / SKP / Images)</label>
-              <div class="input-action-group">
-                <input type="text" id="inputBaseDir" class="form-control font-mono" placeholder="например: D:\Проекты — внутри создаётся папка <Артикул>">
-                <button type="button" class="btn btn-secondary btn-action" id="btnSelectBaseDir" title="Выбрать базовую папку для хранения папок артикулов">📁 Обзор</button>
-              </div>
-            </div>
-
-            <div class="form-group">
-              <label for="selectSnapshotFormat">Формат снимков сцен (папка Images)</label>
-              <select id="selectSnapshotFormat" class="form-control">
-                <option value="png" selected>PNG — без потерь</option>
-                <option value="webp">WebP — компактнее (libvips)</option>
-              </select>
-              <span class="field-hint">Для WebP нужна библиотека libvips: DLL кладутся в vendor/libvips плагина. Если её нет — снимок сохраняется как PNG.</span>
-            </div>
-
             <div class="form-group" id="webpQualityGroup">
               <label for="selectWebpQuality">Качество WebP</label>
               <select id="selectWebpQuality" class="form-control">
@@ -421,7 +392,7 @@
                 <option value="95">95 — выше качество</option>
                 <option value="lossless">Lossless — без потерь</option>
               </select>
-              <span class="field-hint">Применяется, когда формат снимков — WebP.</span>
+              <span class="field-hint" id="hintWebpFormat"></span>
             </div>
           </div>
         </div>

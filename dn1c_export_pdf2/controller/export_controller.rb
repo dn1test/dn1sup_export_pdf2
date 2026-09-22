@@ -97,8 +97,8 @@ module DN1Code
 
         # Экспорт снимков включенных сцен в папку артикула: <Артикул>/images/.
         # Набор «последних сцен»: папка очищается и перезаписывается при каждом экспорте.
-        # Формат снимков задается pdf_settings[:snapshot_format]: 'png' или 'webp' (конвертация
-        # PNG->WebP через libvips, при недоступной библиотеке — фолбэк на PNG).
+        # Формат снимков не настраивается: WebP при доступной libvips (конвертация
+        # PNG->WebP через libvips, при ошибке конвертации — фолбэк на PNG), иначе PNG.
         # Разрешение и пропорции берутся из pdf_settings (image_width / render_quality,
         # image_aspect_ratio / custom_ratio, наценка — aspect_ratio конкретной сцены).
         # @param reusable [Hash] { имя сцены => путь к уже отрендеренному временному изображению }
@@ -114,7 +114,7 @@ module DN1Code
           Dir.glob(File.join(images_dir, "*.{png,webp}")).each { |f| File.delete(f) rescue nil }
 
           settings  = @project_data.pdf_settings
-          webp_mode = snapshot_format(settings) == "webp"
+          webp_mode = defined?(Service::VipsService) && Service::VipsService.available?
           webp_opts = webp_quality_setting(settings)
           written   = []
           scenes.each_with_index do |scene_item, idx|
@@ -146,12 +146,6 @@ module DN1Code
         end
 
         private
-
-        # Формат снимков сцен из настроек: 'png' (по умолчанию) или 'webp'
-        def snapshot_format(settings)
-          fmt = settings[:snapshot_format].to_s.downcase.strip
-          fmt == "webp" ? "webp" : "png"
-        end
 
         # Качество WebP из настроек: 'lossless' -> сжатие без потерь, иначе целое 1..100 (умолчание 85)
         def webp_quality_setting(settings)

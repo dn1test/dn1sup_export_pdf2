@@ -77,10 +77,14 @@ module DN1Code
               project_data.pdf_settings[:show_aspect_overlay] = Service::OverlayService.overlay_active?(model)
             end
 
-            json_str = JSON.generate(project_data.to_h)
+            # Формат снимков не настраивается: WebP при доступной libvips, иначе PNG.
+            # Флаг передается отдельным ключом верхнего уровня (to_h возвращает живые ссылки —
+            # писать внутрь pdf_settings нельзя, иначе ключ уйдёт в settings.yaml).
+            payload = project_data.to_h
+            payload[:vips_available] = Service::VipsService.available? if defined?(Service::VipsService)
+            json_str = JSON.generate(payload)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
-
           # Переключение видимости рамки пропорций кадра через Sketchup::Overlay
           dialog.add_action_callback("toggleAspectOverlay") do |_action_context, enabled_val|
             model = Sketchup.active_model
@@ -127,20 +131,6 @@ module DN1Code
               end
             rescue StandardError
             end
-          end
-
-          # Генератор артикула по стандарту CF# / HF#
-          dialog.add_action_callback("generateArticul") do |_action_context, params_json|
-            commercial = false
-            if params_json && !params_json.to_s.empty?
-              begin
-                parsed = JSON.parse(params_json)
-                commercial = parsed["commercial"] == true || parsed["commercial"] == "true" || parsed["commercial"] == 1 || parsed["commercial"] == "1"
-              rescue StandardError
-              end
-            end
-            art = Model::ProjectData.generate_articul(commercial: commercial)
-            dialog.execute_script("window.app && window.app.onArticulGenerated(#{JSON.generate(art)});")
           end
 
           # Создание папки проекта по артикулу рядом с рабочим файлом .skp и первичная
@@ -213,25 +203,6 @@ module DN1Code
 
               idx = row_index.to_i
               dialog.execute_script("window.app && window.app.onDirectorySelected(#{idx}, #{JSON.generate(rel_path)});")
-            end
-          end
-
-          # Выбор базовой папки артикула (в ней создаются папки <Артикул> с YAML/PDF/SKP/PNG)
-          dialog.add_action_callback("selectBaseDir") do |_action_context, _param|
-            model = Sketchup.active_model
-            default_dir = ""
-            if model && model.respond_to?(:path) && !model.path.to_s.empty?
-              default_dir = File.dirname(model.path)
-            end
-
-            chosen_folder = UI.select_directory(
-              title:     "Выберите базовую папку для папок артикулов",
-              directory: default_dir
-            )
-
-            if chosen_folder && !chosen_folder.to_s.empty?
-              abs_path = File.expand_path(chosen_folder.to_s)
-              dialog.execute_script("window.app && window.app.onBaseDirSelected(#{JSON.generate(abs_path)});")
             end
           end
 
