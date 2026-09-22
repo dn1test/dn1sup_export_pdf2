@@ -108,33 +108,6 @@
                 <textarea id="inputProjectDescription" class="form-control" rows="2" placeholder="Краткое описание задания и назначения изделия..."></textarea>
               </div>
 
-              <div class="form-group full-width">
-                <label for="inputBaseDir">Базовая папка артикула (YAML / PDF / SKP / Images)</label>
-                <div class="input-action-group">
-                  <input type="text" id="inputBaseDir" class="form-control font-mono" placeholder="например: D:\Проекты — внутри создаётся папка <Артикул>">
-                  <button type="button" class="btn btn-secondary btn-action" id="btnSelectBaseDir" title="Выбрать базовую папку для хранения папок артикулов">📁 Обзор</button>
-                </div>
-              </div>
-
-              <div class="form-group">
-                <label for="selectSnapshotFormat">Формат снимков сцен (папка Images)</label>
-                <select id="selectSnapshotFormat" class="form-control">
-                  <option value="png" selected>PNG — без потерь</option>
-                  <option value="webp">WebP — компактнее (libvips)</option>
-                </select>
-                <span class="field-hint">Для WebP нужна библиотека libvips: DLL кладутся в vendor/libvips плагина. Если её нет — снимок сохраняется как PNG.</span>
-              </div>
-
-              <div class="form-group" id="webpQualityGroup">
-                <label for="selectWebpQuality">Качество WebP</label>
-                <select id="selectWebpQuality" class="form-control">
-                  <option value="75">75 — компактнее</option>
-                  <option value="85" selected>85 — рекомендуемое</option>
-                  <option value="95">95 — выше качество</option>
-                  <option value="lossless">Lossless — без потерь</option>
-                </select>
-                <span class="field-hint">Применяется, когда формат снимков — WebP.</span>
-              </div>
             </div>
           </div>
 
@@ -416,6 +389,43 @@
 
       <!-- TAB 6: SETTINGS -->
       <section id="tab-settings" class="tab-pane">
+        <!-- General Settings Card -->
+        <div class="settings-card" style="margin-bottom: 16px;">
+          <div class="card-header">
+            <span class="card-header-icon">🗂️</span>
+            <span class="card-header-title">Общие настройки</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group full-width">
+              <label for="inputBaseDir">Базовая папка артикула (YAML / PDF / SKP / Images)</label>
+              <div class="input-action-group">
+                <input type="text" id="inputBaseDir" class="form-control font-mono" placeholder="например: D:\Проекты — внутри создаётся папка <Артикул>">
+                <button type="button" class="btn btn-secondary btn-action" id="btnSelectBaseDir" title="Выбрать базовую папку для хранения папок артикулов">📁 Обзор</button>
+              </div>
+            </div>
+
+            <div class="form-group">
+              <label for="selectSnapshotFormat">Формат снимков сцен (папка Images)</label>
+              <select id="selectSnapshotFormat" class="form-control">
+                <option value="png" selected>PNG — без потерь</option>
+                <option value="webp">WebP — компактнее (libvips)</option>
+              </select>
+              <span class="field-hint">Для WebP нужна библиотека libvips: DLL кладутся в vendor/libvips плагина. Если её нет — снимок сохраняется как PNG.</span>
+            </div>
+
+            <div class="form-group" id="webpQualityGroup">
+              <label for="selectWebpQuality">Качество WebP</label>
+              <select id="selectWebpQuality" class="form-control">
+                <option value="75">75 — компактнее</option>
+                <option value="85" selected>85 — рекомендуемое</option>
+                <option value="95">95 — выше качество</option>
+                <option value="lossless">Lossless — без потерь</option>
+              </select>
+              <span class="field-hint">Применяется, когда формат снимков — WebP.</span>
+            </div>
+          </div>
+        </div>
+
         <!-- LayOut Parameters Card -->
         <div class="settings-card" style="margin-bottom: 16px;">
           <div class="card-header">
