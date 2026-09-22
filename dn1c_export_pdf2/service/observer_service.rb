@@ -88,7 +88,7 @@ module DN1Code
             Dialog::ExportDialog.refresh_if_open(model) if defined?(Dialog::ExportDialog)
 
             if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
-              yaml_name = project_data.yaml_filename(model)
+              yaml_name = Model::ProjectData::PROJECT_YAML_NAME
               rev = project_data.project_info[:revision]
               Sketchup.status_text = "DN1C Export PDF: Открыт проект #{yaml_name} (Ревизия r#{sprintf('%03d', rev)})"
             end

@@ -6702,9 +6702,8 @@
     onProjectFolderCreated: function (folderPath, yamlSaved) {
       if (!folderPath) return;
       showNotification(
-        yamlSaved
-          ? `Папка проекта создана: ${folderPath} (project.yaml записан)`
-          : `Папка проекта создана: ${folderPath}`,
+        (yamlSaved ? `Папка проекта создана: ${folderPath} (project.yaml записан)` : `Папка проекта создана: ${folderPath}`) +
+          " — сохраните модель (Ctrl+S), чтобы артикул остался в файле .skp",
         "success"
       );
     },

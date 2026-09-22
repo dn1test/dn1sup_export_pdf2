@@ -13,10 +13,12 @@ module DN1Code
     module Model
       # Модель данных проекта: хранит информацию о проекте, сценах, истории ревизий и параметрах PDF.
       # Единственный источник данных — YAML файлы: данные проекта — только внутри папки артикула
-      # (<базовая папка|папка SKP>/<Артикул>/project.yaml), настройки PDF и шаблоны страниц —
+      # (<папка .skp>/<Артикул>/project.yaml), настройки PDF и шаблоны страниц —
       # в системных файлах YAML внутри расширения (settings.yaml + layout.yaml).
-      # Сохранение без артикула запрещено: save_project_yaml не пишет данные на диск.
-      # Библиотека модели SketchUp (Attribute Dictionaries) не используется.
+      # В одной папке может быть несколько проектов — у каждого свой артикул и своя
+      # папка проекта; папку проекта для модели определяет артикул из самого .skp
+      # (ModelArticulStore). Сохранение без артикула запрещено: save_project_yaml
+      # не пишет данные на диск.
       class ProjectData
         # Пути к глобальным настройкам программы (хранятся внутри плагина)
         PLUGIN_CONFIG_DIR     = File.expand_path("../config", __dir__)
@@ -1036,30 +1038,6 @@ module DN1Code
           name.to_s.gsub(/[\\\/:\*\?"<>\|]/, "_").strip
         end
 
-        # Определяет имя YAML файла по артикулу или имени файла модели (схема до 2.1:
-        # файл данных лежал рядом с .skp или внутри папки артикула под именем <Артикул>.yaml).
-        # Оставлено для обратной совместимости: обнаружение и миграция старых проектов.
-        # Актуальное имя файла данных — PROJECT_YAML_NAME (project.yaml).
-        # @param project_info [Hash] метаданные проекта
-        # @param model [Sketchup::Model, nil] экземпляр модели SketchUp
-        # @return [String] имя файла YAML (например, "PRJ-100.yaml" или "ModelName.yaml")
-        def self.resolve_yaml_filename(project_info, model = nil)
-          articul = project_info && project_info[:articul] ? project_info[:articul].to_s.strip : ""
-          if !articul.empty?
-            clean_name = sanitize_filename(articul)
-            return "#{clean_name}.yaml" unless clean_name.empty?
-          end
-
-          if model && model.respond_to?(:path) && !model.path.to_s.empty?
-            clean_path = model.path.to_s.tr("\\", "/")
-            base_name = File.basename(clean_path, ".*")
-            clean_base = sanitize_filename(base_name)
-            return "#{clean_base}.yaml" unless clean_base.empty?
-          end
-
-          "project_config.yaml"
-        end
-
         # Суффикс версии и ревизии для имен файлов истории ("01#001")
         # @param project_info [Hash] метаданные проекта
         # @return [String]
@@ -1084,75 +1062,6 @@ module DN1Code
           end
 
           nil
-        end
-
-        # Ищет файл данных проекта project.yaml внутри папок артикулов рядом с моделью
-        # (<папка модели>/*/project.yaml). Ровно одна папка артикула — файл найден;
-        # несколько — однозначно сопоставить модель проекту нельзя, возвращаем nil
-        # (пользователь выбирает проект через «Импорт YAML»).
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [String, nil] абсолютный путь к project.yaml или nil
-        def self.find_project_yaml_for_model(model)
-          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
-
-          dir = File.dirname(model.path.to_s.tr("\\", "/"))
-          candidates = Dir.glob(File.join(dir, "*", PROJECT_YAML_NAME)).reject do |f|
-            File.basename(File.dirname(f)).start_with?("~", ".")
-          end
-
-          candidates.size == 1 ? candidates.first : nil
-        end
-
-        # Legacy-поиск YAML файла конфигурации по схеме до 2.1 (рядом с .skp:
-        # <model>.yaml / project_config.yaml / <Артикул>.yaml-якорь).
-        # @param model [Sketchup::Model] модель SketchUp
-        # @return [String, nil] абсолютный путь к существующему YAML файлу или nil
-        def self.find_yaml_path_for_model(model)
-          return nil unless model && model.respond_to?(:path) && !model.path.to_s.empty?
-
-          clean_path = model.path.to_s.tr("\\", "/")
-          dir = File.dirname(clean_path)
-          base_name = File.basename(clean_path, ".*")
-
-          # 1. Проверяем имя файла модели <model_basename>.yaml / .yml
-          model_yaml = File.join(dir, "#{base_name}.yaml")
-          return model_yaml if File.exist?(model_yaml)
-
-          model_yml = File.join(dir, "#{base_name}.yml")
-          return model_yml if File.exist?(model_yml)
-
-          # 2. Проверяем project_config.yaml / .yml
-          cfg_yaml = File.join(dir, "project_config.yaml")
-          return cfg_yaml if File.exist?(cfg_yaml)
-
-          cfg_yml = File.join(dir, "project_config.yml")
-          return cfg_yml if File.exist?(cfg_yml)
-
-          # 3. Сканируем папку модели на наличие YAML файла конфигурации проекта (исключая edit_history и layout)
-          layout_names = ["layout.yaml", "layout.yml", "layout_config.yaml", "layout_config.yml", "layouts.yaml", "layouts.yml"]
-          all_yamls = Dir.glob(File.join(dir, "*.{yaml,yml}")).reject do |f|
-            bn = File.basename(f)
-            bn.start_with?("~", ".") || bn == "edit_history.yaml" || bn == "edit_history.yml" || layout_names.include?(bn)
-          end
-
-          if all_yamls.size == 1
-            return all_yamls.first
-          elsif all_yamls.size > 1
-            matching = all_yamls.find do |f|
-              txt = File.read(f, 600, encoding: "utf-8") rescue ""
-              txt.include?("project:") || txt.include?("project_info:") || txt.include?("api_targets:")
-            end
-            return matching if matching
-          end
-
-          nil
-        end
-
-        # Имя файла данных проекта — всегда project.yaml (внутри папки артикула)
-        # @param model [Sketchup::Model, nil] модель SketchUp (не используется, оставлен для совместимости)
-        # @return [String] имя файла YAML
-        def yaml_filename(model = nil)
-          PROJECT_YAML_NAME
         end
 
         # Папка артикула проекта: <папка .skp>/<Артикул>
@@ -1182,11 +1091,14 @@ module DN1Code
         end
 
         # Автоматическая загрузка данных:
-        # 1. Загрузка глобальных настроек программы из плагина (settings.yaml + layout.yaml)
-        # 2. Данные проекта: project.yaml внутри папки артикула (<папка SKP>/*/project.yaml);
-        #    legacy-фолбэк — файлы по схеме до 2.1 (якорь рядом с .skp, <Артикул>/<Артикул>.yaml)
-        # 3. Журнал правок: <Артикул>/edit_history.yaml, фолбэк — edit_history.yaml рядом с SKP
-        # Библиотека модели SketchUp (атрибуты) не читается.
+        # 1. Глобальные настройки программы из плагина (settings.yaml + layout.yaml)
+        # 2. Данные проекта: project.yaml в папке артикула <папка .skp>/<Артикул>.
+        #    Артикул берется только из самого файла модели (.skp, ModelArticulStore):
+        #    в одной папке может быть несколько проектов — у каждого свой артикул
+        #    и своя папка проекта, файловая эвристика не используется
+        # 3. Журнал правок: <Артикул>/edit_history.yaml
+        # Модель без артикула в .skp проект не загружает (источник :default):
+        # артикул создается через панель либо привязывается через «Импорт YAML».
         # @param model [Sketchup::Model, nil] модель SketchUp
         # @return [Symbol] источник загрузки (:yaml или :default)
         def load_auto(model)
@@ -1195,51 +1107,30 @@ module DN1Code
 
           loaded_from = nil
 
-          # 1. Файл данных проекта project.yaml внутри папки артикула рядом с .skp
-          yaml_file = self.class.find_project_yaml_for_model(model)
-          yaml_file = self.class.find_yaml_path_for_model(model) if yaml_file.nil? || !File.exist?(yaml_file)
-          if yaml_file && File.exist?(yaml_file)
-            loaded_from = :yaml if load_from_yaml(yaml_file, include_settings: false)
-          end
-
-          # 1b. Если артикул определен (из project.yaml или legacy-якоря), канонический
-          # файл ищем внутри папки артикула: project.yaml, затем legacy <Артикул>.yaml —
-          # он приоритетен перед файлами рядом с .skp
-          if model && !@project_info[:articul].to_s.strip.empty?
+          # 2. Артикул из самого файла модели (.skp) определяет папку проекта
+          skp_articul = ModelArticulStore.read(model)
+          unless skp_articul.empty?
+            @project_info[:articul] = skp_articul
             art_dir = articul_dir_for_model(model)
             if art_dir && File.directory?(art_dir)
-              clean_art = self.class.sanitize_filename(@project_info[:articul])
-              [PROJECT_YAML_NAME, "#{clean_art}.yaml", "#{clean_art}.yml"].each do |name|
-                canonical_yaml = File.join(art_dir, name)
-                next unless File.exist?(canonical_yaml)
-                next if yaml_file && File.expand_path(canonical_yaml) == File.expand_path(yaml_file)
-
-                loaded_from = :yaml if load_from_yaml(canonical_yaml, include_settings: false)
-                break
-              end
+              project_yaml = File.join(art_dir, PROJECT_YAML_NAME)
+              loaded_from = :yaml if File.exist?(project_yaml) && load_from_yaml(project_yaml, include_settings: false)
             end
           end
 
-          if model && model.respond_to?(:path) && !model.path.to_s.empty?
-            clean_path = model.path.to_s.tr("\\", "/")
-            dir = File.dirname(clean_path)
-
-            # 2. Журнал изменений: сначала внутри папки артикула, затем legacy — рядом с .skp
-            hist_file = nil
-            unless @project_info[:articul].to_s.strip.empty?
-              art_dir = articul_dir_for_model(model)
-              candidate = art_dir ? File.join(art_dir, "edit_history.yaml") : nil
-              hist_file = candidate if candidate && File.exist?(candidate)
-            end
-            hist_file ||= File.join(dir, "edit_history.yaml")
-            load_from_edit_history(hist_file, @project_info[:articul]) if File.exist?(hist_file)
+          # 3. Журнал правок — только внутри папки артикула
+          if model && !@project_info[:articul].to_s.strip.empty?
+            art_dir = articul_dir_for_model(model)
+            hist_file = art_dir ? File.join(art_dir, "edit_history.yaml") : nil
+            load_from_edit_history(hist_file, @project_info[:articul]) if hist_file && File.exist?(hist_file)
 
             # Шаблоны страниц НЕ читаются из папки проекта:
             # единый источник — layout.yaml внутри расширения (общий для всех .skp)
           end
 
-          # Запись в библиотеку модели (.skp) не выполняется: единственные источники —
-          # YAML рядом с моделью и системные YAML файлы расширения.
+          # Запись в библиотеку модели (.skp) при загрузке не выполняется: атрибут
+          # артикула пишется только в точках сохранения (save_project_yaml,
+          # createProjectFolder, SessionStore.import_project_yaml).
 
           # Нормализация пропорций фрейма к 4:3 при недопустимом значении
           saved_val = @pdf_settings[:image_aspect_ratio].to_s.strip
@@ -1254,17 +1145,12 @@ module DN1Code
         end
 
         # Сохранение данных проекта в YAML: единственный файл — project.yaml внутри
-        # папки артикула (<базовая папка|папка SKP>/<Артикул>/project.yaml).
+        # папки артикула (<папка .skp>/<Артикул>/project.yaml).
         # Без артикула данные проекта на диск не пишутся — метод возвращает false.
-        # После записи удаляются legacy-дубликаты по схеме до 2.1, созданные самим
-        # плагином: якорь <Артикул>.yaml рядом с .skp и прежний канонический
-        # <Артикул>.yaml внутри папки артикула. Общие файлы-шаблоны (project_config.yaml,
-        # <имя модели>.yaml) и папки прежних артикулов (история PDF/SKP/PNG) не трогаются.
+        # После успешной записи артикул дублируется в атрибуты модели (.skp).
         # @param model [Sketchup::Model] модель SketchUp
-        # @param previous_articul [String, nil] артикул, сохраненный в сессии до текущих правок;
-        #   при смене артикула прежний <артикул>.yaml-якорь удаляется во избежание дубликатов
         # @return [Boolean] true в случае успешного сохранения
-        def save_project_yaml(model, previous_articul: nil)
+        def save_project_yaml(model)
           return false unless model
           return false unless model.respond_to?(:path) && !model.path.to_s.empty?
 
@@ -1277,56 +1163,11 @@ module DN1Code
           return false unless target_yaml
 
           FileUtils.mkdir_p(File.dirname(target_yaml)) rescue nil
-          return false unless save_to_yaml(target_yaml, include_settings: false)
-
-          cleanup_legacy_yaml_files(model, target_yaml, previous_articul: previous_articul)
-
-          true
+          save_to_yaml(target_yaml, include_settings: false) &&
+            # Артикул дублируется в атрибуты модели (.skp): после сохранения файла
+            # модель в любой сессии определяет свою папку проекта по артикулу
+            ModelArticulStore.write(model, @project_info[:articul])
         end
-
-        private
-
-        # Удаляет legacy-файлы данных проекта по схеме до 2.1: якорь <Артикул>.yaml
-        # рядом с .skp (текущего и, при переименовании, прежнего артикула) и прежний
-        # канонический <Артикул>.yaml внутри папки артикула.
-        # @param model [Sketchup::Model] модель SketchUp
-        # @param target_yaml [String] путь свежезаписанного project.yaml
-        # @param previous_articul [String, nil] артикул до текущих правок
-        # @return [void]
-        def cleanup_legacy_yaml_files(model, target_yaml, previous_articul: nil)
-          model_dir = File.dirname(model.path.to_s.tr("\\", "/"))
-          art_dir = articul_dir_for_model(model)
-          target_norm = File.expand_path(target_yaml).tr("\\", "/").downcase
-          current_art = @project_info[:articul].to_s.strip
-
-          # Список пар [шаблон пути, расширения]: для каждого существующего файла,
-          # не совпадающего с целевым project.yaml, выполняется удаление
-          checks = []
-          unless current_art.empty?
-            clean_art = self.class.sanitize_filename(current_art)
-            checks << [File.join(model_dir, "#{clean_art}%s"), [".yaml", ".yml"]] unless clean_art.empty?
-            if art_dir && !clean_art.empty?
-              checks << [File.join(art_dir, "#{clean_art}%s"), [".yaml", ".yml"]]
-            end
-          end
-          old_art = previous_articul.to_s.strip
-          unless old_art.empty? || old_art == current_art
-            clean_old = self.class.sanitize_filename(old_art)
-            checks << [File.join(model_dir, "#{clean_old}%s"), [".yaml", ".yml"]] unless clean_old.empty?
-          end
-
-          checks.each do |pattern, exts|
-            exts.each do |ext|
-              legacy_yaml = format(pattern, ext)
-              next unless File.exist?(legacy_yaml)
-
-              legacy_norm = File.expand_path(legacy_yaml).tr("\\", "/").downcase
-              File.delete(legacy_yaml) rescue nil if legacy_norm != target_norm
-            end
-          end
-        end
-
-        public
 
         # Применяет данные формы (payload из веб-интерфейса) к текущему объекту в памяти.
         # Запись на диск не выполняется — данные живут в сессии до flush.

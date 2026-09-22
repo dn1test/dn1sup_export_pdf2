@@ -151,6 +151,10 @@ module DN1Code
                 project_data = Model::SessionStore.data(model)
                 project_data.project_info[:articul] = articul if project_data.project_info[:articul].to_s.strip.empty?
                 project_data.sync_with_model_scenes(model) if model
+                # Артикул сразу пишется в атрибуты модели (.skp): попадает в файл
+                # при ближайшем сохранении модели (Ctrl+S) — после этого папка
+                # проекта определяется по самому файлу при любом открытии
+                Model::ModelArticulStore.write(model, articul) if model
 
                 art_dir = project_data.articul_dir_for_model(model)
                 if art_dir.nil? || art_dir.to_s.empty?
@@ -518,7 +522,7 @@ module DN1Code
               ok = Model::SessionStore.flush(model) if defined?(Model::SessionStore)
 
               if ok
-                yaml_name = project_data.yaml_filename(model)
+                yaml_name = Model::ProjectData::PROJECT_YAML_NAME
                 dialog.execute_script("window.app && window.app.showNotification('Сохранено: YAML проекта (#{yaml_name}) + настройки PDF и шаблоны расширения', 'success');")
                 if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
                   Sketchup.status_text = "DN1C Export PDF: Данные сохранены (#{yaml_name} + settings.yaml + layout.yaml)"
@@ -550,7 +554,7 @@ module DN1Code
               else
                 project_data.sync_with_model_scenes(model) if model
                 ok = Model::SessionStore.flush(model) if defined?(Model::SessionStore)
-                yaml_name = model ? project_data.yaml_filename(model) : "project.yaml"
+                yaml_name = Model::ProjectData::PROJECT_YAML_NAME
                 if ok
                   dialog.execute_script("window.app && window.app.showNotification('Сохранено в YAML (#{yaml_name}) + настройки расширения', 'success');")
                 elsif project_data.project_info[:articul].to_s.strip.empty?

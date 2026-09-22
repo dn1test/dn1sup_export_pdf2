@@ -40,7 +40,7 @@ module DN1Code
       extension_path = File.join(__dir__, "dn1c_export_pdf2", "main")
       ex = SketchupExtension.new(NAME_EXTENSION, extension_path)
       ex.description = PLUGIN_DESCRIPTION
-      ex.version     = VERSION
+      ex.version     = PLUGIN_VERSION
       ex.copyright   = PLUGIN_COPYRIGHT
       ex.creator     = NAME_CREATOR
 

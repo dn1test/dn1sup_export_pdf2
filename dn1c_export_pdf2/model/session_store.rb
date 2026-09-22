@@ -9,7 +9,8 @@ module DN1Code
       # модели SketchUp на всё время работы программы. Все правки пользователя
       # применяются к объекту в памяти; запись на диск (YAML) выполняется только
       # в трех точках: принудительное сохранение (кнопка), экспорт PDF и
-      # закрытие SketchUp (flush_all). Библиотека модели (атрибуты .skp) не используется.
+      # закрытие SketchUp (flush_all). В библиотеке модели (.skp) хранится только
+      # артикул (ModelArticulStore).
       module SessionStore
         @sessions = {}
 
@@ -25,11 +26,10 @@ module DN1Code
               project_data = ProjectData.new
               project_data.load_auto(model)
               entry = {
-                data:           project_data,
-                model:          model,
-                model_path:     model_path_of(model),
-                articul_before: project_data.project[:articul].to_s.dup,
-                dirty:          false
+                data:       project_data,
+                model:      model,
+                model_path: model_path_of(model),
+                dirty:      false
               }
               @sessions[key] = entry
             end
@@ -117,12 +117,13 @@ module DN1Code
             return nil unless pd.load_from_yaml(file_path, include_settings: false)
 
             pd.sync_with_model_scenes(model) if model
+            # Артикул импортированного проекта дублируется в атрибуты модели (.skp)
+            ModelArticulStore.write(model, pd.project[:articul]) if model
             @sessions[key_for(model)] = {
-              data:           pd,
-              model:          model,
-              model_path:     model_path_of(model),
-              articul_before: pd.project[:articul].to_s.dup,
-              dirty:          true
+              data:       pd,
+              model:      model,
+              model_path: model_path_of(model),
+              dirty:      true
             }
             pd
           rescue StandardError => e
@@ -146,9 +147,8 @@ module DN1Code
             pd = entry[:data]
             m = model || entry[:model]
             pd.sync_with_model_scenes(m) if m
-            ok_yaml = pd.save_project_yaml(m, previous_articul: entry[:articul_before])
+            ok_yaml = pd.save_project_yaml(m)
             ok_cfg  = pd.save_program_settings
-            entry[:articul_before] = pd.project[:articul].to_s.dup
             entry[:dirty] = false
             ok_yaml || ok_cfg
           rescue StandardError => e

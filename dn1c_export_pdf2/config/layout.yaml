@@ -215,7 +215,7 @@ layout:
       h: 82
       visible: true
       content: render_viewport
-      show_background: true
+      show_background: false
       aspect_ratio: '4:3'
       scale_pct: 100
       align: left
@@ -389,7 +389,7 @@ layout:
       h: 82
       visible: true
       content: render_viewport
-      show_background: true
+      show_background: false
       aspect_ratio: '4:3'
       scale_pct: 100
       align: left
@@ -562,8 +562,8 @@ layout:
       h: 82
       visible: true
       content: render_viewport
-      show_background: true
-      aspect_ratio: '3:2'
+      show_background: false
+      aspect_ratio: '4:3'
       scale_pct: 100
       align: left
       font_size: 8
@@ -735,7 +735,7 @@ layout:
       h: 82
       visible: true
       content: render_viewport
-      show_background: true
+      show_background: false
       aspect_ratio: '4:3'
       scale_pct: 100
       align: left
@@ -877,7 +877,7 @@ layout:
       line_aligns:
       line_valigns:
       opacity: 0.9
-      show_background: true
+      show_background: false
     header:
       visible: false
       content: none
