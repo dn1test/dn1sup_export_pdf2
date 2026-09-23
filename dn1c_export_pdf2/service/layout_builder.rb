@@ -64,6 +64,13 @@ module DN1Code
           end
 
           pdf_path = custom_output_path || controller.send(:resolve_default_pdf_path)
+
+          # Целевой PDF открыт в просмотрщике → запись упадёт с EACCES.
+          # Предупреждаем сразу и не пытаемся сохранить.
+          if Model::FileOpener.file_locked?(pdf_path)
+            raise "Целевой PDF открыт в программе просмотра и заблокирован для записи:\n#{pdf_path}\nЗакройте его и повторите экспорт."
+          end
+
           FileUtils.mkdir_p(File.dirname(pdf_path))
 
           temp_images = []
@@ -199,9 +206,14 @@ module DN1Code
               begin
                 last_candidate = controller.resolve_last_pdf_path
                 if last_candidate && File.expand_path(last_candidate) != File.expand_path(pdf_path)
-                  FileUtils.mkdir_p(File.dirname(last_candidate))
-                  FileUtils.cp(pdf_path, last_candidate)
-                  controller.last_pdf_path = last_candidate
+                  # Копия открыта в просмотрщике — не трогаем её, экспорт не валим
+                  if Model::FileOpener.file_locked?(last_candidate)
+                    warn "Предупреждение: копия _last.pdf открыта в программе просмотра и не обновлена: #{last_candidate}"
+                  else
+                    FileUtils.mkdir_p(File.dirname(last_candidate))
+                    FileUtils.cp(pdf_path, last_candidate)
+                    controller.last_pdf_path = last_candidate
+                  end
                 end
               rescue StandardError => e
                 warn "Предупреждение: не удалось создать копию _last.pdf (#{last_candidate}): #{e.message}"
@@ -241,11 +253,13 @@ module DN1Code
 
             progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")
 
-            # 8. Открытие PDF файла (openURL требует URL-схему file:///)
+            # 8. Открытие PDF файла системной программой по умолчанию
             # Открываем именно копию «_last» рядом с .skp, если она создана
-            if settings[:auto_open_pdf] && defined?(UI) && UI.respond_to?(:openURL)
+            if auto_open_enabled?(settings)
               opened = controller.last_pdf_path || pdf_path
-              UI.openURL(Model::PathUtil.file_url(opened))
+              unless Model::FileOpener.open_path(opened)
+                warn "Предупреждение: PDF создан (#{opened}), но не открылся автоматически — откройте его вручную."
+              end
             end
 
             pdf_path
@@ -256,6 +270,13 @@ module DN1Code
         end
 
         private
+
+        # Защитное чтение флага автооткрытия: ключ может прийти символьным или
+        # строковым (YAML-настройки / payload диалога)
+        def auto_open_enabled?(settings)
+          value = settings[:auto_open_pdf] || settings["auto_open_pdf"]
+          !value.nil? && value != false
+        end
 
         # ------------------------------------------------------------------
         # Единицы измерения и геометрия

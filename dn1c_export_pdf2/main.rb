@@ -21,6 +21,7 @@ require_relative "service/snapshot_worker"
 
 # Загрузка моделей данных
 require_relative "model/path_util"
+require_relative "model/file_opener"
 require_relative "model/model_articul_store"
 require_relative "model/project_data"
 require_relative "model/session_store"

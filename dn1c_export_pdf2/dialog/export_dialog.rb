@@ -498,7 +498,7 @@ module DN1Code
               folder_abs = candidates.find { |p| Dir.exist?(p) }
 
               if folder_abs && File.exist?(folder_abs)
-                UI.openURL(Model::PathUtil.file_url(folder_abs))
+                Model::FileOpener.open_path(folder_abs)
               else
                 UI.messagebox("Папка не найдена на диске:\n#{folder_raw}")
               end
@@ -628,7 +628,7 @@ module DN1Code
               if clean_path.empty?
                 # Пустая ссылка — открывать нечего
               elsif File.exist?(clean_path)
-                UI.openURL(Model::PathUtil.file_url(File.dirname(clean_path)))
+                Model::FileOpener.open_path(File.dirname(clean_path))
               else
                 UI.messagebox("Папка не найдена на диске:\n#{clean_path}")
               end
@@ -644,7 +644,7 @@ module DN1Code
               if clean_path.empty?
                 # Пустая ссылка — открывать нечего
               elsif File.exist?(clean_path)
-                UI.openURL(Model::PathUtil.file_url(clean_path))
+                Model::FileOpener.open_path(clean_path)
               else
                 UI.messagebox("Файл не найден на диске:\n#{clean_path}")
               end

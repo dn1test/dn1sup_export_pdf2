@@ -7,6 +7,13 @@
 require_relative "mock_sketchup"
 require_relative "../main"
 require_relative "test_template_params"
+
+# Перехватчик системного открытия: тесты не должны реально запускать
+# ShellExecuteW / программу по умолчанию — вызовы логируются в stdout
+DN1Code::ExportPdf2::Model::FileOpener.launcher_override = lambda do |path|
+  puts "[FileOpener] #{path}"
+  true
+end
 # require "pdf/core" - Removed, all PDF generation is now native via LayOut API
 
 if defined?(Sketchup) && Sketchup.respond_to?(:version)
@@ -264,6 +271,10 @@ class TestRunner
     test_scene_snapshots_reuse_rendered_source
     test_snapshot_worker_background_pool
     test_path_util_file_url_encoding
+    test_file_opener_open_path
+    test_file_opener_file_locked
+    test_export_aborts_when_target_pdf_locked
+    test_export_skips_last_copy_when_locked
     test_history_rev_ver_fields_and_migration
     test_74_save_without_articul_writes_no_yaml
     test_75_legacy_yaml_ignored
@@ -5996,8 +6007,8 @@ class TestRunner
     assert(File.exist?(expected_pdf), "Версионированный PDF в папке артикула создан: #{expected_pdf}")
     assert(File.exist?(expected_last), "Копия _last.pdf создана рядом с .skp: #{expected_last}")
     assert(File.expand_path(controller.last_pdf_path.to_s) == expected_last, "controller.last_pdf_path указывает на копию _last")
-    assert(captured.string.include?("file:///" + expected_last.tr("\\", "/")),
-           "Автооткрытие получилo URL копии _last (#{captured.string[/\[UI::openURL\][^\n]*/]})")
+    assert(captured.string.include?("[FileOpener] " + expected_last.tr("\\", "/")),
+           "Автооткрытие получило путь копии _last (#{captured.string[/\[FileOpener\][^\n]*/]})")
 
     # Привязка pdf_link: заполняется только самая свежая пустая запись, повтор не затирает
     assert(project_data.stamp_history_pdf_link!(result_path.to_s), "stamp_history_pdf_link! проставил ссылку")
@@ -6337,6 +6348,165 @@ class TestRunner
     assert(pu.file_url("").nil?, "Пустая строка возвращает nil")
     assert(pu.file_url("   ").nil?, "Строка из пробелов возвращает nil")
     assert(pu.file_url(nil).nil?, "nil возвращает nil")
+  end
+
+  def test_file_opener_open_path
+    puts "\n--- 72b. Тест FileOpener: открытие системной программой через перехватчик ---"
+
+    opener   = DN1Code::ExportPdf2::Model::FileOpener
+    original = opener.launcher_override
+    calls    = []
+    opener.launcher_override = ->(path) { calls << path; true }
+
+    begin
+      # Существующий файл — лаунчер получает путь как есть
+      existing = File.expand_path(__FILE__)
+      assert(opener.open_path(existing) == true, "Существующий файл: open_path возвращает true")
+      assert(calls.last == existing, "Лаунчер получил путь файла (#{calls.last.inspect})")
+
+      # Существующая папка
+      dir = File.expand_path(__dir__)
+      assert(opener.open_path(dir) == true, "Существующая папка: open_path возвращает true")
+      assert(calls.last == dir, "Лаунчер получил путь папки (#{calls.last.inspect})")
+
+      # Несуществующий/пустой путь — false без вызова лаунчера
+      calls.clear
+      assert(opener.open_path("Z:/definitely/missing/file.pdf") == false, "Несуществующий путь возвращает false")
+      assert(opener.open_path("") == false, "Пустой путь возвращает false")
+      assert(opener.open_path(nil) == false, "nil возвращает false")
+      assert(calls.empty?, "Лаунчер не вызывается для несуществующих путей")
+
+      # Сбой лаунчера не маскируется под успех
+      opener.launcher_override = ->(_path) { false }
+      assert(opener.open_path(File.expand_path(__FILE__)) == false, "Сбой лаунчера -> open_path возвращает false")
+    ensure
+      opener.launcher_override = original
+    end
+  end
+
+  def test_file_opener_file_locked
+    puts "\n--- 72c. Тест FileOpener.file_locked?: детект файла, открытого другой программой ---"
+
+    require "fiddle"
+    opener = DN1Code::ExportPdf2::Model::FileOpener
+
+    test_dir = File.expand_path("test_file_lock", __dir__)
+    FileUtils.rm_rf(test_dir)
+    FileUtils.mkdir_p(test_dir)
+    path = File.join(test_dir, "doc.pdf")
+    File.binwrite(path, "%PDF-1.4 lock test")
+
+    begin
+      assert(opener.file_locked?(path) == false, "Обычный файл не считается открытым")
+      assert(opener.file_locked?(File.join(test_dir, "missing.pdf")) == false, "Отсутствующий файл не считается открытым")
+      assert(opener.file_locked?(nil) == false, "nil не считается открытым")
+
+      # Эксклюзивный хэндл как у просмотрщика PDF: shareMode = 0
+      kernel32 = Fiddle.dlopen("kernel32.dll")
+      create_w = Fiddle::Function.new(
+        kernel32["CreateFileW"],
+        [Fiddle::TYPE_VOIDP, Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP,
+         Fiddle::TYPE_INT, Fiddle::TYPE_INT, Fiddle::TYPE_VOIDP],
+        Fiddle::TYPE_VOIDP
+      )
+      close_h = Fiddle::Function.new(kernel32["CloseHandle"], [Fiddle::TYPE_VOIDP], Fiddle::TYPE_INT)
+      utf16 = ->(s) { (s.encode("UTF-16LE") + "\0".encode("UTF-16LE")).b }
+      generic_rw = -1_073_741_824 # 0xC0000000 = GENERIC_READ | GENERIC_WRITE
+
+      handle = create_w.call(utf16.call(File.expand_path(path)), generic_rw, 0, nil, 3, 0x80, nil)
+      begin
+        assert(handle.to_i != 0 && handle.to_i != 2**64 - 1, "Эксклюзивный хэндл получен")
+        assert(opener.file_locked?(path) == true, "Файл с чужим эксклюзивным хэндлом определён как открытый")
+      ensure
+        close_h.call(handle)
+      end
+
+      assert(opener.file_locked?(path) == false, "После закрытия чужого хэндла файл снова доступен")
+    ensure
+      FileUtils.rm_rf(test_dir)
+    end
+  end
+
+  def test_export_aborts_when_target_pdf_locked
+    puts "\n--- 72d. Экспорт прерывается с предупреждением, если целевой PDF открыт ---"
+
+    opener = DN1Code::ExportPdf2::Model::FileOpener
+    opener.singleton_class.send(:alias_method, :file_locked_real, :file_locked?)
+    opener.singleton_class.send(:define_method, :file_locked?) { |_path| true }
+
+    test_dir = File.expand_path("test_locked_export", __dir__)
+    FileUtils.rm_rf(test_dir)
+    skp_dir = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    begin
+      model = Sketchup::MockModel.new(File.join(skp_dir, "Table.skp"))
+      model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Вид 1")])
+
+      project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+      project_data.pdf_settings[:auto_open_pdf] = false
+      project_data.sync_with_model_scenes(model)
+
+      controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+      target = File.join(test_dir, "out.pdf")
+      File.binwrite(target, "OLD CONTENT")
+
+      raised = false
+      begin
+        controller.export(target)
+      rescue StandardError => e
+        raised = true
+        assert(e.message.include?("заблокирован"), "Сообщение объясняет причину (#{e.message.inspect})")
+      end
+      assert(raised, "Экспорт прерван, когда целевой PDF заблокирован")
+      assert(File.binread(target) == "OLD CONTENT", "Открытый файл не перезаписан")
+    ensure
+      opener.singleton_class.send(:alias_method, :file_locked?, :file_locked_real)
+      opener.singleton_class.send(:remove_method, :file_locked_real)
+      FileUtils.rm_rf(test_dir)
+    end
+  end
+
+  def test_export_skips_last_copy_when_locked
+    puts "\n--- 72e. Копия _last.pdf открыта — пропускается, экспорт не валим ---"
+
+    opener = DN1Code::ExportPdf2::Model::FileOpener
+    opener.singleton_class.send(:alias_method, :file_locked_real, :file_locked?)
+
+    test_dir = File.expand_path("test_locked_last_export", __dir__)
+    FileUtils.rm_rf(test_dir)
+    skp_dir = File.join(test_dir, "models")
+    FileUtils.mkdir_p(skp_dir)
+
+    begin
+      skp_file = File.join(skp_dir, "Chair.skp")
+      model = Sketchup::MockModel.new(skp_file)
+      model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Обложка")])
+
+      project_data = DN1Code::ExportPdf2::Model::ProjectData.new
+      project_data.project_info[:articul] = "EXP-LCK"
+      project_data.pdf_settings[:auto_open_pdf] = false
+      project_data.sync_with_model_scenes(model)
+
+      controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
+
+      File.binwrite(controller.resolve_last_pdf_path, "STALE OLD COPY")
+      last_path = File.expand_path(controller.resolve_last_pdf_path.to_s)
+      opener.singleton_class.send(:define_method, :file_locked?) do |path|
+        File.expand_path(path.to_s) == last_path
+      end
+
+      result_path = controller.export(nil)
+      DN1Code::ExportPdf2::Service::SnapshotWorker.drain
+
+      assert(File.exist?(result_path.to_s), "Версионный PDF создан несмотря на открытую копию _last")
+      assert(File.binread(controller.resolve_last_pdf_path) == "STALE OLD COPY", "Открытая копия _last не перезаписана")
+      assert(controller.last_pdf_path.nil?, "last_pdf_path не указывает на необновлённую копию")
+    ensure
+      opener.singleton_class.send(:alias_method, :file_locked?, :file_locked_real)
+      opener.singleton_class.send(:remove_method, :file_locked_real)
+      FileUtils.rm_rf(test_dir)
+    end
   end
 
   def test_history_rev_ver_fields_and_migration
