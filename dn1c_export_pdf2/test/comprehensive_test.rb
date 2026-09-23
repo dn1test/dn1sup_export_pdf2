@@ -4020,9 +4020,9 @@ class TestRunner
 
     # 1. Проверка навигационных кнопок в index.html
     assert(html_content.include?('data-tab="tab-scenes"'), "index.html содержит кнопку вкладки tab-scenes")
-    assert(html_content.include?('Страницы проекта'), "index.html содержит заголовок 'Страницы проекта'")
+    assert(html_content.include?('Страницы'), "index.html содержит заголовок 'Страницы'")
     assert(html_content.include?('data-tab="tab-templates"'), "index.html содержит отдельную кнопку вкладки tab-templates")
-    assert(html_content.include?('Настройка шаблонов'), "index.html содержит заголовок 'Настройка шаблонов'")
+    assert(html_content.include?('Шаблоны'), "index.html содержит заголовок 'Шаблоны'")
 
     # 2. Проверка раздельных секций в index.html
     assert(html_content.include?('<section id="tab-scenes" class="tab-pane">'), "index.html содержит секцию #tab-scenes")

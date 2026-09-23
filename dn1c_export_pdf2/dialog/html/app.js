@@ -4885,7 +4885,7 @@
   }
 
   // Актуализировать список страниц из модели SketchUp при открытии вкладки
-  // «Страницы проекта» (новые страницы добавляются, удалённые убираются),
+  // «Страницы» (новые страницы добавляются, удалённые убираются),
   // затем перегенерировать эскизы всех сцен
   function refreshScenesFromModel() {
     if (window.sketchup && typeof window.sketchup.refreshScenes === "function") {
@@ -6711,7 +6711,7 @@
       ensureCustomLayouts();
       syncDirectoriesSpecifications();
       renderUI();
-      // Если диалог уже открыт на вкладке «Страницы проекта», актуализируем
+      // Если диалог уже открыт на вкладке «Страницы», актуализируем
       // список страниц и эскизы (повторное открытие диалога из меню)
       const scenesPane = document.getElementById("tab-scenes");
       if (scenesPane && scenesPane.classList.contains("active")) {

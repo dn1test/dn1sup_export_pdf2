@@ -34,13 +34,6 @@ layout:
         scene_name: "#005EB0"
         scene_description: "#475569"
       opacity: 0.95
-    cover_title:
-      x: 10.0
-      "y": 15.0
-      w: 80.0
-      h: 12.0
-      visible: true
-      align: center
     image_4_3:
       x: 25
       "y": 12
@@ -576,36 +569,46 @@ layout:
       "y": 0
       w: 25
       h: 58
-      visible: false
+      visible: true
       content: info_lines
       align: left
       valign: top
       font_size: 8
       item_gap_mm: 2.0
       item_gap: 2
-      lines: []
+      lines:
+      - toc_pages
+      - spec_materials
+      - spec_appliances
+      - general_notes
+      - workflow_history
+      - workflow_stadia
+      - workflow_revision
+      - workflow_version
+      - workflow_date
+      - articul
       line_aligns:
         toc_pages: left
         spec_materials: left
         spec_appliances: left
         general_notes: left
-        workflow_history: left
-        workflow_stadia: left
-        workflow_revision: left
-        workflow_version: left
-        workflow_date: left
-        articul: left
+        workflow_history: right
+        workflow_stadia: right
+        workflow_revision: right
+        workflow_version: right
+        workflow_date: right
+        articul: right
       line_valigns:
         toc_pages: top
         spec_materials: top
         spec_appliances: top
         general_notes: top
-        workflow_history: bottom
-        workflow_stadia: bottom
-        workflow_revision: bottom
-        workflow_version: bottom
-        workflow_date: bottom
-        articul: bottom
+        workflow_history: top
+        workflow_stadia: top
+        workflow_revision: top
+        workflow_version: top
+        workflow_date: top
+        articul: top
       line_font_sizes:
         toc_pages: 8
         spec_materials: 8
@@ -629,15 +632,15 @@ layout:
         workflow_date: "#334155"
         articul: "#334155"
       opacity: 0.88
-      show_titles: true
+      show_titles: false
       line_show_titles: {}
     slot_2:
       x: 0
       "y": 58
       w: 25
       h: 36
-      visible: false
-      content: none
+      visible: true
+      content: info_lines
       align: left
       valign: bottom
       font_size: 8
@@ -648,8 +651,8 @@ layout:
       "y": 0
       w: 25
       h: 58
-      visible: false
-      content: none
+      visible: true
+      content: info_lines
       align: right
       valign: top
       font_size: 8
