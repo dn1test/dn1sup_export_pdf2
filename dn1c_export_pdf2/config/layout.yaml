@@ -22,8 +22,8 @@ layout:
         scene_name: 4
         scene_description: 5
       line_font_sizes:
-        furniture_name: 20
-        place_address: 28
+        furniture_name: 28
+        place_address: 20
         customer_or_company: 20
         scene_name: 11
         scene_description: 9
@@ -34,6 +34,13 @@ layout:
         scene_name: "#005EB0"
         scene_description: "#475569"
       opacity: 0.95
+    cover_title:
+      x: 10.0
+      "y": 15.0
+      w: 80.0
+      h: 12.0
+      visible: true
+      align: center
     image_4_3:
       x: 25
       "y": 12
@@ -60,12 +67,7 @@ layout:
       font_size: 10
       item_gap_mm: 2.0
       item_gap: 2
-      lines:
-      - articul
-      - workflow_date
-      - workflow_version
-      - workflow_revision
-      - workflow_stadia
+      lines: []
       line_aligns:
         articul: left
         workflow_date: left
@@ -227,7 +229,7 @@ layout:
       "y": 10
       w: 28
       h: 40
-      visible: true
+      visible: false
       content: info_lines
       align: right
       valign: top
@@ -401,7 +403,7 @@ layout:
       "y": 0
       w: 25
       h: 58
-      visible: true
+      visible: false
       content: info_lines
       align: left
       valign: top
@@ -543,11 +545,11 @@ layout:
         place_address: 1
         customer_or_company: 1
       line_font_sizes:
-        scene_name: 10
+        scene_name: 14
         scene_description: 8
-        furniture_name: 8
-        place_address: 8
-        customer_or_company: 8
+        furniture_name: 10
+        place_address: 10
+        customer_or_company: 10
       line_colors:
         scene_name: "#005EB0"
         scene_description: "#475569"
@@ -581,9 +583,7 @@ layout:
       font_size: 8
       item_gap_mm: 2.0
       item_gap: 2
-      lines:
-      - general_notes
-      - workflow_stadia
+      lines: []
       line_aligns:
         toc_pages: left
         spec_materials: left
@@ -754,8 +754,7 @@ layout:
       font_size: 8
       item_gap_mm: 2.0
       item_gap: 2
-      lines:
-      - workflow_stadia
+      lines: []
       line_aligns:
         toc_pages: left
         spec_materials: left
@@ -862,13 +861,13 @@ layout:
       opacity: 1
   blank:
     image_4_3:
-      visible: true
+      visible: false
       content: render_viewport
       custom_text: ''
       align: left
       valign: top
       font_size: 8
-      aspect_ratio: '16:9'
+      aspect_ratio: '4:3'
       scale_pct: 100
       lines: []
       line_rows:

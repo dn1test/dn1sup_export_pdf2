@@ -124,6 +124,25 @@
     }
   ];
 
+  // Дата в превью — в печатном формате PDF (dd.mm.yyyy), а не в локали браузера (9/22/2026)
+  const previewDate = (d) => {
+    const s = String(d || "").trim();
+    if (s) return s;
+    const now = new Date();
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`;
+  };
+
+  // Стадии приходят из Ruby массивом объектов {name, status};
+  // поддерживаем и легаси-кортежи [_, done, title]
+  const stadiaName = (st) => (st && typeof st === "object" && !Array.isArray(st) && st.name !== undefined)
+    ? String(st.name)
+    : (Array.isArray(st) ? String(st[2]) : String(st));
+  const stadiaMark = (st) => {
+    const done = Array.isArray(st) ? !!st[1] : !!(st && st.status);
+    return `${done ? "[✓]" : "[ ]"} ${stadiaName(st)}`;
+  };
+
   // Available Information Lines that can be toggled on/off in each block
   const AVAILABLE_INFO_LINES = [
     { key: "toc_pages",        group: "project",  label: "Содержание (список страниц)", icon: "📑", getVal: (info, wf) => {
@@ -146,7 +165,7 @@
     { key: "workflow_stadia",  group: "workflow", label: "Стадия проекта",          icon: "⏳", getVal: (info, wf) => {
         const s = wf.stadia || info.stadia;
         if (Array.isArray(s) && s.length > 0) {
-          return s.map(st => Array.isArray(st) ? `${st[1] ? "[✓]" : "[ ]"} ${st[2]}` : String(st)).join(" • ");
+          return s.map(st => stadiaMark(st)).join(" • ");
         }
         return (wf.status || info.status || "").trim() || "РД";
       }
@@ -154,8 +173,8 @@
     { key: "workflow_revision",group: "workflow", label: "Ревизия",                 icon: "🏷️", getVal: (info, wf) => `Ревизия ${wf.revision || info.revision || '001'}` },
     { key: "workflow_version", group: "workflow", label: "Версия",                  icon: "🔢", getVal: (info, wf) => `Версия ${wf.version || info.version || '01'}` },
     { key: "workflow_date",    group: "workflow", label: "Дата",                    icon: "🗓️", getVal: (info, wf) => {
-        const d = wf.last_edit_date || info.date || info.created_date;
-        return d ? String(d).trim() : new Date().toLocaleDateString();
+        // Источники зеркалируют Ruby resolve_parts("workflow_date"): date_order || date
+        return previewDate(wf.date_order || info.date);
       }
     },
     { key: "articul",          group: "project",  label: "Артикул",                 icon: "🔖", getVal: (info, wf) => (info.articul || "").trim() || "CF#260905_160129" },
@@ -164,7 +183,8 @@
     { key: "customer_or_company", group: "customer", label: "Имя заказчика или Название компании", icon: "👤", getVal: (info, wf) => [info.name_customer || info.customer, info.company || info.name_company].filter(Boolean).map(s => s.trim()).join(" | ") || "Смирнов С.С. | ООО «МебельПроект»" },
     { key: "footer_last_edit", group: "system",   label: "Последние изменения",     icon: "📝", getVal: (info, wf) => {
         const h = wf.history_edit || info.history_edit;
-        const last = Array.isArray(h) && h.length > 0 ? (Array.isArray(h[h.length - 1]) ? `${h[h.length - 1][0]} ${h[h.length - 1][1]}` : h[h.length - 1]) : (wf.last_edit || info.last_edit || "");
+        // В памяти история хранится от новых к старым (как в Ruby-экспорте) — берём первую запись
+        const last = Array.isArray(h) && h.length > 0 ? (Array.isArray(h[0]) ? `${h[0][0]} ${h[0][1]}` : h[0]) : (wf.last_edit || info.last_edit || "");
         const s = String(last).trim();
         return s ? (s.toLowerCase().startsWith("последние") ? s : `Последние изменения: ${s}`) : "Последние изменения: —";
       }
@@ -181,7 +201,7 @@
       }
     },
     { key: "footer_date",      group: "system",   label: "Дата",                    icon: "🗓️", getVal: (info, wf) => {
-        const d = (wf.last_edit_date || info.date || '').trim() || new Date().toLocaleDateString();
+        const d = previewDate(wf.last_edit_date || info.date);
         return d.toLowerCase().startsWith("дата") ? d : `Дата: ${d}`;
       }
     },
@@ -190,7 +210,7 @@
         const rev = wf.revision || info.revision || '001';
         const ver = wf.version || info.version || '01';
         const art = (info.articul || '').trim() || 'CF#260905_160129';
-        return `Ревизия ${rev} # Версия ${ver} | ${art} | ${new Date().toLocaleDateString()}`;
+        return `Ревизия ${rev} # Версия ${ver} | ${art} | ${previewDate()}`;
       }
     },
     { key: "project_desc",     group: "project",  label: "Описание задания",        icon: "📋", getVal: (info, wf) => (info.project_description || info.description || "").trim() },
@@ -1758,7 +1778,7 @@
 
       if (leftItems.length === 0 && centerItems.length === 0 && rightItems.length === 0) {
         leftItems.push("Последние изменения: —");
-        centerItems.push(`Версия ${wf.version || '01'} # Ревизия ${wf.revision || '001'}   |   Артикул: ${info.articul || 'CF#...'}   |   ${new Date().toLocaleDateString()}`);
+        centerItems.push(`Версия ${wf.version || '01'} # Ревизия ${wf.revision || '001'}   |   Артикул: ${info.articul || 'CF#...'}   |   ${previewDate()}`);
         rightItems.push("Страница 1 | 4");
       }
 
@@ -2292,10 +2312,10 @@
       { key: "spec_appliances",   label: "🔌 Техника и подсветка",        val: [info.appliances, info.lighting].filter(Boolean).map(s => s.trim()).filter(Boolean).join("; ") || "Встраиваемая техника, LED 3000K..." },
       { key: "general_notes",     label: "📝 Общие пояснения",            val: (info.project_description || info.description || info.notes || "Замеры выполнены по факту").trim() },
       { key: "workflow_history",  label: "📜 История правок",             val: (wf.last_edit || info.last_edit || "Корректировка фасадов").trim() },
-      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(wf.stadia) ? wf.stadia.map(st => Array.isArray(st) ? st[2] : String(st)).join(", ") : String(wf.stadia || wf.status || info.status || "РД")).trim() },
+      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(wf.stadia) ? wf.stadia.map(st => stadiaName(st)).join(", ") : String(wf.stadia || wf.status || info.status || "РД")).trim() },
       { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || info.revision || "001").trim() },
       { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || info.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: String(wf.date_order || info.date || new Date().toISOString().slice(0, 10)).trim() },
+      { key: "workflow_date",     label: "📅 Дата",                      val: previewDate(wf.date_order || info.date) },
       { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
     ];
 
@@ -2464,7 +2484,7 @@
     const sampleRev = String(wf.revision || info.revision || "001").trim();
     const sampleVer = String(wf.version || info.version || "01").trim();
     const sampleArt = String(info.articul || "CF#...").trim();
-    const sampleDate = String(wf.last_edit_date || info.date || new Date().toLocaleDateString()).trim();
+    const sampleDate = previewDate(wf.last_edit_date || info.date);
     const sampleLastEdit = String(wf.last_edit || "Корректировка фасадов").trim();
 
     const footerItemsDef = [
@@ -2594,7 +2614,7 @@
       { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(info.stadia) ? info.stadia.map(st => (st && st.name) ? st.name : String(st)).join(", ") : String(info.stadia || "РД")).trim() },
       { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || "001").trim() },
       { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: String(wf.date_order || new Date().toISOString().slice(0, 10)).trim() },
+      { key: "workflow_date",     label: "📅 Дата",                      val: previewDate(wf.date_order || info.date) },
       { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
     ];
 
@@ -2880,6 +2900,11 @@
         if (sId === "slot_1") {
           const s1 = ensureMiddleSlotDefaults(targetTpl);
           s1.visible = isVis;
+          // «Вкл» среднего блока — главный выключатель всех инфо-слотов шаблона:
+          // синхронизируем слоты 2–4, чтобы конфиг соответствовал рендеру
+          ["slot_2", "slot_3", "slot_4"].forEach((sId2) => {
+            updateBlockSlot(sId2, { visible: isVis }, targetTpl);
+          });
         }
         updateBlockSlot(sId, updates, targetTpl);
         const blk = (sId === "slot_1" ? document.getElementById("card_middle") : null) || document.getElementById(`block_${sId}`) || document.getElementById("card_middle");

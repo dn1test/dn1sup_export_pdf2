@@ -715,7 +715,8 @@ module Layout
     def rtf=(rtf_text)
       @rtf_data = rtf_text
       # Извлекаем читаемый текст из простого RTF для отладки
-      @text = rtf_text.gsub(/\\u(-?\d+)\?/) { Regexp.last_match(1).to_i.abs.chr rescue "" }
+      # (кириллица приходит как \uNNNN? — декодируем в UTF-8, иначе .chr теряет её)
+      @text = rtf_text.gsub(/\\u(-?\d+)\?/) { Regexp.last_match(1).to_i.abs.chr(Encoding::UTF_8) rescue "" }
                       .gsub(/\{\\[^{}]*}|\\[a-z]+\d* ?/i, "")
                       .gsub(/[{}]/, "")
       true
@@ -750,6 +751,21 @@ module Layout
       super()
       @bounds = bounds
       @type = TYPE_NORMAL
+    end
+  end
+
+  # Ломаная линия (галочка чекбокса стадии проекта)
+  class Path < Entity
+    attr_accessor :points
+
+    def initialize(*points)
+      super()
+      @points = points
+    end
+
+    def append_point(point)
+      @points << point
+      self
     end
   end
 

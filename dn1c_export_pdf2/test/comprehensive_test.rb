@@ -6,6 +6,7 @@
 
 require_relative "mock_sketchup"
 require_relative "../main"
+require_relative "test_template_params"
 # require "pdf/core" - Removed, all PDF generation is now native via LayOut API
 
 if defined?(Sketchup) && Sketchup.respond_to?(:version)
@@ -159,6 +160,8 @@ module DN1Code
 end
 
 class TestRunner
+  include DN1Code::ExportPdf2::TestSupport::TemplateParamsTests
+
   def initialize
     @passed = 0
     @failed = 0
@@ -267,6 +270,12 @@ class TestRunner
     test_76_discovery_multiple_articul_folders_ambiguous
     test_77_edit_history_in_articul_folder
     test_78_articul_offer_on_dialog_open_and_folder_creation
+
+    test_79_template_params_header
+    test_80_template_params_middle
+    test_81_template_params_footer
+    test_82_template_params_data_contract_and_js_guards
+    test_83_middle_block_master_switch
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"

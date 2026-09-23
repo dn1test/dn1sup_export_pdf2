@@ -1317,10 +1317,14 @@ module DN1Code
             end
           end
 
-          # Отрисовка остальных слотов, если они видимы и не были обработаны
+          # Отрисовка остальных слотов, если они видимы и не были обработаны.
+          # «Вкл» среднего блока (slot_1) — главный выключатель всех инфо-слотов
+          # шаблона: при выключенном slot_1 параметры блока не выводятся вовсе,
+          # при включенном слоты 2–4 самостоятельно не отрисовываются — ими
+          # управляет зонная система slot_1 (line_aligns/line_valigns).
           slot_coords.each do |slot_id, defs|
             next if handled_slots.include?(slot_id)
-            next unless block_visible?(page_cfg, slot_id)
+            next unless slot_id == :slot_1 && s1_vis
 
             cfg = get_block_config(ctx, pt, slot_id)
             lines = cfg[:lines] || cfg["lines"]
