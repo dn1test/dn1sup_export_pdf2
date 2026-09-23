@@ -14,7 +14,7 @@ layout:
     params:
     - id: g_mueltqbw_ll48m
       label: ''
-      show_label: false
+      show_label: true
       align: center
       valign: top
       font_family: Roboto Condensed
@@ -52,7 +52,7 @@ layout:
       font_size: 10.0
       color: "#0F172A"
       visible: true
-      source: project.room_name
+      source: project.address
   description:
     image_4_3:
       x: 25
