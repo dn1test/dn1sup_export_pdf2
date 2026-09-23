@@ -505,91 +505,23 @@ module DN1Code
           ]
         end
 
-        # Возвращает конфигурацию визуальных блоков макета страниц по умолчанию (в процентах)
-        # @return [Hash] хэш с координатами и свойствами блоков для каждого типа страницы
+        # Возвращает конфигурацию шаблона страниц по умолчанию (в процентах)
+        # @return [Hash] для каждого типа страницы: видовое окно + пустой список параметров.
+        # Параметры шаблона пользователь создает вручную (свободное размещение на странице).
         def default_custom_layouts
-          default_hdr_lines = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"]
-          default_hdr_rows  = { "furniture_name" => 1, "place_address" => 2, "customer_or_company" => 3, "scene_name" => 4, "scene_description" => 5 }
-          default_hdr_sizes = { "furniture_name" => 11.0, "place_address" => 10.0, "customer_or_company" => 10.0, "scene_name" => 11.0, "scene_description" => 9.0 }
-          default_hdr_colors = { "furniture_name" => "#005EB0", "place_address" => "#0F172A", "customer_or_company" => "#0F172A", "scene_name" => "#005EB0", "scene_description" => "#475569" }
-
-          default_mid_lines = ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"]
-          default_mid_aligns = {
-            "toc_pages" => "left", "spec_materials" => "left", "spec_appliances" => "left", "general_notes" => "left",
-            "workflow_history" => "left", "workflow_stadia" => "left", "workflow_revision" => "left",
-            "workflow_version" => "left", "workflow_date" => "left", "articul" => "left"
-          }
-          default_mid_valigns = {
-            "toc_pages" => "top", "spec_materials" => "top", "spec_appliances" => "top", "general_notes" => "top",
-            "workflow_history" => "bottom", "workflow_stadia" => "bottom", "workflow_revision" => "bottom",
-            "workflow_version" => "bottom", "workflow_date" => "bottom", "articul" => "bottom"
-          }
-          default_mid_sizes = {
-            "toc_pages" => 8.0, "spec_materials" => 8.0, "spec_appliances" => 8.0, "general_notes" => 8.0,
-            "workflow_history" => 8.0, "workflow_stadia" => 8.0, "workflow_revision" => 8.0,
-            "workflow_version" => 8.0, "workflow_date" => 8.0, "articul" => 8.0
-          }
-          default_mid_colors = {
-            "toc_pages" => "#334155", "spec_materials" => "#334155", "spec_appliances" => "#334155", "general_notes" => "#334155",
-            "workflow_history" => "#334155", "workflow_stadia" => "#334155", "workflow_revision" => "#334155",
-            "workflow_version" => "#334155", "workflow_date" => "#334155", "articul" => "#334155"
-          }
-
-          default_ftr_lines = ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"]
-          default_ftr_aligns = {
-            "footer_last_edit" => "left", "footer_ver_rev" => "center", "footer_articul" => "center",
-            "footer_date" => "center", "footer_page_total" => "right"
+          default_image_block = {
+            x: 25.0, y: 12.0, w: 50.0, h: 82.0,
+            visible: true, content: "render_viewport",
+            show_background: false, aspect_ratio: "4:3", scale_pct: 100
           }
 
           {
-            cover: {
-              header:      { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 13.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              cover_title: { x: 10.0, y: 15.0, w: 80.0, h: 12.0, visible: true, align: "center" },
-              image_4_3:   { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["articul", "workflow_date", "workflow_version", "workflow_revision", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
-            },
-            description: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.5, item_gap_mm: 2.0, item_gap: 2.0, lines: ["spec_materials", "spec_appliances", "general_notes"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.5, lines: ["spec_materials", "spec_appliances"], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
-            },
-            explain: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["toc_pages", "general_notes", "workflow_history", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.92 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.0, lines: ["toc_pages", "workflow_history"], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
-            },
-            general: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 11.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["general_notes", "workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: true, content: "info_lines", align: "right", valign: "bottom", font_size: 8.0, lines: ["workflow_history", "workflow_stadia"], opacity: 0.9 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
-            },
-            visual: {
-              header:    { x: 25.0, y: 0.0, w: 50.0, h: 30.0, visible: true, content: "header_title", align: "center", valign: "top", font_size: 10.0, lines: default_hdr_lines.dup, line_rows: default_hdr_rows.dup, line_font_sizes: default_hdr_sizes.dup, line_colors: default_hdr_colors.dup, opacity: 0.95 },
-              image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: true, content: "render_viewport", show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
-              slot_1:    { x: 0.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "info_lines", align: "left", valign: "top", font_size: 8.0, item_gap_mm: 2.0, item_gap: 2.0, lines: ["workflow_stadia"], line_aligns: default_mid_aligns.dup, line_valigns: default_mid_valigns.dup, line_font_sizes: default_mid_sizes.dup, line_colors: default_mid_colors.dup, opacity: 0.88 },
-              slot_2:    { x: 0.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "left", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_3:    { x: 75.0, y: 0.0, w: 25.0, h: 58.0, visible: false, content: "none", align: "right", valign: "top", font_size: 8.0, lines: [], opacity: 0.88 },
-              slot_4:    { x: 75.0, y: 58.0, w: 25.0, h: 36.0, visible: false, content: "none", align: "right", valign: "bottom", font_size: 8.0, lines: [], opacity: 0.88 },
-              footer:    { x: 0.0, y: 94.0, w: 100.0, h: 6.0, visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: default_ftr_lines.dup, line_aligns: default_ftr_aligns.dup, opacity: 1.0 }
-            }
+            cover:       { image_4_3: default_image_block.dup, params: [] },
+            description: { image_4_3: default_image_block.dup, params: [] },
+            explain:     { image_4_3: default_image_block.dup, params: [] },
+            general:     { image_4_3: default_image_block.dup, params: [] },
+            visual:      { image_4_3: default_image_block.dup, params: [] }
           }
-
         end
 
         # Возвращает базовые настройки экспорта PDF по умолчанию
@@ -1413,6 +1345,49 @@ module DN1Code
           end
         end
 
+        # Нормализация списка параметров шаблона: приведение полей к допустимым
+        # значениям (строки, числа, кламп координат 0..100, булев флаги).
+        # Запись с group: true — блок объединения параметров: вложенные параметры
+        # выводятся одной строкой с разделителем « | ».
+        # @param raw [Array] сырой список параметров (из payload диалога или YAML)
+        # @return [Array<Hash>]
+        def normalize_template_params(raw)
+          return [] unless raw.is_a?(Array)
+
+          raw.filter_map do |p|
+            next unless p.is_a?(Hash)
+
+            src = (p[:source] || p["source"]).to_s.strip
+            is_group = p[:group] == true || p["group"] == true || p[:group].to_s == "true"
+            next if !is_group && src.empty?
+
+            label     = (p[:label] || p["label"]).to_s.strip
+            show_l    = p.key?(:show_label) ? p[:show_label] : p["show_label"]
+            visible   = p.key?(:visible) ? p[:visible] : p["visible"]
+            align_raw = (p[:align] || p["align"] || "left").to_s.strip.downcase
+            valign_raw = (p[:valign] || p["valign"] || "top").to_s.strip.downcase
+
+            base = {
+              id:         (p[:id] || p["id"]).to_s.strip,
+              label:      label,
+              show_label: !(show_l == false || show_l.to_s == "false" || show_l == 0 || show_l.to_s == "0"),
+              align:      %w[left center right].include?(align_raw) ? align_raw : "left",
+              valign:     %w[top bottom].include?(valign_raw) ? valign_raw : "top",
+              font_family: (p[:font_family] || p["font_family"]).to_s.strip,
+              font_size:  (p[:font_size] || p["font_size"] || 10.0).to_f.clamp(4.0, 72.0),
+              color:      (p[:color] || p["color"] || "#0F172A").to_s.strip,
+              visible:    !(visible == false || visible.to_s == "false" || visible == 0 || visible.to_s == "0")
+            }
+
+            if is_group
+              children = normalize_template_params(p[:params] || p["params"] || [])
+              base.merge!(group: true, params: children)
+            else
+              base.merge!(source: src)
+            end
+          end
+        end
+
         # Загружает макеты страниц из отдельного YAML файла (layout.yaml / layout_config.yaml)
         # @param file_path [String] путь к файлу макета
         # @return [Boolean] true, если макеты успешно прочитаны
@@ -1439,47 +1414,30 @@ module DN1Code
 
             @pdf_settings[:custom_layouts] ||= default_custom_layouts
             layouts.each do |page_key, blocks|
-              if blocks.is_a?(Hash)
-                @pdf_settings[:custom_layouts][page_key] ||= {}
-                blocks.each do |slot_id, slot_cfg|
-                  if slot_cfg.is_a?(Hash)
-                    @pdf_settings[:custom_layouts][page_key][slot_id] ||= {}
-                    @pdf_settings[:custom_layouts][page_key][slot_id].merge!(slot_cfg)
-                  else
-                    @pdf_settings[:custom_layouts][page_key][slot_id] = slot_cfg
-                  end
-                  if slot_id.to_s == "header"
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:y] = 0.0
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:h] = 30.0
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:valign] ||= "top"
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:line_rows] ||= { "furniture_name" => 1, "place_address" => 2, "customer_or_company" => 3, "scene_name" => 4, "scene_description" => 5 }
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:line_font_sizes] ||= { "furniture_name" => 11.0, "place_address" => 10.0, "customer_or_company" => 10.0, "scene_name" => 11.0, "scene_description" => 9.0 }
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:line_colors] ||= { "furniture_name" => "#005EB0", "place_address" => "#0F172A", "customer_or_company" => "#0F172A", "scene_name" => "#005EB0", "scene_description" => "#475569" }
-                  end
-                  if slot_id.to_s == "image_4_3"
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:aspect_ratio] ||= "4:3"
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] = (@pdf_settings[:custom_layouts][page_key][slot_id][:scale_pct] || 100).to_i
-                    raw_bg = @pdf_settings[:custom_layouts][page_key][slot_id][:show_background]
-                    @pdf_settings[:custom_layouts][page_key][slot_id][:show_background] = !(raw_bg == false || raw_bg.to_s == "false" || raw_bg == 0 || raw_bg.to_s == "0")
-                  end
-                  if slot_id.to_s == "slot_1"
-                    cfg = @pdf_settings[:custom_layouts][page_key][slot_id]
-                    if cfg.is_a?(Hash)
-                      c = (cfg[:content] || cfg["content"]).to_s
-                      lines = cfg[:lines] || cfg["lines"]
-                      if c.empty?
-                        cfg[:content] = "info_lines"
-                      end
-                      if lines.nil?
-                        def_tpl = default_custom_layouts[page_key.to_sym]
-                        def_lines = def_tpl && def_tpl[:slot_1] && def_tpl[:slot_1][:lines]
-                        cfg[:lines] = def_lines ? def_lines.dup : ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia"]
-                      end
-                      cfg[:item_gap_mm] = (cfg[:item_gap_mm] || cfg["item_gap_mm"] || cfg[:item_gap] || cfg["item_gap"] || 2.0).to_f
-                    end
-                  end
+              next unless blocks.is_a?(Hash)
+
+              # Чистый лист: страница читается, только если в ней есть блоки новой
+              # модели (image_4_3 / params); записи старой (header/slot_N/footer)
+              # игнорируются целиком.
+              has_new = blocks.key?(:image_4_3) || blocks.key?("image_4_3") ||
+                        blocks.key?(:params) || blocks.key?("params")
+              next unless has_new
+
+              page = @pdf_settings[:custom_layouts][page_key] ||= {}
+
+              blocks.each do |slot_id, slot_cfg|
+                if slot_id.to_s == "image_4_3" && slot_cfg.is_a?(Hash)
+                  page[:image_4_3] ||= {}
+                  page[:image_4_3].merge!(slot_cfg)
+                  page[:image_4_3][:aspect_ratio] ||= "4:3"
+                  page[:image_4_3][:scale_pct] = (page[:image_4_3][:scale_pct] || 100).to_i
+                  raw_bg = page[:image_4_3][:show_background]
+                  page[:image_4_3][:show_background] = !(raw_bg == false || raw_bg.to_s == "false" || raw_bg == 0 || raw_bg.to_s == "0")
+                elsif slot_id.to_s == "params" && slot_cfg.is_a?(Array)
+                  page[:params] = normalize_template_params(slot_cfg)
                 end
               end
+              page[:params] ||= []
             end
             true
           rescue StandardError => e
@@ -1488,7 +1446,7 @@ module DN1Code
           end
         end
 
-        # Сохраняет текущую конфигурацию макетов страниц в отдельный YAML файл
+        # Сохраняет текущую конфигурацию шаблонов страниц в отдельный YAML файл
         # @param file_path [String] путь к файлу layout.yaml
         # @return [Boolean] true в случае успешного сохранения
         def save_to_layout_yaml(file_path)
@@ -1497,29 +1455,11 @@ module DN1Code
           FileUtils.mkdir_p(File.dirname(file_path))
           layouts_data = @pdf_settings[:custom_layouts] || default_custom_layouts
           if layouts_data.is_a?(Hash)
-            layouts_data.each_value do |page_slots|
-              next unless page_slots.is_a?(Hash)
-              hdr = page_slots[:header] || page_slots["header"]
-              if hdr.is_a?(Hash)
-                hdr[:y] = 0.0 if hdr.key?(:y)
-                hdr["y"] = 0.0 if hdr.key?("y")
-                hdr[:h] = 30.0 if hdr.key?(:h)
-                hdr["h"] = 30.0 if hdr.key?("h")
-                hdr[:h] ||= 30.0
-              end
-              s1 = page_slots[:slot_1] || page_slots["slot_1"]
-              if s1.is_a?(Hash)
-                c = (s1[:content] || s1["content"]).to_s
-                if c.empty? || c == "none"
-                  s1[:content] = "info_lines" if s1.key?(:content)
-                  s1["content"] = "info_lines" if s1.key?("content")
-                  s1[:content] ||= "info_lines"
-                end
-                gap_val = (s1[:item_gap_mm] || s1["item_gap_mm"] || s1[:item_gap] || s1["item_gap"] || 2.0).to_f
-                s1[:item_gap_mm] = gap_val if s1.key?(:item_gap_mm)
-                s1["item_gap_mm"] = gap_val if s1.key?("item_gap_mm")
-                s1[:item_gap_mm] ||= gap_val
-              end
+            layouts_data.each_value do |page_blocks|
+              next unless page_blocks.is_a?(Hash)
+
+              params = page_blocks[:params] || page_blocks["params"]
+              page_blocks[:params] = normalize_template_params(params) if params.is_a?(Array)
             end
           end
 

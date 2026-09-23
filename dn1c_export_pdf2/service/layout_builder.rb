@@ -12,11 +12,10 @@ module DN1Code
     module Service
       # Полнофункциональный экспорт PDF и проектов LayOut через SketchUp LayOut Ruby API.
       #
-      # Страницы и видовые экраны строятся по модульной сетке (из layout.yaml):
+      # Страницы строятся по шаблону (из layout.yaml):
       #   image_4_3 — видовой экран модели (Layout::SketchUpModel) или растровый оверрайд (Layout::Image),
-      #   header    — многострочный заголовок проекта и сцены с разделителями,
-      #   slot_1..4 — информационные колонки спецификаций и истории,
-      #   footer    — нижний колонтитул в 3 колонки,
+      #   params    — пользовательские параметры шаблона со свободным размещением
+      #               на странице (X/Y в % рабочей области, выравнивание, кегль, цвет),
       #   stamp     — повернутый полупрозрачный водяной знак/штамп.
       #
         # Документ формируется в многослойной структуре (Viewports, Graphics, Content, Annotations)
@@ -35,12 +34,7 @@ module DN1Code
         PT_PER_INCH = 72.0
 
         # Цвета оформления
-        SEP_COLOR         = "CBD5E1" # разделительные линии
-        FOOTER_COLOR      = "475569" # текст подвала
-        SLOT_TEXT_COLOR   = "334155" # строки слотов
-        HEADER_TEXT_COLOR = "0F172A" # заголовок по умолчанию
-        CUSTOM_TEXT_COLOR = "1E293B" # custom_text слотов
-        HEADER_SEP_COLOR  = "CBD5E1" # разделитель " | " в строках заголовка
+        PARAM_TEXT_COLOR = "0F172A" # текст параметров по умолчанию
 
         # Проверка доступности LayOut Ruby API в текущем окружении
         def available?
@@ -373,44 +367,6 @@ module DN1Code
           !(val == false || val.to_s.strip.downcase == "false" || val.to_s.strip == "0")
         end
 
-        # Расчет абсолютных координат блока в пунктах.
-        # content: { left:, top:, w:, h: } — рабочая область листа в pt (top = верхняя грань).
-        def get_block_box(content, page_cfg, block_id, def_x, def_y, def_w, def_h)
-          cfg = page_cfg[block_id] || page_cfg[block_id.to_s] || {}
-
-          x_pct = (cfg[:x] || cfg["x"] || def_x).to_f
-          y_pct = (cfg[:y] || cfg["y"] || def_y).to_f
-          w_pct = (cfg[:w] || cfg["w"] || def_w).to_f
-          h_pct = (cfg[:h] || cfg["h"] || def_h).to_f
-
-          # Высота заголовка задана жестко 30%, от верхнего края листа
-          if block_id.to_s == "header"
-            y_pct = 0.0
-            h_pct = 30.0
-          end
-
-          # Подвал страницы всегда привязан к нижнему краю листа
-          if block_id.to_s == "footer"
-            h_pct = 4.0 if h_pct <= 0.0
-            y_pct = 100.0 - h_pct
-          end
-
-          raw_vis = cfg.key?(:visible) ? cfg[:visible] : cfg["visible"]
-          visible = raw_vis.nil? ? true : !(raw_vis == false || raw_vis.to_s.strip.downcase == "false" || raw_vis.to_s.strip == "0")
-          align   = (cfg[:align] || cfg["align"] || "left").to_s.to_sym
-          valign  = (cfg[:valign] || cfg["valign"] || (block_id.to_s == "footer" ? "bottom" : "top")).to_s.to_sym
-
-          {
-            x:       content[:left] + (content[:w] * (x_pct / 100.0)),
-            y:       content[:top] - (content[:h] * (y_pct / 100.0)),
-            width:   content[:w] * (w_pct / 100.0),
-            height:  content[:h] * (h_pct / 100.0),
-            visible: visible,
-            align:   align,
-            valign:  valign
-          }
-        end
-
         # ------------------------------------------------------------------
         # Цвета
         # ------------------------------------------------------------------
@@ -501,101 +457,6 @@ module DN1Code
           text_ent
         rescue StandardError => e
           warn "Ошибка добавления текста LayOut: #{e.message}"
-          nil
-        end
-
-        # RTF-escaped строка (кириллица через \uNNNN?)
-        def rtf_escape(text)
-          out = +""
-          text.to_s.each_char do |ch|
-            case ch
-            when "\\" then out << "\\\\"
-            when "{"  then out << "\\{"
-            when "}"  then out << "\\}"
-            else
-              code = ch.ord
-              if code < 128
-                out << ch
-              else
-                signed = code > 32_767 ? code - 65_536 : code
-                out << "\\u#{signed}?"
-              end
-            end
-          end
-          out
-        end
-
-        # Многофрагментная строка заголовка через RTF (разные цвета/размеры для элементов)
-        # fragments: [{ text:, size:, color:, bold: }]
-        def add_rtf_text(ctx, doc, page, layer, fragments, box, opts = {})
-          runs = []
-          colors = [[15, 23, 42]]
-          fragments.each do |f|
-            next if f[:text].to_s.empty?
-
-            rgb = hex_to_rgb(f[:color] || HEADER_TEXT_COLOR, [15, 23, 42])
-            idx = colors.index(rgb)
-            if idx.nil?
-              colors << rgb
-              idx = colors.size - 1
-            end
-            half = [(f[:size].to_f * 2).round, 2].max
-            # Глобальный font_weight=bold распространяется и на RTF-фрагменты
-            bold = f[:bold] || ctx[:text_bold] ? true : false
-            run = +"\\cf#{idx}\\fs#{half} "
-            run << "\\b " if bold
-            run << rtf_escape(f[:text])
-            run << "\\b0 " if bold
-            runs << run
-          end
-          return if runs.empty?
-
-          colortbl = colors.drop(1).map { |rgb| "\\red#{rgb[0]}\\green#{rgb[1]}\\blue#{rgb[2]};" }.join
-          align_code = case opts[:align]
-                       when :right then "qr"
-                       when :center then "qc"
-                       else "ql"
-                       end
-          font = opts[:font] || ctx[:font] || "Sofia Sans Condensed"
-          rtf = "{\\rtf1\\ansi\\deff0{\\fonttbl{\\f0 #{font};}}{\\colortbl;#{colortbl}}" \
-                "\\pard\\#{align_code}\\f0 #{runs.join}\\par}"
-
-          extra_h = 1.5
-          text_ent = ::Layout::FormattedText.new(" ", make_bounds_pt(ctx, box[:x], box[:y], box[:width], box[:height] + extra_h))
-          text_ent.grow_mode = ::Layout::FormattedText::GROW_MODE_BOUNDED
-          text_ent.rtf = rtf
-          # LayOut игнорирует \fonttbl из RTF, поэтому семейство/кегль дополнительно
-          # задаются стилем entity — иначе заголовок печатается дефолтным шрифтом
-          # (Microsoft Sans Serif), игнорируя выбор пользователя.
-          base_size = fragments.map { |f| f[:size].to_f }.max
-          style = text_ent.style(0)
-          apply_text_style!(style, size: base_size, align: opts[:align], font: font, bold: ctx[:text_bold])
-          text_ent.apply_style(style)
-          doc.add_entity(text_ent, layer, page)
-          text_ent
-        rescue StandardError => e
-          warn "Ошибка добавления RTF текста LayOut: #{e.message}"
-          nil
-        end
-
-        # Горизонтальная разделительная линия (тонкая залитая плашка)
-        def add_hline(ctx, doc, page, layer, x_pt, y_center_pt, w_pt, color_hex = SEP_COLOR, thickness_pt = 0.7)
-          return if w_pt <= 0 || thickness_pt <= 0
-
-          # верхняя грань плашки = центр + половина толщины
-          bounds = make_bounds_pt(ctx, x_pt, y_center_pt + thickness_pt / 2.0, w_pt, thickness_pt)
-          rect = ::Layout::Rectangle.new(bounds)
-          style = rect.style
-          if style.respond_to?(:solid_filled=)
-            style.solid_filled = true
-            style.fill_color = layout_color(color_hex) if style.respond_to?(:fill_color=)
-          end
-          style.stroked = false if style.respond_to?(:stroked=)
-          rect.style = style
-          doc.add_entity(rect, layer, page)
-          rect
-        rescue StandardError => e
-          warn "Ошибка добавления линии LayOut: #{e.message}"
           nil
         end
 
@@ -758,23 +619,10 @@ module DN1Code
                       end
           page_ctx = (page_font != ctx[:font]) ? ctx.merge(font: page_font) : ctx
 
-          # 2. Верхний заголовок (Header)
-          if block_visible?(page_cfg, :header)
-            hdr_box = get_block_box(content, page_cfg, :header, 0.0, 0.0, 100.0, 30.0)
-            render_modular_header(doc, page, cnt_layer, hdr_box, page_cfg, page_ctx, rctx, gfx_layer)
-          end
+          # 2. Параметры шаблона со свободным размещением
+          render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, page_ctx, rctx)
 
-          # 3. Информационные слоты поверх видового экрана
-          render_modular_slots(doc, page, cnt_layer, content, page_cfg, pt, page_ctx, rctx, gfx_layer)
-
-          # 4. Нижний колонтитул (Footer)
-          if block_visible?(page_cfg, :footer)
-            ftr_cfg = get_block_config(page_ctx, pt, :footer)
-            ftr_box = get_block_box(content, page_cfg, :footer, 0.0, 94.0, 100.0, 6.0)
-            render_modular_footer(doc, page, cnt_layer, ftr_box, ftr_cfg, page_ctx, rctx)
-          end
-
-          # 5. Штамп/водяной знак
+          # 3. Штамп/водяной знак
           render_stamp(doc, page, ann_layer, content, page_ctx)
         end
 
@@ -1085,476 +933,165 @@ module DN1Code
         end
 
         # ------------------------------------------------------------------
-        # Верхний заголовок (зеркало PageBase#render_modular_header)
+        # Параметры шаблона: размещение по зонам страницы
         # ------------------------------------------------------------------
 
-        def render_modular_header(doc, page, layer, hdr_box, page_cfg, ctx, rctx, gfx_layer = nil)
-          cfg = page_cfg[:header] || page_cfg["header"] || {}
-          content_type = (cfg[:content] || cfg["content"] || "header_title").to_s
-          valign = (cfg[:valign] || cfg["valign"] || "top").to_s.to_sym
-          font_size = (cfg[:font_size] || cfg["font_size"] || 11.0).to_f
-          hdr_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
-                       FontService.layout_font_family(cfg[:font_family])
-                     else
-                       ctx[:font]
-                     end
-          lines = cfg[:lines] || cfg["lines"]
-          if lines.nil?
-            lines = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"]
-          end
-          return if lines.is_a?(Array) && lines.empty?
+        # Отступ между параметрами в одной зоне (мм)
+        PARAM_ZONE_GAP_MM = 2.5
 
-          if content_type == "custom_text"
-            txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
-            add_bounded_text(ctx, doc, page, layer, txt,
-                             { x: hdr_box[:x], y: hdr_box[:y], width: hdr_box[:width], height: hdr_box[:height] },
-                             size: font_size, color: HEADER_TEXT_COLOR, bold: true, align: :center, anchor: valign, font: hdr_font)
-            return
-          end
-
-          line_rows       = cfg[:line_rows] || cfg["line_rows"] || {}
-          line_font_sizes = cfg[:line_font_sizes] || cfg["line_font_sizes"] || {}
-          line_colors     = cfg[:line_colors] || cfg["line_colors"] || {}
-
-          grouped_rows = { 1 => [], 2 => [], 3 => [], 4 => [], 5 => [] }
-          if lines && lines.is_a?(Array) && !lines.empty?
-            lines.each_with_index do |k, idx|
-              k_str = k.to_s
-              default_r = case k_str
-                          when "furniture_name" then 1
-                          when "place_address" then 2
-                          when "customer_or_company" then 3
-                          when "scene_name", "name", "name_scene" then 4
-                          when "scene_description", "description", "scene_desc", "desc" then 5
-                          else [idx + 1, 5].min
-                          end
-              row_num = (line_rows[k_str] || line_rows[k.to_sym] || default_r).to_i
-              row_num = 1 if row_num < 1
-              row_num = 5 if row_num > 5
-
-              val = InfoLineResolver.resolve_header_item(rctx, k_str)
-              if val && !val.to_s.strip.empty?
-                item_sz = (line_font_sizes[k_str] || line_font_sizes[k.to_sym] || font_size).to_f
-                item_sz = font_size if item_sz <= 0.0
-
-                raw_col = (line_colors[k_str] || line_colors[k.to_sym] || HEADER_TEXT_COLOR).to_s.strip
-                clean_col = raw_col.sub(/^#/, "")
-                clean_col = HEADER_TEXT_COLOR if clean_col.empty?
-
-                grouped_rows[row_num] << {
-                  key:   k_str,
-                  text:  val.to_s.strip,
-                  size:  item_sz,
-                  color: clean_col
-                }
-              end
-            end
-          end
-
-          active_rows = [1, 2, 3, 4, 5].select { |r| grouped_rows[r] && !grouped_rows[r].empty? }
-          return if active_rows.empty?
-
-          align = :center
-
-          # Расчет высоты строк и отступов (увеличенные промежутки между строками)
-          item_gap = active_rows.size > 1 ? (active_rows.size > 3 ? 5.5 : 7.5) : 0.0
-          row_heights = {}
-          pitch = font_line_pitch_ratio(hdr_font)
-          active_rows.each do |r|
-            max_item_sz = grouped_rows[r].map { |it| it[:size] }.max || font_size
-            row_heights[r] = [(max_item_sz * pitch).round(2) + 2.0, max_item_sz + 4.0].max
-          end
-          raw_total_h = row_heights.values.sum + ((active_rows.size - 1) * item_gap)
-
-          scale = 1.0
-          available_h = hdr_box[:height] - 4.0
-          if raw_total_h > available_h && raw_total_h > 0
-            scale = [available_h / raw_total_h, 0.6].max
-          end
-
-          scaled_item_gap = item_gap * scale
-          scaled_row_heights = {}
-          active_rows.each { |r| scaled_row_heights[r] = row_heights[r] * scale }
-          total_h = scaled_row_heights.values.sum + ((active_rows.size - 1) * scaled_item_gap)
-
-          cur_y = case valign
-                  when :top
-                    hdr_box[:y] - 2
-                  when :bottom
-                    hdr_box[:y] - hdr_box[:height] + total_h + 2
-                  else # :center
-                    offset = [(hdr_box[:height] - total_h) / 2.0, 2.0].max
-                    hdr_box[:y] - offset
-                  end
-
-          active_rows.each_with_index do |r, idx|
-            items = grouped_rows[r]
-            r_h = scaled_row_heights[r]
-
-            fragments = []
-            items.each_with_index do |it, i|
-              if i > 0
-                fragments << {
-                  text:  " | ",
-                  size:  [it[:size], items[i - 1][:size]].min * scale,
-                  color: HEADER_SEP_COLOR,
-                  bold:  false
-                }
-              end
-              fragments << {
-                text:  it[:text],
-                size:  it[:size] * scale,
-                color: it[:color],
-                bold:  true
-              }
-            end
-
-            add_rtf_text(ctx, doc, page, layer, fragments,
-                         { x: hdr_box[:x] + 4, y: cur_y, width: hdr_box[:width] - 8, height: r_h },
-                         align: align, font: hdr_font)
-            cur_y -= r_h
-
-            if idx < active_rows.size - 1
-              sep_y = cur_y - (scaled_item_gap / 2.0)
-              line_w = [hdr_box[:width] * 0.45, 130.0].min
-              lx = hdr_box[:x] + (hdr_box[:width] - line_w) / 2.0
-              add_hline(ctx, doc, page, (gfx_layer || layer), lx, sep_y, line_w, SEP_COLOR, 0.5)
-              cur_y -= scaled_item_gap
-            end
-          end
-        end
-
-        # ------------------------------------------------------------------
-        # Слоты (информационные колонки спецификаций и истории)
-        # ------------------------------------------------------------------
-
-        def render_modular_slots(doc, page, layer, content, page_cfg, pt, ctx, rctx, gfx_layer = nil)
-          slot_coords = {
-            slot_1: [0.0, 0.0, 25.0, 58.0],
-            slot_2: [0.0, 58.0, 25.0, 36.0],
-            slot_3: [75.0, 0.0, 25.0, 58.0],
-            slot_4: [75.0, 58.0, 25.0, 36.0]
-          }
-
-          s1_vis = block_visible?(page_cfg, :slot_1)
-          s1_cfg = s1_vis ? get_block_config(ctx, pt, :slot_1) : nil
-          s1_lines = s1_cfg ? (s1_cfg[:lines] || s1_cfg["lines"]) : nil
-          handled_slots = []
-
-          s1_content = s1_cfg ? (s1_cfg[:content] || s1_cfg["content"]).to_s : ""
-          is_info_lines = s1_content == "info_lines" || (s1_content != "custom_text" && s1_content != "project_card" && s1_content != "customer_card" && s1_content != "workflow_status" && s1_content != "history_table")
-
-          if s1_vis && s1_cfg && s1_lines.is_a?(Array) && !s1_lines.empty? && is_info_lines
-            handled_slots = [:slot_1, :slot_2, :slot_3, :slot_4]
-            line_aligns = s1_cfg[:line_aligns] || s1_cfg["line_aligns"] || {}
-            line_valigns = s1_cfg[:line_valigns] || s1_cfg["line_valigns"] || {}
-
-            s1_w = (s1_cfg[:w] || s1_cfg["w"] || 25.0).to_f
-            s3_cfg = get_block_config(ctx, pt, :slot_3)
-            s3_w = (s3_cfg && (s3_cfg[:w] || s3_cfg["w"])) ? (s3_cfg[:w] || s3_cfg["w"]).to_f : 25.0
-            s3_x = 100.0 - s3_w
-
-            zones = {
-              left_top:     { lines: [], align: "left",  valign: :top,    target_slot: :slot_1 },
-              left_center:  { lines: [], align: "left",  valign: :center, target_slot: :slot_1_center },
-              left_bottom:  { lines: [], align: "left",  valign: :bottom, target_slot: :slot_2 },
-              right_top:    { lines: [], align: "right", valign: :top,    target_slot: :slot_3 },
-              right_center: { lines: [], align: "right", valign: :center, target_slot: :slot_3_center },
-              right_bottom: { lines: [], align: "right", valign: :bottom, target_slot: :slot_4 }
-            }
-
-            s1_lines.each do |k|
-              k_str = k.to_s
-              k_sym = k.to_sym rescue nil
-              side = (line_aligns[k_str] || (k_sym && line_aligns[k_sym]) || s1_cfg[:align] || "left").to_s == "right" ? :right : :left
-              raw_v = (line_valigns[k_str] || (k_sym && line_valigns[k_sym]) || s1_cfg[:valign] || "top").to_s.downcase
-              vpos = case raw_v
-                     when "bottom" then :bottom
-                     when "center", "middle" then :center
-                     else :top
-                     end
-
-              zone_key = "#{side}_#{vpos}".to_sym
-              zones[zone_key][:lines] << k if zones[zone_key]
-            end
-
-            opacity = (s1_cfg[:opacity] || s1_cfg["opacity"] || 0.90).to_f
-
-            # Расчет непересекающихся координат для зон каждого столбца (left/right)
-            col_boxes = {}
-            [:left, :right].each do |side|
-              col_x = (side == :right) ? s3_x : 0.0
-              col_w = (side == :right) ? s3_w : s1_w
-
-              has_top = !zones[:"#{side}_top"][:lines].empty?
-              has_mid = !zones[:"#{side}_center"][:lines].empty?
-              has_bot = !zones[:"#{side}_bottom"][:lines].empty?
-
-              if has_top && has_mid && has_bot
-                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 30.0]
-                col_boxes[:"#{side}_center"] = [col_x, 30.0, col_w, 34.0]
-                col_boxes[:"#{side}_bottom"] = [col_x, 64.0, col_w, 30.0]
-              elsif has_top && has_mid && !has_bot
-                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 36.0]
-                col_boxes[:"#{side}_center"] = [col_x, 36.0, col_w, 58.0]
-              elsif !has_top && has_mid && has_bot
-                col_boxes[:"#{side}_center"] = [col_x, 0.0,  col_w, 58.0]
-                col_boxes[:"#{side}_bottom"] = [col_x, 58.0, col_w, 36.0]
-              elsif !has_top && has_mid && !has_bot
-                col_boxes[:"#{side}_center"] = [col_x, 0.0,  col_w, 94.0]
-              elsif has_top && !has_mid && has_bot
-                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 58.0]
-                col_boxes[:"#{side}_bottom"] = [col_x, 58.0, col_w, 36.0]
-              elsif has_top && !has_mid && !has_bot
-                col_boxes[:"#{side}_top"]    = [col_x, 0.0,  col_w, 94.0]
-              elsif !has_top && !has_mid && has_bot
-                col_boxes[:"#{side}_bottom"] = [col_x, 0.0,  col_w, 94.0]
-              end
-            end
-
-            zones.each do |zone_key, z_data|
-              q_lines = z_data[:lines]
-              next if q_lines.empty?
-
-              target_slot = z_data[:target_slot]
-              coords = col_boxes[zone_key] || [0.0, 0.0, 25.0, 58.0]
-              slot_box = {
-                x:      content[:left] + (content[:w] * (coords[0] / 100.0)),
-                y:      content[:top] - (content[:h] * (coords[1] / 100.0)),
-                width:  content[:w] * (coords[2] / 100.0),
-                height: content[:h] * (coords[3] / 100.0),
-                visible: true,
-                align:   z_data[:align].to_sym,
-                valign:  z_data[:valign]
-              }
-
-              q_cfg = s1_cfg.dup
-              q_cfg[:content] = "info_lines"
-              q_cfg[:lines] = q_lines
-              q_cfg[:align] = z_data[:align]
-              q_cfg[:valign] = z_data[:valign]
-
-              render_modular_slot_card(doc, page, layer, slot_box, "info_lines", q_cfg, opacity, target_slot, ctx, rctx, gfx_layer)
-            end
-          end
-
-          # Отрисовка остальных слотов, если они видимы и не были обработаны.
-          # «Вкл» среднего блока (slot_1) — главный выключатель всех инфо-слотов
-          # шаблона: при выключенном slot_1 параметры блока не выводятся вовсе,
-          # при включенном слоты 2–4 самостоятельно не отрисовываются — ими
-          # управляет зонная система slot_1 (line_aligns/line_valigns).
-          slot_coords.each do |slot_id, defs|
-            next if handled_slots.include?(slot_id)
-            next unless slot_id == :slot_1 && s1_vis
-
-            cfg = get_block_config(ctx, pt, slot_id)
-            lines = cfg[:lines] || cfg["lines"]
-            content_type = (cfg[:content] || cfg["content"]).to_s
-            content_type = "info_lines" if (content_type.empty? || content_type == "none") && lines.is_a?(Array) && !lines.empty?
-            next if content_type.empty? || content_type == "none"
-
-            slot_box = get_block_box(content, page_cfg, slot_id, defs[0], defs[1], defs[2], defs[3])
-            opacity = (cfg[:opacity] || cfg["opacity"] || 0.90).to_f
-            render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, opacity, slot_id, ctx, rctx, gfx_layer)
-          end
-        end
-
-        # Карточка слота (информационный блок)
-        def render_modular_slot_card(doc, page, layer, slot_box, content_type, cfg, _opacity, slot_id, ctx, rctx, gfx_layer = nil)
-          pad = 4
-          in_x = slot_box[:x] + pad
-          in_y = slot_box[:y] - pad
-          in_w = [slot_box[:width] - (pad * 2), 10.0].max
-          in_h = [slot_box[:height] - (pad * 2), 10.0].max
-
-          slot_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
-                        FontService.layout_font_family(cfg[:font_family])
-                      else
-                        ctx[:font]
-                      end
-
-          is_right_slot = [:slot_3, :slot_4, "slot_3", "slot_4"].include?(slot_id)
-          default_align = is_right_slot ? :right : :left
-          raw_align = cfg[:align] || cfg["align"]
-          align = if raw_align && !raw_align.to_s.empty?
-                    raw_align.to_s.to_sym
-                  else
-                    default_align
-                  end
-          align = :right if is_right_slot && align == :left
-          align = :left if !is_right_slot && align == :right
-
-          is_bottom_slot = [:slot_2, :slot_4, "slot_2", "slot_4"].include?(slot_id)
-          raw_valign = cfg[:valign] || cfg["valign"]
-          valign = if raw_valign && !raw_valign.to_s.empty?
-                     v_sym = raw_valign.to_s.to_sym
-                     [:top, :center, :middle, :bottom].include?(v_sym) ? (v_sym == :middle ? :center : v_sym) : (is_bottom_slot ? :bottom : :top)
-                   else
-                     is_bottom_slot ? :bottom : :top
-                   end
-
-          font_size = (cfg[:font_size] || cfg["font_size"] || 8.0).to_f
-          lines = cfg[:lines] || cfg["lines"]
-          in_bottom_y = slot_box[:y] - slot_box[:height] + pad
-
-          if content_type == "custom_text"
-            txt = (cfg[:custom_text] || cfg["custom_text"] || "").to_s
-            txt_h = estimate_text_height(txt, font_size, in_w, slot_font, ctx[:text_bold])
-            txt_box_h = [txt_h + 2.0, in_h].min
-            if valign == :bottom
-              target_top_y = [in_bottom_y + txt_box_h, in_y].min
-              add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: target_top_y, width: in_w, height: txt_box_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :bottom, font: slot_font)
-            elsif valign == :center
-              offset = [(in_h - txt_box_h) / 2.0, 0.0].max
-              target_top_y = in_y - offset
-              add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: target_top_y, width: in_w, height: txt_box_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: :top, font: slot_font)
-            else
-              add_bounded_text(ctx, doc, page, layer, txt, { x: in_x, y: in_y, width: in_w, height: in_h },
-                               size: font_size, color: CUSTOM_TEXT_COLOR, align: align, anchor: valign, font: slot_font)
-            end
-            return
-          end
-
-          items = []
-          line_aligns = cfg[:line_aligns] || cfg["line_aligns"] || {}
-          line_sizes = cfg[:line_font_sizes] || cfg["line_font_sizes"] || {}
-          line_colors = cfg[:line_colors] || cfg["line_colors"] || {}
-
-          if lines && lines.is_a?(Array)
-            line_show_titles = cfg[:line_show_titles] || cfg["line_show_titles"] || {}
-            block_show_titles = cfg[:show_titles] != false && cfg["show_titles"] != false && cfg[:show_titles] != "false" && cfg["show_titles"] != "false"
-
-            lines.each do |line_key|
-              k_str = line_key.to_s
-              k_sym = line_key.to_sym rescue nil
-
-              show_title = if line_show_titles.key?(k_str)
-                             line_show_titles[k_str] != false && line_show_titles[k_str] != "false"
-                           elsif k_sym && line_show_titles.key?(k_sym)
-                             line_show_titles[k_sym] != false && line_show_titles[k_sym] != "false"
-                           else
-                             block_show_titles
-                           end
-
-              line_text = InfoLineResolver.resolve_formatted(rctx, line_key, show_title: show_title)
-              next if line_text.nil? || line_text.to_s.empty?
-
-              it_sz = (line_sizes[k_str] || (k_sym && line_sizes[k_sym]) || font_size).to_f
-              it_sz = font_size if it_sz <= 0.0
-
-              raw_col = (line_colors[k_str] || (k_sym && line_colors[k_sym]) || SLOT_TEXT_COLOR).to_s.strip
-              it_col = raw_col.sub(/^#/, "")
-              it_col = SLOT_TEXT_COLOR if it_col.empty?
-
-              it_align = (line_aligns[k_str] || (k_sym && line_aligns[k_sym]) || align).to_s.to_sym
-              it_align = align unless [:left, :right, :center].include?(it_align)
-
-              items << {
-                key:   k_str,
-                text:  line_text,
-                size:  it_sz,
-                color: it_col,
-                align: it_align
-              }
-            end
+        # Колонка зоны по выравниванию: «слева» — колонка у левого края,
+        # «справа» — у правого края, «центр» — симметрично относительно середины.
+        # y_top/box_h задаются расчетом высоты группы (в pt, y — верх коробки).
+        def param_zone_box(content, align, y_top, box_h)
+          case align
+          when :center
+            w = content[:w] * 0.5
+            x = content[:left] + ((content[:w] - w) / 2.0)
+          when :right
+            w = content[:w] * 0.45
+            x = content[:left] + content[:w] - w
           else
-            raw_lines = case content_type
-                        when "project_card"
-                          InfoLineResolver.default_project_card_lines(rctx)
-                        when "customer_card"
-                          InfoLineResolver.default_customer_card_lines(rctx)
-                        when "workflow_status"
-                          InfoLineResolver.default_workflow_status_lines(rctx)
-                        when "history_table"
-                          InfoLineResolver.default_history_lines(rctx)
-                        when "materials_spec"
-                          [ctx[:info][:materials].to_s.strip.empty? ? "Фасады, корпус, фурнитура..." : ctx[:info][:materials].to_s.strip]
-                        when "appliances_spec"
-                          [ctx[:info][:appliances].to_s.strip.empty? ? "Встраиваемая техника и приборы..." : ctx[:info][:appliances].to_s.strip]
-                        when "lighting_spec"
-                          [ctx[:info][:lighting].to_s.strip.empty? ? "LED подсветка и блоки питания..." : ctx[:info][:lighting].to_s.strip]
-                        when "scene_notes"
-                          desc = rctx[:scene_item] ? rctx[:scene_item].description : nil
-                          [(desc && !desc.empty?) ? desc : (ctx[:info][:notes].to_s.strip.empty? ? "Габаритные размеры и привязки..." : ctx[:info][:notes].to_s.strip)]
-                        else
-                          []
-                        end
-            (raw_lines || []).each do |s|
-              items << { text: s, size: font_size, color: SLOT_TEXT_COLOR, align: align } if s && !s.empty?
-            end
+            w = content[:w] * 0.45
+            x = content[:left]
           end
+          { x: x, y: y_top, width: w, height: [box_h, 10.0].max }
+        end
 
-          return if items.empty?
+        # Расчет высоты многострочного текста в pt (запас на выносные элементы)
+        def estimate_text_height(text, size_pt, width_pt, font_name = nil, bold = false)
+          return 0.0 if text.to_s.empty?
 
-          item_gap = if (cfg.key?(:item_gap_mm) && !cfg[:item_gap_mm].nil?) || (cfg.key?("item_gap_mm") && !cfg["item_gap_mm"].nil?)
-                       mm_val = (cfg[:item_gap_mm] || cfg["item_gap_mm"]).to_f
-                       (mm_val * PT_PER_INCH / 25.4).round(1)
-                     elsif (cfg.key?(:item_gap) && !cfg[:item_gap].nil?) || (cfg.key?("item_gap") && !cfg["item_gap"].nil?)
-                       (cfg[:item_gap] || cfg["item_gap"]).to_f
-                     else
-                       6.0
-                     end
-          item_heights = items.map do |it|
-            estimate_text_height(it[:text], it[:size], in_w, slot_font, ctx[:text_bold])
-          end
-          total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
+          char_ratio = font_char_width_ratio(font_name) * (bold ? 1.05 : 1.0)
+          pitch_ratio = font_line_pitch_ratio(font_name)
 
-          slot_scale = 1.0
-          if total_items_h > in_h && total_items_h > 0
-            slot_scale = [in_h / total_items_h, 0.6].max
-            item_gap = (item_gap * slot_scale).round(2)
-            item_heights = items.map do |it|
-              sc_sz = (it[:size] * slot_scale).round(2)
-              estimate_text_height(it[:text], sc_sz, in_w, slot_font, ctx[:text_bold])
-            end
-            total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
-          end
+          # Эффективная ширина ~90% от геометрической границы (перенос по словам)
+          cpl = [((width_pt.to_f * 0.90) / (size_pt.to_f * char_ratio)).floor, 1].max
+          lines = text.to_s.split("\n", -1).sum { |seg| [(seg.length.to_f / cpl).ceil, 1].max }
+          lines_count = [lines, 1].max
 
-          # Если даже после масштабирования суммарная высота превышает доступную, уменьшаем межстрочные интервалы
-          if total_items_h > in_h && items.size > 1
-            excess = total_items_h - in_h
-            gap_reduction = [excess / (items.size - 1), [item_gap - 1.0, 0.0].max].min
-            if gap_reduction > 0
-              item_gap = (item_gap - gap_reduction).round(2)
-              total_items_h = item_heights.sum + ([items.size - 1, 0].max * item_gap)
-            end
-          end
+          ((lines_count * size_pt.to_f * pitch_ratio) + 2.5).round(2)
+        end
 
-          cur_y = if valign == :bottom
-                    [in_bottom_y + total_items_h, in_y].min
-                  elsif valign == :center
-                    offset = [(in_h - total_items_h) / 2.0, 0.0].max
-                    in_y - offset
-                  else
-                    in_y
-                  end
+        # Рендер всех параметров шаблона. Место параметра определяется его
+        # выравниваниями: лево/центр/право задает колонку, верх/низ — привязку
+        # группы к верхнему или нижнему краю рабочей области. Параметры одной
+        # зоны складываются в столбик в порядке списка с отступом PARAM_ZONE_GAP_MM.
+        # Формат строки: [Заголовок: ]Значение; пустое значение или visible: false —
+        # параметр не выводится. Стадии проекта (чек-лист) рисуются с квадратами.
+        def render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, ctx, rctx)
+          params = page_cfg[:params] || page_cfg["params"]
+          return unless params.is_a?(Array)
 
-          items.each_with_index do |it, idx|
-            h = item_heights[idx]
-            if it[:key] == "workflow_stadia" && it[:text].to_s.include?("\n")
-              draw_stadia_check_rows(ctx, doc, page, layer, it, { x: in_x, y: cur_y, width: in_w, height: h },
-                                     slot_font, slot_scale, (gfx_layer || layer))
+          # 1. Видимые параметры с непустым значением, разложенные по шести зонам.
+          #    Блоки (group: true) объединяют вложенные параметры в одну строку
+          #    с разделителем « | » и стилем самого блока.
+          zones = {}
+          params.each do |param|
+            next unless param.is_a?(Hash)
+
+            raw_vis = param.key?(:visible) ? param[:visible] : param["visible"]
+            next if raw_vis == false || raw_vis.to_s.strip.downcase == "false" || raw_vis.to_s.strip == "0"
+
+            is_group = param[:group] == true || param["group"] == true || param[:group].to_s == "true"
+            stadia = false
+
+            if is_group
+              children = param[:params] || param["params"] || []
+              values = children.filter_map do |child|
+                next unless child.is_a?(Hash)
+
+                child_src = (child[:source] || child["source"]).to_s.strip
+                child_val = InfoLineResolver.resolve_param(rctx, child_src)
+                next if child_val.nil? || child_val.to_s.strip.empty?
+
+                child_val.to_s.strip
+              end
+              next if values.empty?
+              value = values.join(" | ")
             else
-              add_bounded_text(ctx, doc, page, layer, it[:text], { x: in_x, y: cur_y, width: in_w, height: h },
-                               size: (it[:size] * slot_scale).round(2), color: it[:color], align: it[:align] || align, anchor: :top, font: slot_font)
+              source = (param[:source] || param["source"]).to_s.strip
+              value = InfoLineResolver.resolve_param(rctx, source)
+              next if value.nil? || value.to_s.strip.empty?
+              stadia = source == "workflow.stadia"
+              value = value.to_s
             end
-            cur_y -= h
 
-            if idx < items.size - 1
-              sep_y = cur_y - (item_gap / 2.0)
-              line_w = [in_w * 0.75, 120.0].min
-              item_align = it[:align] || align
-              lx = if item_align == :right
-                     in_x + in_w - line_w
-                   elsif item_align == :center
-                     in_x + (in_w - line_w) / 2.0
-                   else
-                     in_x
-                   end
-              add_hline(ctx, doc, page, (gfx_layer || layer), lx, sep_y, line_w, SEP_COLOR, 0.5)
-              cur_y -= item_gap
+            raw_show_label = param.key?(:show_label) ? param[:show_label] : param["show_label"]
+            show_label = raw_show_label.nil? ? true : !(raw_show_label == false || raw_show_label.to_s.strip.downcase == "false")
+            # Двоеточие после метки добавляет рендерер: хвостовые «:» из ввода пользователя срезаем,
+            # иначе на листе печатается «Артикул:: значение»
+            label = (param[:label] || param["label"]).to_s.strip.sub(/:+\s*\z/, "").strip
+
+            align = case (param[:align] || param["align"] || "left").to_s.downcase.strip
+                    when "center" then :center
+                    when "right"  then :right
+                    else :left
+                    end
+            valign = (param[:valign] || param["valign"] || "top").to_s.downcase.strip == "bottom" ? :bottom : :top
+
+            size = (param[:font_size] || param["font_size"] || 10.0).to_f
+            size = 10.0 if size <= 0.0
+
+            # Шрифт параметра: пусто — шрифт страницы, иначе семейство из комплекта
+            raw_ff = (param[:font_family] || param["font_family"]).to_s.strip
+            font = raw_ff.empty? ? ctx[:font] : FontService.layout_font_family(raw_ff)
+
+            raw_col = (param[:color] || param["color"] || PARAM_TEXT_COLOR).to_s.strip.sub(/^#/, "")
+            raw_col = PARAM_TEXT_COLOR if raw_col.empty?
+
+            (zones[[align, valign]] ||= []) << {
+              stadia:     stadia,
+              text:       value,
+              label:      label,
+              show_label: show_label,
+              size:       size,
+              color:      raw_col,
+              font:       font
+            }
+          end
+          return if zones.empty?
+
+          gap_pt = (PARAM_ZONE_GAP_MM * PT_PER_INCH / 25.4).round(2)
+
+          # 2. Отрисовка зон: группа «верх» начинается от верхнего края рабочей
+          #    области, группа «низ» заканчивается у нижнего края
+          zones.each do |(align, valign), items|
+            heights = items.map do |it|
+              w = param_zone_box(content, align, 0.0, 1.0)[:width]
+              h = estimate_text_height(it[:text], it[:size], w, it[:font], ctx[:text_bold])
+              if it[:stadia] && it[:show_label] && !it[:label].empty?
+                h += it[:size] * font_line_pitch_ratio(it[:font])
+              end
+              h
+            end
+            total_h = heights.sum + ([items.size - 1, 0].max * gap_pt)
+
+            cur_y = valign == :bottom ? (content[:top] - content[:h] + total_h) : content[:top]
+
+            items.each_with_index do |it, i|
+              h = heights[i]
+              box = param_zone_box(content, align, cur_y, h)
+
+              if it[:stadia] && it[:text].include?("\n")
+                # Стадии (чек-лист): заголовок — отдельной строкой над списком,
+                # чтобы не ломать разбор строк "[✓]/[ ]" с квадратами-чекбоксами.
+                if it[:show_label] && !it[:label].empty?
+                  pitch = it[:size] * font_line_pitch_ratio(it[:font])
+                  add_bounded_text(ctx, doc, page, cnt_layer, "#{it[:label]}:",
+                                   { x: box[:x], y: box[:y], width: box[:width], height: pitch },
+                                   size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
+                  box = box.merge(y: box[:y] - pitch, height: [box[:height] - pitch, 10.0].max)
+                end
+                draw_stadia_check_rows(ctx, doc, page, cnt_layer,
+                                       { text: it[:text], size: it[:size], color: it[:color], align: align },
+                                       box, it[:font], 1.0, (gfx_layer || cnt_layer))
+              else
+                text = (it[:show_label] && !it[:label].empty?) ? "#{it[:label]}: #{it[:text]}" : it[:text]
+                add_bounded_text(ctx, doc, page, cnt_layer, text, box,
+                                 size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
+              end
+
+              cur_y -= h + gap_pt
             end
           end
         end
@@ -1588,139 +1125,6 @@ module DN1Code
             0.48
           else
             0.50
-          end
-        end
-
-        # Точный расчет высоты многострочного текста в pt для LayOut FormattedText
-        def estimate_text_height(text, size_pt, width_pt, font_name = nil, bold = false)
-          return 0.0 if text.to_s.empty?
-
-          # Жирное начертание шире — учитываем в коэффициенте символа
-          char_ratio = font_char_width_ratio(font_name) * (bold ? 1.05 : 1.0)
-          pitch_ratio = font_line_pitch_ratio(font_name)
-
-          # Учитываем перенос по словам: эффективная ширина ~90% от геометрической границы
-          cpl = [((width_pt.to_f * 0.90) / (size_pt.to_f * char_ratio)).floor, 1].max
-          lines = text.to_s.split("\n", -1).sum { |seg| [(seg.length.to_f / cpl).ceil, 1].max }
-          lines_count = [lines, 1].max
-
-          # Высота строк + базовый вертикальный запас (+2.5 pt на внутренние отступы блока и выносные элементы шрифта)
-          ((lines_count * size_pt.to_f * pitch_ratio) + 2.5).round(2)
-        end
-
-        # ------------------------------------------------------------------
-        # Нижний колонтитул (зеркало PageBase#render_modular_footer)
-        # ------------------------------------------------------------------
-
-        def render_modular_footer(doc, page, layer, ftr_box, cfg, ctx, rctx)
-          raw_valign = (cfg[:valign] || cfg["valign"] || "bottom").to_s
-          valign = (raw_valign == "top") ? :top : :bottom
-          font_size = (cfg[:font_size] || cfg["font_size"] || 8.5).to_f
-          footer_font = if cfg[:font_family] && !cfg[:font_family].to_s.strip.empty?
-                          FontService.layout_font_family(cfg[:font_family])
-                        else
-                          ctx[:font]
-                        end
-
-          raw_lines = cfg[:lines] || cfg["lines"]
-          lines = if raw_lines.is_a?(Array) && !raw_lines.empty?
-                    raw_lines.map(&:to_s)
-                  else
-                    ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"]
-                  end
-
-          # Поддержка старого составного ключа footer_rev_ver_date
-          expanded_lines = []
-          lines.each do |k|
-            if k == "footer_rev_ver_date"
-              expanded_lines << "footer_ver_rev"
-              expanded_lines << "footer_articul"
-              expanded_lines << "footer_date"
-            else
-              expanded_lines << k
-            end
-          end
-
-          raw_aligns = cfg[:line_aligns] || cfg["line_aligns"] || {}
-          line_aligns = {}
-          if raw_aligns.is_a?(Hash)
-            raw_aligns.each { |k, v| line_aligns[k.to_s] = v.to_s }
-          end
-
-          default_aligns = {
-            "footer_last_edit"  => "left",
-            "footer_ver_rev"    => "center",
-            "footer_articul"    => "center",
-            "footer_date"       => "center",
-            "footer_page_total" => "right"
-          }
-
-          left_items = []
-          center_items = []
-          right_items = []
-
-          expanded_lines.each do |k|
-            text = InfoLineResolver.resolve(rctx, k)
-            next if text.nil? || text.to_s.strip.empty?
-
-            item_align = (line_aligns[k] || default_aligns[k] || "center").to_s.downcase
-            case item_align
-            when "left"
-              left_items << text.to_s.strip
-            when "right"
-              right_items << text.to_s.strip
-            else
-              center_items << text.to_s.strip
-            end
-          end
-
-          left_text = left_items.join("   |   ")
-          center_text = center_items.join("   |   ")
-          right_text = right_items.join("   |   ")
-
-          y_pos = ftr_box[:y]
-          h_pos = ftr_box[:height]
-          w_total = ftr_box[:width]
-
-          # Адаптивный расчет ширины колонок в зависимости от наличия контента
-          has_left = !left_text.empty?
-          has_center = !center_text.empty?
-          has_right = !right_text.empty?
-
-          footer_opts = { size: font_size, color: FOOTER_COLOR, font: footer_font, anchor: valign }
-
-          if has_left && has_center && has_right
-            w_left = (w_total * 0.35).round(2)
-            w_center = (w_total * 0.42).round(2)
-            w_right = (w_total - w_left - w_center).round(2)
-            x_left = ftr_box[:x] + 4
-            x_center = ftr_box[:x] + w_left + 2
-            x_right = ftr_box[:x] + w_left + w_center + 4
-
-            add_bounded_text(ctx, doc, page, layer, left_text,   { x: x_left,   y: y_pos, width: w_left - 6,   height: h_pos }, footer_opts.merge(align: :left))
-            add_bounded_text(ctx, doc, page, layer, center_text, { x: x_center, y: y_pos, width: w_center - 4, height: h_pos }, footer_opts.merge(align: :center))
-            add_bounded_text(ctx, doc, page, layer, right_text,  { x: x_right,  y: y_pos, width: w_right - 12, height: h_pos }, footer_opts.merge(align: :right))
-          elsif has_left && has_right && !has_center
-            w_left = (w_total * 0.65).round(2)
-            w_right = (w_total - w_left).round(2)
-            add_bounded_text(ctx, doc, page, layer, left_text,  { x: ftr_box[:x] + 4, y: y_pos, width: w_left - 6,   height: h_pos }, footer_opts.merge(align: :left))
-            add_bounded_text(ctx, doc, page, layer, right_text, { x: ftr_box[:x] + w_left + 4, y: y_pos, width: w_right - 12, height: h_pos }, footer_opts.merge(align: :right))
-          elsif has_center && !has_left && !has_right
-            add_bounded_text(ctx, doc, page, layer, center_text, { x: ftr_box[:x] + 4, y: y_pos, width: w_total - 8, height: h_pos }, footer_opts.merge(align: :center))
-          elsif has_left && !has_center && !has_right
-            add_bounded_text(ctx, doc, page, layer, left_text, { x: ftr_box[:x] + 4, y: y_pos, width: w_total - 8, height: h_pos }, footer_opts.merge(align: :left))
-          elsif has_right && !has_left && !has_center
-            add_bounded_text(ctx, doc, page, layer, right_text, { x: ftr_box[:x] + 4, y: y_pos, width: w_total - 12, height: h_pos }, footer_opts.merge(align: :right))
-          elsif has_left && has_center && !has_right
-            w_left = (w_total * 0.45).round(2)
-            w_center = (w_total - w_left).round(2)
-            add_bounded_text(ctx, doc, page, layer, left_text,   { x: ftr_box[:x] + 4, y: y_pos, width: w_left - 6,   height: h_pos }, footer_opts.merge(align: :left))
-            add_bounded_text(ctx, doc, page, layer, center_text, { x: ftr_box[:x] + w_left + 2, y: y_pos, width: w_center - 6, height: h_pos }, footer_opts.merge(align: :center))
-          elsif has_center && has_right && !has_left
-            w_center = (w_total * 0.65).round(2)
-            w_right = (w_total - w_center).round(2)
-            add_bounded_text(ctx, doc, page, layer, center_text, { x: ftr_box[:x] + 4, y: y_pos, width: w_center - 6, height: h_pos }, footer_opts.merge(align: :center))
-            add_bounded_text(ctx, doc, page, layer, right_text,  { x: ftr_box[:x] + w_center + 4, y: y_pos, width: w_right - 12, height: h_pos }, footer_opts.merge(align: :right))
           end
         end
 

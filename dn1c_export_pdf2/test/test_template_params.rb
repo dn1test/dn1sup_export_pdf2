@@ -1,18 +1,20 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Проверка параметров секций «Заголовок страницы (Шапка) / Средний блок /
-# Подвал страницы (Footer)» вкладки «Настройка шаблона».
+# Проверка пользовательских параметров шаблона (вкладка «Шаблоны» →
+# «Параметры страницы» → «+ Создать параметр»).
 #
-# В отличие от старых тестов (структура конфига + факт генерации PDF), здесь
-# каждый параметр проверяется по ФАКТИЧЕСКОМУ результату в документе LayOut
-# (мок): тексты, позиции (bounds), стили (размер/цвет/выравнивание/якорь),
-# чекбоксы стадий.
+# Готовых списков параметров больше нет: параметр создается из источника данных
+# («Данные проекта», «Папки спецификации», сцена, страница) и размещается
+# свободно на странице (X/Y в %, выравнивание, кегль, цвет, заголовок, Вкл).
+#
+# Каждый тест проверяет ФАКТИЧЕСКИЙ результат в документе LayOut (мок): тексты,
+# позиции (bounds), стили (размер/цвет/выравнивание), чекбоксы стадий, а также
+# нормализацию конфига при загрузке/сохранении layout.yaml.
 #
 # Запуск отдельно:
 #   ruby -I dn1c_export_pdf2 dn1c_export_pdf2/test/test_template_params.rb
 # В составе общего прогона подключается из comprehensive_test.rb
-# (TestRunner подмешивает TemplateParamsTests).
 # -------------------------------------------------------------------------------
 
 require_relative "mock_sketchup"
@@ -47,7 +49,11 @@ module DN1Code
             address:        "г. Москва, ул. Ленина, 10",
             name_customer:  "Иванов И.И.",
             company:        "ООО «МебельПроект»",
-            articul:        "CF#260922_100000"
+            articul:        "CF#260922_100000",
+            price:          "150 000",
+            total_duration: "45",
+            start_date:     "01.09.2026",
+            end_date:       "15.10.2026"
           )
           pd.workflow[:version]         = "02"
           pd.workflow[:revision]        = "003"
@@ -60,8 +66,26 @@ module DN1Code
           pd
         end
 
-        def tp_layout(pd, tpl, slot)
-          pd.pdf_settings[:custom_layouts][tpl][slot]
+        # Список параметров шаблона (создается пользователем через модал)
+        def tp_params(pd, tpl)
+          tpl_cfg = pd.pdf_settings[:custom_layouts][tpl] ||= {}
+          tpl_cfg[:params] ||= []
+        end
+
+        # Добавить параметр в шаблон (как это делает модал «Создать параметр»)
+        def tp_add_param(pd, tpl, source, attrs = {})
+          tp_params(pd, tpl) << {
+            id:         "p_test_#{tp_params(pd, tpl).size}",
+            source:     source,
+            label:      "",
+            show_label: true,
+            align:      "left",
+            valign:     "top",
+            font_family: "",
+            font_size:  10.0,
+            color:      "#0F172A",
+            visible:    true
+          }.merge(attrs)
         end
 
         # Рендер одной страницы в мок-документ; возвращает Document
@@ -81,11 +105,6 @@ module DN1Code
           doc.entities.map { |rec| rec[:entity] }.grep(::Layout::FormattedText)
         end
 
-        # Строки заголовка — единственные, кто идёт через RTF
-        def tp_rtf_texts(doc)
-          tp_texts(doc).select { |t| t.rtf_data.to_s.start_with?("{\\rtf1") }
-        end
-
         def tp_find_text(doc, fragment)
           tp_texts(doc).find { |t| t.plain_text.to_s.include?(fragment) }
         end
@@ -98,316 +117,371 @@ module DN1Code
           doc.entities.map { |rec| rec[:entity] }.grep(::Layout::Path)
         end
 
-        # Отключить всё, кроме исследуемого блока (чистая выдача сущностей)
-        def tp_isolate(pd, tpl, keep: :slot_1)
-          %i[header slot_1 slot_2 slot_3 slot_4 footer].each do |b|
-            tp_layout(pd, tpl, b)[:visible] = (b == keep)
-          end
-        end
-
         # ------------------------------------------------------------------
-        # 79. Шапка: Вкл, valign ↑⇕↓, состав строк, «стр.», «пт.», цвет
+        # 79. Параметр страницы: Вкл, заголовок, X/Y, выравнивание, кегль, цвет
         # ------------------------------------------------------------------
-        def test_79_template_params_header
-          puts "\n--- 79. Параметры шапки: Вкл / valign / строки / стр. / пт. / цвет ---"
+        def test_79_template_params_placement
+          puts "\n--- 79. Параметр страницы: Вкл / заголовок / X/Y / выравнивание / кегль / цвет ---"
 
-          # 1. Чекбокс «Вкл» (header.visible)
+          # 1. Параметр по умолчанию: «Заголовок: значение»
           pd = tp_make_project
-          tp_layout(pd, :cover, :header)[:lines] = ["furniture_name"]
+          tp_add_param(pd, :cover, "project.furniture_name", label: "Изделие")
           doc = tp_render(pd)
-          assert(!tp_rtf_texts(doc).empty?, "Шапка по умолчанию (Вкл) рисует RTF-строки")
-          assert(tp_find_text(doc, "Шкаф-купе АЛЬФА"), "Название мебели попадает в шапку")
+          ent = tp_find_text(doc, "Шкаф-купе АЛЬФА")
+          assert(ent, "Параметр с заполненным источником выводится на страницу")
+          assert(ent.plain_text.include?("Изделие:"), "Заголовок параметра выводится перед значением")
 
-          tp_layout(pd, :cover, :header)[:visible] = false
+          # 2. Чекбокс «Вкл» (param.visible)
+          tp_params(pd, :cover).first[:visible] = false
           doc_off = tp_render(pd)
-          assert(tp_rtf_texts(doc_off).empty?, "Чекбокс «Вкл» off (header.visible=false) убирает шапку целиком")
+          assert(tp_texts(doc_off).empty?, "«Вкл» off (visible=false) убирает параметр со страницы")
 
-          # 2. Вертикальное выравнивание ↑/⇕/↓ (header.valign) — позиции по bounds
-          tops = {}
-          %w[top center bottom].each do |va|
-            pd_va = tp_make_project
-            hdr_va = tp_layout(pd_va, :cover, :header)
-            hdr_va[:lines] = ["furniture_name"]
-            hdr_va[:valign] = va
-            ent = tp_rtf_texts(tp_render(pd_va)).first
-            tops[va] = ent.bounds.y * 72.0 # LayOut: y вниз от верхнего края
-          end
-          assert(tops["top"] < tops["center"] && tops["center"] < tops["bottom"],
-                 "valign ↑/⇕/↓ смещает шапку вниз по странице " \
-                 "(top=#{tops['top'].round(1)} < center=#{tops['center'].round(1)} < bottom=#{tops['bottom'].round(1)} pt)")
-          assert(tops["bottom"] - tops["top"] > 60.0,
-                 "Разнос позиций valign достаточный (#{(tops['bottom'] - tops['top']).round(1)} pt)")
+          # 3. «Показывать» off — выводится только значение, без заголовка
+          tp_params(pd, :cover).first[:visible] = true
+          tp_params(pd, :cover).first[:show_label] = false
+          doc_no_label = tp_render(pd)
+          no_label = tp_texts(doc_no_label).find { |t| t.plain_text.strip == "Шкаф-купе АЛЬФА" }
+          assert(no_label, "«Показывать» off — на листе только значение")
+          assert(!tp_texts(doc_no_label).any? { |t| t.plain_text.include?("Изделие:") },
+                 "«Показывать» off — заголовка «Изделие:» на листе нет")
 
-          # 3. Чекбоксы строк (header.lines): включена одна — рисуется одна
-          pd_one = tp_make_project
-          hdr_one = tp_layout(pd_one, :cover, :header)
-          hdr_one[:lines] = ["furniture_name"]
-          hdr_one[:line_rows] = { "furniture_name" => 1 }
-          ents_one = tp_rtf_texts(tp_render(pd_one))
-          assert(ents_one.size == 1, "Включена одна строка — рисуется ровно одна строка шапки")
-          assert(ents_one.first.plain_text.include?("Шкаф-купе АЛЬФА"), "В строке — название мебели")
+          # 4. Пустое значение источника — параметр не выводится (без заглушек)
+          pd_empty = tp_make_project
+          tp_add_param(pd_empty, :cover, "customer.phone", label: "Телефон")
+          assert(tp_texts(tp_render(pd_empty)).empty?,
+                 "Незаполненный источник (телефон) → параметр не печатается, заглушки нет")
 
-          pd_two = tp_make_project
-          hdr_two = tp_layout(pd_two, :cover, :header)
-          hdr_two[:lines] = %w[furniture_name place_address]
-          hdr_two[:line_rows] = { "furniture_name" => 1, "place_address" => 2 }
-          ents_two = tp_rtf_texts(tp_render(pd_two))
-          assert(ents_two.size == 2, "Строки на стр.1 и стр.2 — два отдельных блока")
-          assert(ents_two.map(&:plain_text).join(" ").include?("Прихожая"),
-                 "Вторая строка содержит «Место установки» (room|address)")
-          tp_isolate(pd_two, :cover, keep: :header)
-          assert(tp_rtf_texts(tp_render(pd_two)).size == 2 &&
-                 tp_rects(tp_render(pd_two)).size == 1,
-                 "Между стр.1 и стр.2 рисуется один разделитель")
+          # 5. Размещение по зонам: выравнивания задают колонку и привязку группы
+          pd_z = tp_make_project
+          tp_add_param(pd_z, :cover, "project.articul", label: "Артикул", align: "left", valign: "top")
+          tp_add_param(pd_z, :cover, "project.room_name", label: "Помещение", align: "center", valign: "top")
+          tp_add_param(pd_z, :cover, "workflow.version", label: "Версия", align: "right", valign: "bottom")
+          doc_z = tp_render(pd_z)
+          ent_left   = tp_find_text(doc_z, "CF#260922_100000")
+          ent_center = tp_find_text(doc_z, "Прихожая")
+          ent_right  = tp_find_text(doc_z, "v02")
 
-          # 4. Группировка «стр.»: все на стр.1 — одна строка через « | »
-          pd_grp = tp_make_project
-          hdr_grp = tp_layout(pd_grp, :cover, :header)
-          hdr_grp[:lines] = %w[furniture_name place_address customer_or_company]
-          hdr_grp[:line_rows] = { "furniture_name" => 1, "place_address" => 1, "customer_or_company" => 1 }
-          grp = tp_rtf_texts(tp_render(pd_grp))
-          assert(grp.size == 1, "Все три пункта на стр.1 — объединены в одну строку")
-          gtxt = grp.first.plain_text
-          assert(gtxt.include?("Шкаф-купе АЛЬФА") && gtxt.include?("Прихожая") && gtxt.include?("Иванов И.И."),
-                 "В объединённую строку вошли все включённые пункты")
-          assert(gtxt.include?(" | "), "Пункты внутри строки разделяются « | »")
-          i_fn  = gtxt.index("Шкаф-купе АЛЬФА")
-          i_pa  = gtxt.index("Прихожая")
-          i_cu  = gtxt.index("Иванов И.И.")
-          assert(i_fn < i_pa && i_pa < i_cu, "Порядок пунктов внутри строки следует порядку списка lines")
+          assert((ent_left.bounds.x * 72.0 - MARGIN_PT).abs < 6.0,
+                 "Зона «слева вверху»: колонка от левого края рабочей области (#{(ent_left.bounds.x * 72.0).round(1)} ≈ #{MARGIN_PT.round(1)} pt)")
+          assert((ent_left.bounds.y * 72.0 - MARGIN_PT).abs < 6.0,
+                 "Зона «слева вверху»: группа начинается от верхнего края рабочей области")
 
-          # 5. Кегль «пт.» (line_font_sizes) — \fs = pt*2 в RTF
-          pd_sz = tp_make_project
-          hdr_sz = tp_layout(pd_sz, :cover, :header)
-          hdr_sz[:lines] = %w[furniture_name place_address]
-          hdr_sz[:line_rows] = { "furniture_name" => 1, "place_address" => 2 }
-          hdr_sz[:line_font_sizes] = { "furniture_name" => 20, "place_address" => 14 }
-          sz_ents = tp_rtf_texts(tp_render(pd_sz))
-          rtf_fn = sz_ents.find { |t| t.plain_text.include?("Шкаф-купе") }.rtf_data
-          rtf_pa = sz_ents.find { |t| t.plain_text.include?("Прихожая") }.rtf_data
-          assert(rtf_fn.include?("\\fs40"), "«пт.» 20 для названия → \\fs40 в RTF")
-          assert(rtf_pa.include?("\\fs28"), "«пт.» 14 для адреса → \\fs28 в RTF")
+          c_mid = (ent_center.bounds.x + ent_center.bounds.width / 2.0) * 72.0
+          page_mid = MARGIN_PT + CONTENT_W / 2.0
+          assert((c_mid - page_mid).abs < CONTENT_W * 0.1,
+                 "Зона «по центру вверху»: текст центрирован на листе (#{c_mid.round(1)} ≈ #{page_mid.round(1)} pt)")
 
-          # 6. Цвет строки (line_colors) → colortbl в RTF
-          pd_col = tp_make_project
-          hdr_col = tp_layout(pd_col, :cover, :header)
-          hdr_col[:lines] = ["furniture_name"]
-          hdr_col[:line_rows] = { "furniture_name" => 1 }
-          hdr_col[:line_colors] = { "furniture_name" => "FF0000" }
-          rtf_col = tp_rtf_texts(tp_render(pd_col)).first.rtf_data
-          assert(rtf_col.include?("\\red255\\green0\\blue0;"), "Цвет строки FF0000 попадает в палитру RTF (colortbl)")
-          assert(rtf_col.include?("\\cf1"), "Фрагмент строки ссылается на свой цвет (\\cf1)")
-        end
+          r_edge = (ent_right.bounds.x + ent_right.bounds.width) * 72.0
+          assert((r_edge - (MARGIN_PT + CONTENT_W)).abs < 6.0,
+                 "Зона «справа внизу»: текст у правого края рабочей области (#{r_edge.round(1)} pt)")
+          assert(((ent_right.bounds.y + ent_right.bounds.height) * 72.0 - (MARGIN_PT + CONTENT_H)).abs < 6.0,
+                 "Зона «справа внизу»: группа прижата к нижнему краю рабочей области")
 
-        # ------------------------------------------------------------------
-        # 80. Средний блок: Вкл, Все/Снять, Заголовок, ⇤⇥, ↑⇕↓, Aa, цвет,
-        #     расстояние мм, стадии с чекбоксами
-        # ------------------------------------------------------------------
-        def test_80_template_params_middle
-          puts "\n--- 80. Параметры среднего блока: Вкл / Все/Снять / Заголовок / ⇤⇥ / ↑⇕↓ / Aa / цвет / расстояние / стадии ---"
+          # 6. Параметры одной зоны складываются в столбик в порядке списка
+          pd_s = tp_make_project
+          tp_add_param(pd_s, :cover, "project.articul", label: "Артикул", align: "left", valign: "top")
+          tp_add_param(pd_s, :cover, "project.room_name", label: "Помещение", align: "left", valign: "top")
+          doc_s = tp_render(pd_s)
+          y_first = tp_find_text(doc_s, "CF#").bounds.y * 72.0
+          y_second = tp_find_text(doc_s, "Прихожая").bounds.y * 72.0
+          assert(y_second > y_first, "Параметры одной зоны идут друг под другом (#{y_first.round(1)} → #{y_second.round(1)} pt)")
+          assert(y_second - y_first < 120.0,
+                 "Отступ между параметрами зоны небольшой (#{(y_second - y_first).round(1)} pt)")
 
-          # 1. Чекбокс «Вкл» (slot_1.visible)
-          pd = tp_make_project
-          tp_isolate(pd, :cover, keep: :slot_1)
-          s1 = tp_layout(pd, :cover, :slot_1)
-          s1[:lines] = %w[workflow_revision workflow_version]
-          s1[:line_aligns]  = {}
-          s1[:line_valigns] = { "workflow_revision" => "top", "workflow_version" => "top" }
-          doc = tp_render(pd)
-          assert(tp_find_text(doc, "Ревизия") && tp_find_text(doc, "Версия"),
-                 "Средний блок по умолчанию (Вкл) выводит строки")
-
-          s1[:visible] = false
-          doc_off = tp_render(pd)
-          assert(tp_texts(doc_off).empty?, "Чекбокс «Вкл» off (slot_1.visible=false) убирает средний блок")
-
-          # 2. «Все» / «Снять» (lines: полный список / [])
-          s1[:visible] = true
-          s1[:lines] = []
-          doc_empty = tp_render(pd)
-          assert(tp_texts(doc_empty).empty?, "«Снять» (lines=[]) — строки среднего блока не рисуются")
-          s1[:lines] = %w[workflow_revision]
-          assert(tp_find_text(tp_render(pd), "Ревизия"), "«Все» (lines заполнен) — строка возвращается")
-
-          # 3. Чекбокс «Заголовок» (show_titles): префикс названия строки
-          s1[:lines] = ["workflow_revision"]
-          s1[:show_titles] = true
-          with_title = tp_find_text(tp_render(pd), "Ревизия")
-          assert(with_title && with_title.plain_text.include?("003"),
-                 "«Заголовок» on — строка содержит название «Ревизия» и значение")
-          s1[:show_titles] = false
-          doc_no_title = tp_render(pd)
-          no_title = tp_texts(doc_no_title).find { |t| t.plain_text.strip == "003" }
-          assert(no_title, "«Заголовок» off — выводится только значение (003)")
-          assert(!tp_texts(doc_no_title).any? { |t| t.plain_text.include?("Ревизия") },
-                 "«Заголовок» off — названия строки на странице нет")
-          s1[:show_titles] = true
-
-          # 4. Горизонтальный сдвиг ⇤/⇥ (line_aligns: left/right) — колонки
-          pd_lr = tp_make_project
-          tp_isolate(pd_lr, :cover, keep: :slot_1)
-          s1lr = tp_layout(pd_lr, :cover, :slot_1)
-          s1lr[:lines] = %w[workflow_revision workflow_version]
-          s1lr[:line_aligns]  = { "workflow_revision" => "left", "workflow_version" => "right" }
-          s1lr[:line_valigns] = { "workflow_revision" => "top", "workflow_version" => "top" }
-          doc_lr = tp_render(pd_lr)
-          x_rev = tp_find_text(doc_lr, "Ревизия").bounds.x * 72.0
-          x_ver = tp_find_text(doc_lr, "Версия").bounds.x * 72.0
-          assert(x_ver - x_rev > CONTENT_W * 0.4,
-                 "⇤/⇥ раскидывают строки по колонкам (левая x=#{x_rev.round(1)}, правая x=#{x_ver.round(1)} pt)")
-
-          # 5. Вертикальные зоны ↑/⇕/↓ (line_valigns: top/bottom)
-          pd_tb = tp_make_project
-          tp_isolate(pd_tb, :cover, keep: :slot_1)
-          s1tb = tp_layout(pd_tb, :cover, :slot_1)
-          s1tb[:lines] = %w[workflow_revision workflow_version]
-          s1tb[:line_aligns]  = {}
-          s1tb[:line_valigns] = { "workflow_revision" => "top", "workflow_version" => "bottom" }
-          doc_tb = tp_render(pd_tb)
-          y_rev = tp_find_text(doc_tb, "Ревизия").bounds.y * 72.0
-          y_ver = tp_find_text(doc_tb, "Версия").bounds.y * 72.0
-          assert(y_ver - y_rev > CONTENT_H * 0.2,
-                 "↑/↓ разносят строки по вертикали (верх y=#{y_rev.round(1)}, низ y=#{y_ver.round(1)} pt)")
-
-          # 6. Кегль строки «Aa» (line_font_sizes) и кегль блока (font_size)
+          # 7. Кегль параметра (font_size)
           pd_fs = tp_make_project
-          tp_isolate(pd_fs, :cover, keep: :slot_1)
-          s1fs = tp_layout(pd_fs, :cover, :slot_1)
-          s1fs[:lines] = %w[workflow_revision workflow_version]
-          s1fs[:line_aligns]  = {}
-          s1fs[:line_valigns] = {}
-          s1fs[:font_size] = 10.0
-          s1fs[:line_font_sizes] = { "workflow_revision" => 12.0 }
-          doc_fs = tp_render(pd_fs)
-          sz_rev = tp_find_text(doc_fs, "Ревизия").style.font_size
-          sz_ver = tp_find_text(doc_fs, "Версия").style.font_size
-          assert((sz_rev - 12.0).abs < 0.01, "«Aa» 12 для Ревизии → font_size=12 (получено #{sz_rev})")
-          assert((sz_ver - 10.0).abs < 0.01, "Без своего кегля строка берёт кегль блока 10 (получено #{sz_ver})")
+          tp_add_param(pd_fs, :cover, "project.room_name", label: "Помещение", font_size: 20.0)
+          sz = tp_find_text(tp_render(pd_fs), "Прихожая").style.font_size
+          assert((sz - 20.0).abs < 0.01, "Кегль параметра 20 → font_size=20 (получено #{sz})")
 
-          # 7. Цвет строки (line_colors)
-          s1fs[:line_colors] = { "workflow_revision" => "005EB0" }
-          doc_col = tp_render(pd_fs)
-          c = tp_find_text(doc_col, "Ревизия").style.text_color
-          assert(c.is_a?(::Sketchup::Color) && c.red == 0 && c.green == 0x5E && c.blue == 0xB0,
-                 "Цвет строки #005EB0 применяется к тексту (rgb=#{c.is_a?(::Sketchup::Color) ? "#{c.red},#{c.green},#{c.blue}" : c.inspect})")
+          # 8. Цвет параметра (color)
+          pd_col = tp_make_project
+          tp_add_param(pd_col, :cover, "project.room_name", label: "Помещение", color: "#005EB0")
+          c = tp_find_text(tp_render(pd_col), "Прихожая").style.text_color
+          assert(c.is_a?(::Sketchup::Color) && c.red == 0x00 && c.green == 0x5E && c.blue == 0xB0,
+                 "Цвет #005EB0 применяется к тексту параметра (rgb=#{c.red},#{c.green},#{c.blue})")
 
-          # 8. «Расстояние ... мм» (item_gap_mm) — зазор между соседними строками
-          gap_of = lambda do |mm|
-            pd_g = tp_make_project
-            tp_isolate(pd_g, :cover, keep: :slot_1)
-            s1g = tp_layout(pd_g, :cover, :slot_1)
-            s1g[:lines] = %w[workflow_revision workflow_version articul]
-            s1g[:line_aligns]  = {}
-            s1g[:line_valigns] = {}
-            s1g[:item_gap_mm]  = mm
-            d = tp_render(pd_g)
-            t1 = tp_find_text(d, "Ревизия")
-            t2 = tp_find_text(d, "Версия")
-            (t2.bounds.y - (t1.bounds.y + t1.bounds.height)) * 72.0
-          end
-          gap_2mm  = gap_of.call(2.0)
-          gap_20mm = gap_of.call(20.0)
-          expected = (20.0 - 2.0) * 72.0 / 25.4
-          assert((gap_20mm - gap_2mm - expected).abs < 1.5,
-                 "«Расстояние мм» линейно меняет зазор: Δ=#{(gap_20mm - gap_2mm).round(1)} pt, " \
-                 "ожидание 18 мм = #{expected.round(1)} pt")
+          # 9. Выравнивание печатается в стиле текста (ALIGN_*)
+          pd_al = tp_make_project
+          tp_add_param(pd_al, :cover, "project.articul", label: "A", x: 50.0, align: "center")
+          tp_add_param(pd_al, :cover, "project.room_name", label: "B", x: 95.0, align: "right")
+          doc_al = tp_render(pd_al)
+          assert(tp_find_text(doc_al, "CF#").style.text_alignment == ::Layout::Style::ALIGN_CENTER,
+                 "Выравнивание «Центр» → ALIGN_CENTER в стиле")
+          assert(tp_find_text(doc_al, "Прихожая").style.text_alignment == ::Layout::Style::ALIGN_RIGHT,
+                 "Выравнивание «Справа» → ALIGN_RIGHT в стиле")
 
-          # 9. «Стадия проекта» — чекбоксы [✓]/[ ] (draw_stadia_check_rows)
+          # 10. Шрифт параметра (font_family); пусто — шрифт страницы
+          pd_ff = tp_make_project
+          tp_add_param(pd_ff, :cover, "project.room_name", label: "Помещение", font_family: "Oswald")
+          tp_add_param(pd_ff, :cover, "project.articul", label: "A", y: 30.0, font_family: "")
+          doc_ff = tp_render(pd_ff)
+          expected_ff = ::DN1Code::ExportPdf2::Service::FontService.layout_font_family("Oswald")
+          assert(tp_find_text(doc_ff, "Прихожая").style.font_family == expected_ff,
+                 "Шрифт параметра Oswald → font_family=#{expected_ff} (получено: #{tp_find_text(doc_ff, 'Прихожая').style.font_family.inspect})")
+          assert(tp_find_text(doc_ff, "CF#").style.font_family == "Sofia Sans Condensed",
+                 "Пустой шрифт → шрифт страницы (Sofia Sans Condensed)")
+        end
+
+        # ------------------------------------------------------------------
+        # 80. Источники значений (зеркало InfoLineResolver#resolve_param)
+        # ------------------------------------------------------------------
+        def test_80_template_params_sources
+          puts "\n--- 80. Источники параметров: проект / папки / сцена / страница / стадии ---"
+
+          pd  = tp_make_project
+          ctx = LB.send(:build_context, pd, nil, "Sofia Sans Condensed")
+          rctx = LB.send(:resolver_context, ctx, nil, 2, 3)
+          res = ::DN1Code::ExportPdf2::Service::InfoLineResolver
+
+          # 1. Данные проекта
+          assert(res.resolve_param(rctx, "project.articul") == "CF#260922_100000", "project.articul → артикул")
+          assert(res.resolve_param(rctx, "project.room_name") == "Прихожая", "project.room_name → помещение")
+          assert(res.resolve_param(rctx, "customer.name") == "Иванов И.И.", "customer.name → заказчик")
+          assert(res.resolve_param(rctx, "workflow.price") == "150 000 руб.", "workflow.price → с «руб.»")
+          assert(res.resolve_param(rctx, "workflow.duration") == "45 дн.", "workflow.duration → с «дн.»")
+          assert(res.resolve_param(rctx, "workflow.version") == "v02", "workflow.version → v02")
+          assert(res.resolve_param(rctx, "workflow.revision") == "#r003", "workflow.revision → #r003")
+          assert(res.resolve_param(rctx, "workflow.author").nil?, "Пустой автор → nil")
+
+          # 2. История: последние изменения = новейшая запись; полная история — построчно
+          assert(res.resolve_param(rctx, "workflow.last_edit") == "2026-09-10 12:00 Правка фасадов",
+                 "workflow.last_edit → первая (новейшая) запись истории")
+          hist = res.resolve_param(rctx, "workflow.history")
+          assert(hist.include?("Правка фасадов") && hist.include?("Первичная выдача"),
+                 "workflow.history → все записи")
+          assert(hist.include?("\n"), "История многострочная")
+
+          # 3. Папки спецификации: название и описание по индексу
+          pd.directories = [{ path: "C:/job", title: "Материалы", description: "ЛДСП 16 мм, Blum" }]
+          dctx = LB.send(:resolver_context, ctx, nil, 1, 4)
+          assert(res.resolve_param(dctx, "dir.0.title") == "Материалы", "dir.0.title → название папки")
+          assert(res.resolve_param(dctx, "dir.0.description") == "ЛДСП 16 мм, Blum", "dir.0.description → спецификация папки")
+          assert(res.resolve_param(dctx, "dir.5.description").nil?, "Несуществующая папка → nil")
+
+          # 4. Сцена и страница (сцена берется из scene_item контекста текущей страницы)
+          scene = ::DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Тестовая сцена", page_type: :cover)
+          sctx = LB.send(:resolver_context, ctx, scene, 2, 3)
+          assert(res.resolve_param(sctx, "scene.name") == "01. Тестовая сцена", "scene.name → имя сцены")
+          assert(res.resolve_param(rctx, "page.number_total") == "Страница 2 | 3", "page.number_total → «Страница 2 | 3»")
+          pd.directories = []
+          pd.scenes = [
+            ::DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Титул", page_type: :cover),
+            ::DN1Code::ExportPdf2::Model::SceneItem.new(name: "02. Общий вид", page_type: :general)
+          ]
+          assert(res.resolve_param(dctx, "page.toc").include?("02. Общий вид"),
+                 "page.toc → список включённых страниц")
+
+          # 5. Стадии проекта: параметр рисуется чекбоксами
           pd_st = tp_make_project
-          tp_isolate(pd_st, :cover, keep: :slot_1)
           pd_st.workflow[:stadia] = [
             { name: "Эскизный проект",      status: true  },
             { name: "Рабочая документация", status: false },
             { name: "Детализация",          status: false }
           ]
-          s1st = tp_layout(pd_st, :cover, :slot_1)
-          s1st[:lines] = ["workflow_stadia"]
-          s1st[:line_aligns]  = {}
-          s1st[:line_valigns] = {}
-          s1st[:show_titles]  = true
+          tp_add_param(pd_st, :cover, "workflow.stadia", label: "Стадии", y: 30.0)
           doc_st = tp_render(pd_st)
-          assert(tp_find_text(doc_st, "Стадия проекта"), "«Заголовок» on — выводится заголовок «Стадия проекта»")
           assert(tp_find_text(doc_st, "Эскизный проект") && tp_find_text(doc_st, "Рабочая документация"),
                  "Названия стадий выводятся строками")
           assert(tp_rects(doc_st).size == 3, "На каждую стадию рисуется квадрат-чекбокс (3 шт)")
-          assert(tp_paths(doc_st).size == 1, "Галочка-ломаная рисуется только для отмеченной стадии (1 шт)")
+          assert(tp_paths(doc_st).size == 1, "Галочка рисуется только для отмеченной стадии (1 шт)")
 
-          s1st[:show_titles] = false
-          doc_st_nt = tp_render(pd_st)
-          assert(!tp_texts(doc_st_nt).any? { |t| t.plain_text.include?("Стадия проекта") },
-                 "«Заголовок» off — заголовка стадий нет, строки остаются")
-          assert(tp_rects(doc_st_nt).size == 3 && tp_paths(doc_st_nt).size == 1,
-                 "Чекбоксы стадий не зависят от чекбокса «Заголовок»")
+          # 6. Неизвестный источник → nil (параметр молча не выводится)
+          assert(res.resolve_param(dctx, "legacy.unknown_key").nil?, "Неизвестный источник → nil")
+          pd_unk = tp_make_project
+          tp_add_param(pd_unk, :cover, "legacy.unknown_key", label: "X")
+          assert(tp_texts(tp_render(pd_unk)).empty?, "Параметр с неизвестным источником не печатается")
         end
 
         # ------------------------------------------------------------------
-        # 81. Подвал: Вкл, размер шрифта, Слева/Центр/Справа, нумерация страниц
+        # 84. Блок объединения параметров: одна строка через « | », стиль блока
         # ------------------------------------------------------------------
-        def test_81_template_params_footer
-          puts "\n--- 81. Параметры подвала: Вкл / размер / Слева-Центр-Справа / якорь / нумерация ---"
+        def test_84_template_params_group_block
+          puts "\n--- 84. Блок параметров: объединение детей в строку через « | » ---"
 
-          # 1. Чекбокс «Вкл» (footer.visible)
+          # 1. Блок рендерится одной строкой, стиль берется у блока
           pd = tp_make_project
-          tp_isolate(pd, :cover, keep: :footer)
-          doc = tp_render(pd, page_index: 1, total_pages: 4)
-          assert(tp_find_text(doc, "Страница 1 | 4"), "Подвал по умолчанию (Вкл) выводит нумерацию страниц")
+          pd.project_info[:phone] = "+7 999 000-00-00"
+          tp_params(pd, :cover) << {
+            id: "g1", group: true, label: "", show_label: false,
+            align: "left", valign: "top", font_family: "", font_size: 12.0,
+            color: "#005EB0", visible: true,
+            params: [
+              { id: "c1", source: "project.room_name", label: "", show_label: false },
+              { id: "c2", source: "project.articul", label: "", show_label: false },
+              { id: "c3", source: "customer.phone", label: "", show_label: false }
+            ]
+          }
+          doc = tp_render(pd)
+          ent = tp_find_text(doc, "Прихожая")
+          assert(ent, "Блок с заполненными детьми выводится на страницу")
+          assert(ent.plain_text.include?(" | "), "Дети блока объединены разделителем « | »")
+          assert(ent.plain_text.include?("Прихожая") && ent.plain_text.include?("CF#260922_100000") && ent.plain_text.include?("+7 999"),
+                 "В строке блока все заполненные дети (#{ent.plain_text.inspect})")
+          sz = ent.style.font_size
+          assert((sz - 12.0).abs < 0.01, "Строка блока использует кегль блока (12, получено #{sz})")
 
-          tp_layout(pd, :cover, :footer)[:visible] = false
-          assert(tp_texts(tp_render(pd)).empty?, "Чекбокс «Вкл» off (footer.visible=false) убирает подвал")
+          # 2. Пустые дети пропускаются: строка = только заполненные значения
+          tp_params(pd, :cover).first[:params].last[:source] = "customer.email"
+          ent2 = tp_find_text(tp_render(pd), "Прихожая")
+          assert(ent2.plain_text == "Прихожая | CF#260922_100000",
+                 "Пустой источник в блоке пропускается (получено: #{ent2.plain_text.inspect})")
 
-          tp_layout(pd, :cover, :footer)[:visible] = true
+          # 3. Заголовок блока выводится перед строкой значений
+          g = tp_params(pd, :cover).first
+          g[:label] = "Реквизиты"
+          g[:show_label] = true
+          ent3 = tp_find_text(tp_render(pd), "Реквизиты: Прихожая")
+          assert(ent3, "Заголовок блока выводится перед объединенной строкой")
 
-          # 2. Бакеты по умолчанию: Слева/Центр/Справа (line_aligns)
-          doc2 = tp_render(pd, page_index: 2, total_pages: 3)
-          ents = tp_texts(doc2)
-          assert(ents.size == 3, "Три группы (слева/центр/справа) — три текстовых блока (получено #{ents.size})")
-          left, center, right = ents.sort_by { |t| t.bounds.x }
-          ltxt, ctxt, rtxt = left.plain_text, center.plain_text, right.plain_text
+          # 4. Порядок детей внутри блока = порядок в строке
+          c = g[:params]
+          g[:params] = [c[1], c[0]]
+          ent4 = tp_find_text(tp_render(pd), "CF#260922_100000 | Прихожая")
+          assert(ent4, "Порядок детей в блоке задает порядок значений в строке")
 
-          assert(ltxt.include?("Последние изменения: 2026-09-10 12:00 Правка фасадов"),
-                 "Слева — «Последние изменения» из НОВЕЙШЕЙ записи истории")
-          assert(!ltxt.include?("Первичная выдача"), "Старые записи истории в подвал не попадают")
-          assert(ctxt.include?("Версия 02 # Ревизия 003"), "Центр — «Версия 02 # Ревизия 003»")
-          assert(ctxt.include?("Артикул: CF#260922_100000"), "Центр — артикул")
-          assert(ctxt.include?("Дата: 22.09.2026"), "Центр — дата из last_edit_date (dd.mm.yyyy)")
-          assert(rtxt.include?("Страница 2 | 3"), "Справа — нумерация «Страница 2 | 3» текущей страницы")
+          # 5. Полностью пустой блок не выводится
+          g[:show_label] = false
+          g[:params] = [{ id: "c9", source: "customer.email", label: "", show_label: false }]
+          assert(tp_texts(tp_render(pd)).empty?, "Блок без заполненных детей не выводится")
 
-          assert(left.style.text_alignment   == ::Layout::Style::ALIGN_LEFT,
-                 "Левая группа имеет выравнивание ALIGN_LEFT")
-          assert(center.style.text_alignment == ::Layout::Style::ALIGN_CENTER,
-                 "Центральная группа имеет выравнивание ALIGN_CENTER")
-          assert(right.style.text_alignment  == ::Layout::Style::ALIGN_RIGHT,
-                 "Правая группа имеет выравнивание ALIGN_RIGHT")
-          assert(ents.all? { |t| t.style.text_anchor == ::Layout::Style::ANCHOR_BOTTOM },
-                 "Все строки подвала привязаны к нижнему краю (ANCHOR_BOTTOM)")
-
-          # 3. Переключатели «Слева/Центр/Справа» у строк (footer.line_aligns)
-          ftr = tp_layout(pd, :cover, :footer)
-          ftr[:line_aligns] = { "footer_last_edit" => "right", "footer_page_total" => "left" }
-          doc3 = tp_render(pd, page_index: 1, total_pages: 4)
-          page_ent = tp_find_text(doc3, "Страница 1 | 4")
-          edit_ent = tp_find_text(doc3, "Последние изменения")
-          assert(page_ent.bounds.x < edit_ent.bounds.x,
-                 "Перенос строки в другую группу меняет её колонку (Страница теперь левее Последних изменений)")
-          assert(page_ent.style.text_alignment == ::Layout::Style::ALIGN_LEFT,
-                 "Строка, переведённая в «Слева», печатается с ALIGN_LEFT")
-
-          # 4. Размер шрифта подвала (footer.font_size)
-          ftr[:line_aligns] = {}
-          ftr[:font_size] = 9.5
-          doc4 = tp_render(pd)
-          assert(tp_texts(doc4).all? { |t| (t.style.font_size - 9.5).abs < 0.01 },
-                 "«Размер шрифта» применяется ко всем строкам подвала (9.5 пт)")
+          # 6. «Вкл» off убирает блок целиком
+          g[:params] = [{ id: "c1", source: "project.room_name", label: "", show_label: false }]
+          g[:visible] = false
+          assert(tp_texts(tp_render(pd)).empty?, "«Вкл» off (visible=false) убирает блок со страницы")
         end
 
         # ------------------------------------------------------------------
-        # 82. Контракт данных для диалога + guard-тесты исправлений app.js
+        # 81. Независимость шаблонов + дефолты + layout.yaml (чистый лист)
+        # ------------------------------------------------------------------
+        def test_81_template_params_per_template_and_yaml
+          puts "\n--- 81. Параметры привязаны к шаблону; layout.yaml: чистый лист + нормализация ---"
+
+          # 1. Параметры каждого шаблона независимы
+          pd = tp_make_project
+          tp_add_param(pd, :cover, "project.articul", label: "Артикул")
+          doc_cover = tp_render(pd, scene_type: :cover)
+          assert(tp_find_text(doc_cover, "CF#260922_100000"), "Параметр шаблона cover выводится на cover-странице")
+          doc_general = tp_render(pd, scene_type: :general)
+          assert(tp_texts(doc_general).empty?, "Параметры шаблона cover не попадают на страницы других шаблонов")
+
+          # 2. Дефолтные шаблоны: только видовое окно + пустой список параметров
+          pd.pdf_settings[:custom_layouts] = pd.send(:default_custom_layouts)
+          %i[cover description explain general visual].each do |tpl|
+            cfg = pd.pdf_settings[:custom_layouts][tpl]
+            assert(cfg.is_a?(Hash) && cfg.key?(:image_4_3) && cfg[:params] == [],
+                   "Дефолт шаблона #{tpl}: image_4_3 + пустой params, без старых блоков")
+            assert(!cfg.key?(:header) && !cfg.key?(:slot_1) && !cfg.key?(:footer),
+                   "Дефолт шаблона #{tpl}: блоков header/slot_1/footer больше нет")
+          end
+
+          # 3. load_from_layout_yaml: страница со СТАРОЙ структурой игнорируется целиком
+          dir = File.expand_path("tp_yaml_dir", __dir__)
+          require "fileutils"
+          FileUtils.mkdir_p(dir)
+          legacy_path = File.join(dir, "layout_legacy.yaml")
+          File.write(legacy_path, <<~YAML, encoding: "utf-8")
+            ---
+            layout:
+              cover:
+                header:
+                  x: 25.0
+                  visible: true
+                  lines:
+                    - furniture_name
+                slot_1:
+                  x: 0.0
+                  visible: true
+                  lines:
+                    - articul
+          YAML
+          pd2 = tp_make_project
+          assert(pd2.send(:load_from_layout_yaml, legacy_path), "Старый layout.yaml читается без ошибок")
+          cover2 = pd2.pdf_settings[:custom_layouts][:cover]
+          assert(cover2[:params] == [], "Чистый лист: строки старой шапки/слотов не переносятся в параметры")
+          assert(!cover2.key?(:header) && !cover2.key?(:slot_1), "Старые блоки в конфиг не попадают")
+
+          # 4. load_from_layout_yaml: новая структура читается, params нормализуются
+          new_path = File.join(dir, "layout_new.yaml")
+          File.write(new_path, <<~YAML, encoding: "utf-8")
+            ---
+            layout:
+              cover:
+                image_4_3:
+                  x: 25.0
+                  visible: true
+                  aspect_ratio: '16:9'
+                  scale_pct: 120
+                params:
+                  - id: p1
+                    source: project.room_name
+                    label: Помещение
+                    x: 150.0
+                    y: -3.0
+                    align: top
+                    font_size: 99
+                    color: "#005EB0"
+                  - source: ""
+                  - id: p2
+                    source: dir.0.description
+                    visible: "false"
+                  - id: g9
+                    group: true
+                    label: Блок
+                    x: 33.0
+                    params:
+                      - id: c1
+                        source: project.room_name
+                        x: 77.0
+                      - source: ""
+          YAML
+          pd3 = tp_make_project
+          assert(pd3.send(:load_from_layout_yaml, new_path), "Новый layout.yaml читается")
+          cover3 = pd3.pdf_settings[:custom_layouts][:cover]
+          params3 = cover3[:params]
+          assert(params3.size == 3, "Параметр без источника отбрасывается, остальные нормализуются (3 шт)")
+          p1 = params3.first
+          assert(!p1.key?(:x) && !p1.key?(:y), "Координаты X/Y удалены из модели параметров (задаются выравниваниями)")
+          assert(p1[:align] == "left", "Недопустимое выравнивание → left")
+          assert(p1[:font_size] <= 72.0, "Кегль ограничен сверху (#{p1[:font_size]})")
+          assert(p1[:color] == "#005EB0", "Цвет сохраняется")
+          assert(cover3[:image_4_3][:scale_pct] == 120 && cover3[:image_4_3][:aspect_ratio] == "16:9",
+                 "Настройки видовоего окна сохраняются (ограничение масштаба — на рендере)")
+          p2 = params3[1]
+          assert(p2[:visible] == false, "visible: \"false\" → false")
+          assert(p2[:font_size] == 10.0, "Отсутствующие поля получают дефолты")
+          assert(p2[:valign] == "top" && p2[:font_family] == "", "valign и шрифт по умолчанию: top / «» (шрифт страницы)")
+
+          # 6. Блок (group: true): нормализуется вместе с вложенными параметрами
+          g = params3.find { |p| p[:group] == true }
+          assert(g, "Блок (group: true) сохраняется при нормализации")
+          assert(g[:params].size == 1, "Дитя блока без источника отбрасывается (1 шт)")
+          child = g[:params].first
+          assert(child[:source] == "project.room_name" && !child.key?(:x),
+                 "Дитя блока нормализуется: источник сохранен, X/Y удалены")
+
+          # 5. save_to_layout_yaml: параметры сохраняются и читаются обратно
+          pd4 = tp_make_project
+          tp_add_param(pd4, :cover, "customer.name", label: "Заказчик", x: 42.0, y: 96.0, align: "right")
+          out_path = File.join(dir, "layout_out.yaml")
+          assert(pd4.send(:save_to_layout_yaml, out_path), "layout.yaml сохраняется")
+          pd5 = tp_make_project
+          pd5.send(:load_from_layout_yaml, out_path)
+          saved = pd5.pdf_settings[:custom_layouts][:cover][:params]
+          assert(saved.size == 1 && saved.first[:source] == "customer.name" && saved.first[:align] == "right",
+                 "Сохраненный параметр читается обратно без потерь")
+
+          FileUtils.rm_rf(dir)
+        end
+
+        # ------------------------------------------------------------------
+        # 82. Контракт данных для диалога + guard-тесты новой модели app.js
         # ------------------------------------------------------------------
         def test_82_template_params_data_contract_and_js_guards
           puts "\n--- 82. Контракт данных (stadia → JSON) и guard-тесты app.js ---"
 
           # 1. Ruby отдаёт стадионы массивом объектов {name, status} —
-          #    именно эту форму ждёт диалог (раньше из-за этого был [object Object])
+          #    именно эту форму ждёт диалог
           pd = tp_make_project
           pd.workflow[:stadia] = [
             { name: "Эскизный проект", status: true },
@@ -420,56 +494,91 @@ module DN1Code
                  "Каждая стадия — объект {name, status} (легаси-кортежи не отдаются)")
           assert(stadia.first["name"] == "Эскизный проект", "Имена стадий передаются как строки")
 
-          # 2. Guard-тесты исправленного app.js
+          # 2. Guard-тесты новой модели параметров в app.js
           js_path = File.join(__dir__, "../dialog/html/app.js")
           js = File.read(js_path, encoding: "utf-8")
 
-          assert(js.include?("const stadiaName =") && js.include?("const stadiaMark ="),
-                 "app.js умеет читать стадионы-объекты {name, status} (stadiaName/stadiaMark)")
-          assert(js.include?('s.map(st => stadiaMark(st)).join(" • ")'),
-                 "Превью стадий (WYSIWYG) форматируется через stadiaMark")
-          assert(js.include?('wf.stadia.map(st => stadiaName(st)).join(", ")'),
-                 "Список «Средний блок» форматирует стадионы через stadiaName (не String(st))")
+          # 2a. Готовые списки полностью убраны
+          assert(!js.include?("const PARAM_DEFS"), "app.js: готовый каталог PARAM_DEFS удален")
+          assert(!js.include?("buildParamCatalog"), "app.js: buildParamCatalog удален")
+          assert(!js.include?("mergePreservedLines"), "app.js: mergePreservedLines удален")
+          assert(!js.include?("getInfoLineDef"), "app.js: getInfoLineDef удален")
+          assert(!js.include?("DEFAULT_LINES_BY_CONTENT"), "app.js: DEFAULT_LINES_BY_CONTENT удален")
+          assert(!js.include?("line_rows") && !js.include?("line_aligns") && !js.include?("line_valigns"),
+                 "app.js: карты строк/зон старых блоков удалены")
+
+          # 2b. Функция создания параметра на месте
+          assert(js.include?("function buildParamSources"), "app.js: buildParamSources строит каталог источников из данных")
+          assert(js.include?("function paramPreviewValue"), "app.js: paramPreviewValue дает живое превью значения")
+          assert(js.include?("function normalizeTemplateParam"), "app.js: normalizeTemplateParam нормализует параметр")
+          assert(js.include?("function openParamModal"), "app.js: openParamModal открывает модал создания/правки")
+          assert(js.include?("btnCreateParam"), "app.js: кнопка «+ Создать параметр» на месте")
+          assert(js.include?('dir.${idx}.description'), "app.js: источники папок строятся динамически (dir.N.description)")
+
+          # 2c. Настройки параметра: источник/заголовок — в модале, остальное —
+          #     в строке параметра; X/Y убраны, место задается выравниваниями
+          html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+          %w[paramModalSource paramModalLabel].each do |id|
+            assert(html_text.include?(id) && js.include?(id), "Поле модала #{id} присутствует в диалоге")
+          end
+          assert(!html_text.include?("paramModalX") && !html_text.include?("paramModalY"),
+                 "Поля X/Y убраны из модала параметра")
+          assert(!js.include?("DEFAULT_PARAM_SETTINGS.x") && !js.include?("num(p.x"),
+                 "app.js: координаты X/Y убраны из модели параметра")
+          assert(js.include?("function paramZoneLabel"), "app.js: сводка строки показывает зону размещения")
+          assert(js.include?('tpl-param-zone'), "app.js: зона размещения — во второй строке (стиль и размещение)")
+          assert(js.include?("tpl-param-preview-empty"), "app.js: пустые данные параметра помечены в строке «(нет данных)»")
+          assert(js.include?("function setupParamDragAndDrop") && js.include?("tpl-param-drag"),
+                 "app.js: параметры сортируются перетаскиванием за ручку ⠿ (drag-and-drop)")
+
+          # 2e. Блок объединения параметров
+          assert(js.include?("btnCreateParamGroup"), "app.js: кнопка «📦 Блок» создает блок объединения")
+          assert(js.include?("function createParamGroup"), "app.js: createParamGroup создает пустой блок")
+          assert(js.include?("tpl-param-group-list") && js.include?("tpl-param-child-out"),
+                 "app.js: блок содержит перетаскиваемых детей с кнопкой вывода из блока")
+          assert(js.include?("p.group === true"), "app.js: normalizeTemplateParam сохраняет блоки с детьми")
+          lb_text = File.read(File.join(__dir__, "../service/layout_builder.rb"), encoding: "utf-8")
+          assert(lb_text.include?('values.join(" | ")'), "layout_builder.rb: блок объединяет детей через « | »")
+          pd_rb = File.read(File.join(__dir__, "../model/project_data.rb"), encoding: "utf-8")
+          assert(pd_rb.include?("base.merge!(group: true, params: children)"),
+                 "project_data.rb: normalize_template_params нормализует блоки вместе с детьми")
+          %w[tpl-param-font tpl-param-size tpl-param-valign tpl-param-align tpl-param-color tpl-param-show-label].each do |cls|
+            assert(js.include?(cls), "Контрол строки параметра #{cls} присутствует в app.js")
+          end
+          assert(js.include?("PARAM_FONT_FAMILIES"), "app.js: выбор шрифта параметра из комплекта плагина")
+          assert(js.include?('["top", "bottom"].includes(valignRaw)'),
+                 "app.js: вертикальная привязка параметра — верх/низ")
+
+          # 2d. Прочие гарантии качества
+          assert(!js.include?("Фасады МДФ, ЛДСП, Blum") && !js.include?("CF#260905_160129"),
+                 "В источниках параметров нет текстовых заглушек-примеров")
           assert(!js.include?("toLocaleDateString"), "В превью нет локального формата даты (9/22/2026)")
           assert(js.include?("const previewDate ="), "app.js использует единый хелпер даты previewDate")
-          assert(js.include?("Array.isArray(h[0]) ? `${h[0][0]} ${h[0][1]}` : h[0]"),
-                 "«Последние изменения» в превью берут первую (новейшую) запись истории, как Ruby-экспорт")
+          assert(js.include?("histEntryText(h[0])"),
+                 "«Последние изменения» берут первую (новейшую) запись истории, как Ruby-экспорт")
         end
-        # ------------------------------------------------------------------
-        # 83. «Вкл» среднего блока — главный выключатель всех инфо-слотов:
-        # при выключении параметры блока не выводятся в PDF вовсе
-        # ------------------------------------------------------------------
-        def test_83_middle_block_master_switch
-          puts "\n--- 83. «Вкл» среднего блока гасит ВСЕ инфо-слоты шаблона (слоты 2–4 не самостоятельны) ---"
 
-          # 1. Шаблон description: slot_1 ВКЛ — работает зонная система slot_1;
-          #    собственные строки slot_3 (видим по умолчанию) игнорируются
+        # ------------------------------------------------------------------
+        # 83. Сброс шаблона и хранение: layout_builder читает params нового формата
+        # ------------------------------------------------------------------
+        def test_83_template_params_render_reads_new_config_only
+          puts "\n--- 83. Рендер читает только params; старые ключи игнорируются ---"
+
+          # 1. Старые ключи в конфиге (легаси layout.yaml) не рендерятся
           pd = tp_make_project
-          pd.project_info[:materials]   = "Фасады МДФ, Blum"
-          pd.project_info[:appliances]  = "Вытяжка"
-          pd.project_info[:lighting]    = "LED 3000K"
-          tp_isolate(pd, :description, keep: :slot_1)
-          s3 = tp_layout(pd, :description, :slot_3)
-          s3[:visible] = true
-          s3[:lines]   = ["articul"] # уникальная строка, которой нет в списке slot_1
-          doc_on = tp_render(pd, scene_type: :description)
-          assert(tp_find_text(doc_on, "Материалы и фурнитура"),
-                 "slot_1 ВКЛ: строки среднего блока выводятся")
-          assert(!tp_texts(doc_on).any? { |t| t.plain_text.include?("Артикул") },
-                 "slot_1 ВКЛ: собственные строки slot_3 не отрисовываются (управляет зонная система slot_1)")
+          cover = pd.pdf_settings[:custom_layouts][:cover]
+          cover[:header] = { visible: true, lines: ["furniture_name"] }
+          cover[:slot_1] = { visible: true, lines: ["articul"] }
+          cover[:footer] = { visible: true, lines: ["footer_page_total"] }
+          doc = tp_render(pd)
+          assert(tp_texts(doc).empty?,
+                 "Старые блоки header/slot_1/footer в конфиге не рендерятся (чистый лист)")
 
-          # 2. «Вкл» ВЫКЛ — параметры среднего блока исчезают со страницы ЦЕЛИКОМ,
-          #    даже если slot_3/slot_4 видимы и заполнены (легаси-конфиги)
-          tp_layout(pd, :description, :slot_1)[:visible] = false
-          doc_off = tp_render(pd, scene_type: :description)
-          assert(tp_texts(doc_off).empty?,
-                 "«Вкл» ВЫКЛ: ни один параметр среднего блока не попадает на страницу " \
-                 "(включая видимый slot_3 с собственными строками)")
-
-          # 3. Guard: чекбокс «Вкл» синхронизирует слоты 2–4 в конфиге
-          js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
-          assert(js.include?('["slot_2", "slot_3", "slot_4"].forEach'),
-                 "app.js: переключение «Вкл» среднего блока синхронизирует видимость слотов 2–4")
+          # 2. Новый параметр рендерится рядом с «мусорными» ключами
+          tp_add_param(pd, :cover, "project.room_name", label: "Помещение", y: 10.0)
+          doc2 = tp_render(pd)
+          assert(tp_find_text(doc2, "Прихожая"), "Новый параметр выводится независимо от легаси-ключей")
+          assert(tp_texts(doc2).size == 1, "На странице ровно один текстовый блок — созданный параметр")
         end
       end
     end
@@ -503,14 +612,15 @@ if __FILE__ == $PROGRAM_NAME
 
       def run_all
         puts "=========================================================="
-        puts "  Проверка параметров: Шапка / Средний блок / Подвал"
+        puts "  Проверка параметров шаблона (свободное размещение)"
         puts "=========================================================="
 
-        test_79_template_params_header
-        test_80_template_params_middle
-        test_81_template_params_footer
+        test_79_template_params_placement
+        test_80_template_params_sources
+        test_81_template_params_per_template_and_yaml
         test_82_template_params_data_contract_and_js_guards
-        test_83_middle_block_master_switch
+        test_83_template_params_render_reads_new_config_only
+        test_84_template_params_group_block
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"

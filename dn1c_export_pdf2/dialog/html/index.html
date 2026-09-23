@@ -251,7 +251,7 @@
           <div class="templates-sidebar-header">
             <div class="sidebar-title-group">
               <span class="sidebar-title-icon">📐</span>
-              <span class="sidebar-title-text">Шаблоны страниц</span>
+              <span class="sidebar-title-text">Название шаблона</span>
             </div>
             <div class="sidebar-header-actions">
               <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
@@ -269,6 +269,13 @@
 
         <!-- Template & List Settings Panel (Right) -->
         <div class="template-settings-panel" id="templateSettingsPanel">
+          <!-- Panel Header -->
+          <div class="template-settings-header">
+            <div class="sidebar-title-group">
+              <span class="sidebar-title-icon">⚙️</span>
+              <span class="sidebar-title-text">Параметры шаблона</span>
+            </div>
+          </div>
           <!-- Toolbar -->
           <div class="template-settings-toolbar">
             <div class="toolbar-row toolbar-main-row">
@@ -721,7 +728,7 @@
           <h3 style="margin: 0; font-size: 15px;">Переименование шаблона страницы</h3>
         </div>
         <p class="field-hint" style="margin: 8px 0 14px 0;">Укажите новое название для этого шаблона страницы:</p>
-        
+
         <div class="form-group" style="margin-bottom: 18px;">
           <label for="inputRenameTemplateName" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Название шаблона *</label>
           <input type="text" id="inputRenameTemplateName" class="form-control" style="width: 100%; box-sizing: border-box;">
@@ -730,6 +737,33 @@
         <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
           <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate">Отмена</button>
           <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate">Сохранить</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Template Parameter Create/Edit Modal -->
+    <div id="paramModal" class="modal-overlay hidden" tabindex="-1">
+      <div class="modal-card modal-form-card param-modal-card">
+        <div class="modal-header-row">
+          <span class="modal-card-icon">🧩</span>
+          <h3 id="paramModalTitle" style="margin: 0; font-size: 15px;">Создать параметр</h3>
+        </div>
+        <p class="field-hint" style="margin: 8px 0 12px 0;">Выберите источник данных параметра. Шрифт, размер, выравнивания (задают место на странице), цвет и заголовок настраиваются в строке параметра.</p>
+
+        <div class="form-group" style="margin-bottom: 10px;">
+          <label for="paramModalSource" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Источник данных *</label>
+          <select id="paramModalSource" class="form-control" style="width: 100%; box-sizing: border-box;"></select>
+          <div id="paramModalPreview" class="param-modal-preview"></div>
+        </div>
+
+        <div class="form-group" style="margin-bottom: 14px;">
+          <label for="paramModalLabel" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;" title="Текст перед значением на листе (показ включается галкой «Заголовок» в строке параметра)">Заголовок</label>
+          <input type="text" id="paramModalLabel" class="form-control" placeholder="Например: Помещение" style="width: 100%; box-sizing: border-box;">
+        </div>
+
+        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+          <button type="button" class="btn btn-secondary" id="btnCancelParam">Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmParam">Сохранить параметр</button>
         </div>
       </div>
     </div>

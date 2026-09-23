@@ -16,113 +16,16 @@
     lastExportedPdf: ""
   };
 
-  const DEFAULT_MIDDLE_ALIGNS = {
-    toc_pages: "left", spec_materials: "left", spec_appliances: "left", general_notes: "left",
-    workflow_history: "left", workflow_stadia: "left", workflow_revision: "left",
-    workflow_version: "left", workflow_date: "left", articul: "left"
+  // Блок видового экрана по умолчанию (единый для всех шаблонов; отличия —
+  // пропорция кадра и масштаб, задаются в DEFAULT_LAYOUTS)
+  const DEFAULT_IMAGE_SLOT = {
+    x: 25.0, y: 12.0, w: 50.0, h: 82.0,
+    visible: true,
+    content: "render_viewport",
+    show_background: false,
+    aspect_ratio: "4:3",
+    scale_pct: 100
   };
-
-  const DEFAULT_MIDDLE_VALIGNS = {
-    toc_pages: "top", spec_materials: "top", spec_appliances: "top", general_notes: "top",
-    workflow_history: "bottom", workflow_stadia: "bottom", workflow_revision: "bottom",
-    workflow_version: "bottom", workflow_date: "bottom", articul: "bottom"
-  };
-
-  const DEFAULT_MIDDLE_SIZES = {
-    toc_pages: 8, spec_materials: 8, spec_appliances: 8, general_notes: 8,
-    workflow_history: 8, workflow_stadia: 8, workflow_revision: 8,
-    workflow_version: 8, workflow_date: 8, articul: 8
-  };
-
-  const DEFAULT_MIDDLE_COLORS = {
-    toc_pages: "#334155", spec_materials: "#334155", spec_appliances: "#334155", general_notes: "#334155",
-    workflow_history: "#334155", workflow_stadia: "#334155", workflow_revision: "#334155",
-    workflow_version: "#334155", workflow_date: "#334155", articul: "#334155"
-  };
-
-  // 7 Standard Layout Zones (matching user sketch wireframe)
-  const FIXED_SLOT_DEFS = [
-    {
-      id: "image_4_3",
-      label: "КАРТИНКА ПРОЕКТА",
-      icon: "🖼️",
-      slot_class: "slot-image-4-3",
-      x: 0.0, y: 0.0, w: 100.0, h: 100.0,
-      aspect_ratio: "4:3",
-      scale_pct: 100,
-      is_image: true
-    },
-    {
-      id: "header",
-      label: "ЗАГОЛОВОК",
-      icon: "🔝",
-      slot_class: "slot-header",
-      default_content: "header_title",
-      x: 0.0, y: 0.0, w: 100.0, h: 30.0,
-      valign: "top",
-      default_valign: "top",
-      default_lines: ["furniture_name", "place_address", "customer_or_company"],
-      default_line_rows: { furniture_name: 1, place_address: 2, customer_or_company: 3, scene_name: 4, scene_description: 5 },
-      default_line_font_sizes: { furniture_name: 11, place_address: 10, customer_or_company: 10, scene_name: 11, scene_description: 9 },
-      default_line_colors: { furniture_name: "#005EB0", place_address: "#0F172A", customer_or_company: "#0F172A", scene_name: "#005EB0", scene_description: "#475569" }
-    },
-    {
-      id: "slot_1",
-      label: "ЛЕВЫЙ ВЕРХ",
-      icon: "⬛",
-      slot_class: "slot-1",
-      default_content: "info_lines",
-      x: 0.0, y: 0.0, w: 25.0, h: 58.0,
-      default_lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
-      default_line_aligns: Object.assign({}, DEFAULT_MIDDLE_ALIGNS),
-      default_line_valigns: Object.assign({}, DEFAULT_MIDDLE_VALIGNS),
-      default_line_font_sizes: Object.assign({}, DEFAULT_MIDDLE_SIZES),
-      default_line_colors: Object.assign({}, DEFAULT_MIDDLE_COLORS)
-    },
-    {
-      id: "slot_3",
-      label: "ПРАВЫЙ ВЕРХ",
-      icon: "⬛",
-      slot_class: "slot-3",
-      default_content: "info_lines",
-      x: 75.0, y: 0.0, w: 25.0, h: 58.0,
-      default_lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"]
-    },
-    {
-      id: "slot_2",
-      label: "ЛЕВЫЙ НИЗ",
-      icon: "⬛",
-      slot_class: "slot-2",
-      default_content: "info_lines",
-      x: 0.0, y: 58.0, w: 25.0, h: 36.0,
-      default_lines: ["workflow_history", "workflow_stadia"]
-    },
-    {
-      id: "slot_4",
-      label: "ПРАВЫЙ НИЗ",
-      icon: "⬛",
-      slot_class: "slot-4",
-      default_content: "info_lines",
-      x: 75.0, y: 58.0, w: 25.0, h: 36.0,
-      default_lines: ["workflow_history", "workflow_stadia"]
-    },
-    {
-      id: "footer",
-      label: "ПОДВАЛ",
-      icon: "📑",
-      slot_class: "slot-footer",
-      default_content: "footer_info",
-      x: 0.0, y: 94.0, w: 100.0, h: 6.0,
-      default_lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"],
-      default_line_aligns: {
-        footer_last_edit: "left",
-        footer_ver_rev: "center",
-        footer_articul: "center",
-        footer_date: "center",
-        footer_page_total: "right"
-      }
-    }
-  ];
 
   // Дата в превью — в печатном формате PDF (dd.mm.yyyy), а не в локали браузера (9/22/2026)
   const previewDate = (d) => {
@@ -143,139 +46,291 @@
     return `${done ? "[✓]" : "[ ]"} ${stadiaName(st)}`;
   };
 
-  // Available Information Lines that can be toggled on/off in each block
-  const AVAILABLE_INFO_LINES = [
-    { key: "toc_pages",        group: "project",  label: "Содержание (список страниц)", icon: "📑", getVal: (info, wf) => {
-        const sc = (state.scenes || []).filter(s => s.enabled !== false && s.page_type !== "skip");
-        const total = sc.length;
-        return total > 0 ? `(всего страниц: ${total}) ` + sc.map((s, i) => `${i + 1}. ${s.name}`).join(" • ") : "Список страниц проекта (0 страниц)";
+  // -----------------------------------------------------------------------------
+  // Источники параметров шаблона. Готовых списков параметров больше нет:
+  // пользователь создает параметр сам — выбирает источник данных (поля вкладок
+  // «Данные проекта» и «Папки спецификации», плюс сценические и страничные
+  // источники) и настраивает размещение на странице. Значения «сырые»:
+  // заголовок-префикс задается настройкой самого параметра (label).
+  // -----------------------------------------------------------------------------
+  const tval = (v) => String(v === undefined || v === null ? "" : v).trim();
+
+  // Запись истории правок: [дата, текст] | {data|date, edit|text} | строка
+  const histEntryText = (e) => {
+    if (Array.isArray(e)) return `${tval(e[0])} ${tval(e[1])}`.trim();
+    if (e && typeof e === "object") {
+      const d = tval(e.data || e.date);
+      const txt = tval(e.edit || e.text || e.description);
+      return `${d} ${txt}`.trim();
+    }
+    return tval(e);
+  };
+
+  const catalogScene = () => {
+    const scenes = state.scenes || [];
+    if (layoutState.selectedSceneIndex !== undefined && scenes[layoutState.selectedSceneIndex]) {
+      return scenes[layoutState.selectedSceneIndex];
+    }
+    return scenes.find((s) => s.page_type === (layoutState.currentTemplate || "cover")) || scenes[0] || null;
+  };
+
+  // Группы источников для диалога создания/редактирования параметра
+  function buildParamSources() {
+    const groups = [
+      { title: "Данные проекта — Паспорт объекта", options: [
+        { value: "project.articul",        label: "🔖 Артикул проекта" },
+        { value: "project.furniture_name", label: "🪑 Изделие" },
+        { value: "project.room_name",      label: "🚪 Помещение / Место установки" },
+        { value: "project.address",        label: "📍 Адрес установки" },
+        { value: "project.company",        label: "🏢 Название компании" },
+        { value: "project.description",    label: "📋 Описание проекта" }
+      ] },
+      { title: "Данные проекта — Заказчик", options: [
+        { value: "customer.id",    label: "🆔 ID заказчика" },
+        { value: "customer.name",  label: "👤 Заказчик (контактное лицо)" },
+        { value: "customer.phone", label: "📞 Телефон" },
+        { value: "customer.email", label: "✉️ Email" }
+      ] },
+      { title: "Данные проекта — Ход работы", options: [
+        { value: "workflow.author",     label: "👷 Автор / Конструктор" },
+        { value: "workflow.price",      label: "💰 Стоимость проекта" },
+        { value: "workflow.start_date", label: "📅 Дата начала" },
+        { value: "workflow.end_date",   label: "📅 Дата сдачи" },
+        { value: "workflow.duration",   label: "⏱️ Длительность / Трудозатраты" },
+        { value: "workflow.version",    label: "🔢 Версия" },
+        { value: "workflow.revision",   label: "🏷️ Ревизия" },
+        { value: "workflow.date",       label: "🗓️ Дата" },
+        { value: "workflow.status",     label: "⏳ Статус" },
+        { value: "workflow.stadia",     label: "✅ Стадии проекта (чек-лист)" },
+        { value: "workflow.last_edit",  label: "📝 Последние изменения" },
+        { value: "workflow.history",    label: "📜 История правок" }
+      ] },
+      { title: "Сцена", options: [
+        { value: "scene.name",        label: "📐 Название сцены" },
+        { value: "scene.description", label: "📝 Описание сцены" }
+      ] },
+      { title: "Страница", options: [
+        { value: "page.number_total", label: "📄 Страница | Страниц" },
+        { value: "page.toc",          label: "📑 Содержание (список страниц)" }
+      ] }
+    ];
+
+    // Динамические источники по папкам спецификаций
+    const dirs = Array.isArray(state.directories) ? state.directories : [];
+    const dirOptions = [];
+    dirs.forEach((d, idx) => {
+      if (!d) return;
+      const t = tval(d.title) || getFolderName(d.path) || `Раздел #${idx + 1}`;
+      dirOptions.push({ value: `dir.${idx}.title`, label: `📁 ${t} — название папки` });
+      dirOptions.push({ value: `dir.${idx}.description`, label: `📁 ${t} — спецификация папки` });
+    });
+    if (dirOptions.length > 0) {
+      groups.splice(3, 0, { title: "Папки спецификации", options: dirOptions });
+    }
+    return groups;
+  }
+
+  // Человекочитаемое название источника (для списка созданных параметров)
+  function paramSourceLabel(source) {
+    const s = tval(source);
+    const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+    if (m) {
+      const idx = parseInt(m[1], 10);
+      const d = (state.directories || [])[idx];
+      const t = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
+      return m[2] === "title" ? `📁 ${t} — название` : `📁 ${t} — спецификация`;
+    }
+    for (const g of buildParamSources()) {
+      const opt = g.options.find((o) => o.value === s);
+      if (opt) return opt.label;
+    }
+    return s || "—";
+  }
+
+  // Живое значение источника для превью (зеркало InfoLineResolver#resolve_param).
+  // Пустая строка — данных нет: параметр не выводится на лист.
+  function paramPreviewValue(source) {
+    const info = state.project_info || {};
+    const wf = state.workflow || {};
+    const s = tval(source);
+    switch (s) {
+      case "project.articul":        return tval(info.articul);
+      case "project.furniture_name": return tval(info.furniture_name || info.name_product || info.name_project);
+      case "project.room_name":      return tval(info.room_name || info.name_place);
+      case "project.address":        return tval(info.address || info.adress);
+      case "project.company":        return tval(info.company || info.name_company);
+      case "project.description":    return tval(info.project_description || info.description);
+      case "customer.id":            return tval(info.customer_id || info.id);
+      case "customer.name":          return tval(info.name_customer || info.customer);
+      case "customer.phone":         return tval(info.phone);
+      case "customer.email":         return tval(info.email);
+      case "workflow.author":        return tval(wf.author || info.author);
+      case "workflow.price": {
+        const v = tval(info.price);
+        return v ? `${v} руб.` : "";
       }
-    },
-    { key: "spec_materials",   group: "specs",    label: "Материалы и фурнитура",   icon: "🛠️", getVal: (info, wf) => (info.materials || "").trim() || "Фасады МДФ, ЛДСП, Blum..." },
-    { key: "spec_appliances",  group: "specs",    label: "Техника и подсветка",     icon: "🔌", getVal: (info, wf) => [info.appliances, info.lighting].filter(Boolean).map(s => s.trim()).filter(Boolean).join("; ") || "Встраиваемая техника, LED 3000K..." },
-    { key: "general_notes",    group: "project",  label: "Общие пояснения",         icon: "📝", getVal: (info, wf) => (info.project_description || info.description || info.notes || "").trim() || "Замеры выполнены по факту" },
-    { key: "workflow_history", group: "workflow", label: "История правок",          icon: "📜", getVal: (info, wf) => {
+      case "workflow.start_date":    return tval(info.start_date);
+      case "workflow.end_date":      return tval(info.end_date);
+      case "workflow.duration": {
+        const d = tval(info.total_duration);
+        return d ? (/дн|день|час/i.test(d) ? d : `${d} дн.`) : "";
+      }
+      case "workflow.version":       return `v${tval(wf.version || info.version) || "01"}`;
+      case "workflow.revision":      return `#r${tval(wf.revision || info.revision) || "001"}`;
+      case "workflow.date":          return previewDate(wf.date_order || info.date);
+      case "workflow.status":        return tval(wf.status || info.status);
+      case "workflow.stadia": {
+        const arr = (Array.isArray(wf.stadia) && wf.stadia.length > 0) ? wf.stadia
+                  : ((Array.isArray(info.stadia) && info.stadia.length > 0) ? info.stadia : null);
+        return arr ? arr.map(stadiaMark).join("\n") : tval(wf.status || info.status);
+      }
+      case "workflow.last_edit": {
         const h = wf.history_edit || info.history_edit;
-        if (Array.isArray(h) && h.length > 0) {
-          return h.map(e => Array.isArray(e) ? `${e[0]} ${e[1]}` : String(e)).join(" • ");
-        }
-        return (wf.last_edit || info.last_edit || "").trim() || "Корректировка фасадов";
+        if (Array.isArray(h) && h.length > 0) return histEntryText(h[0]);
+        return tval(wf.last_edit || info.last_edit);
       }
-    },
-    { key: "workflow_stadia",  group: "workflow", label: "Стадия проекта",          icon: "⏳", getVal: (info, wf) => {
-        const s = wf.stadia || info.stadia;
-        if (Array.isArray(s) && s.length > 0) {
-          return s.map(st => stadiaMark(st)).join(" • ");
-        }
-        return (wf.status || info.status || "").trim() || "РД";
-      }
-    },
-    { key: "workflow_revision",group: "workflow", label: "Ревизия",                 icon: "🏷️", getVal: (info, wf) => `Ревизия ${wf.revision || info.revision || '001'}` },
-    { key: "workflow_version", group: "workflow", label: "Версия",                  icon: "🔢", getVal: (info, wf) => `Версия ${wf.version || info.version || '01'}` },
-    { key: "workflow_date",    group: "workflow", label: "Дата",                    icon: "🗓️", getVal: (info, wf) => {
-        // Источники зеркалируют Ruby resolve_parts("workflow_date"): date_order || date
-        return previewDate(wf.date_order || info.date);
-      }
-    },
-    { key: "articul",          group: "project",  label: "Артикул",                 icon: "🔖", getVal: (info, wf) => (info.articul || "").trim() || "CF#260905_160129" },
-    { key: "furniture_name",   group: "project",  label: "Название мебели",         icon: "🪑", getVal: (info, wf) => (info.furniture_name || info.name_product || "").trim() || "Шкаф, Тумба, Зеркало" },
-    { key: "place_address",    group: "project",  label: "Место установки | Адрес установки", icon: "📍", getVal: (info, wf) => [info.room_name || info.name_place, info.address || info.adress].filter(Boolean).map(s => s.trim()).join(" | ") || "Санузел у бани | г. Москва" },
-    { key: "customer_or_company", group: "customer", label: "Имя заказчика или Название компании", icon: "👤", getVal: (info, wf) => [info.name_customer || info.customer, info.company || info.name_company].filter(Boolean).map(s => s.trim()).join(" | ") || "Смирнов С.С. | ООО «МебельПроект»" },
-    { key: "footer_last_edit", group: "system",   label: "Последние изменения",     icon: "📝", getVal: (info, wf) => {
+      case "workflow.history": {
         const h = wf.history_edit || info.history_edit;
-        // В памяти история хранится от новых к старым (как в Ruby-экспорте) — берём первую запись
-        const last = Array.isArray(h) && h.length > 0 ? (Array.isArray(h[0]) ? `${h[0][0]} ${h[0][1]}` : h[0]) : (wf.last_edit || info.last_edit || "");
-        const s = String(last).trim();
-        return s ? (s.toLowerCase().startsWith("последние") ? s : `Последние изменения: ${s}`) : "Последние изменения: —";
+        return Array.isArray(h) ? h.map(histEntryText).filter(Boolean).join("\n") : tval(wf.last_edit || info.last_edit);
       }
-    },
-    { key: "footer_ver_rev",   group: "system",   label: "Версия # Ревизия",        icon: "🔢", getVal: (info, wf) => {
-        const ver = wf.version || info.version || '01';
-        const rev = wf.revision || info.revision || '001';
-        return `Версия ${ver} # Ревизия ${rev}`;
+      case "scene.name": {
+        const sc = catalogScene();
+        return tval(sc && (sc.name || sc.original_name));
       }
-    },
-    { key: "footer_articul",   group: "system",   label: "Артикул",                 icon: "🔖", getVal: (info, wf) => {
-        const art = (info.articul || '').trim() || 'CF#260905_160129';
-        return art.toLowerCase().startsWith("артикул") ? art : `Артикул: ${art}`;
+      case "scene.description": {
+        const sc = catalogScene();
+        return tval(sc && sc.description);
       }
-    },
-    { key: "footer_date",      group: "system",   label: "Дата",                    icon: "🗓️", getVal: (info, wf) => {
-        const d = previewDate(wf.last_edit_date || info.date);
-        return d.toLowerCase().startsWith("дата") ? d : `Дата: ${d}`;
+      case "page.number_total":
+        // Нумерация известна только при экспорте — в превью условный образец
+        return "Страница 1 | N";
+      case "page.toc": {
+        const sc = (state.scenes || []).filter((x) => x.enabled !== false);
+        return sc.length > 0 ? sc.map((x, i) => `${i + 1}. ${x.name}`).join("\n") : "";
       }
-    },
-    { key: "footer_page_total",group: "system",   label: "Страница Страниц",        icon: "📄", getVal: () => "Страница 1 | 4" },
-    { key: "footer_rev_ver_date", group: "system", label: "Ревизия # Версия | Артикул | Дата", icon: "🗓️", getVal: (info, wf) => {
-        const rev = wf.revision || info.revision || '001';
-        const ver = wf.version || info.version || '01';
-        const art = (info.articul || '').trim() || 'CF#260905_160129';
-        return `Ревизия ${rev} # Версия ${ver} | ${art} | ${previewDate()}`;
-      }
-    },
-    { key: "project_desc",     group: "project",  label: "Описание задания",        icon: "📋", getVal: (info, wf) => (info.project_description || info.description || "").trim() },
-    { key: "workflow_status",  group: "workflow", label: "Статус проекта",          icon: "⏳", getVal: (info, wf) => (wf.status || info.status || "").trim() },
-    { key: "room_name",        group: "project",  label: "Помещение",               icon: "🚪", getVal: (info, wf) => (info.room_name || info.name_place || "").trim() },
-    { key: "address",          group: "project",  label: "Адрес установки",        icon: "📍", getVal: (info, wf) => (info.address || info.adress || "").trim() },
-    { key: "customer_name",    group: "customer", label: "Заказчик / Контакт",      icon: "👤", getVal: (info, wf) => (info.name_customer || info.customer || "").trim() },
-    { key: "customer_phone",   group: "customer", label: "Телефон",                 icon: "📞", getVal: (info, wf) => (info.phone || "").trim() },
-    { key: "customer_email",   group: "customer", label: "Email",                   icon: "✉️", getVal: (info, wf) => (info.email || "").trim() },
-    { key: "customer_company", group: "customer", label: "Компания заказчика",      icon: "🏢", getVal: (info, wf) => (info.company || info.name_company || "").trim() },
-    { key: "workflow_dates",   group: "workflow", label: "Сроки (Начало — Сдача)",  icon: "📅", getVal: (info, wf) => (info.start_date || info.end_date) ? `${info.start_date || "—"} → ${info.end_date || "—"}` : "" },
-    { key: "workflow_price",   group: "workflow", label: "Стоимость проекта",       icon: "💰", getVal: (info, wf) => info.price ? `${info.price} руб.` : "" },
-    { key: "workflow_author",  group: "workflow", label: "Автор / Конструктор",     icon: "👷", getVal: (info, wf) => (wf.author || info.author || "").trim() },
-    { key: "scene_notes",      group: "specs",    label: "Примечание к сцене",      icon: "📝", getVal: (info, wf) => (info.notes || "").trim() },
-    { key: "scene_name",        group: "project",  label: "Название Сцены",          icon: "📐", getVal: (info, wf) => {
-        const sc = (layoutState.selectedSceneIndex !== undefined && state.scenes[layoutState.selectedSceneIndex])
-          ? state.scenes[layoutState.selectedSceneIndex]
-          : ((state.scenes || []).find(s => s.page_type === (layoutState.currentTemplate || "cover")) || (state.scenes || [])[0]);
-        return (sc?.name || sc?.original_name || "01. Сцена SketchUp").trim();
-      }
-    },
-    { key: "scene_description", group: "project",  label: "Описание Сцены",          icon: "📝", getVal: (info, wf) => {
-        const sc = (layoutState.selectedSceneIndex !== undefined && state.scenes[layoutState.selectedSceneIndex])
-          ? state.scenes[layoutState.selectedSceneIndex]
-          : ((state.scenes || []).find(s => s.page_type === (layoutState.currentTemplate || "cover")) || (state.scenes || [])[0]);
-        return (sc?.description || "").trim();
+      default: {
+        const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+        if (m) {
+          const d = (state.directories || [])[parseInt(m[1], 10)];
+          return d ? tval(d[m[2] === "title" ? "title" : "description"]) : "";
+        }
+        return "";
       }
     }
+  }
+
+  // Одинаковые для всех параметров настройки по умолчанию.
+  // Место на странице определяется выравниваниями: лево/центр/право — колонка,
+  // верх/низ — привязка группы к верхнему или нижнему краю листа.
+  const DEFAULT_PARAM_SETTINGS = {
+    align: "left",
+    valign: "top",
+    font_family: "",
+    font_size: 10,
+    color: "#0F172A"
+  };
+
+  const PARAM_FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32];
+
+  // Шрифты комплекта плагина для построчного выбора («По умолчанию» = шрифт страницы)
+  const PARAM_FONT_FAMILIES = [
+    { value: "", label: "По умолчанию" },
+    { value: "Sofia Sans Condensed", label: "Sofia Sans Condensed" },
+    { value: "Sofia Sans Extra Condensed", label: "Sofia Sans Extra Condensed" },
+    { value: "Oswald", label: "Oswald" },
+    { value: "Roboto Condensed", label: "Roboto Condensed" },
+    { value: "Ubuntu Condensed", label: "Ubuntu Condensed" }
   ];
 
-  // Helper to resolve info line definitions including dynamic directory lines
-  function getInfoLineDef(key) {
-    if (!key) return null;
-    const found = AVAILABLE_INFO_LINES.find((l) => l.key === key);
-    if (found) return found;
+  // Нормализация параметра шаблона (зеркало ProjectData#normalize_template_params).
+  // Запись с group: true — блок объединения параметров: вложенные параметры
+  // выводятся одной строкой с разделителем « | ».
+  function normalizeTemplateParam(raw) {
+    const p = raw && typeof raw === "object" ? raw : {};
+    const bool = (v, def) => (v === undefined || v === null) ? def : !(v === false || v === "false" || v === 0 || v === "0");
+    const num = (v, def, min, max) => {
+      const n = parseFloat(v);
+      return isNaN(n) ? def : Math.min(max, Math.max(min, n));
+    };
+    const alignRaw = tval(p.align);
+    const valignRaw = tval(p.valign);
+    const ffRaw = tval(p.font_family);
+    const common = {
+      id: tval(p.id),
+      // Двоеточие после метки добавляет рендерер — хвостовые «:» из ввода срезаем
+      label: tval(p.label).replace(/:+\s*$/, "").trim(),
+      show_label: bool(p.show_label, true),
+      align: ["left", "center", "right"].includes(alignRaw) ? alignRaw : "left",
+      valign: ["top", "bottom"].includes(valignRaw) ? valignRaw : "top",
+      font_family: PARAM_FONT_FAMILIES.some((f) => f.value === ffRaw) ? ffRaw : "",
+      font_size: num(p.font_size, DEFAULT_PARAM_SETTINGS.font_size, 4, 72),
+      color: /^#[0-9a-fA-F]{6}$/.test(tval(p.color)) ? tval(p.color) : DEFAULT_PARAM_SETTINGS.color,
+      visible: bool(p.visible, true)
+    };
 
-    if (typeof key === "string" && key.startsWith("dir_desc_")) {
-      const idx = parseInt(key.replace("dir_desc_", ""), 10);
-      const dirs = Array.isArray(state.directories) ? state.directories : [];
-      const d = dirs[idx] || {};
-      const dTitle = (d.title || getFolderName(d.path) || `Раздел #${idx + 1}`).trim();
-      return {
-        key: key,
-        group: "specs",
-        label: `📁 ${dTitle}`,
-        icon: "📁",
-        getVal: () => (d.description || "").trim() || "—"
-      };
+    if (p.group === true || p.group === "true") {
+      const children = Array.isArray(p.params) ? p.params : [];
+      return Object.assign(common, {
+        id: common.id || `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+        group: true,
+        show_label: bool(p.show_label, false),
+        params: children
+          .filter((c) => c && typeof c === "object" && tval(c.source))
+          .map((c) => ({
+            id: tval(c.id) || `c_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+            source: tval(c.source),
+            label: tval(c.label),
+            show_label: bool(c.show_label, false)
+          }))
+      });
     }
 
-    if (key === "dir_specs" || key === "directories_spec") {
-      return {
-        key: key,
-        group: "specs",
-        label: "📁 Все спецификации папок",
-        icon: "📁",
-        getVal: () => {
-          const dirs = (state.directories || []).filter(d => d && (d.description || "").trim());
-          if (dirs.length === 0) return "—";
-          return dirs.map((d, i) => `${d.title || ("Раздел #" + (i + 1))}: ${(d.description || "").trim()}`).join(" • ");
-        }
-      };
-    }
+    return Object.assign(common, {
+      id: common.id || `p_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
+      source: tval(p.source)
+    });
+  }
 
-    return null;
+  // Создание пустого блока объединения параметров
+  function createParamGroup(tplKey) {
+    ensureCustomLayouts();
+    const key = tplKey || layoutState.currentTemplate || "cover";
+    if (!state.pdf_settings.custom_layouts[key]) {
+      state.pdf_settings.custom_layouts[key] = {};
+    }
+    const group = normalizeTemplateParam({
+      group: true,
+      label: "",
+      show_label: false,
+      align: DEFAULT_PARAM_SETTINGS.align,
+      valign: DEFAULT_PARAM_SETTINGS.valign,
+      font_family: DEFAULT_PARAM_SETTINGS.font_family,
+      font_size: DEFAULT_PARAM_SETTINGS.font_size,
+      color: DEFAULT_PARAM_SETTINGS.color,
+      visible: true,
+      params: []
+    });
+    state.pdf_settings.custom_layouts[key].params.push(group);
+    renderTemplateSettingsList();
+    notifyChange();
+    showNotification("Блок создан — перетащите в него параметры", "success");
+  }
+
+  // Название зоны размещения параметра (для сводки в строке)
+  function paramZoneLabel(p) {
+    const h = p.align === "center" ? "По центру" : (p.align === "right" ? "Справа" : "Слева");
+    const v = p.valign === "bottom" ? "внизу" : "вверху";
+    return `${h} ${v}`;
+  }
+
+  // «N параметров» с согласованием окончаний
+  function paramCountText(n) {
+    const mod10 = n % 10;
+    const mod100 = n % 100;
+    const word = (mod10 === 1 && mod100 !== 11) ? "параметр"
+      : (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) ? "параметра"
+        : "параметров";
+    return `${n} ${word}`;
   }
 
   // Deep clone utility to guarantee complete independence of template slot settings
@@ -289,257 +344,40 @@
     return copy;
   }
 
-  const DEFAULT_LINES_BY_CONTENT = {
-    slot_1: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
-    slot_3: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
-    slot_2: ["workflow_history", "workflow_stadia"],
-    slot_4: ["workflow_history", "workflow_stadia"],
-    header: ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"],
-    footer: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"]
-  };
-
-  const DEFAULT_HEADER_SLOT = {
-    visible: true,
-    align: "center",
-    valign: "top",
-    font_size: 11,
-    lines: ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"],
-    line_rows: { furniture_name: 1, place_address: 2, customer_or_company: 3, scene_name: 4, scene_description: 5 },
-    line_font_sizes: { furniture_name: 11, place_address: 10, customer_or_company: 10, scene_name: 11, scene_description: 9 },
-    line_colors: { furniture_name: "#005EB0", place_address: "#0F172A", customer_or_company: "#0F172A", scene_name: "#005EB0", scene_description: "#475569" },
-    opacity: 0.95
-  };
-
-  const DEFAULT_MIDDLE_SLOT = {
-    visible: true,
-    content: "info_lines",
-    show_titles: true,
-    line_show_titles: {},
-    align: "left",
-    valign: "top",
-    font_size: 8,
-    item_gap_mm: 2,
-    item_gap: 2,
-    lines: ["toc_pages", "spec_materials", "spec_appliances", "general_notes", "workflow_history", "workflow_stadia", "workflow_revision", "workflow_version", "workflow_date", "articul"],
-    line_aligns: Object.assign({}, DEFAULT_MIDDLE_ALIGNS),
-    line_valigns: Object.assign({}, DEFAULT_MIDDLE_VALIGNS),
-    line_font_sizes: Object.assign({}, DEFAULT_MIDDLE_SIZES),
-    line_colors: Object.assign({}, DEFAULT_MIDDLE_COLORS),
-    opacity: 0.9
-  };
-
-  // Factory function to ensure each template receives 100% independent deep-cloned slot instances
-  function createDefaultHeaderSlot() {
-    return deepClone(DEFAULT_HEADER_SLOT);
+// Шаблоны страниц: имя + настройки видового экрана. Параметры (params)
+// создаются пользователем вручную; новые шаблоны стартуют с пустым списком.
+const DEFAULT_LAYOUTS = {
+  cover: {
+    name: "Титульный лист (Cover)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { scale_pct: 80 })
+  },
+  description: {
+    name: "Описание и спецификации (Description)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { scale_pct: 70 })
+  },
+  explain: {
+    name: "Содержание и ведомость (Explain)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { scale_pct: 60 })
+  },
+  general: {
+    name: "Общий вид (General)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { aspect_ratio: "16:9" })
+  },
+  visual: {
+    name: "Визуализация (Visual)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { aspect_ratio: "16:9" })
+  },
+  blank: {
+    name: "Без шаблона (Blank)",
+    image_4_3: Object.assign({}, DEFAULT_IMAGE_SLOT, { aspect_ratio: "16:9" })
   }
-
-  function createDefaultMiddleSlot(overrides = {}) {
-    return Object.assign(deepClone(DEFAULT_MIDDLE_SLOT), deepClone(overrides));
-  }
-
-  // Default block configurations for each page template (strictly independent & purpose-tailored)
-  const DEFAULT_LAYOUTS = {
-    cover: {
-      name: "Титульный лист (Cover)",
-      slots: {
-        header: {
-          visible: true,
-          content: "header_title",
-          valign: "top",
-          font_size: 13,
-          lines: ["furniture_name", "place_address", "customer_or_company"],
-          line_rows: { furniture_name: 1, place_address: 2, customer_or_company: 3, scene_name: 4, scene_description: 5 },
-          line_font_sizes: { furniture_name: 14, place_address: 11, customer_or_company: 11, scene_name: 11, scene_description: 9 },
-          line_colors: { furniture_name: "#005EB0", place_address: "#0F172A", customer_or_company: "#0F172A", scene_name: "#005EB0", scene_description: "#475569" },
-          opacity: 0.95
-        },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 80 },
-        slot_1: {
-          visible: true,
-          content: "info_lines",
-          align: "left",
-          valign: "top",
-          font_size: 8.5,
-          item_gap_mm: 3.0,
-          lines: ["articul", "workflow_date", "workflow_version", "workflow_revision", "workflow_stadia"],
-          line_aligns: { articul: "left", workflow_date: "left", workflow_version: "left", workflow_revision: "left", workflow_stadia: "left" },
-          line_valigns: { articul: "top", workflow_date: "top", workflow_version: "top", workflow_revision: "bottom", workflow_stadia: "bottom" },
-          line_font_sizes: { articul: 9, workflow_date: 8.5, workflow_version: 8.5, workflow_revision: 8.5, workflow_stadia: 8.5 },
-          line_colors: { articul: "#005EB0", workflow_date: "#334155", workflow_version: "#334155", workflow_revision: "#334155", workflow_stadia: "#334155" },
-          opacity: 0.92
-        },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        slot_3: { visible: false, content: "none", align: "right", valign: "top", font_size: 8, lines: [], opacity: 0.9 },
-        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
-      }
-    },
-    description: {
-      name: "Описание и спецификации (Description)",
-      slots: {
-        header: {
-          visible: true,
-          content: "header_title",
-          valign: "top",
-          font_size: 11,
-          lines: ["furniture_name", "place_address", "scene_name", "scene_description"],
-          line_rows: { furniture_name: 1, place_address: 2, scene_name: 3, scene_description: 4, customer_or_company: 5 },
-          line_font_sizes: { furniture_name: 11, place_address: 10, scene_name: 11, scene_description: 9, customer_or_company: 10 },
-          line_colors: { furniture_name: "#005EB0", place_address: "#0F172A", scene_name: "#005EB0", scene_description: "#475569", customer_or_company: "#0F172A" },
-          opacity: 0.95
-        },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 70 },
-        slot_1: {
-          visible: true,
-          content: "info_lines",
-          align: "left",
-          valign: "top",
-          font_size: 8.5,
-          item_gap_mm: 2.5,
-          lines: ["spec_materials", "spec_appliances", "general_notes"],
-          line_aligns: { spec_materials: "left", spec_appliances: "left", general_notes: "left" },
-          line_valigns: { spec_materials: "top", spec_appliances: "top", general_notes: "top" },
-          line_font_sizes: { spec_materials: 8.5, spec_appliances: 8.5, general_notes: 8.5 },
-          line_colors: { spec_materials: "#334155", spec_appliances: "#334155", general_notes: "#334155" },
-          opacity: 0.92
-        },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        slot_3: { visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8.5, lines: ["spec_materials", "spec_appliances"], opacity: 0.9 },
-        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
-      }
-    },
-    explain: {
-      name: "Содержание и ведомость (Explain)",
-      slots: {
-        header: {
-          visible: true,
-          content: "header_title",
-          valign: "top",
-          font_size: 11,
-          lines: ["furniture_name", "customer_or_company", "scene_name", "scene_description"],
-          line_rows: { furniture_name: 1, customer_or_company: 2, scene_name: 3, scene_description: 4, place_address: 5 },
-          line_font_sizes: { furniture_name: 11, customer_or_company: 10, scene_name: 11, scene_description: 9, place_address: 10 },
-          line_colors: { furniture_name: "#005EB0", customer_or_company: "#0F172A", scene_name: "#005EB0", scene_description: "#475569", place_address: "#0F172A" },
-          opacity: 0.95
-        },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "4:3", scale_pct: 60 },
-        slot_1: {
-          visible: true,
-          content: "info_lines",
-          align: "left",
-          valign: "top",
-          font_size: 8,
-          item_gap_mm: 2.0,
-          lines: ["toc_pages", "general_notes", "workflow_history", "workflow_stadia"],
-          line_aligns: { toc_pages: "left", general_notes: "left", workflow_history: "left", workflow_stadia: "left" },
-          line_valigns: { toc_pages: "top", general_notes: "top", workflow_history: "bottom", workflow_stadia: "bottom" },
-          line_font_sizes: { toc_pages: 8, general_notes: 8, workflow_history: 8, workflow_stadia: 8 },
-          line_colors: { toc_pages: "#334155", general_notes: "#334155", workflow_history: "#334155", workflow_stadia: "#334155" },
-          opacity: 0.92
-        },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        slot_3: { visible: true, content: "info_lines", align: "right", valign: "top", font_size: 8, lines: ["toc_pages", "workflow_history"], opacity: 0.9 },
-        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0.9 },
-        footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
-      }
-    },
-    general: {
-      name: "Общий вид (General)",
-      slots: {
-        header: {
-          visible: true,
-          content: "header_title",
-          valign: "top",
-          font_size: 11,
-          lines: ["scene_name", "scene_description", "furniture_name", "place_address"],
-          line_rows: { scene_name: 1, scene_description: 2, furniture_name: 3, place_address: 4, customer_or_company: 5 },
-          line_font_sizes: { scene_name: 12, scene_description: 9, furniture_name: 10, place_address: 10, customer_or_company: 10 },
-          line_colors: { scene_name: "#005EB0", scene_description: "#475569", furniture_name: "#005EB0", place_address: "#0F172A", customer_or_company: "#0F172A" },
-          opacity: 0.95
-        },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "16:9", scale_pct: 100 },
-        slot_1: {
-          visible: false,
-          content: "none",
-          align: "left",
-          valign: "top",
-          font_size: 8,
-          item_gap_mm: 2.0,
-          lines: [],
-          opacity: 0.88
-        },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0.88 },
-        slot_3: { visible: false, content: "none", align: "right", valign: "top", font_size: 8, lines: [], opacity: 0.88 },
-        slot_4: {
-          visible: true,
-          content: "info_lines",
-          align: "right",
-          valign: "bottom",
-          font_size: 8,
-          lines: ["workflow_history", "workflow_stadia"],
-          line_aligns: { workflow_history: "right", workflow_stadia: "right" },
-          line_valigns: { workflow_history: "bottom", workflow_stadia: "bottom" },
-          opacity: 0.9
-        },
-        footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"], line_aligns: { footer_last_edit: "left", footer_ver_rev: "center", footer_articul: "center", footer_date: "center", footer_page_total: "right" }, opacity: 1.0 }
-      }
-    },
-    visual: {
-      name: "Визуализация (Visual)",
-      slots: {
-        header: {
-          visible: true,
-          content: "header_title",
-          valign: "top",
-          font_size: 10,
-          lines: ["scene_name", "scene_description"],
-          line_rows: { scene_name: 1, scene_description: 2, furniture_name: 3, place_address: 4, customer_or_company: 5 },
-          line_font_sizes: { scene_name: 11, scene_description: 9, furniture_name: 10, place_address: 10, customer_or_company: 10 },
-          line_colors: { scene_name: "#005EB0", scene_description: "#475569", furniture_name: "#005EB0", place_address: "#0F172A", customer_or_company: "#0F172A" },
-          opacity: 0.95
-        },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "16:9", scale_pct: 100 },
-        slot_1: {
-          visible: false,
-          content: "none",
-          align: "left",
-          valign: "top",
-          font_size: 8,
-          item_gap_mm: 2.0,
-          lines: [],
-          opacity: 0.88
-        },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0.88 },
-        slot_3: { visible: false, content: "none", align: "right", valign: "top", font_size: 8, lines: [], opacity: 0.88 },
-        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0.88 },
-        footer: { visible: true, content: "footer_info", align: "center", valign: "bottom", font_size: 8.5, lines: ["footer_ver_rev", "footer_page_total"], line_aligns: { footer_ver_rev: "left", footer_page_total: "right" }, opacity: 1.0 }
-      }
-    },
-    blank: {
-      name: "Без шаблона (Blank)",
-      slots: {
-        header: { visible: false, content: "none", valign: "top", font_size: 11, lines: [], opacity: 0 },
-        image_4_3: { visible: true, content: "render_viewport", aspect_ratio: "16:9", scale_pct: 100 },
-        slot_1: { visible: false, content: "none", align: "left", valign: "top", font_size: 8, lines: [], opacity: 0 },
-        slot_2: { visible: false, content: "none", align: "left", valign: "bottom", font_size: 8, lines: [], opacity: 0 },
-        slot_3: { visible: false, content: "none", align: "right", valign: "top", font_size: 8, lines: [], opacity: 0 },
-        slot_4: { visible: false, content: "none", align: "right", valign: "bottom", font_size: 8, lines: [], opacity: 0 },
-        footer: { visible: false, content: "none", align: "center", valign: "bottom", font_size: 8.5, lines: [], opacity: 0 }
-      }
-    }
-  };
+};
 
 
   // Layout Editor Internal State
   const layoutState = {
     currentTemplate: "cover",
-    selectedBlockId: "slot_1",
-    snapEnabled: true,
-    snapGridPct: 2.0,
-    guidesEnabled: true,
-    zoomLevel: 1.0,
-    openLinesPopoverBlockId: null
+    selectedSceneIndex: 0
   };
 
   // DOM Elements Cache
@@ -992,112 +830,56 @@
   }
 
   // -----------------------------------------------------------------------------
-  // Fixed Slot Layout Editor Engine
+  // Template Layout Engine: видовое окно + пользовательские параметры
   // -----------------------------------------------------------------------------
 
+  // Нормализация конфигов шаблонов. Чистый лист: блоки старой модели
+  // (header/slot_1..4/footer) удаляются; остаются только image_4_3, params
+  // и метаданные пользовательского шаблона (name/_name/_base_type/_icon).
   function ensureCustomLayouts() {
     if (!state.pdf_settings) state.pdf_settings = {};
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
 
-    const validSlotIds = new Set(FIXED_SLOT_DEFS.map((s) => s.id));
     const metaKeys = new Set(["name", "_name", "_base_type", "_icon", "_meta"]);
 
     const allTplKeys = Array.from(new Set([...Object.keys(DEFAULT_LAYOUTS), ...Object.keys(state.pdf_settings.custom_layouts)]));
 
     allTplKeys.forEach((tplKey) => {
-      if (!state.pdf_settings.custom_layouts[tplKey]) {
+      const cfg = state.pdf_settings.custom_layouts[tplKey];
+      if (!cfg || typeof cfg !== "object") {
         state.pdf_settings.custom_layouts[tplKey] = {};
+        return;
       }
 
-      // Purge legacy keys (e.g. cover_accent_bar, cover_hero_image, desc_header, etc.), preserving metadata
-      Object.keys(state.pdf_settings.custom_layouts[tplKey]).forEach((k) => {
-        if (!validSlotIds.has(k) && !metaKeys.has(k)) {
-          delete state.pdf_settings.custom_layouts[tplKey][k];
+      Object.keys(cfg).forEach((k) => {
+        if (k !== "image_4_3" && k !== "params" && !metaKeys.has(k)) {
+          delete cfg[k];
         }
       });
 
-      const baseKey = state.pdf_settings.custom_layouts[tplKey]?._base_type || (DEFAULT_LAYOUTS[tplKey] ? tplKey : "general");
-      const tplDefaults = (DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general)?.slots || {};
-      FIXED_SLOT_DEFS.forEach((slotDef) => {
-        const current = state.pdf_settings.custom_layouts[tplKey][slotDef.id];
-        const defSlot = tplDefaults[slotDef.id] || {};
-        const defContent = defSlot.content || slotDef.default_content || "none";
-        const defFontSize = defSlot.font_size !== undefined ? defSlot.font_size : (slotDef.id === "header" ? 11 : (slotDef.id === "footer" ? 8.5 : 8));
-        const defLines = defSlot.lines ? deepClone(defSlot.lines) : (DEFAULT_LINES_BY_CONTENT[slotDef.id] ? deepClone(DEFAULT_LINES_BY_CONTENT[slotDef.id]) : (slotDef.default_lines ? deepClone(slotDef.default_lines) : []));
-        const defLineRows = defSlot.line_rows ? deepClone(defSlot.line_rows) : (slotDef.default_line_rows ? deepClone(slotDef.default_line_rows) : null);
-        const defLineFontSizes = defSlot.line_font_sizes ? deepClone(defSlot.line_font_sizes) : (slotDef.default_line_font_sizes ? deepClone(slotDef.default_line_font_sizes) : null);
-        const defLineColors = defSlot.line_colors ? deepClone(defSlot.line_colors) : (slotDef.default_line_colors ? deepClone(slotDef.default_line_colors) : null);
-        const defLineAligns = defSlot.line_aligns ? deepClone(defSlot.line_aligns) : (slotDef.default_line_aligns ? deepClone(slotDef.default_line_aligns) : null);
-        const defLineValigns = defSlot.line_valigns ? deepClone(defSlot.line_valigns) : (slotDef.default_line_valigns ? deepClone(slotDef.default_line_valigns) : null);
+      const baseKey = cfg._base_type || (DEFAULT_LAYOUTS[tplKey] ? tplKey : "general");
+      const defImg = (DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general).image_4_3 || DEFAULT_IMAGE_SLOT;
 
-        if (!current) {
-          state.pdf_settings.custom_layouts[tplKey][slotDef.id] = {
-            visible: isSlotVisible(defSlot),
-            content: defContent,
-            custom_text: defSlot.custom_text || "",
-            align: defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left"),
-            valign: defSlot.valign || (slotDef.id === "footer" ? "bottom" : (slotDef.id === "header" ? "top" : "top")),
-            font_size: defFontSize,
-            aspect_ratio: defSlot.aspect_ratio || slotDef.aspect_ratio || "4:3",
-            scale_pct: defSlot.scale_pct !== undefined ? defSlot.scale_pct : (slotDef.scale_pct !== undefined ? slotDef.scale_pct : 100),
-            lines: defLines,
-            line_rows: defLineRows,
-            line_font_sizes: defLineFontSizes,
-            line_colors: defLineColors,
-            line_aligns: defLineAligns,
-            line_valigns: defLineValigns,
-            opacity: defSlot.opacity !== undefined ? defSlot.opacity : 0.9
-          };
-        } else {
-          if (current.visible === undefined || current.visible === null) {
-            current.visible = defSlot.visible !== false;
-          } else {
-            current.visible = isSlotVisible(current);
-          }
-          if (slotDef.id === "image_4_3") {
-            if (!current.aspect_ratio) current.aspect_ratio = defSlot.aspect_ratio || "4:3";
-            if (current.scale_pct === undefined) current.scale_pct = defSlot.scale_pct !== undefined ? defSlot.scale_pct : 100;
-          }
-          if (!current.content || (current.content === "none" && defSlot.content && defSlot.content !== "none" && !current.explicit_none)) {
-            current.content = defContent;
-          }
-          if (!current.align) current.align = defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left");
-          if (current.font_size === undefined) current.font_size = defFontSize;
-          if (!current.lines) current.lines = defLines;
-          if (slotDef.id === "header") {
-            const ALLOWED_HDR_KEYS = ["furniture_name", "place_address", "customer_or_company", "scene_name", "scene_description"];
-            if (Array.isArray(current.lines)) {
-              const hasAnyAllowed = current.lines.some((k) => ALLOWED_HDR_KEYS.includes(k));
-              if (!hasAnyAllowed && current.lines.length > 0) {
-                current.lines = [...ALLOWED_HDR_KEYS];
-              } else {
-                current.lines = current.lines.filter((k) => ALLOWED_HDR_KEYS.includes(k));
-              }
-            }
-            if (!current.valign) current.valign = defSlot.valign || "top";
-            current.line_rows = Object.assign({}, defLineRows, current.line_rows || {});
-            current.line_font_sizes = Object.assign({}, defLineFontSizes, current.line_font_sizes || {});
-            current.line_colors = Object.assign({}, defLineColors, current.line_colors || {});
-          }
-          if (slotDef.id === "slot_1") {
-            if (!current.content) current.content = defSlot.content || "info_lines";
-            if (!current.lines) {
-              current.lines = defSlot.lines ? deepClone(defSlot.lines) : deepClone(DEFAULT_MIDDLE_SLOT.lines);
-            }
-            current.line_aligns = Object.assign({}, defLineAligns || DEFAULT_MIDDLE_ALIGNS, current.line_aligns || {});
-            current.line_valigns = Object.assign({}, defLineValigns || DEFAULT_MIDDLE_VALIGNS, current.line_valigns || {});
-            current.line_font_sizes = Object.assign({}, defLineFontSizes || DEFAULT_MIDDLE_SIZES, current.line_font_sizes || {});
-            current.line_colors = Object.assign({}, defLineColors || DEFAULT_MIDDLE_COLORS, current.line_colors || {});
-            if (current.item_gap_mm === undefined && current.item_gap === undefined) {
-              current.item_gap_mm = defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : 2;
-            }
-          }
-          if (slotDef.id === "footer") {
-            current.line_aligns = Object.assign({}, defLineAligns || {}, current.line_aligns || {});
-          }
-          if (current.opacity === undefined) current.opacity = defSlot.opacity !== undefined ? defSlot.opacity : 0.9;
-        }
-      });
+      if (!cfg.image_4_3 || typeof cfg.image_4_3 !== "object") {
+        cfg.image_4_3 = deepClone(defImg);
+      } else {
+        cfg.image_4_3.visible = isSlotVisible(cfg.image_4_3);
+        if (!cfg.image_4_3.content) cfg.image_4_3.content = defImg.content || "render_viewport";
+        if (!cfg.image_4_3.aspect_ratio) cfg.image_4_3.aspect_ratio = defImg.aspect_ratio || "4:3";
+        if (cfg.image_4_3.scale_pct === undefined) cfg.image_4_3.scale_pct = defImg.scale_pct !== undefined ? defImg.scale_pct : 100;
+        if (cfg.image_4_3.x === undefined) cfg.image_4_3.x = defImg.x;
+        if (cfg.image_4_3.y === undefined) cfg.image_4_3.y = defImg.y;
+        if (cfg.image_4_3.w === undefined) cfg.image_4_3.w = defImg.w;
+        if (cfg.image_4_3.h === undefined) cfg.image_4_3.h = defImg.h;
+      }
+
+      if (!Array.isArray(cfg.params)) {
+        cfg.params = [];
+      } else {
+        cfg.params = cfg.params
+          .filter((p) => p && typeof p === "object" && (p.group === true || p.group === "true" || tval(p.source)))
+          .map(normalizeTemplateParam);
+      }
     });
   }
 
@@ -1150,7 +932,7 @@
         name: DEFAULT_LAYOUTS[tplKey].name,
         icon: iconMap[tplKey] || "📄",
         isDefault: true,
-        slots: DEFAULT_LAYOUTS[tplKey].slots || {}
+        image_def: DEFAULT_LAYOUTS[tplKey].image_4_3 || DEFAULT_IMAGE_SLOT
       };
     }
     const customLayouts = state.pdf_settings?.custom_layouts || {};
@@ -1166,7 +948,7 @@
       icon: icon,
       isDefault: false,
       baseType: baseKey,
-      slots: baseDef.slots || {}
+      image_def: baseDef.image_4_3 || DEFAULT_IMAGE_SLOT
     };
   }
 
@@ -1319,10 +1101,9 @@
     ensureCustomLayouts();
     const newKey = "custom_" + Date.now().toString(36);
 
-    const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
-    const baseSlots = state.pdf_settings.custom_layouts[baseKey] || baseDef.slots || {};
-
-    state.pdf_settings.custom_layouts[newKey] = deepClone(baseSlots);
+    // Копия актуальной конфигурации шаблона-основы (видовое окно + параметры)
+    const baseCfg = state.pdf_settings.custom_layouts[baseKey] || {};
+    state.pdf_settings.custom_layouts[newKey] = deepClone(baseCfg);
     state.pdf_settings.custom_layouts[newKey].name = trimmedName;
     state.pdf_settings.custom_layouts[newKey]._name = trimmedName;
     state.pdf_settings.custom_layouts[newKey]._base_type = baseKey;
@@ -1457,441 +1238,19 @@
     openRenameTemplateModal(tplKey);
   }
 
-  function getActiveLayoutBlocks() {
-    ensureCustomLayouts();
-    const tplKey = layoutState.currentTemplate || "cover";
-    const tplDef = getTemplateDef(tplKey);
-    const tplDefaults = tplDef.slots || {};
-    const customTpl = state.pdf_settings.custom_layouts[tplKey] || {};
-
-    return FIXED_SLOT_DEFS.map((slotDef) => {
-      const custom = customTpl[slotDef.id] || {};
-      const defSlot = tplDefaults[slotDef.id] || {};
-      const content = custom.content || defSlot.content || slotDef.default_content || "none";
-      const defaultLines = defSlot.lines ? [...defSlot.lines] : (DEFAULT_LINES_BY_CONTENT[slotDef.id] || DEFAULT_LINES_BY_CONTENT[content] || slotDef.default_lines || []);
-      const defaultLineRows = defSlot.line_rows || slotDef.default_line_rows || null;
-      const defaultLineFontSizes = defSlot.line_font_sizes || slotDef.default_line_font_sizes || null;
-      const defaultLineColors = defSlot.line_colors || slotDef.default_line_colors || null;
-      const defaultLineAligns = defSlot.line_aligns || slotDef.default_line_aligns || null;
-      const defaultLineValigns = defSlot.line_valigns || slotDef.default_line_valigns || null;
-
-      let customX = custom.x !== undefined ? parseFloat(custom.x) : (defSlot.x !== undefined ? parseFloat(defSlot.x) : slotDef.x);
-      let customY = custom.y !== undefined ? parseFloat(custom.y) : (defSlot.y !== undefined ? parseFloat(defSlot.y) : slotDef.y);
-      let customW = custom.w !== undefined ? parseFloat(custom.w) : (defSlot.w !== undefined ? parseFloat(defSlot.w) : slotDef.w);
-      let customH = custom.h !== undefined ? parseFloat(custom.h) : (defSlot.h !== undefined ? parseFloat(defSlot.h) : slotDef.h);
-
-      if (slotDef.id === "header") {
-        customY = 0.0;
-        customH = 30.0;
-      }
-
-      return {
-        id: slotDef.id,
-        label: slotDef.label,
-        icon: slotDef.icon,
-        slot_class: slotDef.slot_class,
-        is_image: !!slotDef.is_image,
-        x: customX,
-        y: customY,
-        w: customW,
-        h: customH,
-        visible: custom.visible !== undefined ? custom.visible : (defSlot.visible !== false),
-        content: content,
-        custom_text: custom.custom_text !== undefined ? custom.custom_text : (defSlot.custom_text || ""),
-        align: custom.align || defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : (slotDef.id === "slot_3" || slotDef.id === "slot_4" ? "right" : "left")),
-        valign: custom.valign || defSlot.valign || (slotDef.id === "footer" ? "bottom" : "top"),
-        font_size: custom.font_size !== undefined ? custom.font_size : (defSlot.font_size !== undefined ? defSlot.font_size : (slotDef.id === "header" ? 11 : (slotDef.id === "footer" ? 8.5 : 8))),
-        aspect_ratio: custom.aspect_ratio || defSlot.aspect_ratio || slotDef.aspect_ratio || "4:3",
-        scale_pct: custom.scale_pct !== undefined ? custom.scale_pct : (defSlot.scale_pct !== undefined ? defSlot.scale_pct : (slotDef.scale_pct !== undefined ? slotDef.scale_pct : 100)),
-        lines: custom.lines ? [...custom.lines] : (defSlot.lines ? [...defSlot.lines] : [...defaultLines]),
-        line_rows: custom.line_rows ? Object.assign({}, custom.line_rows) : (defaultLineRows ? Object.assign({}, defaultLineRows) : null),
-        line_font_sizes: custom.line_font_sizes ? Object.assign({}, custom.line_font_sizes) : (defaultLineFontSizes ? Object.assign({}, defaultLineFontSizes) : null),
-        line_colors: custom.line_colors ? Object.assign({}, custom.line_colors) : (defaultLineColors ? Object.assign({}, defaultLineColors) : null),
-        line_aligns: custom.line_aligns ? Object.assign({}, custom.line_aligns) : (defaultLineAligns ? Object.assign({}, defaultLineAligns) : null),
-        line_valigns: custom.line_valigns ? Object.assign({}, custom.line_valigns) : (defaultLineValigns ? Object.assign({}, defaultLineValigns) : null),
-        show_titles: custom.show_titles !== undefined ? custom.show_titles : (defSlot.show_titles !== undefined ? defSlot.show_titles : true),
-        line_show_titles: custom.line_show_titles ? Object.assign({}, custom.line_show_titles) : (defSlot.line_show_titles ? Object.assign({}, defSlot.line_show_titles) : null),
-        opacity: custom.opacity !== undefined ? custom.opacity : (defSlot.opacity !== undefined ? defSlot.opacity : 0.9),
-        content_options: slotDef.content_options || null
-      };
-    });
+// Слияние обновлений в конфиг блока шаблона (видовое окно и др.) с вкладки «Страницы»
+function updateBlockSlot(blockId, updates, targetTplKey) {
+  ensureCustomLayouts();
+  const tplKey = targetTplKey || layoutState.currentTemplate || "cover";
+  if (!state.pdf_settings.custom_layouts[tplKey]) {
+    state.pdf_settings.custom_layouts[tplKey] = {};
   }
-
-  function getBlockData(blockId) {
-    const blocks = getActiveLayoutBlocks();
-    return blocks.find((b) => b.id === blockId) || null;
+  const cur = state.pdf_settings.custom_layouts[tplKey][blockId];
+  if (!cur || typeof cur !== "object") {
+    state.pdf_settings.custom_layouts[tplKey][blockId] = {};
   }
-
-  function ensureMiddleSlotDefaults(targetTpl) {
-    ensureCustomLayouts();
-    const tplKey = targetTpl || layoutState.currentTemplate || "cover";
-    if (!state.pdf_settings.custom_layouts[tplKey]) {
-      state.pdf_settings.custom_layouts[tplKey] = {};
-    }
-    const defTpl = getTemplateDef(tplKey);
-    const defSlot1 = defTpl.slots?.slot_1 || DEFAULT_MIDDLE_SLOT;
-    if (!state.pdf_settings.custom_layouts[tplKey].slot_1) {
-      state.pdf_settings.custom_layouts[tplKey].slot_1 = deepClone(defSlot1);
-    }
-    const s1 = state.pdf_settings.custom_layouts[tplKey].slot_1;
-    if (!s1.content) s1.content = defSlot1.content || "info_lines";
-    if (!s1.lines) {
-      s1.lines = deepClone(defSlot1.lines || DEFAULT_MIDDLE_SLOT.lines);
-    }
-    if (s1.show_titles === undefined) {
-      s1.show_titles = defSlot1.show_titles !== undefined ? defSlot1.show_titles : true;
-    }
-    if (!s1.line_show_titles) {
-      s1.line_show_titles = deepClone(defSlot1.line_show_titles || {});
-    }
-    if (!s1.line_aligns) s1.line_aligns = deepClone(defSlot1.line_aligns || DEFAULT_MIDDLE_ALIGNS);
-    if (!s1.line_valigns) s1.line_valigns = deepClone(defSlot1.line_valigns || DEFAULT_MIDDLE_VALIGNS);
-    if (!s1.line_font_sizes) s1.line_font_sizes = deepClone(defSlot1.line_font_sizes || DEFAULT_MIDDLE_SIZES);
-    if (!s1.line_colors) s1.line_colors = deepClone(defSlot1.line_colors || DEFAULT_MIDDLE_COLORS);
-    if (s1.item_gap_mm === undefined && s1.item_gap === undefined) {
-      s1.item_gap_mm = defSlot1.item_gap_mm !== undefined ? defSlot1.item_gap_mm : 2;
-    }
-    return s1;
-  }
-
-  function updateBlockSlot(blockId, updates, targetTplKey) {
-    ensureCustomLayouts();
-    const tplKey = targetTplKey || layoutState.currentTemplate || "cover";
-    if (!state.pdf_settings.custom_layouts[tplKey]) {
-      state.pdf_settings.custom_layouts[tplKey] = {};
-    }
-    if (!state.pdf_settings.custom_layouts[tplKey][blockId]) {
-      state.pdf_settings.custom_layouts[tplKey][blockId] = {};
-    }
-    if (blockId === "header") {
-      updates.y = 0.0;
-      updates.h = 30.0;
-    }
-    if (blockId === "slot_1" || blockId === "slot_2" || blockId === "slot_3" || blockId === "slot_4") {
-      const curContent = state.pdf_settings.custom_layouts[tplKey][blockId]?.content;
-      if (!updates.content && (!curContent || curContent === "none")) {
-        updates.content = "info_lines";
-      }
-    }
-    Object.assign(state.pdf_settings.custom_layouts[tplKey][blockId], deepClone(updates));
-  }
-
-  function updateHeaderHeight(newH) {
-    updateBlockSlot("header", { y: 0.0, h: 30.0 });
-  }
-
-  function updateColumnWidthFromEdge(side, widthPct) {
-    widthPct = Math.max(10, Math.min(80, Math.round(parseFloat(widthPct) * 10) / 10));
-    if (isNaN(widthPct)) return;
-
-    if (side === "left") {
-      updateBlockSlot("slot_1", { x: 0.0, w: widthPct, align: "left" });
-      updateBlockSlot("slot_2", { x: 0.0, w: widthPct, align: "left" });
-    } else if (side === "right") {
-      const rightX = Math.round((100 - widthPct) * 10) / 10;
-      updateBlockSlot("slot_3", { x: rightX, w: widthPct, align: "right" });
-      updateBlockSlot("slot_4", { x: rightX, w: widthPct, align: "right" });
-    }
-  }
-
-  function updateColumnWidth(newW) {
-    newW = Math.max(10, Math.min(80, Math.round(newW * 10) / 10));
-    updateColumnWidthFromEdge("left", newW);
-    updateColumnWidthFromEdge("right", newW);
-  }
-
-  function getContentLabel(contentKey) {
-    const allOptions = [
-      { value: "header_title", label: "Заголовок" },
-      { value: "render_viewport", label: "4:3 Рендер" },
-      { value: "footer_info", label: "Подвал" },
-      ...SLOT_STANDARD_CONTENT_OPTIONS
-    ];
-    const found = allOptions.find((o) => o.value === contentKey);
-    return found ? found.label.replace(/^[^a-zA-Zа-яА-Я0-9]+/, "") : contentKey;
-  }
-
-  // Generate live content preview for a block on the virtual sheet
-  function generateBlockPreviewHtml(blk) {
-    const info = state.project_info || {};
-    const wf = state.workflow || {};
-    const align = blk.align || (blk.id === "header" || blk.id === "footer" ? "center" : "left");
-    const fontSize = blk.font_size !== undefined ? parseFloat(blk.font_size) : (blk.id === "header" ? 11 : (blk.id === "footer" ? 8.5 : 8));
-    const titleSize = Math.min(22, Math.max(7, fontSize + 1.5));
-
-    if (blk.id === "image_4_3") {
-      if (!blk.visible || blk.content === "none") {
-        return `<div class="block-image-placeholder" style="opacity: 0.4;"><span>⚪ Видовой экран отключен</span></div>`;
-      }
-      const ratioLabel = blk.aspect_ratio || "4:3";
-      const scaleLabel = blk.scale_pct !== undefined ? blk.scale_pct : 100;
-      return `
-        <div class="block-image-placeholder">
-          <div class="image-aspect-badge">📐 ${ratioLabel} РЕНДЕР МОДЕЛИ (${scaleLabel}%)</div>
-          <div class="image-subnote">Видовой экран сцены SketchUp под текстом</div>
-        </div>
-      `;
-    }
-
-    // Active lines for this block
-    const activeLines = Array.isArray(blk.lines)
-      ? blk.lines
-      : (DEFAULT_LINES_BY_CONTENT[blk.content] || []);
-
-    if (blk.id === "header") {
-      const headerValign = blk.valign || "top";
-      const justifyVal = headerValign === "top" ? "flex-start" : (headerValign === "bottom" ? "flex-end" : "center");
-
-      if (blk.content === "custom_text") {
-        return `
-          <div style="text-align: center; overflow: hidden; display: flex; flex-direction: column; justify-content: ${justifyVal}; height: 100%;">
-            <div style="font-size: ${fontSize}px; font-weight: 700; color: #005EB0; font-stretch: extra-condensed; letter-spacing: -0.025em; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${blk.custom_text || "Пользовательский заголовок страницы"}</div>
-          </div>
-        `;
-      }
-      if (blk.content === "none") {
-        return `<div style="font-size: ${Math.max(7, fontSize - 2)}px; color: #94a3b8; font-style: italic; text-align: center;">(Заголовок скрыт)</div>`;
-      }
-
-      const lineRows = blk.line_rows || {
-        furniture_name: 1,
-        place_address: 2,
-        customer_or_company: 3,
-        scene_name: 4,
-        scene_description: 5
-      };
-      const lineFontSizes = blk.line_font_sizes || {
-        furniture_name: 11,
-        place_address: 10,
-        customer_or_company: 10,
-        scene_name: 11,
-        scene_description: 9
-      };
-      const lineColors = blk.line_colors || {
-        furniture_name: "#005EB0",
-        place_address: "#0F172A",
-        customer_or_company: "#0F172A",
-        scene_name: "#005EB0",
-        scene_description: "#475569"
-      };
-      const sampleFurn = (info.furniture_name || info.name_product || "Шкаф, Тумба").trim();
-      const sampleRoom = (info.room_name || info.name_place || "Прихожая").trim();
-      const sampleAddr = (info.address || info.adress || "Адрес объекта").trim();
-      const sampleCust = (info.company || info.name_customer || info.customer || "Заказчик").trim();
-
-      const activeTpl = layoutState.currentTemplate || "cover";
-      const matchingScene = (layoutState.selectedSceneIndex !== undefined && state.scenes[layoutState.selectedSceneIndex] && state.scenes[layoutState.selectedSceneIndex].page_type === activeTpl)
-        ? state.scenes[layoutState.selectedSceneIndex]
-        : ((state.scenes || []).find((s) => s.page_type === activeTpl) || (state.scenes || [])[0]);
-      const sampleSceneName = (matchingScene?.name || matchingScene?.original_name || "01. Обложка").trim();
-      const sampleSceneDesc = (matchingScene?.description || "").trim();
-
-      const getHeaderItemVal = (k) => {
-        if (k === "furniture_name") return sampleFurn;
-        if (k === "place_address") return [sampleRoom, sampleAddr].filter(Boolean).join(" | ") || "Место | Адрес";
-        if (k === "customer_or_company") return sampleCust;
-        if (k === "scene_name" || k === "name" || k === "name_scene") return sampleSceneName;
-        if (k === "scene_description" || k === "description" || k === "scene_desc" || k === "desc") return sampleSceneDesc;
-        const lineDef = getInfoLineDef(k);
-        return lineDef ? lineDef.getVal(info, wf) : "";
-      };
-
-      const grouped = { 1: [], 2: [], 3: [], 4: [], 5: [] };
-      activeLines.forEach((k, idx) => {
-        const defaultR = k === "furniture_name" ? 1 : (k === "place_address" ? 2 : (k === "customer_or_company" ? 3 : (k === "scene_name" ? 4 : (k === "scene_description" ? 5 : Math.min(idx + 1, 5)))));
-        const row = parseInt(lineRows[k] || defaultR, 10);
-        const targetRow = Math.max(1, Math.min(5, isNaN(row) ? 1 : row));
-        const val = getHeaderItemVal(k);
-        if (val) {
-          const itemFs = parseFloat(lineFontSizes[k] || fontSize);
-          const itemCol = (lineColors[k] || "#005EB0").trim();
-          grouped[targetRow].push({ text: val, size: itemFs, color: itemCol });
-        }
-      });
-
-      const renderedLines = [];
-      [1, 2, 3, 4, 5].forEach((r) => {
-        if (grouped[r].length > 0) {
-          renderedLines.push(grouped[r]);
-        }
-      });
-
-      if (renderedLines.length === 0) {
-        return "";
-      }
-
-      const linesHtml = renderedLines.map((rowItems, idx) => {
-        const sep = (idx < renderedLines.length - 1)
-          ? `<div style="width: 45%; max-width: 130px; height: 1px; background: #CBD5E1; margin: 5px auto;"></div>`
-          : ``;
-        const itemsContent = rowItems.map((it, i) => {
-          const s = (i > 0) ? `<span style="color: #CBD5E1; margin: 0 4px; font-weight: 700;">|</span>` : ``;
-          return `${s}<span style="font-size: ${it.size}px; color: ${it.color}; font-weight: 700;">${it.text}</span>`;
-        }).join("");
-        return `<div style="font-stretch: extra-condensed; letter-spacing: -0.025em; text-overflow: ellipsis; white-space: nowrap; overflow: hidden; line-height: 1.4; padding: 2px 0;">${itemsContent}</div>${sep}`;
-      }).join("");
-
-      return `
-        <div style="text-align: center; overflow: hidden; display: flex; flex-direction: column; justify-content: ${justifyVal}; height: 100%;">
-          ${linesHtml}
-        </div>
-      `;
-    }
-
-    if (blk.id === "footer") {
-      if (blk.content === "custom_text") {
-        return `<div style="font-size: ${fontSize}px; color: #64748B; text-align: ${align}; font-stretch: extra-condensed; letter-spacing: -0.025em;">${blk.custom_text || "Пользовательский подвал"}</div>`;
-      }
-      if (blk.content === "none") {
-        return `<div style="font-size: ${Math.max(7, fontSize - 2)}px; color: #94a3b8; font-style: italic; text-align: center;">(Подвал скрыт)</div>`;
-      }
-
-      const defaultAligns = {
-        footer_last_edit: "left",
-        footer_ver_rev: "center",
-        footer_articul: "center",
-        footer_date: "center",
-        footer_page_total: "right"
-      };
-      const lineAligns = blk.line_aligns || defaultAligns;
-
-      const leftItems = [];
-      const centerItems = [];
-      const rightItems = [];
-
-      activeLines.forEach((lineKey) => {
-        let actualKeys = [lineKey];
-        if (lineKey === "footer_rev_ver_date") {
-          actualKeys = ["footer_ver_rev", "footer_articul", "footer_date"];
-        }
-        actualKeys.forEach((k) => {
-          const lineDef = getInfoLineDef(k);
-          if (!lineDef) return;
-          const val = lineDef.getVal(info, wf);
-          if (!val && val !== 0) return;
-          const itAlign = lineAligns[k] || defaultAligns[k] || "center";
-          if (itAlign === "left") leftItems.push(val);
-          else if (itAlign === "right") rightItems.push(val);
-          else centerItems.push(val);
-        });
-      });
-
-      if (leftItems.length === 0 && centerItems.length === 0 && rightItems.length === 0) {
-        leftItems.push("Последние изменения: —");
-        centerItems.push(`Версия ${wf.version || '01'} # Ревизия ${wf.revision || '001'}   |   Артикул: ${info.articul || 'CF#...'}   |   ${previewDate()}`);
-        rightItems.push("Страница 1 | 4");
-      }
-
-      return `
-        <div style="font-size: ${fontSize}px; color: #64748B; font-stretch: extra-condensed; letter-spacing: -0.025em; display: flex; justify-content: space-between; align-items: flex-end; width: 100%; height: 100%; overflow: hidden; white-space: nowrap; padding: 0 4px; box-sizing: border-box; gap: 8px;">
-          <div style="flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${leftItems.join("   |   ")}</div>
-          <div style="flex: 1.2; text-align: center; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${centerItems.join("   |   ")}</div>
-          <div style="flex: 0.8; text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">${rightItems.join("   |   ")}</div>
-        </div>
-      `;
-    }
-
-    if (blk.content === "none") {
-      return `<div style="font-size: ${Math.max(7, fontSize - 1)}px; color: #94a3b8; font-style: italic; text-align: center; margin-top: 10px;">(Пустой слот)</div>`;
-    }
-
-    if (blk.content === "custom_text") {
-      return `
-        <div style="font-size: ${fontSize}px; color: #334155; text-align: ${align}; font-stretch: extra-condensed; letter-spacing: -0.025em; line-height: 1.35; white-space: pre-wrap;">
-          ${blk.custom_text || "Произвольный текст блока..."}
-        </div>
-      `;
-    }
-
-    // Card titles for standard content blocks
-    const cardTitles = {
-      project_card:    "📋 ПАСПОРТ ОБЪЕКТА",
-      customer_card:   "👤 ЗАКАЗЧИК",
-      workflow_status: "⏱️ СТАТУС И СРОКИ",
-      history_table:   "📜 ИСТОРИЯ ИЗМЕНЕНИЙ",
-      materials_spec:  "🛠️ МАТЕРИАЛЫ",
-      appliances_spec: "🔌 ТЕХНИКА",
-      lighting_spec:   "💡 ПОДСВЕТКА",
-      scene_notes:     "📝 ПРИМЕЧАНИЕ К ВИДУ",
-      info_lines:      "📑 РЕКВИЗИТЫ ПРОЕКТА"
-    };
-    const titleText = cardTitles[blk.content] || "ИНФОРМАЦИЯ";
-
-    // Build rendered lines
-    let renderedLinesHtml = "";
-    const lineFontSizes = blk.line_font_sizes || {};
-    const lineColors = blk.line_colors || {};
-    if (activeLines.length > 0) {
-      renderedLinesHtml = activeLines.map((lineKey) => {
-        const lineDef = getInfoLineDef(lineKey);
-        if (!lineDef) return "";
-        const val = lineDef.getVal(info, wf);
-        if (!val && val !== 0) return "";
-        const itFs = parseFloat(lineFontSizes[lineKey]) || fontSize;
-        const itCol = (lineColors[lineKey] || "#334155").trim();
-        return `<div style="font-size: ${itFs}px; color: ${itCol}; line-height: 1.35;"><b>${lineDef.label}:</b> ${val}</div>`;
-      }).filter(Boolean).join("");
-    }
-
-    // Fallback if no lines or empty
-    if (!renderedLinesHtml) {
-      renderedLinesHtml = `<div style="color: #94a3b8; font-style: italic;">(Нет отмеченных строк)</div>`;
-    }
-
-    return `
-      <div style="font-weight: 700; color: #005EB0; font-size: ${titleSize}px; font-stretch: extra-condensed; letter-spacing: -0.025em; margin-bottom: 3px; text-align: ${align};">
-        ${titleText}
-      </div>
-      <div style="font-size: ${fontSize}px; color: #334155; line-height: 1.35; font-stretch: extra-condensed; letter-spacing: -0.025em; text-align: ${align};">
-        ${renderedLinesHtml}
-      </div>
-    `;
-  }
-
-
-
-  // -----------------------------------------------------------------------------
-  // Template & List Settings Engine (Replaces Virtual Canvas with List Controls)
-  // -----------------------------------------------------------------------------
-
-  const HEADER_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 46, 52];
-  const BLOCK_FONT_SIZES = [8, 10, 12, 14, 16, 18];
-  const HEADER_LINE_FONT_SIZES = [8, 10, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 46, 52];
-  const MIDDLE_LINE_FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16];
-  const HEADER_COLOR_PALETTE = [
-    { value: "#005EB0", label: "Синий фирменный", dot: "🔵" },
-    { value: "#0F172A", label: "Темный графит",   dot: "⚫" },
-    { value: "#000000", label: "Черный",          dot: "⬛" },
-    { value: "#1E293B", label: "Темно-серый",      dot: "🌑" },
-    { value: "#475569", label: "Серый",           dot: "🔘" },
-    { value: "#64748B", label: "Светло-серый",    dot: "⚪" },
-    { value: "#2563EB", label: "Ярко-синий",      dot: "🔷" },
-    { value: "#0284C7", label: "Голубой",         dot: "🔹" },
-    { value: "#0D9488", label: "Бирюзовый",       dot: "🟢" },
-    { value: "#16A34A", label: "Зеленый",         dot: "🟩" },
-    { value: "#DC2626", label: "Красный",         dot: "🔴" },
-    { value: "#EA580C", label: "Оранжевый",       dot: "🟧" },
-    { value: "#7C3AED", label: "Фиолетовый",      dot: "🟣" },
-    { value: "#B45309", label: "Охра / Бронза",   dot: "🟤" }
-  ];
-
-  function renderFontSizeOptions(currentVal, allowedSizes, defaultVal) {
-    const cur = parseFloat(currentVal);
-    let closest = allowedSizes[0];
-    let minDiff = Infinity;
-    for (const sz of allowedSizes) {
-      const diff = Math.abs(cur - sz);
-      if (diff < minDiff) {
-        minDiff = diff;
-        closest = sz;
-      }
-    }
-    return allowedSizes.map((sz) => {
-      const isSel = (sz === closest) ? ' selected' : '';
-      const isDef = (defaultVal !== undefined && sz === defaultVal) ? ' (стандарт)' : '';
-      return `<option value="${sz}"${isSel}>${sz} pt${isDef}</option>`;
-    }).join('');
-  }
+  Object.assign(state.pdf_settings.custom_layouts[tplKey][blockId], deepClone(updates));
+}
 
   // Синхронизация оверлея в SketchUp с выбранной сценой/страницей
   function syncCurrentSceneOverlay(scene, overrideRatio, isUserAction = false) {
@@ -2049,1496 +1408,696 @@
     callRuby("updateAspectSettings", JSON.stringify(payload));
   }
 
+// -----------------------------------------------------------------------------
+// Template Settings Engine: карточка «Параметры страницы» (созданные параметры)
+// -----------------------------------------------------------------------------
+
+function getTemplateParams(tplKey) {
+  ensureCustomLayouts();
+  const key = tplKey || layoutState.currentTemplate || "cover";
+  const cfg = state.pdf_settings.custom_layouts[key] || {};
+  return Array.isArray(cfg.params) ? cfg.params : [];
+}
+
+function setTemplateParams(params, tplKey) {
+  ensureCustomLayouts();
+  const key = tplKey || layoutState.currentTemplate || "cover";
+  if (!state.pdf_settings.custom_layouts[key]) {
+    state.pdf_settings.custom_layouts[key] = {};
+  }
+  state.pdf_settings.custom_layouts[key].params = (params || []).map(normalizeTemplateParam);
+}
+
   function renderTemplateSettingsList(isUserAction = false) {
-    if (!els.templateSettingsContainer) return;
-    ensureCustomLayouts();
-    syncDirectoriesSpecifications();
+  if (!els.templateSettingsContainer) return;
+  ensureCustomLayouts();
+  syncDirectoriesSpecifications();
 
-    const tplKey = layoutState.currentTemplate || "cover";
-    const customTpl = state.pdf_settings.custom_layouts[tplKey] || {};
-    const tplDefObj = getTemplateDef(tplKey);
-    const tplDef = tplDefObj.slots ? tplDefObj : (DEFAULT_LAYOUTS[tplDefObj.baseType] || DEFAULT_LAYOUTS.cover);
-    const info = state.project_info || {};
-    const wf = state.workflow || {};
+  const tplKey = layoutState.currentTemplate || "cover";
+  const tplDefObj = getTemplateDef(tplKey);
+  const params = getTemplateParams(tplKey);
 
-    if (els.currentTemplateTitle) {
-      els.currentTemplateTitle.textContent = `${tplDefObj.icon || "📄"} ${tplDefObj.name}`;
-    }
-    const isCustom = !DEFAULT_LAYOUTS[tplKey];
-    if (els.btnDeleteCurrentTemplate) {
-      els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
-    }
-    if (els.btnRenameCurrentTemplate) {
-      els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
-    }
-
-    // Page format badge
-    const isPortrait = (els.selectPageLayout ? els.selectPageLayout.value : state.pdf_settings?.page_layout) === "portrait";
-    const pageSize = (els.selectPageSize ? els.selectPageSize.value : state.pdf_settings?.page_size) || "A3";
-    if (els.layoutPageInfoBadge) {
-      els.layoutPageInfoBadge.textContent = `${pageSize} ${isPortrait ? "Книжная" : "Альбомная"}`;
-    }
-
-    // Margin input sync
-    if (els.inputLayoutMargin) {
-      const curMargin = state.pdf_settings?.margin_mm !== undefined ? state.pdf_settings.margin_mm : 5;
-      els.inputLayoutMargin.value = curMargin;
-    }
-
-    updateLayoutUsageBadge();
-
-    // Helper to get slot config
-    const getSlot = (slotId) => {
-      const def = tplDef.slots?.[slotId] || {};
-      const custom = customTpl[slotId] || {};
-      return Object.assign({}, def, custom);
-    };
-
-    const header = getSlot("header");
-    const slot1 = getSlot("slot_1");
-    const slot2 = getSlot("slot_2");
-    const slot3 = getSlot("slot_3");
-    const slot4 = getSlot("slot_4");
-    const footer = getSlot("footer");
-    const image43 = getSlot("image_4_3");
-
-    // Current column widths from slot_1 (left edge) and slot_3 (right edge)
-    const colWidthLeft = Math.round((slot1.w !== undefined ? slot1.w : 25) * 10) / 10;
-    const colWidthRight = Math.round((slot3.w !== undefined ? slot3.w : 25) * 10) / 10;
-    const headerHeight = 30.0;
-
-    let html = "";
-
-    // -------------------------------------------------------------
-    // CARD 1: ЗАГОЛОВОК СТРАНИЦЫ (Header) - Left Column Row 1
-    // -------------------------------------------------------------
-    const headerLines = Array.isArray(header.lines) ? header.lines : ["furniture_name", "place_address", "customer_or_company"];
-    const headerLineRows = header.line_rows || {};
-    const headerLineFontSizes = header.line_font_sizes || {};
-    const headerLineColors = header.line_colors || {};
-
-    const getHdrRow = (k, def) => {
-      const val = parseInt(headerLineRows[k], 10);
-      return (val >= 1 && val <= 5) ? val : def;
-    };
-    const getHdrSize = (k, def) => {
-      const val = parseFloat(headerLineFontSizes[k]);
-      return (!isNaN(val) && val > 0) ? val : def;
-    };
-    const getHdrColor = (k, def) => {
-      const val = (headerLineColors[k] || "").trim();
-      return val || def;
-    };
-
-    const rowFurn = getHdrRow("furniture_name", 1);
-    const sizeFurn = getHdrSize("furniture_name", 11);
-    const colFurn = getHdrColor("furniture_name", "#005EB0");
-
-    const rowPlace = getHdrRow("place_address", 2);
-    const sizePlace = getHdrSize("place_address", 10);
-    const colPlace = getHdrColor("place_address", "#0F172A");
-
-    const rowCust = getHdrRow("customer_or_company", 3);
-    const sizeCust = getHdrSize("customer_or_company", 10);
-    const colCust = getHdrColor("customer_or_company", "#0F172A");
-
-    const rowSceneName = getHdrRow("scene_name", 4);
-    const sizeSceneName = getHdrSize("scene_name", 11);
-    const colSceneName = getHdrColor("scene_name", "#005EB0");
-
-    const rowSceneDesc = getHdrRow("scene_description", 5);
-    const sizeSceneDesc = getHdrSize("scene_description", 9);
-    const colSceneDesc = getHdrColor("scene_description", "#475569");
-
-    const headerFontSize = header.font_size !== undefined ? parseFloat(header.font_size) : 11;
-    const headerValign = header.valign || "top";
-    const isHeaderVis = isSlotVisible(header);
-
-    const sampleFurn = (info.furniture_name || "Шкаф, Тумба").trim();
-    const sampleRoom = (info.room_name || "Прихожая").trim();
-    const sampleAddr = (info.address || "Адрес объекта").trim();
-    const sampleCust = (info.company || info.name_customer || info.customer || "Заказчик").trim();
-
-    const matchingScene = (layoutState.selectedSceneIndex !== undefined && state.scenes[layoutState.selectedSceneIndex] && state.scenes[layoutState.selectedSceneIndex].page_type === tplKey)
-      ? state.scenes[layoutState.selectedSceneIndex]
-      : ((state.scenes || []).find((s) => s.page_type === tplKey) || (state.scenes || [])[0]);
-    const sampleSceneName = (matchingScene?.name || matchingScene?.original_name || "01. Обложка").trim();
-    const sampleSceneDesc = (matchingScene?.description || "").trim();
-
-    const renderHdrItemControls = (key, activeRow, activeSize, activeColor) => {
-      let rowOptions = "";
-      for (let r = 1; r <= 5; r++) {
-        rowOptions += `<option value="${r}" ${activeRow === r ? 'selected' : ''}>${r}</option>`;
-      }
-
-      let sizeOptions = "";
-      let matched = false;
-      const roundedSize = Math.round(activeSize);
-      HEADER_LINE_FONT_SIZES.forEach((sz) => {
-        const isSel = (roundedSize === sz);
-        if (isSel) matched = true;
-        sizeOptions += `<option value="${sz}" ${isSel ? 'selected' : ''}>${sz} pt</option>`;
-      });
-      if (!matched && activeSize) {
-        sizeOptions += `<option value="${activeSize}" selected>${activeSize} pt</option>`;
-      }
-
-      return `
-        <div class="tpl-hdr-item-controls" data-key="${key}">
-          <div class="tpl-hdr-param-box" title="Номер строки (1–5)">
-            <select class="tpl-hdr-select sel-hdr-line-row" data-key="${key}">
-              ${rowOptions}
-            </select>
-          </div>
-          <div class="tpl-hdr-param-box" title="Размер шрифта строки (пт)">
-            <select class="tpl-hdr-select sel-hdr-line-size" data-key="${key}">
-              ${sizeOptions}
-            </select>
-          </div>
-          <div class="tpl-hdr-param-box" title="Цвет текста строки">
-            <input type="color" class="inp-hdr-line-color" data-key="${key}" value="${activeColor || '#0F172A'}" title="Цвет текста">
-          </div>
-        </div>
-      `;
-    };
-
-    const headerAvailableLines = [
-      { key: "furniture_name", label: "🏷️ Название мебели / Изделие", preview: sampleFurn, row: rowFurn, size: sizeFurn, color: colFurn }, // data-key="furniture_name"
-      { key: "place_address", label: "🚪 Место установки | 📍 Адрес объекта", preview: `${sampleRoom} | ${sampleAddr}`, row: rowPlace, size: sizePlace, color: colPlace }, // data-key="place_address"
-      { key: "customer_or_company", label: "👤 Имя заказчика или 🏢 Компания", preview: sampleCust, row: rowCust, size: sizeCust, color: colCust }, // data-key="customer_or_company"
-      { key: "scene_name", label: "📐 Название Сцены", preview: sampleSceneName, row: rowSceneName, size: sizeSceneName, color: colSceneName }, // data-key="scene_name"
-      { key: "scene_description", label: "📝 Описание Сцены", preview: sampleSceneDesc || 'нет описания', row: rowSceneDesc, size: sizeSceneDesc, color: colSceneDesc } // data-key="scene_description"
-    ];
-
-    const savedHeaderOrder = Array.isArray(header.item_order) ? header.item_order : [];
-    const orderedHeaderLines = [...headerAvailableLines].sort((a, b) => {
-      let idxA = savedHeaderOrder.indexOf(a.key);
-      let idxB = savedHeaderOrder.indexOf(b.key);
-      if (idxA === -1 && idxB === -1) {
-        return (a.row || 0) - (b.row || 0);
-      }
-      if (idxA === -1) return 1;
-      if (idxB === -1) return -1;
-      return idxA - idxB;
-    });
-
-    const cardHeaderHtml = `
-      <div class="tpl-card tpl-panel-left ${!isHeaderVis ? 'disabled-card disabled-block' : ''}" id="card_header">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">🏛️</span>
-            <span class="tpl-card-title">Заголовок страницы (Шапка)</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <div class="tpl-header-valign-control">
-              <span class="tpl-header-valign-label">По вертикали:</span>
-              <div class="tpl-btn-group" id="grp_header_valign">
-                <button type="button" class="tpl-btn-align ${headerValign === 'top' ? 'active' : ''}" data-valign="top" title="По верху">⬆</button>
-                <button type="button" class="tpl-btn-align ${headerValign === 'center' ? 'active' : ''}" data-valign="center" title="По центру">↕</button>
-                <button type="button" class="tpl-btn-align ${headerValign === 'bottom' ? 'active' : ''}" data-valign="bottom" title="По низу">⬇</button>
-              </div>
-            </div>
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
-              <input type="checkbox" id="chk_header_visible" ${isHeaderVis ? 'checked' : ''}>
-              <span>Вкл</span>
-            </label>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-          <div>
-            <div class="tpl-hdr-columns-header">
-              <span class="tpl-hdr-col-title-lines">Выводимые строки заголовка:</span>
-              <div class="tpl-hdr-col-titles">
-                <span class="tpl-hdr-col-title col-row" title="Номер строки (1–5)">стр.</span>
-                <span class="tpl-hdr-col-title col-size" title="Размер шрифта (пт)">пт.</span>
-                <span class="tpl-hdr-col-title col-color" title="Цвет текста">цвет</span>
-              </div>
-            </div>
-            <div class="tpl-lines-checklist">
-              ${orderedHeaderLines.map((item) => `
-                <div class="tpl-line-item tpl-hdr-line-row" draggable="true" data-key="${item.key}">
-                  <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
-                  <label class="tpl-hdr-label-wrap">
-                    <input type="checkbox" class="chk-hdr-line" data-key="${item.key}" ${headerLines.includes(item.key) ? 'checked' : ''}>
-                    <span class="tpl-line-label">${item.label}</span>
-                    <span class="tpl-line-preview">(${item.preview})</span>
-                  </label>
-                  ${renderHdrItemControls(item.key, item.row, item.size, item.color)}
-                </div>
-              `).join("")}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // -------------------------------------------------------------
-    // CARD 2: СРЕДНИЙ БЛОК (Middle)
-    // -------------------------------------------------------------
-    const isMiddleVis = isSlotVisible(slot1);
-    const isTitlesVis = slot1.show_titles !== false;
-    const middleFontSize = slot1.font_size !== undefined ? parseFloat(slot1.font_size) : 8;
-    const middleItemGap = slot1.item_gap_mm !== undefined ? parseFloat(slot1.item_gap_mm) : (slot1.item_gap !== undefined ? parseFloat(slot1.item_gap) : 2);
-    const middleLines = Array.isArray(slot1.lines) ? slot1.lines : (DEFAULT_LINES_BY_CONTENT.slot_1 || []);
-    const middleLineAligns = slot1.line_aligns || {};
-    const middleLineValigns = slot1.line_valigns || {};
-    const middleLineFontSizes = slot1.line_font_sizes || {};
-    const middleLineColors = slot1.line_colors || {};
-    const middleLineShowTitles = slot1.line_show_titles || {};
-
-    const getMidAlign = (k, def = "left") => {
-      const val = (middleLineAligns[k] || "").trim();
-      return (val === "right" || val === "left") ? val : def;
-    };
-    const getMidValign = (k, def = "top") => {
-      const val = (middleLineValigns[k] || "").trim();
-      return (val === "bottom" || val === "center" || val === "top") ? val : def;
-    };
-    const getMidSize = (k, def = middleFontSize || 8) => {
-      const val = parseFloat(middleLineFontSizes[k]);
-      return (!isNaN(val) && val > 0) ? val : def;
-    };
-    const getMidColor = (k, def = "#334155") => {
-      const val = (middleLineColors[k] || "").trim();
-      return val || def;
-    };
-    const getMidShowTitle = (k, def = isTitlesVis) => {
-      return middleLineShowTitles[k] !== undefined ? !!middleLineShowTitles[k] : def;
-    };
-
-    const middleAvailableLines = [
-      { key: "toc_pages",         label: "📑 Содержание (список страниц)", val: "1. Титул, 2. План" },
-      { key: "spec_materials",    label: "🛠️ Материалы и фурнитура",      val: (info.materials || "Фасады МДФ, ЛДСП, Blum...").trim() },
-      { key: "spec_appliances",   label: "🔌 Техника и подсветка",        val: [info.appliances, info.lighting].filter(Boolean).map(s => s.trim()).filter(Boolean).join("; ") || "Встраиваемая техника, LED 3000K..." },
-      { key: "general_notes",     label: "📝 Общие пояснения",            val: (info.project_description || info.description || info.notes || "Замеры выполнены по факту").trim() },
-      { key: "workflow_history",  label: "📜 История правок",             val: (wf.last_edit || info.last_edit || "Корректировка фасадов").trim() },
-      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(wf.stadia) ? wf.stadia.map(st => stadiaName(st)).join(", ") : String(wf.stadia || wf.status || info.status || "РД")).trim() },
-      { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || info.revision || "001").trim() },
-      { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || info.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: previewDate(wf.date_order || info.date) },
-      { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
-    ];
-
-    // Динамически добавляем описание каждого блока папки (directories) в средний список шаблонов
-    if (Array.isArray(state.directories) && state.directories.length > 0) {
-      state.directories.forEach((d, idx) => {
-        if (!d) return;
-        const dTitle = (d.title || getFolderName(d.path) || `Раздел #${idx + 1}`).trim();
-        const dDesc = (d.description || "").trim();
-        const dKey = `dir_desc_${idx}`;
-        middleAvailableLines.push({
-          key: dKey,
-          label: `📁 ${dTitle}`,
-          val: dDesc || "(описание раздела не заполнено)"
-        });
-      });
-      const allSpecs = state.directories.filter(d => d && (d.description || "").trim()).map((d, i) => `${d.title || ("Раздел #" + (i + 1))}: ${(d.description || "").trim()}`).join(" • ");
-      if (allSpecs) {
-        middleAvailableLines.push({
-          key: "dir_specs",
-          label: "📁 Все спецификации папок",
-          val: allSpecs
-        });
-      }
-    }
-
-    const renderMiddleItemControls = (key, activeAlign, activeValign, activeSize, activeColor) => {
-      let sizeOptions = "";
-      let matched = false;
-      const roundedSize = Math.round(activeSize);
-      MIDDLE_LINE_FONT_SIZES.forEach((sz) => {
-        const isSel = (roundedSize === sz);
-        if (isSel) matched = true;
-        sizeOptions += `<option value="${sz}" ${isSel ? 'selected' : ''}>${sz} pt</option>`;
-      });
-      if (!matched && activeSize) {
-        sizeOptions += `<option value="${activeSize}" selected>${activeSize} pt</option>`;
-      }
-
-      return `
-        <div class="tpl-middle-item-controls" data-key="${key}">
-          <div class="tpl-btn-group tpl-middle-edge-group" data-key="${key}" title="Край страницы: слева / справа">
-            <button type="button" class="tpl-btn-align tpl-btn-middle-edge ${activeAlign === 'left' ? 'active' : ''}" data-key="${key}" data-align="left" title="По левому краю страницы">⇤</button>
-            <button type="button" class="tpl-btn-align tpl-btn-middle-edge ${activeAlign === 'right' ? 'active' : ''}" data-key="${key}" data-align="right" title="По правому краю страницы">⇥</button>
-          </div>
-          <div class="tpl-btn-group tpl-middle-valign-group" data-key="${key}" title="По высоте: сверху / середина / снизу">
-            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'top' ? 'active' : ''}" data-key="${key}" data-valign="top" title="Сверху">⬆</button>
-            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'center' ? 'active' : ''}" data-key="${key}" data-valign="center" title="По центру (середина)">↕</button>
-            <button type="button" class="tpl-btn-align tpl-btn-middle-valign ${activeValign === 'bottom' ? 'active' : ''}" data-key="${key}" data-valign="bottom" title="Снизу">⬇</button>
-          </div>
-          <div class="tpl-hdr-param-box tpl-middle-param-size" title="Размер шрифта строки (пт)">
-            <select class="tpl-hdr-select sel-middle-line-size" data-key="${key}">
-              ${sizeOptions}
-            </select>
-          </div>
-          <div class="tpl-hdr-param-box tpl-middle-param-color" title="Цвет текста строки">
-            <input type="color" class="inp-hdr-line-color inp-middle-line-color" data-key="${key}" value="${activeColor || '#334155'}" title="Цвет текста">
-          </div>
-        </div>
-      `;
-    };
-
-    const savedMiddleOrder = Array.isArray(slot1.item_order) ? slot1.item_order : [];
-    const orderedMiddleLines = [...middleAvailableLines].sort((a, b) => {
-      let idxA = savedMiddleOrder.indexOf(a.key);
-      let idxB = savedMiddleOrder.indexOf(b.key);
-      if (idxA === -1 && idxB === -1) return 0;
-      if (idxA === -1) return 1;
-      if (idxB === -1) return -1;
-      return idxA - idxB;
-    });
-
-    const cardMiddleHtml = `
-      <div class="tpl-card tpl-panel-left ${!isMiddleVis ? 'disabled-card disabled-block' : ''}" id="card_middle" data-slot="slot_1">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">📋</span>
-            <span class="tpl-card-title">Средний блок</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <div class="tpl-footer-font-control">
-              <span class="tpl-footer-font-label">Шрифт:</span>
-              <select class="form-control tpl-control-select sel-slot-fontsize" data-slot="slot_1">
-                ${renderFontSizeOptions(middleFontSize, MIDDLE_LINE_FONT_SIZES, 8)}
-              </select>
-            </div>
-            <div class="tpl-footer-font-control" title="Расстояние между пунктами на странице">
-              <span class="tpl-footer-font-label" title="Расстояние между пунктами на странице">Расстояние:</span>
-              <input type="number" class="form-control tpl-control-input inp-slot-itemgap" data-slot="slot_1" min="0" max="30" step="0.5" value="${middleItemGap}" style="width: 44px;" title="Расстояние между пунктами на странице (мм)">
-              <span class="unit-text" style="font-size: 10px; color: #64748b; font-weight: 600;">мм</span>
-            </div>
-            <div style="display: flex; gap: 3px; margin-right: 4px;">
-              <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Все</button>
-              <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="slot_1" style="font-size: 9px; padding: 1px 5px;">Снять</button>
-            </div>
-            <label class="checkbox-label tpl-chk-titles-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;" title="Выводить заголовки пунктов на листах проекта">
-              <input type="checkbox" class="chk-slot-show-titles" data-slot="slot_1" ${isTitlesVis ? 'checked' : ''}>
-              <span>Заголовок</span>
-            </label>
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
-              <input type="checkbox" id="chk_middle_visible" class="chk-slot-visible" data-slot="slot_1" ${isMiddleVis ? 'checked' : ''}>
-              <span>Вкл</span>
-            </label>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-          <div>
-            <div class="tpl-middle-columns-header">
-              <span class="tpl-middle-col-title-lines">Выводимые строки среднего блока:</span>
-              <div class="tpl-middle-col-titles">
-                <span class="tpl-middle-col-title col-edge" title="Выравнивание: по левому / правому краю страницы">⇤ / ⇥</span>
-                <span class="tpl-middle-col-title col-valign" title="По высоте: сверху / середина / снизу">⬆ ↕ ⬇</span>
-                <span class="tpl-middle-col-title col-size" title="Размер шрифта (пт)">Aa</span>
-                <span class="tpl-middle-col-title col-color" title="Цвет текста">🎨</span>
-              </div>
-            </div>
-            <div class="tpl-lines-checklist">
-              ${orderedMiddleLines.map(item => {
-                const align = getMidAlign(item.key, "left");
-                const valign = getMidValign(item.key, "top");
-                const size = getMidSize(item.key, middleFontSize);
-                const color = getMidColor(item.key, "#334155");
-                const isChecked = middleLines.includes(item.key);
-                return `
-                  <div class="tpl-line-item tpl-middle-line-row" draggable="true" data-key="${item.key}">
-                    <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
-                    <label class="tpl-middle-label-wrap">
-                      <input type="checkbox" class="chk-slot-line" data-slot="slot_1" data-key="${item.key}" ${isChecked ? 'checked' : ''}>
-                      <span class="tpl-line-label">${item.label}</span>
-                      ${item.val ? `<span class="tpl-line-preview">(${item.val})</span>` : ''}
-                    </label>
-                    ${renderMiddleItemControls(item.key, align, valign, size, color)}
-                  </div>
-                `;
-              }).join("")}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // -------------------------------------------------------------
-    // CARD 3: ПОДВАЛ СТРАНИЦЫ (Footer)
-    // -------------------------------------------------------------
-    const footerLines = Array.isArray(footer.lines) ? footer.lines : ["footer_last_edit", "footer_ver_rev", "footer_articul", "footer_date", "footer_page_total"];
-    let effectiveFooterLines = [...footerLines];
-    if (effectiveFooterLines.includes("footer_rev_ver_date")) {
-      effectiveFooterLines = effectiveFooterLines.filter((k) => k !== "footer_rev_ver_date");
-      if (!effectiveFooterLines.includes("footer_ver_rev")) effectiveFooterLines.push("footer_ver_rev");
-      if (!effectiveFooterLines.includes("footer_articul")) effectiveFooterLines.push("footer_articul");
-      if (!effectiveFooterLines.includes("footer_date")) effectiveFooterLines.push("footer_date");
-    }
-
-    const defaultFooterAligns = {
-      footer_last_edit: "left",
-      footer_ver_rev: "center",
-      footer_articul: "center",
-      footer_date: "center",
-      footer_page_total: "right"
-    };
-    const footerLineAligns = Object.assign({}, defaultFooterAligns, footer.line_aligns || {});
-
-    const footerFontSize = footer.font_size !== undefined ? parseFloat(footer.font_size) : 8.5;
-    const isFooterVis = isSlotVisible(footer);
-
-    const sampleRev = String(wf.revision || info.revision || "001").trim();
-    const sampleVer = String(wf.version || info.version || "01").trim();
-    const sampleArt = String(info.articul || "CF#...").trim();
-    const sampleDate = previewDate(wf.last_edit_date || info.date);
-    const sampleLastEdit = String(wf.last_edit || "Корректировка фасадов").trim();
-
-    const footerItemsDef = [
-      {
-        key: "footer_last_edit",
-        label: "Последние изменения",
-        icon: "📝",
-        preview: sampleLastEdit
-      },
-      {
-        key: "footer_ver_rev",
-        label: "Версия # Ревизия",
-        icon: "🔢",
-        preview: `v.${sampleVer} # rev.${sampleRev}`
-      },
-      {
-        key: "footer_articul",
-        label: "Артикул",
-        icon: "🔖",
-        preview: sampleArt
-      },
-      {
-        key: "footer_date",
-        label: "Дата",
-        icon: "🗓️",
-        preview: sampleDate
-      },
-      {
-        key: "footer_page_total",
-        label: "Страница Страниц",
-        icon: "📄",
-        preview: "1 | 4"
-      }
-    ];
-
-    const savedFooterOrder = Array.isArray(footer.item_order) ? footer.item_order : [];
-    const orderedFooterLines = [...footerItemsDef].sort((a, b) => {
-      let idxA = savedFooterOrder.indexOf(a.key);
-      let idxB = savedFooterOrder.indexOf(b.key);
-      if (idxA === -1 && idxB === -1) return 0;
-      if (idxA === -1) return 1;
-      if (idxB === -1) return -1;
-      return idxA - idxB;
-    });
-
-    const cardFooterHtml = `
-      <div class="tpl-card tpl-panel-left ${!isFooterVis ? 'disabled-card disabled-block' : ''}" id="card_footer">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">📌</span>
-            <span class="tpl-card-title">Подвал страницы (Footer)</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <div class="tpl-footer-font-control">
-              <span class="tpl-footer-font-label">Шрифт подвала:</span>
-              <select id="sel_footer_fontsize" class="form-control tpl-control-select">
-                ${renderFontSizeOptions(footerFontSize, BLOCK_FONT_SIZES, 8)}
-              </select>
-            </div>
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin-left: 4px;">
-              <input type="checkbox" id="chk_footer_visible" ${isFooterVis ? 'checked' : ''}>
-              <span>Вкл</span>
-            </label>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-          <div>
-            <div class="tpl-ftr-columns-header">
-              <span>Выводимые секции подвала:</span>
-              <span style="font-size: 10px; color: #64748b; font-weight: 600;">Выравнивание: слева / центр / справа • По нижнему краю страницы ⬇</span>
-            </div>
-            <div class="tpl-lines-checklist">
-              ${orderedFooterLines.map((item) => {
-                const isChecked = effectiveFooterLines.includes(item.key);
-                const curAlign = footerLineAligns[item.key] || defaultFooterAligns[item.key] || "center";
-                return `
-                  <div class="tpl-line-item tpl-ftr-line-row" draggable="true" data-key="${item.key}">
-                    <span class="drag-handle" title="Перетащите мышкой для изменения порядка">⠿</span>
-                    <label class="tpl-ftr-label-wrap">
-                      <input type="checkbox" class="chk-ftr-line" data-key="${item.key}" ${isChecked ? 'checked' : ''}>
-                      <span class="tpl-line-label">${item.icon} ${item.label}</span>
-                      <span class="tpl-line-preview">(${item.preview})</span>
-                    </label>
-                    <div class="tpl-ftr-align-picker">
-                      <div class="tpl-btn-group tpl-ftr-align-group" data-key="${item.key}">
-                        <button type="button" class="tpl-btn-align tpl-btn-ftr-align ${curAlign === 'left' ? 'active' : ''}" data-key="${item.key}" data-align="left" title="Слева">Слева</button>
-                        <button type="button" class="tpl-btn-align tpl-btn-ftr-align ${curAlign === 'center' ? 'active' : ''}" data-key="${item.key}" data-align="center" title="По центру">Центр</button>
-                        <button type="button" class="tpl-btn-align tpl-btn-ftr-align ${curAlign === 'right' ? 'active' : ''}" data-key="${item.key}" data-align="right" title="Справа">Справа</button>
-                      </div>
-                    </div>
-                  </div>
-                `;
-              }).join("")}
-            </div>
-          </div>
-        </div>
-      </div>
-    `;
-
-    // -------------------------------------------------------------
-    // FULL TWO-COLUMN ASSEMBLY REPLACED BY SINGLE COLUMN (Заголовок, Средний, Подвал)
-    // -------------------------------------------------------------
-    html = `
-      <div class="tpl-single-column-layout">
-        ${cardHeaderHtml}
-        ${cardMiddleHtml}
-        ${cardFooterHtml}
-      </div>
-    `;
-
-    els.templateSettingsContainer.innerHTML = html;
-    bindTemplateSettingsEvents(tplKey);
-    syncCurrentTemplateOverlay(null, isUserAction);
+  if (els.currentTemplateTitle) {
+    els.currentTemplateTitle.textContent = `${tplDefObj.icon || "📄"} ${tplDefObj.name}`;
+  }
+  const isCustom = !DEFAULT_LAYOUTS[tplKey];
+  if (els.btnDeleteCurrentTemplate) {
+    els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+  }
+  if (els.btnRenameCurrentTemplate) {
+    els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
   }
 
-  function renderSlotCardHtml(slotId, title, icon, side, slotData, isFullList, widthPct, info, wf) {
-    const isVis = slotData.visible !== false;
-    const fontSize = slotData.font_size !== undefined ? parseFloat(slotData.font_size) : 8;
-    const lines = Array.isArray(slotData.lines) ? slotData.lines : (DEFAULT_LINES_BY_CONTENT[slotData.content] || DEFAULT_LINES_BY_CONTENT[slotId] || []);
+  // Page format badge
+  const isPortrait = (els.selectPageLayout ? els.selectPageLayout.value : state.pdf_settings?.page_layout) === "portrait";
+  const pageSize = (els.selectPageSize ? els.selectPageSize.value : state.pdf_settings?.page_size) || "A3";
+  if (els.layoutPageInfoBadge) {
+    els.layoutPageInfoBadge.textContent = `${pageSize} ${isPortrait ? "Книжная" : "Альбомная"}`;
+  }
 
-    const fullAvailableLines = [
-      { key: "toc_pages",         label: "📑 Содержание (список страниц)", val: "1. Титул, 2. План" },
-      { key: "spec_materials",    label: "🛠️ Материалы и Фурнитура",      val: "МДФ, Blum, эмаль" },
-      { key: "spec_appliances",   label: "🔌 Техника и подсветка",        val: "LED 4000K, Вытяжка" },
-      { key: "general_notes",     label: "📝 Общие пояснения",            val: "Замеры выполнены" },
-      { key: "workflow_history",  label: "📜 История правок",             val: String(wf.last_edit || "Корректировка фасадов").trim() },
-      { key: "workflow_stadia",   label: "⏱️ Стадия проекта",             val: (Array.isArray(info.stadia) ? info.stadia.map(st => (st && st.name) ? st.name : String(st)).join(", ") : String(info.stadia || "РД")).trim() },
-      { key: "workflow_revision", label: "🔢 Ревизия",                   val: String(wf.revision || "001").trim() },
-      { key: "workflow_version",  label: "🏷️ Версия",                    val: String(wf.version || "01").trim() },
-      { key: "workflow_date",     label: "📅 Дата",                      val: previewDate(wf.date_order || info.date) },
-      { key: "articul",           label: "🔖 Артикул проекта",           val: String(info.articul || "CF#...").trim() }
-    ];
+  // Margin input sync
+  if (els.inputLayoutMargin) {
+    const curMargin = state.pdf_settings?.margin_mm !== undefined ? state.pdf_settings.margin_mm : 5;
+    els.inputLayoutMargin.value = curMargin;
+  }
 
-    const availableList = isFullList ? fullAvailableLines : fullAvailableLines.filter(l => ["workflow_history", "workflow_stadia", "articul", "workflow_date"].includes(l.key));
+  updateLayoutUsageBadge();
 
-    const isRight = side === "right";
-    const panelCls = isRight ? "tpl-panel-right" : "tpl-panel-left";
-    const textAlign = isRight ? "right" : "left";
+    const sizeOptionsHtml = (current) => {
+      const sizes = PARAM_FONT_SIZES.includes(current) ? PARAM_FONT_SIZES : PARAM_FONT_SIZES.concat([current]).sort((a, b) => a - b);
+      return sizes.map((s) => `<option value="${s}" ${s === current ? "selected" : ""}>${s} pt</option>`).join("");
+    };
 
-    // Controls for Left / Right slot
-    const widthControlHtml = (slotId === "slot_1" || slotId === "slot_3")
-      ? (isRight
-          ? `<div class="tpl-control-item" title="Ширина блока в % от правого края листа"><span style="font-size: 10px; color: #64748b;">% от края</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="right" min="10" max="80" step="1" value="${widthPct}" style="width: 44px; height: 21px;"><span class="tpl-control-label">:Ширина</span></div>`
-          : `<div class="tpl-control-item" title="Ширина блока в % от левого края листа"><span class="tpl-control-label">Ширина:</span><input type="number" class="form-control tpl-control-input inp-slot-col-w" data-side="left" min="10" max="80" step="1" value="${widthPct}" style="width: 44px; height: 21px;"><span style="font-size: 10px; color: #64748b;">% от края</span></div>`)
-      : "";
+    const fontOptionsHtml = (current) => PARAM_FONT_FAMILIES
+      .map((f) => `<option value="${f.value}" ${f.value === current ? "selected" : ""}>${f.label}</option>`).join("");
 
-    const isBottomSlot = (slotId === "slot_2" || slotId === "slot_4");
-    const alignBadgeHtml = isRight
-      ? `<span class="badge" style="font-size: 9px; background: #f1f5f9; color: #334155; padding: 1px 5px; font-weight: 600; border: none;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по правому краю">${isBottomSlot ? 'От низа ⬇ • ' : ''}Текст справа ➡</span>`
-      : `<span class="badge" style="font-size: 9px; background: #e0f2fe; color: #0369a1; padding: 1px 5px; font-weight: 600; border: none;" title="Текст на странице PDF выравнивается ${isBottomSlot ? 'от низа и ' : ''}по левому краю">⬅ Текст слева${isBottomSlot ? ' • От низа ⬇' : ''}</span>`;
-
-    return `
-      <div class="tpl-card ${panelCls} ${!isVis ? 'disabled-card disabled-block' : ''}" id="block_${slotId}">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">${icon || '📋'}</span>
-            <span class="tpl-card-title">${title}</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer;">
-              <input type="checkbox" class="chk-slot-visible" data-slot="${slotId}" ${isVis ? 'checked' : ''}>
+    const renderParamRowHtml = (p) => {
+      const preview = paramPreviewValue(p.source);
+      const previewShort = preview.replace(/\n+/g, " ⏎ ");
+      const shownLabel = p.show_label && p.label ? p.label : "";
+      return `
+        <div class="tpl-param-row ${p.visible ? "" : "disabled-block"}" data-id="${p.id}">
+          <div class="tpl-param-head">
+            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
+            <label class="tpl-param-vis" title="Выводить параметр на страницах шаблона">
+              <input type="checkbox" class="tpl-param-visible" data-id="${p.id}" ${p.visible ? "checked" : ""}>
               <span>Вкл</span>
             </label>
+            <div class="tpl-param-main">
+              <span class="tpl-param-label">${paramSourceLabel(p.source)}</span>
+              ${shownLabel ? `<span class="tpl-param-caption">«${shownLabel}»</span>` : ""}
+              ${previewShort ? `<span class="tpl-line-preview">(${previewShort})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
+            </div>
+            <div class="tpl-param-actions">
+              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${p.id}" title="Выше в списке">↑</button>
+              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${p.id}" title="Ниже в списке">↓</button>
+              <button type="button" class="tpl-param-btn tpl-param-edit" data-id="${p.id}" title="Изменить источник и заголовок">✏️</button>
+              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${p.id}" title="Удалить параметр">🗑️</button>
+            </div>
+          </div>
+          <div class="tpl-param-controls">
+            <input type="color" class="tpl-param-color" data-id="${p.id}" value="${p.color}" title="Цвет текста параметра">
+            <div class="tpl-param-box" title="Шрифт параметра («По умолчанию» — шрифт страницы)">
+              <select class="tpl-param-select tpl-param-font" data-id="${p.id}">${fontOptionsHtml(p.font_family || "")}</select>
+            </div>
+            <div class="tpl-param-box" title="Размер шрифта (пт)">
+              <select class="tpl-param-select tpl-param-size" data-id="${p.id}">${sizeOptionsHtml(p.font_size)}</select>
+            </div>
+            <div class="tpl-btn-group" title="Вертикальная привязка: группа у верхнего / нижнего края листа">
+              <button type="button" class="tpl-param-btn tpl-param-valign ${p.valign !== "bottom" ? "active" : ""}" data-id="${p.id}" data-valign="top" title="По верху">⬆</button>
+              <button type="button" class="tpl-param-btn tpl-param-valign ${p.valign === "bottom" ? "active" : ""}" data-id="${p.id}" data-valign="bottom" title="По низу">⬇</button>
+            </div>
+            <div class="tpl-btn-group" title="Колонка: слева / по центру / справа">
+              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "left" ? "active" : ""}" data-id="${p.id}" data-align="left" title="Слева">⇤</button>
+              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "center" ? "active" : ""}" data-id="${p.id}" data-align="center" title="По центру">↔</button>
+              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "right" ? "active" : ""}" data-id="${p.id}" data-align="right" title="Справа">⇥</button>
+            </div>
+            <label class="tpl-param-vis" title="Выводить заголовок перед значением на листе">
+              <input type="checkbox" class="tpl-param-show-label" data-id="${p.id}" ${p.show_label ? "checked" : ""}>
+              <span>Заголовок</span>
+            </label>
+            <span class="tpl-param-zone" data-id="${p.id}" title="Зона размещения параметра на странице">${paramZoneLabel(p)}</span>
           </div>
         </div>
+      `;
+    };
 
-        <div class="tpl-card-body">
-          <div class="tpl-controls-row">
-            ${!isRight ? `
-              <div class="tpl-control-item">
-                <span class="tpl-control-label">Шрифт:</span>
-                <select class="form-control tpl-control-select sel-slot-fontsize" data-slot="${slotId}">
-                  ${renderFontSizeOptions(fontSize, BLOCK_FONT_SIZES, 8)}
-                </select>
-              </div>
-              ${widthControlHtml}
-              ${alignBadgeHtml}
-              <div style="margin-left: auto; display: flex; gap: 3px;">
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Все</button>
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Снять</button>
-              </div>
-            ` : `
-              <div style="margin-right: auto; display: flex; gap: 3px;">
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-all" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Все</button>
-                <button type="button" class="btn btn-xs btn-secondary btn-slot-none" data-slot="${slotId}" style="font-size: 9px; padding: 1px 5px;">Снять</button>
-              </div>
-              ${alignBadgeHtml}
-              ${widthControlHtml}
-              <div class="tpl-control-item">
-                <span class="tpl-control-label">Шрифт:</span>
-                <select class="form-control tpl-control-select sel-slot-fontsize" data-slot="${slotId}">
-                  ${renderFontSizeOptions(fontSize, BLOCK_FONT_SIZES, 8)}
-                </select>
-              </div>
-            `}
-          </div>
+    // Блок объединения параметров: вложенные параметры выводятся одной строкой
+    // через « | » со стилем блока; внутри блока порядок меняется мышкой.
+    const renderGroupHtml = (g) => {
+      const children = Array.isArray(g.params) ? g.params : [];
+      const childRows = children.map((c) => {
+        const cPrev = paramPreviewValue(c.source).replace(/\n+/g, " ⏎ ");
+        return `
+          <div class="tpl-param-child" data-id="${c.id}">
+            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
+            <span class="tpl-param-child-label">${paramSourceLabel(c.source)}</span>
+            ${cPrev ? `<span class="tpl-line-preview">(${cPrev})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
+            <button type="button" class="tpl-param-child-out" data-id="${c.id}" data-group="${g.id}" title="Вывести из блока">✕</button>
+          </div>`;
+      }).join("");
 
-          <div>
-            <div class="tpl-slot-lines-title" style="text-align: ${textAlign};">Выводимые строки блока:</div>
-            <div class="tpl-lines-checklist">
-              ${availableList.map(item => `
-                <label class="tpl-line-item">
-                  <input type="checkbox" class="chk-slot-line" data-slot="${slotId}" data-key="${item.key}" ${lines.includes(item.key) ? 'checked' : ''}>
-                  <span class="tpl-line-label">${item.label}</span>
-                  ${item.val ? `<span class="tpl-line-preview">(${item.val})</span>` : ''}
-                </label>
-              `).join("")}
+      return `
+        <div class="tpl-param-row tpl-param-group ${g.visible ? "" : "disabled-block"}" data-id="${g.id}" data-group="true">
+          <div class="tpl-param-head">
+            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
+            <label class="tpl-param-vis" title="Выводить блок на страницах шаблона">
+              <input type="checkbox" class="tpl-param-visible" data-id="${g.id}" ${g.visible ? "checked" : ""}>
+              <span>Вкл</span>
+            </label>
+            <div class="tpl-param-main">
+              <span class="tpl-param-label">📦 Блок</span>
+              <input type="text" class="form-control tpl-param-group-label" data-id="${g.id}" placeholder="Название блока (необязательно)" value="${g.label || ""}">
+              <span class="tpl-param-count">${paramCountText(children.length)}</span>
             </div>
+            <div class="tpl-param-actions">
+              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${g.id}" title="Выше в списке">↑</button>
+              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${g.id}" title="Ниже в списке">↓</button>
+              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${g.id}" title="Удалить блок вместе с его параметрами">🗑️</button>
+            </div>
+          </div>
+          <div class="tpl-param-controls">
+            <input type="color" class="tpl-param-color" data-id="${g.id}" value="${g.color}" title="Цвет текста блока">
+            <div class="tpl-param-box" title="Шрифт блока («По умолчанию» — шрифт страницы)">
+              <select class="tpl-param-select tpl-param-font" data-id="${g.id}">${fontOptionsHtml(g.font_family || "")}</select>
+            </div>
+            <div class="tpl-param-box" title="Размер шрифта (пт)">
+              <select class="tpl-param-select tpl-param-size" data-id="${g.id}">${sizeOptionsHtml(g.font_size)}</select>
+            </div>
+            <div class="tpl-btn-group" title="Вертикальная привязка: группа у верхнего / нижнего края листа">
+              <button type="button" class="tpl-param-btn tpl-param-valign ${g.valign !== "bottom" ? "active" : ""}" data-id="${g.id}" data-valign="top" title="По верху">⬆</button>
+              <button type="button" class="tpl-param-btn tpl-param-valign ${g.valign === "bottom" ? "active" : ""}" data-id="${g.id}" data-valign="bottom" title="По низу">⬇</button>
+            </div>
+            <div class="tpl-btn-group" title="Колонка: слева / по центру / справа">
+              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "left" ? "active" : ""}" data-id="${g.id}" data-align="left" title="Слева">⇤</button>
+              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "center" ? "active" : ""}" data-id="${g.id}" data-align="center" title="По центру">↔</button>
+              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "right" ? "active" : ""}" data-id="${g.id}" data-align="right" title="Справа">⇥</button>
+            </div>
+            <label class="tpl-param-vis" title="Выводить название блока перед строкой на листе">
+              <input type="checkbox" class="tpl-param-show-label" data-id="${g.id}" ${g.show_label ? "checked" : ""}>
+              <span>Заголовок</span>
+            </label>
+            <span class="tpl-param-zone" data-id="${g.id}" title="Зона размещения блока на странице">${paramZoneLabel(g)}</span>
+          </div>
+          <div class="tpl-param-group-list" data-group-id="${g.id}">
+            ${childRows || `<div class="tpl-param-drop-empty">Перетащите сюда параметры — они выстроятся в одну строку через « | »</div>`}
+          </div>
+        </div>
+      `;
+    };
+
+    const rowsHtml = params.map((p) => (p.group ? renderGroupHtml(p) : renderParamRowHtml(p))).join("");
+
+  const html = `
+    <div class="tpl-single-column-layout">
+      <div class="tpl-card" id="card_params">
+        <div class="tpl-card-header">
+          <div class="tpl-card-title-group">
+            <span class="tpl-card-icon">🧩</span>
+            <span class="tpl-card-title">Параметры страницы</span>
+          </div>
+          <div class="tpl-card-header-actions">
+            <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »">📦 Блок</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона">+ Создать параметр</button>
+          </div>
+        </div>
+        <div class="tpl-card-body">
+            <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. Дополнительные настройки задаются в строке параметра: шрифт, размер, привязка по вертикали (⬆/⬇), выравнивание (⇤/↔/⇥), цвет и заголовок. Место на странице определяется выравниваниями: колонка слева/по центру/справа и привязка группы к верхнему или нижнему краю листа. 📦 Блок объединяет параметры в одну строку через « | ».</p>
+          <div class="tpl-params-list">
+            ${rowsHtml || `<div class="tpl-params-empty">Параметров пока нет — нажмите «+ Создать параметр».</div>`}
           </div>
         </div>
       </div>
-    `;
+    </div>
+  `;
+
+  els.templateSettingsContainer.innerHTML = html;
+  bindTemplateSettingsEvents(tplKey);
+  syncCurrentTemplateOverlay(null, isUserAction);
+}
+
+  // Drag-and-drop параметров: сортировка за ручку ⠿, перенос параметров в блок
+  // и обратно, реордер внутри блока. Порядок в списке = порядок в зоне на листе;
+  // порядок внутри блока = порядок в строке « | ».
+  function setupParamDragAndDrop(container, tplKey) {
+    const list = container.querySelector(".tpl-params-list");
+    if (!list) return;
+    const drag = { id: null, fromGroup: null }; // fromGroup: id блока либо null
+
+    const clearMarkers = () => {
+      list.querySelectorAll(".drag-over-top, .drag-over-bottom, .drag-over-group")
+        .forEach((el) => el.classList.remove("drag-over-top", "drag-over-bottom", "drag-over-group"));
+    };
+
+    const findGroup = (params, gid) => params.find((p) => p.id === gid && p.group);
+
+    // Реордер на верхнем уровне списка
+    const reorderTopLevel = (dragId, targetId, before) => {
+      const params = getTemplateParams(tplKey);
+      const fromIdx = params.findIndex((p) => p.id === dragId);
+      if (fromIdx < 0) return;
+      const [moved] = params.splice(fromIdx, 1);
+      const toIdx = params.findIndex((p) => p.id === targetId);
+      if (toIdx < 0) {
+        params.push(moved);
+      } else {
+        params.splice(before ? toIdx : toIdx + 1, 0, moved);
+      }
+      setTemplateParams(params, tplKey);
+    };
+
+    // Перенос параметра/дитя внутрь блока (в конец строки блока)
+    const moveIntoGroup = (groupId, dragId, fromGroup) => {
+      const params = getTemplateParams(tplKey);
+      let moved = null;
+      if (fromGroup === null) {
+        const idx = params.findIndex((p) => p.id === dragId);
+        if (idx < 0) return;
+        [moved] = params.splice(idx, 1);
+      } else {
+        const src = findGroup(params, fromGroup);
+        const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
+        if (cIdx < 0) return;
+        [moved] = src.params.splice(cIdx, 1);
+      }
+      const dst = findGroup(params, groupId);
+      if (!dst) {
+        params.push(moved);
+      } else {
+        (dst.params = Array.isArray(dst.params) ? dst.params : []).push(moved);
+      }
+      setTemplateParams(params, tplKey);
+    };
+
+    // Вывод дитя из блока на верхний уровень (перед/после целевой строки)
+    const moveChildToTopLevel = (fromGroup, dragId, targetId, before) => {
+      const params = getTemplateParams(tplKey);
+      const src = findGroup(params, fromGroup);
+      const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
+      if (cIdx < 0) return;
+      const [moved] = src.params.splice(cIdx, 1);
+      const toIdx = params.findIndex((p) => p.id === targetId);
+      if (toIdx < 0) {
+        params.push(moved);
+      } else {
+        params.splice(before ? toIdx : toIdx + 1, 0, moved);
+      }
+      setTemplateParams(params, tplKey);
+    };
+
+    // Перенос к конкретному дитю: реордер внутри блока либо между блоками
+    const moveChildToChild = (fromGroup, dragId, toGroup, targetChildId, before) => {
+      const params = getTemplateParams(tplKey);
+      let moved = null;
+
+      if (fromGroup === toGroup) {
+        const grp = findGroup(params, toGroup);
+        const arr = grp.params = Array.isArray(grp.params) ? grp.params : [];
+        const fromIdx = arr.findIndex((c) => c.id === dragId);
+        if (fromIdx < 0) return;
+        [moved] = arr.splice(fromIdx, 1);
+        const toIdx = arr.findIndex((c) => c.id === targetChildId);
+        if (toIdx < 0) arr.push(moved);
+        else arr.splice(before ? toIdx : toIdx + 1, 0, moved);
+        setTemplateParams(params, tplKey);
+        return;
+      }
+
+      if (fromGroup === null) {
+        const idx = params.findIndex((p) => p.id === dragId);
+        if (idx < 0) return;
+        [moved] = params.splice(idx, 1);
+      } else {
+        const src = findGroup(params, fromGroup);
+        const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
+        if (cIdx < 0) return;
+        [moved] = src.params.splice(cIdx, 1);
+      }
+
+      const dst = findGroup(params, toGroup);
+      if (!dst) {
+        params.push(moved);
+      } else {
+        const arr = dst.params = Array.isArray(dst.params) ? dst.params : [];
+        const toIdx = arr.findIndex((c) => c.id === targetChildId);
+        if (toIdx < 0) arr.push(moved);
+        else arr.splice(before ? toIdx : toIdx + 1, 0, moved);
+      }
+      setTemplateParams(params, tplKey);
+    };
+
+    // Общая обвязка событий перетаскивания для строки любого уровня.
+    // Дети вложены в строку-блок, поэтому событие должно обрабатывать
+    // только самая внутренняя строка, содержащая цель события.
+    const wireRow = (row, groupId) => {
+      const isOwnEvent = (e) => e.target.closest(".tpl-param-row, .tpl-param-child") === row;
+
+      row.addEventListener("mousedown", (e) => {
+        if (!isOwnEvent(e)) return;
+        const interactive = e.target.closest("input, select, button, label, .tpl-btn-group");
+        row.setAttribute("draggable", interactive ? "false" : "true");
+      });
+      row.addEventListener("mouseup", (e) => {
+        if (!isOwnEvent(e)) return;
+        row.setAttribute("draggable", "true");
+      });
+
+      row.addEventListener("dragstart", (e) => {
+        if (!isOwnEvent(e)) return;
+        drag.id = row.dataset.id;
+        drag.fromGroup = groupId;
+        row.classList.add("dragging");
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("text/plain", row.dataset.id || "");
+      });
+
+      row.addEventListener("dragend", (e) => {
+        if (!isOwnEvent(e)) return;
+        drag.id = null;
+        drag.fromGroup = null;
+        row.classList.remove("dragging");
+        clearMarkers();
+      });
+    };
+
+    // 1. Верхнеуровневые строки (параметры и блоки)
+    list.querySelectorAll(":scope > .tpl-param-row").forEach((row) => {
+      wireRow(row, null);
+
+      row.addEventListener("dragover", (e) => {
+        if (!drag.id) return;
+        if (e.target.closest(".tpl-param-group-list")) return; // подсветку дает список детей
+        if (e.target.closest(".tpl-param-row") !== row) return; // событие из вложенной строки
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (drag.fromGroup === null && drag.id === row.dataset.id) return;
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        row.classList.toggle("drag-over-top", before);
+        row.classList.toggle("drag-over-bottom", !before);
+      });
+
+      row.addEventListener("dragleave", (e) => {
+        if (e.target.closest(".tpl-param-row") !== row) return;
+        row.classList.remove("drag-over-top", "drag-over-bottom");
+      });
+
+      row.addEventListener("drop", (e) => {
+        if (e.target.closest(".tpl-param-row") !== row) return; // событие из вложенной строки
+        if (!drag.id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        const targetId = row.dataset.id;
+        const rect = row.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        row.classList.remove("drag-over-top", "drag-over-bottom");
+
+        if (drag.fromGroup === null) {
+          if (drag.id !== targetId) reorderTopLevel(drag.id, targetId, before);
+        } else {
+          moveChildToTopLevel(drag.fromGroup, drag.id, targetId, before);
+        }
+        drag.id = null;
+        drag.fromGroup = null;
+        renderTemplateSettingsList();
+        notifyChange();
+      });
+    });
+
+    // 2. Контейнер детей блока: бросок сюда переносит параметр в блок (в конец)
+    list.querySelectorAll(":scope > .tpl-param-row[data-group='true'] > .tpl-param-group-list").forEach((glist) => {
+      const groupId = glist.closest(".tpl-param-row").dataset.id;
+
+      glist.addEventListener("dragover", (e) => {
+        if (!drag.id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        glist.classList.add("drag-over-group");
+      });
+      glist.addEventListener("dragleave", () => glist.classList.remove("drag-over-group"));
+      glist.addEventListener("drop", (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        glist.classList.remove("drag-over-group");
+        if (!drag.id) return;
+        const from = drag.fromGroup;
+        const id = drag.id;
+        drag.id = null;
+        drag.fromGroup = null;
+        if (!(from === groupId)) moveIntoGroup(groupId, id, from);
+        renderTemplateSettingsList();
+        notifyChange();
+      });
+    });
+
+    // 3. Дети внутри блока: реордер, прием из других блоков/верхнего уровня
+    list.querySelectorAll(".tpl-param-child").forEach((child) => {
+      const parentGroup = child.closest(".tpl-param-row[data-group='true']")?.dataset.id || null;
+      wireRow(child, parentGroup);
+
+      child.addEventListener("dragover", (e) => {
+        if (!drag.id) return;
+        e.preventDefault();
+        e.dataTransfer.dropEffect = "move";
+        if (drag.fromGroup === parentGroup && drag.id === child.dataset.id) return;
+        const rect = child.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        child.classList.toggle("drag-over-top", before);
+        child.classList.toggle("drag-over-bottom", !before);
+      });
+
+      child.addEventListener("dragleave", () => child.classList.remove("drag-over-top", "drag-over-bottom"));
+
+      child.addEventListener("drop", (e) => {
+        if (!drag.id) return;
+        e.preventDefault();
+        e.stopPropagation();
+        child.classList.remove("drag-over-top", "drag-over-bottom");
+        const rect = child.getBoundingClientRect();
+        const before = e.clientY < rect.top + rect.height / 2;
+        const from = drag.fromGroup;
+        const id = drag.id;
+        drag.id = null;
+        drag.fromGroup = null;
+        moveChildToChild(from, id, parentGroup, child.dataset.id, before);
+        renderTemplateSettingsList();
+        notifyChange();
+      });
+    });
   }
 
   function bindTemplateSettingsEvents(tplKey) {
-    if (!els.templateSettingsContainer) return;
+  if (!els.templateSettingsContainer) return;
+  const container = els.templateSettingsContainer;
 
-    // Header Visible Toggle
-    const chkHdrVis = document.getElementById("chk_header_visible");
-    if (chkHdrVis) {
-      chkHdrVis.addEventListener("change", (e) => {
-        const isVis = Boolean(e.target.checked);
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        updateBlockSlot("header", { visible: isVis }, targetTpl);
-        const card = document.getElementById("card_header");
-        if (card) {
-          card.classList.toggle("disabled-card", !isVis);
-          card.classList.toggle("disabled-block", !isVis);
-        }
-        notifyChange();
-      });
+    const btnCreate = document.getElementById("btnCreateParam");
+    if (btnCreate) {
+      btnCreate.addEventListener("click", () => openParamModal("create", null, tplKey));
     }
 
-
-
-    // Header Valign Buttons
-    const grpHdrValign = document.getElementById("grp_header_valign");
-    if (grpHdrValign) {
-      const btns = grpHdrValign.querySelectorAll(".tpl-btn-align");
-      btns.forEach((btn) => {
-        btn.addEventListener("click", () => {
-          btns.forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          updateBlockSlot("header", { valign: btn.dataset.valign, align: "center" }, tplKey);
-          notifyChange();
-        });
-      });
+    const btnCreateGroup = document.getElementById("btnCreateParamGroup");
+    if (btnCreateGroup) {
+      btnCreateGroup.addEventListener("click", () => createParamGroup(tplKey));
     }
 
-    // Header Lines Checkboxes
-    const hdrCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-hdr-line");
-    hdrCheckboxes.forEach((chk) => {
-      chk.addEventListener("change", () => {
-        const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-hdr-line"))
-          .filter((c) => c.checked)
-          .map((c) => c.dataset.key);
-        updateBlockSlot("header", { lines: checkedKeys }, tplKey);
-        notifyChange();
-      });
+  container.querySelectorAll(".tpl-param-visible").forEach((chk) => {
+    chk.addEventListener("change", () => {
+      const id = chk.dataset.id;
+      const params = getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, { visible: chk.checked }) : p));
+      setTemplateParams(params, tplKey);
+      const row = container.querySelector(`.tpl-param-row[data-id="${id}"]`);
+      if (row) row.classList.toggle("disabled-block", !chk.checked);
+      notifyChange();
+    });
+  });
+
+  container.querySelectorAll(".tpl-param-edit").forEach((btn) => {
+    btn.addEventListener("click", () => openParamModal("edit", btn.dataset.id, tplKey));
+  });
+
+  container.querySelectorAll(".tpl-param-del").forEach((btn) => {
+    btn.addEventListener("click", () => {
+      const id = btn.dataset.id;
+      setTemplateParams(getTemplateParams(tplKey).filter((p) => p.id !== id), tplKey);
+      renderTemplateSettingsList();
+      notifyChange();
+    });
+  });
+
+  const moveParam = (id, delta) => {
+    const params = getTemplateParams(tplKey);
+    const idx = params.findIndex((p) => p.id === id);
+    const target = idx + delta;
+    if (idx < 0 || target < 0 || target >= params.length) return;
+    const swapped = [...params];
+    [swapped[idx], swapped[target]] = [swapped[target], swapped[idx]];
+    setTemplateParams(swapped, tplKey);
+    renderTemplateSettingsList();
+    notifyChange();
+  };
+    container.querySelectorAll(".tpl-param-up").forEach((btn) => {
+      btn.addEventListener("click", () => moveParam(btn.dataset.id, -1));
+    });
+    container.querySelectorAll(".tpl-param-down").forEach((btn) => {
+      btn.addEventListener("click", () => moveParam(btn.dataset.id, 1));
     });
 
-    // Header Line Row Selection (Dropdown)
-    const hdrRowSelects = els.templateSettingsContainer.querySelectorAll(".sel-hdr-line-row");
-    hdrRowSelects.forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const key = sel.dataset.key;
-        const row = parseInt(sel.value, 10);
-        if (!key || isNaN(row)) return;
+    // Перетаскивание параметров за ручку ⠿ меняет их порядок в списке
+    setupParamDragAndDrop(container, tplKey);
 
-        const curHeader = getBlockData("header") || {};
-        const currentLineRows = Object.assign({}, curHeader.line_rows || {
-          furniture_name: 1,
-          place_address: 2,
-          customer_or_company: 3,
-          scene_name: 4,
-          scene_description: 5
-        });
-        currentLineRows[key] = row;
+    // Дополнительные настройки параметра задаются прямо в строке:
+    // шрифт, размер, привязка по вертикали, выравнивание, цвет, заголовок.
+    const updateParam = (id, updates) => {
+      const params = getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, updates) : p));
+      setTemplateParams(params, tplKey);
+      notifyChange();
+      return params.find((p) => p.id === id);
+    };
 
-        const chk = els.templateSettingsContainer.querySelector(`.chk-hdr-line[data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const checkedKeys = Array.from(hdrCheckboxes)
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          updateBlockSlot("header", { lines: checkedKeys, line_rows: currentLineRows }, tplKey);
-        } else {
-          updateBlockSlot("header", { line_rows: currentLineRows }, tplKey);
-        }
-        notifyChange();
-      });
+    const refreshZoneLabel = (param) => {
+      if (!param) return;
+      const zone = container.querySelector(`.tpl-param-zone[data-id="${param.id}"]`);
+      if (zone) zone.textContent = paramZoneLabel(param);
+    };
+
+    container.querySelectorAll(".tpl-param-font").forEach((sel) => {
+      sel.addEventListener("change", () => updateParam(sel.dataset.id, { font_family: sel.value }));
     });
 
-    // Header Line Font Size Selection (Dropdown)
-    const hdrSizeSelects = els.templateSettingsContainer.querySelectorAll(".sel-hdr-line-size");
-    hdrSizeSelects.forEach((sel) => {
+    container.querySelectorAll(".tpl-param-size").forEach((sel) => {
       sel.addEventListener("change", () => {
-        const key = sel.dataset.key;
         const sz = parseFloat(sel.value);
-        if (!key || isNaN(sz)) return;
-
-        const curHeader = getBlockData("header") || {};
-        const currentLineSizes = Object.assign({}, curHeader.line_font_sizes || {
-          furniture_name: 11,
-          place_address: 10,
-          customer_or_company: 10,
-          scene_name: 11,
-          scene_description: 9
-        });
-        currentLineSizes[key] = sz;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-hdr-line[data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const checkedKeys = Array.from(hdrCheckboxes)
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          updateBlockSlot("header", { lines: checkedKeys, line_font_sizes: currentLineSizes }, tplKey);
-        } else {
-          updateBlockSlot("header", { line_font_sizes: currentLineSizes }, tplKey);
-        }
-        notifyChange();
+        if (!isNaN(sz) && sz > 0) updateParam(sel.dataset.id, { font_size: sz });
       });
     });
 
-    // Header Line Color Picker (Square <input type="color">)
-    const hdrColorInputs = els.templateSettingsContainer.querySelectorAll(".inp-hdr-line-color");
-    hdrColorInputs.forEach((inp) => {
-      const handleColorChange = () => {
-        const key = inp.dataset.key;
-        const col = inp.value;
-        if (!key || !col) return;
-
-        const curHeader = getBlockData("header") || {};
-        const currentLineColors = Object.assign({}, curHeader.line_colors || {
-          furniture_name: "#005EB0",
-          place_address: "#0F172A",
-          customer_or_company: "#0F172A",
-          scene_name: "#005EB0",
-          scene_description: "#475569"
-        });
-        currentLineColors[key] = col;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-hdr-line[data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const checkedKeys = Array.from(hdrCheckboxes)
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          updateBlockSlot("header", { lines: checkedKeys, line_colors: currentLineColors }, tplKey);
-        } else {
-          updateBlockSlot("header", { line_colors: currentLineColors }, tplKey);
-        }
-        notifyChange();
-      };
-      inp.addEventListener("input", handleColorChange);
-      inp.addEventListener("change", handleColorChange);
-    });
-
-    // Header Line Row Selection (Buttons fallback)
-    const hdrRowBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-hdr-row");
-    hdrRowBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        e.preventDefault();
-        const key = btn.dataset.key;
-        const row = parseInt(btn.dataset.row, 10);
-        if (!key || isNaN(row)) return;
-
-        const group = btn.closest(".tpl-hdr-row-group");
-        if (group) {
-          group.querySelectorAll(".tpl-btn-hdr-row").forEach((b) => b.classList.remove("active"));
-        }
-        btn.classList.add("active");
-
-        const curHeader = getBlockData("header") || {};
-        const currentLineRows = Object.assign({}, curHeader.line_rows || {
-          furniture_name: 1,
-          place_address: 2,
-          customer_or_company: 3,
-          scene_name: 4,
-          scene_description: 5
-        });
-        currentLineRows[key] = row;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-hdr-line[data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const checkedKeys = Array.from(hdrCheckboxes)
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          updateBlockSlot("header", { lines: checkedKeys, line_rows: currentLineRows }, tplKey);
-        } else {
-          updateBlockSlot("header", { line_rows: currentLineRows }, tplKey);
-        }
-        notifyChange();
-      });
-    });
-
-
-
-    // Slot Visibility Toggles
-    const slotVisCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-slot-visible");
-    slotVisCheckboxes.forEach((chk) => {
-      chk.addEventListener("change", (e) => {
-        const sId = e.target.dataset.slot || "slot_1";
-        const isVis = Boolean(e.target.checked);
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const updates = { visible: isVis };
-        if (isVis && (sId === "slot_1" || sId === "slot_2" || sId === "slot_3" || sId === "slot_4")) {
-          updates.content = "info_lines";
-        }
-        if (sId === "slot_1") {
-          const s1 = ensureMiddleSlotDefaults(targetTpl);
-          s1.visible = isVis;
-          // «Вкл» среднего блока — главный выключатель всех инфо-слотов шаблона:
-          // синхронизируем слоты 2–4, чтобы конфиг соответствовал рендеру
-          ["slot_2", "slot_3", "slot_4"].forEach((sId2) => {
-            updateBlockSlot(sId2, { visible: isVis }, targetTpl);
-          });
-        }
-        updateBlockSlot(sId, updates, targetTpl);
-        const blk = (sId === "slot_1" ? document.getElementById("card_middle") : null) || document.getElementById(`block_${sId}`) || document.getElementById("card_middle");
-        if (blk) {
-          blk.classList.toggle("disabled-block", !isVis);
-          blk.classList.toggle("disabled-card", !isVis);
-        }
-        notifyChange();
-      });
-    });
-
-    // Slot Font Size Selects
-    const slotFsSelects = els.templateSettingsContainer.querySelectorAll(".sel-slot-fontsize");
-    slotFsSelects.forEach((sel) => {
-      sel.addEventListener("change", (e) => {
-        const sId = e.target.dataset.slot;
-        const newFs = parseFloat(e.target.value);
-        if (sId === "slot_1") {
-          const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-          const s1 = ensureMiddleSlotDefaults(targetTpl);
-          s1.font_size = newFs;
-          if (!s1.line_font_sizes) s1.line_font_sizes = {};
-          const allMidKeys = [
-            "toc_pages", "spec_materials", "spec_appliances", "general_notes",
-            "workflow_history", "workflow_stadia", "workflow_revision",
-            "workflow_version", "workflow_date", "articul"
-          ];
-          allMidKeys.forEach((k) => {
-            s1.line_font_sizes[k] = newFs;
-          });
-          Object.keys(s1.line_font_sizes).forEach((k) => {
-            s1.line_font_sizes[k] = newFs;
-          });
-          const midSelects = els.templateSettingsContainer.querySelectorAll(".sel-middle-line-size");
-          midSelects.forEach((midSel) => {
-            midSel.value = newFs.toString();
-          });
-          updateBlockSlot(sId, { font_size: newFs, line_font_sizes: s1.line_font_sizes, content: "info_lines" }, tplKey);
-        } else {
-          updateBlockSlot(sId, { font_size: newFs }, tplKey);
-        }
-        notifyChange();
-      });
-    });
-
-    // Slot Item Gap (Distance between items on page) Inputs
-    const slotGapInputs = els.templateSettingsContainer.querySelectorAll(".inp-slot-itemgap");
-    slotGapInputs.forEach((inp) => {
-      const handleGapChange = (e) => {
-        const sId = e.target.dataset.slot || "slot_1";
-        const val = parseFloat(e.target.value);
-        const newGap = (!isNaN(val) && val >= 0) ? Math.round(val * 10) / 10 : 2;
-        if (sId === "slot_1") {
-          const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-          const s1 = ensureMiddleSlotDefaults(targetTpl);
-          s1.item_gap_mm = newGap;
-          s1.item_gap = newGap;
-          updateBlockSlot(sId, { item_gap_mm: newGap, item_gap: newGap, content: "info_lines" }, tplKey);
-        } else {
-          updateBlockSlot(sId, { item_gap_mm: newGap, item_gap: newGap }, tplKey);
-        }
-        notifyChange();
-      };
-      inp.addEventListener("change", handleGapChange);
-      inp.addEventListener("input", handleGapChange);
-    });
-
-    // Slot Lines Checkboxes
-    const slotLineCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-slot-line");
-    slotLineCheckboxes.forEach((chk) => {
-      chk.addEventListener("change", (e) => {
-        const sId = e.target.dataset.slot;
-        const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll(`.chk-slot-line[data-slot="${sId}"]`))
-          .filter((c) => c.checked)
-          .map((c) => c.dataset.key);
-        const updates = { lines: allSlotLines };
-        if (sId === "slot_1" || sId === "slot_2" || sId === "slot_3" || sId === "slot_4") {
-          updates.content = "info_lines";
-        }
-        updateBlockSlot(sId, updates, tplKey);
-        notifyChange();
-      });
-    });
-
-    // Slot Quick Actions (Все / Снять)
-    const btnSlotAll = els.templateSettingsContainer.querySelectorAll(".btn-slot-all");
-    btnSlotAll.forEach((btn) => {
+    container.querySelectorAll(".tpl-param-valign").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const sId = btn.dataset.slot;
-        const checks = els.templateSettingsContainer.querySelectorAll(`.chk-slot-line[data-slot="${sId}"]`);
-        const keys = [];
-        checks.forEach((c) => {
-          c.checked = true;
-          keys.push(c.dataset.key);
-        });
-        const updates = { lines: keys };
-        if (sId === "slot_1" || sId === "slot_2" || sId === "slot_3" || sId === "slot_4") {
-          updates.content = "info_lines";
-        }
-        updateBlockSlot(sId, updates, tplKey);
-        notifyChange();
+        const group = btn.closest(".tpl-btn-group");
+        if (group) group.querySelectorAll(".tpl-param-valign").forEach((b) => b.classList.remove("active"));
+        btn.classList.add("active");
+        refreshZoneLabel(updateParam(btn.dataset.id, { valign: btn.dataset.valign }));
       });
     });
 
-    const btnSlotNone = els.templateSettingsContainer.querySelectorAll(".btn-slot-none");
-    btnSlotNone.forEach((btn) => {
+    container.querySelectorAll(".tpl-param-align").forEach((btn) => {
       btn.addEventListener("click", () => {
-        const sId = btn.dataset.slot;
-        const checks = els.templateSettingsContainer.querySelectorAll(`.chk-slot-line[data-slot="${sId}"]`);
-        checks.forEach((c) => (c.checked = false));
-        updateBlockSlot(sId, { lines: [] }, tplKey);
-        notifyChange();
-      });
-    });
-
-    // Middle Block Line Edge Alignment (⇤ / ⇥)
-    const midEdgeBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-middle-edge");
-    midEdgeBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const key = btn.dataset.key;
-        const align = btn.dataset.align;
-        if (!key || !align) return;
-
-        const group = btn.closest(".tpl-middle-edge-group");
-        if (group) {
-          group.querySelectorAll(".tpl-btn-middle-edge").forEach((b) => b.classList.remove("active"));
-        }
+        const group = btn.closest(".tpl-btn-group");
+        if (group) group.querySelectorAll(".tpl-param-align").forEach((b) => b.classList.remove("active"));
         btn.classList.add("active");
-
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const s1 = ensureMiddleSlotDefaults(targetTpl);
-        s1.line_aligns[key] = align;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          s1.lines = allSlotLines;
-          s1.content = "info_lines";
-        }
-        updateBlockSlot("slot_1", { line_aligns: s1.line_aligns, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
-        notifyChange();
+        refreshZoneLabel(updateParam(btn.dataset.id, { align: btn.dataset.align }));
       });
     });
 
-    // Middle Block Line Vertical Placement (⬆ / ↕ / ⬇)
-    const midValignBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-middle-valign");
-    midValignBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const key = btn.dataset.key;
-        const valign = btn.dataset.valign;
-        if (!key || !valign) return;
-
-        const group = btn.closest(".tpl-middle-valign-group");
-        if (group) {
-          group.querySelectorAll(".tpl-btn-middle-valign").forEach((b) => b.classList.remove("active"));
-        }
-        btn.classList.add("active");
-
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const s1 = ensureMiddleSlotDefaults(targetTpl);
-        s1.line_valigns[key] = valign;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          s1.lines = allSlotLines;
-          s1.content = "info_lines";
-        }
-        updateBlockSlot("slot_1", { line_valigns: s1.line_valigns, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
-        notifyChange();
-      });
+    container.querySelectorAll(".tpl-param-color").forEach((inp) => {
+      const onColorChange = () => updateParam(inp.dataset.id, { color: inp.value });
+      inp.addEventListener("input", onColorChange);
+      inp.addEventListener("change", onColorChange);
     });
 
-    // Middle Block Line Font Size Selection (Dropdown)
-    const midSizeSelects = els.templateSettingsContainer.querySelectorAll(".sel-middle-line-size");
-    midSizeSelects.forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const key = sel.dataset.key;
-        const sz = parseFloat(sel.value);
-        if (!key || isNaN(sz)) return;
-
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const s1 = ensureMiddleSlotDefaults(targetTpl);
-        s1.line_font_sizes[key] = sz;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          s1.lines = allSlotLines;
-          s1.content = "info_lines";
-        }
-        updateBlockSlot("slot_1", { line_font_sizes: s1.line_font_sizes, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
-        notifyChange();
-      });
-    });
-
-    // Middle Block Line Color Picker (<input type="color">)
-    const midColorInputs = els.templateSettingsContainer.querySelectorAll(".inp-middle-line-color");
-    midColorInputs.forEach((inp) => {
-      const handleColorChange = () => {
-        const key = inp.dataset.key;
-        const col = inp.value;
-        if (!key || !col) return;
-
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const s1 = ensureMiddleSlotDefaults(targetTpl);
-        s1.line_colors[key] = col;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-slot-line[data-slot="slot_1"][data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const allSlotLines = Array.from(els.templateSettingsContainer.querySelectorAll('.chk-slot-line[data-slot="slot_1"]'))
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          s1.lines = allSlotLines;
-          s1.content = "info_lines";
-        }
-        updateBlockSlot("slot_1", { line_colors: s1.line_colors, lines: s1.lines, visible: isSlotVisible(s1), content: s1.content || "info_lines" }, targetTpl);
-        notifyChange();
-      };
-      inp.addEventListener("input", handleColorChange);
-      inp.addEventListener("change", handleColorChange);
-    });
-
-    // Middle Block Titles Toggle (Галка "Заголовок" для страниц проекта)
-    const chkSlotShowTitles = els.templateSettingsContainer.querySelectorAll(".chk-slot-show-titles");
-    chkSlotShowTitles.forEach((chk) => {
-      chk.addEventListener("change", (e) => {
-        const sId = e.target.dataset.slot || "slot_1";
-        const isShown = e.target.checked;
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const s1 = ensureMiddleSlotDefaults(targetTpl);
-        s1.show_titles = isShown;
-        updateBlockSlot(sId, { show_titles: isShown, content: "info_lines" }, tplKey);
-        notifyChange();
-      });
-    });
-
-    // Footer Visible Toggle
-    const chkFtrVis = document.getElementById("chk_footer_visible");
-    if (chkFtrVis) {
-      chkFtrVis.addEventListener("change", (e) => {
-        const isVis = Boolean(e.target.checked);
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        updateBlockSlot("footer", { visible: isVis }, targetTpl);
-        const card = document.getElementById("card_footer");
-        if (card) {
-          card.classList.toggle("disabled-card", !isVis);
-          card.classList.toggle("disabled-block", !isVis);
-        }
-        notifyChange();
-      });
-    }
-
-    // Footer Font Size
-    const selFtrFs = document.getElementById("sel_footer_fontsize");
-    if (selFtrFs) {
-      selFtrFs.addEventListener("change", (e) => {
-        updateBlockSlot("footer", { font_size: parseFloat(e.target.value) }, tplKey);
-        notifyChange();
-      });
-    }
-
-    // Footer Lines Checkboxes
-    const ftrCheckboxes = els.templateSettingsContainer.querySelectorAll(".chk-ftr-line");
-    ftrCheckboxes.forEach((chk) => {
+    container.querySelectorAll(".tpl-param-show-label").forEach((chk) => {
       chk.addEventListener("change", () => {
-        const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-ftr-line"))
-          .filter((c) => c.checked)
-          .map((c) => c.dataset.key);
-        updateBlockSlot("footer", { lines: checkedKeys }, tplKey);
-        notifyChange();
+        updateParam(chk.dataset.id, { show_label: chk.checked });
+        // Заголовок отображается в шапке строки («Название» источника) — перерисуем
+        renderTemplateSettingsList();
       });
     });
 
-    // Footer Line Alignment Buttons
-    const ftrAlignBtns = els.templateSettingsContainer.querySelectorAll(".tpl-btn-ftr-align");
-    ftrAlignBtns.forEach((btn) => {
-      btn.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const key = btn.dataset.key;
-        const align = btn.dataset.align;
-        if (!key || !align) return;
+    // Название блока: сохраняем на лету, без перерисовки (иначе собьется ввод)
+    container.querySelectorAll(".tpl-param-group-label").forEach((inp) => {
+      inp.addEventListener("input", () => updateParam(inp.dataset.id, { label: inp.value }));
+    });
 
-        const group = btn.closest(".tpl-ftr-align-group");
-        if (group) {
-          group.querySelectorAll(".tpl-btn-ftr-align").forEach((b) => b.classList.remove("active"));
-        }
-        btn.classList.add("active");
-
-        const curFooter = getBlockData("footer") || {};
-        const defaultFooterAligns = {
-          footer_last_edit: "left",
-          footer_ver_rev: "center",
-          footer_articul: "center",
-          footer_date: "center",
-          footer_page_total: "right"
-        };
-        const currentLineAligns = Object.assign({}, defaultFooterAligns, curFooter.line_aligns || {});
-        currentLineAligns[key] = align;
-
-        const chk = els.templateSettingsContainer.querySelector(`.chk-ftr-line[data-key="${key}"]`);
-        if (chk && !chk.checked) {
-          chk.checked = true;
-          const checkedKeys = Array.from(els.templateSettingsContainer.querySelectorAll(".chk-ftr-line"))
-            .filter((c) => c.checked)
-            .map((c) => c.dataset.key);
-          updateBlockSlot("footer", { lines: checkedKeys, line_aligns: currentLineAligns }, tplKey);
-        } else {
-          updateBlockSlot("footer", { line_aligns: currentLineAligns }, tplKey);
-        }
+    // ✕ у параметра внутри блока — вывести его из блока обратно в общий список
+    container.querySelectorAll(".tpl-param-child-out").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        const params = getTemplateParams(tplKey);
+        const group = params.find((p) => p.id === btn.dataset.group && p.group);
+        if (!group || !Array.isArray(group.params)) return;
+        const cIdx = group.params.findIndex((c) => c.id === btn.dataset.id);
+        if (cIdx < 0) return;
+        const [child] = group.params.splice(cIdx, 1);
+        params.push(child);
+        setTemplateParams(params, tplKey);
+        renderTemplateSettingsList();
         notifyChange();
       });
     });
+  }
 
-    // -------------------------------------------------------------
-    // CARD 4: КАРТИНКА ЧЕРТЕЖА (Видовой экран 3D) EVENT LISTENERS
-    // -------------------------------------------------------------
-    const chkTplOverlay = document.getElementById("chk_tpl_aspect_overlay");
-    if (chkTplOverlay) {
-      chkTplOverlay.addEventListener("change", (e) => {
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
-        const tplCfg = customLayouts[targetTpl] || {};
-        const imgCfg = tplCfg.image_4_3 || {};
-        if (!isSlotVisible(imgCfg, true) || targetTpl === "blank") {
-          e.target.checked = false;
-          return;
-        }
-        const isChecked = e.target.checked;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.show_aspect_overlay = isChecked;
-        if (els.chkShowAspectOverlay) {
-          els.chkShowAspectOverlay.checked = isChecked;
-        }
-        const tplBadge = document.getElementById("tplAspectOverlayBadge");
-        if (tplBadge) {
-          tplBadge.classList.toggle("disabled-overlay", !isChecked);
-        }
-        callRuby("toggleAspectOverlay", isChecked);
-        if (isChecked) {
-          syncCurrentTemplateOverlay();
-        }
-      });
+// -------------------------------------------------------------
+// Модал создания/редактирования параметра шаблона
+// -------------------------------------------------------------
+let paramModalState = { mode: "create", id: null, tplKey: null };
+
+function fillParamSourceOptions(selectedSource) {
+  const sel = document.getElementById("paramModalSource");
+  if (!sel) return;
+  sel.innerHTML = buildParamSources().map((g) => `
+    <optgroup label="${g.title}">
+      ${g.options.map((o) => `<option value="${o.value}">${o.label}</option>`).join("")}
+    </optgroup>
+  `).join("");
+  if (selectedSource) sel.value = selectedSource;
+}
+
+function updateParamModalPreview() {
+  const sel = document.getElementById("paramModalSource");
+  const box = document.getElementById("paramModalPreview");
+  if (!sel || !box) return;
+  const val = paramPreviewValue(sel.value).replace(/\n+/g, " ⏎ ");
+  box.textContent = val ? `Пример: ${val}` : "Данные не заполнены — параметр не будет выведен на лист";
+  box.classList.toggle("empty", !val);
+}
+
+  function openParamModal(mode, paramId, tplKey) {
+    paramModalState = { mode: mode, id: paramId || null, tplKey: tplKey || layoutState.currentTemplate || "cover" };
+    const modal = document.getElementById("paramModal");
+    if (!modal) return;
+
+    fillParamSourceOptions();
+    const title = document.getElementById("paramModalTitle");
+    const srcSel = document.getElementById("paramModalSource");
+    const inpLabel = document.getElementById("paramModalLabel");
+
+    const existing = mode === "edit" ? getTemplateParams(paramModalState.tplKey).find((p) => p.id === paramId) : null;
+
+    if (title) title.textContent = mode === "edit" ? "Редактировать параметр" : "Создать параметр";
+    if (srcSel) srcSel.value = existing ? existing.source : (srcSel.options[0] ? srcSel.options[0].value : "");
+    if (inpLabel) inpLabel.value = existing ? existing.label : "";
+    updateParamModalPreview();
+
+    modal.classList.remove("hidden");
+    if (srcSel) srcSel.focus();
+  }
+
+  function closeParamModal() {
+    const modal = document.getElementById("paramModal");
+    if (modal) modal.classList.add("hidden");
+    paramModalState = { mode: "create", id: null, tplKey: null };
+  }
+
+  function confirmParamModal() {
+    const srcSel = document.getElementById("paramModalSource");
+    const source = srcSel ? srcSel.value : "";
+    if (!source) {
+      showNotification("Выберите источник данных", "warning");
+      return;
     }
+    const inpLabel = document.getElementById("paramModalLabel");
 
-    const chkImgVis = document.getElementById("chk_image_4_3_visible");
-    if (chkImgVis) {
-      chkImgVis.addEventListener("change", (e) => {
-        const isVis = Boolean(e.target.checked);
-        const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-        updateBlockSlot("image_4_3", { visible: isVis }, targetTpl);
-        const card = document.getElementById("card_image");
-        if (card) {
-          card.classList.toggle("disabled-card", !isVis);
-          card.classList.toggle("disabled-block", !isVis);
-        }
-        const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-        const tplBadge = document.getElementById("tplAspectOverlayBadge");
-        if (!isVis) {
-          if (chkTpl) {
-            chkTpl.checked = false;
-            chkTpl.disabled = true;
-          }
-          if (tplBadge) {
-            tplBadge.classList.add("disabled-overlay");
-          }
-          if (state.pdf_settings) {
-            state.pdf_settings.show_aspect_overlay = false;
-          }
-          if (els.chkShowAspectOverlay) {
-            els.chkShowAspectOverlay.checked = false;
-          }
-          callRuby("toggleAspectOverlay", false);
-        } else {
-          if (chkTpl) {
-            chkTpl.disabled = false;
-          }
-        }
-        notifyChange();
-      });
+    const isEdit = paramModalState.mode === "edit";
+    // Шрифт, размер, выравнивания, цвет, заголовок и «Вкл» задаются в строке
+    // параметра; место на странице определяется выравниваниями.
+    const existing = isEdit ? getTemplateParams(paramModalState.tplKey).find((p) => p.id === paramModalState.id) : null;
+    const value = {
+      id: paramModalState.id || undefined,
+      source: source,
+      label: inpLabel ? inpLabel.value.trim() : "",
+      show_label: existing ? existing.show_label : true,
+      align: existing ? existing.align : DEFAULT_PARAM_SETTINGS.align,
+      valign: existing ? existing.valign : DEFAULT_PARAM_SETTINGS.valign,
+      font_family: existing ? existing.font_family : DEFAULT_PARAM_SETTINGS.font_family,
+      font_size: existing ? existing.font_size : DEFAULT_PARAM_SETTINGS.font_size,
+      color: existing ? existing.color : DEFAULT_PARAM_SETTINGS.color,
+      visible: existing ? existing.visible : true
+    };
+    const normalized = normalizeTemplateParam(value);
+
+    const params = getTemplateParams(paramModalState.tplKey);
+    if (isEdit) {
+      const idx = params.findIndex((p) => p.id === paramModalState.id);
+      if (idx >= 0) params[idx] = normalized;
+      else params.push(normalized);
+    } else {
+      params.push(normalized);
     }
+    setTemplateParams(params, paramModalState.tplKey);
 
-    const grpRatio = document.getElementById("grp_image_aspect_ratio");
-    if (grpRatio) {
-      grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          window.app.setAspectRatio(btn.dataset.ratio);
-        });
-      });
-    }
-
-    const grpScale = document.getElementById("grp_image_scale_pct");
-    if (grpScale) {
-      grpScale.querySelectorAll(".btn-scale-pct").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          grpScale.querySelectorAll(".btn-scale-pct").forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          const scale = parseInt(btn.dataset.scale, 10) || 100;
-          updateBlockSlot("image_4_3", { scale_pct: scale });
-          notifyChange();
-        });
-      });
-    }
-
-    const inpBorderColor = document.getElementById("input_overlay_border_color");
-    if (inpBorderColor) {
-      const onBorderColorChange = (e) => {
-        const val = e.target.value.toUpperCase();
-        const lbl = document.getElementById("val_overlay_border_color");
-        if (lbl) lbl.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_border_color = val;
-        if (els.inputOverlayBorderColor) els.inputOverlayBorderColor.value = val;
-        if (els.overlayBorderColorHex) els.overlayBorderColorHex.textContent = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      inpBorderColor.addEventListener("input", onBorderColorChange);
-      inpBorderColor.addEventListener("change", onBorderColorChange);
-    }
-
-    const inpBorderOpacity = document.getElementById("input_overlay_border_opacity");
-    if (inpBorderOpacity) {
-      const onBorderOpacityChange = (e) => {
-        const val = parseInt(e.target.value, 10) || 100;
-        const lbl = document.getElementById("val_overlay_border_opacity");
-        if (lbl) lbl.textContent = `${val}%`;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_border_opacity = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      inpBorderOpacity.addEventListener("input", onBorderOpacityChange);
-      inpBorderOpacity.addEventListener("change", onBorderOpacityChange);
-    }
-
-    const inpMaskColor = document.getElementById("input_overlay_mask_color");
-    if (inpMaskColor) {
-      const onMaskColorChange = (e) => {
-        const val = e.target.value.toUpperCase();
-        const lbl = document.getElementById("val_overlay_mask_color");
-        if (lbl) lbl.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_mask_color = val;
-        if (els.inputOverlayMaskColor) els.inputOverlayMaskColor.value = val;
-        if (els.overlayMaskColorHex) els.overlayMaskColorHex.textContent = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      inpMaskColor.addEventListener("input", onMaskColorChange);
-      inpMaskColor.addEventListener("change", onMaskColorChange);
-    }
-
-    const inpMaskOpacity = document.getElementById("input_overlay_mask_opacity");
-    if (inpMaskOpacity) {
-      const onMaskOpacityChange = (e) => {
-        const val = parseInt(e.target.value, 10) || 55;
-        const lbl = document.getElementById("val_overlay_mask_opacity");
-        if (lbl) lbl.textContent = `${val}%`;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_mask_opacity = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      inpMaskOpacity.addEventListener("input", onMaskOpacityChange);
-      inpMaskOpacity.addEventListener("change", onMaskOpacityChange);
-    }
-
-    // =============================================================
-    // DRAG AND DROP REORDERING ДЛЯ ПУНКТОВ БЛОКОВ
-    // =============================================================
-    function setupBlockDragAndDrop(cardElement, rowSelector, onReorder) {
-      if (!cardElement) return;
-      const listContainer = cardElement.querySelector(".tpl-lines-checklist");
-      if (!listContainer) return;
-
-      let draggedItem = null;
-
-      const rows = listContainer.querySelectorAll(rowSelector);
-      rows.forEach((row) => {
-        row.setAttribute("draggable", "true");
-
-        row.addEventListener("mousedown", (e) => {
-          if (e.target.closest(".drag-handle")) {
-            row.setAttribute("draggable", "true");
-            return;
-          }
-          if (e.target.closest("input, select, button, label, .tpl-btn-group, .tpl-hdr-param-box")) {
-            row.setAttribute("draggable", "false");
-          } else {
-            row.setAttribute("draggable", "true");
-          }
-        });
-
-        row.addEventListener("mouseup", () => {
-          row.setAttribute("draggable", "true");
-        });
-
-        row.addEventListener("dragstart", (e) => {
-          draggedItem = row;
-          row.classList.add("dragging");
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("text/plain", row.dataset.key || "");
-        });
-
-        row.addEventListener("dragend", () => {
-          if (draggedItem) {
-            draggedItem.classList.remove("dragging");
-            draggedItem = null;
-          }
-          listContainer.querySelectorAll(rowSelector).forEach((r) => {
-            r.classList.remove("drag-over-top", "drag-over-bottom");
-          });
-        });
-
-        row.addEventListener("dragover", (e) => {
-          e.preventDefault();
-          e.dataTransfer.dropEffect = "move";
-          if (!draggedItem || draggedItem === row) return;
-
-          const rect = row.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          if (e.clientY < midY) {
-            row.classList.add("drag-over-top");
-            row.classList.remove("drag-over-bottom");
-          } else {
-            row.classList.add("drag-over-bottom");
-            row.classList.remove("drag-over-top");
-          }
-        });
-
-        row.addEventListener("dragleave", () => {
-          row.classList.remove("drag-over-top", "drag-over-bottom");
-        });
-
-        row.addEventListener("drop", (e) => {
-          e.preventDefault();
-          e.stopPropagation();
-          row.classList.remove("drag-over-top", "drag-over-bottom");
-          if (!draggedItem || draggedItem === row) return;
-
-          const rect = row.getBoundingClientRect();
-          const midY = rect.top + rect.height / 2;
-          if (e.clientY < midY) {
-            listContainer.insertBefore(draggedItem, row);
-          } else {
-            listContainer.insertBefore(draggedItem, row.nextSibling);
-          }
-
-          const newOrder = Array.from(listContainer.querySelectorAll(rowSelector))
-            .map((r) => r.dataset.key)
-            .filter(Boolean);
-
-          if (typeof onReorder === "function") {
-            onReorder(newOrder, listContainer);
-          }
-        });
-      });
-    }
-
-    // 1. Drag and Drop для шапки (Header)
-    const cardHeader = document.getElementById("card_header");
-    setupBlockDragAndDrop(cardHeader, ".tpl-hdr-line-row", (newOrder, container) => {
-      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-      if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
-      if (!state.pdf_settings.custom_layouts[targetTpl]) state.pdf_settings.custom_layouts[targetTpl] = {};
-      if (!state.pdf_settings.custom_layouts[targetTpl].header) state.pdf_settings.custom_layouts[targetTpl].header = {};
-      const hdrConfig = state.pdf_settings.custom_layouts[targetTpl].header;
-      hdrConfig.item_order = newOrder;
-
-      const checkedKeys = new Set(
-        Array.from(container.querySelectorAll(".chk-hdr-line:checked")).map((c) => c.dataset.key)
-      );
-      hdrConfig.lines = newOrder.filter((k) => checkedKeys.has(k));
-
-      const lineRows = Object.assign({}, hdrConfig.line_rows || {});
-      newOrder.forEach((k, idx) => {
-        const rowNum = idx + 1;
-        lineRows[k] = rowNum;
-        const sel = container.querySelector(`.sel-hdr-line-row[data-key="${k}"]`);
-        if (sel) sel.value = rowNum.toString();
-      });
-      hdrConfig.line_rows = lineRows;
-
-      notifyChange();
-    });
-
-    // 2. Drag and Drop для среднего блока (Middle, slot_1)
-    const cardMiddle = document.getElementById("card_middle");
-    setupBlockDragAndDrop(cardMiddle, ".tpl-middle-line-row", (newOrder, container) => {
-      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-      const s1 = ensureMiddleSlotDefaults(targetTpl);
-      s1.item_order = newOrder;
-
-      const checkedKeys = new Set(
-        Array.from(container.querySelectorAll(".chk-slot-line:checked")).map((c) => c.dataset.key)
-      );
-      s1.lines = newOrder.filter((k) => checkedKeys.has(k));
-
-      notifyChange();
-    });
-
-    // 3. Drag and Drop для подвала (Footer)
-    const cardFooter = document.getElementById("card_footer");
-    setupBlockDragAndDrop(cardFooter, ".tpl-ftr-line-row", (newOrder, container) => {
-      const targetTpl = tplKey || layoutState.currentTemplate || "cover";
-      if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
-      if (!state.pdf_settings.custom_layouts[targetTpl]) state.pdf_settings.custom_layouts[targetTpl] = {};
-      if (!state.pdf_settings.custom_layouts[targetTpl].footer) state.pdf_settings.custom_layouts[targetTpl].footer = {};
-      const ftrConfig = state.pdf_settings.custom_layouts[targetTpl].footer;
-      ftrConfig.item_order = newOrder;
-
-      const checkedKeys = new Set(
-        Array.from(container.querySelectorAll(".chk-ftr-line:checked")).map((c) => c.dataset.key)
-      );
-      ftrConfig.lines = newOrder.filter((k) => checkedKeys.has(k));
-
-      notifyChange();
-    });
+    closeParamModal();
+    renderTemplateSettingsList();
+    notifyChange();
+    showNotification(isEdit ? "Параметр обновлен" : "Параметр создан", "success");
   }
 
   // Alias for backward compatibility with existing render calls
@@ -3668,64 +2227,60 @@
       });
     }
 
-    // Reset Layout Button
+    // Reset Layout Button: сброс шаблона к дефолту (видовое окно + пустой список параметров)
     if (els.btnResetLayout) {
       els.btnResetLayout.addEventListener("click", () => {
         const tplKey = layoutState.currentTemplate;
         const tplDefObj = getTemplateDef(tplKey);
-        const defTpl = DEFAULT_LAYOUTS[tplDefObj.baseType] || DEFAULT_LAYOUTS.cover;
+        const defTpl = DEFAULT_LAYOUTS[tplKey] || DEFAULT_LAYOUTS[tplDefObj.baseType] || DEFAULT_LAYOUTS.cover;
         if (!defTpl) return;
 
         if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
         const prevMeta = {};
-        if (state.pdf_settings.custom_layouts[tplKey]) {
-          const cur = state.pdf_settings.custom_layouts[tplKey];
+        const curCfg = state.pdf_settings.custom_layouts[tplKey];
+        if (curCfg) {
           ["name", "_name", "_base_type", "_icon", "_meta"].forEach((k) => {
-            if (cur[k] !== undefined) prevMeta[k] = cur[k];
+            if (curCfg[k] !== undefined) prevMeta[k] = curCfg[k];
           });
         }
-        state.pdf_settings.custom_layouts[tplKey] = Object.assign({}, prevMeta);
-
-        const tplDefaults = defTpl.slots || {};
-        FIXED_SLOT_DEFS.forEach((slotDef) => {
-          const defSlot = tplDefaults[slotDef.id] || {};
-          const defContent = defSlot.content || slotDef.default_content || "none";
-          const defFontSize = defSlot.font_size !== undefined ? defSlot.font_size : (slotDef.id === "header" ? 11 : (slotDef.id === "footer" ? 8.5 : 8));
-          const defLines = defSlot.lines ? deepClone(defSlot.lines) : (DEFAULT_LINES_BY_CONTENT[slotDef.id] ? deepClone(DEFAULT_LINES_BY_CONTENT[slotDef.id]) : (defContent ? deepClone(DEFAULT_LINES_BY_CONTENT[defContent]) : []));
-          const defLineRows = defSlot.line_rows ? deepClone(defSlot.line_rows) : (slotDef.default_line_rows ? deepClone(slotDef.default_line_rows) : null);
-          const defLineFontSizes = defSlot.line_font_sizes ? deepClone(defSlot.line_font_sizes) : (slotDef.default_line_font_sizes ? deepClone(slotDef.default_line_font_sizes) : null);
-          const defLineColors = defSlot.line_colors ? deepClone(defSlot.line_colors) : (slotDef.default_line_colors ? deepClone(slotDef.default_line_colors) : null);
-          const defLineAligns = defSlot.line_aligns ? deepClone(defSlot.line_aligns) : (slotDef.default_line_aligns ? deepClone(slotDef.default_line_aligns) : null);
-          state.pdf_settings.custom_layouts[tplKey][slotDef.id] = {
-            visible: defSlot.visible !== false,
-            content: defContent,
-            custom_text: defSlot.custom_text || "",
-            align: defSlot.align || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "left"),
-            valign: defSlot.valign || (slotDef.id === "header" || slotDef.id === "footer" ? "center" : "top"),
-            font_size: defFontSize,
-            aspect_ratio: defSlot.aspect_ratio || "4:3",
-            scale_pct: defSlot.scale_pct !== undefined ? defSlot.scale_pct : 100,
-            lines: defLines,
-            line_rows: defLineRows,
-            line_font_sizes: defLineFontSizes,
-            line_colors: defLineColors,
-            line_aligns: defLineAligns,
-            show_titles: defSlot.show_titles !== undefined ? defSlot.show_titles : (slotDef.id === "slot_1" ? true : undefined),
-            line_show_titles: defSlot.line_show_titles ? deepClone(defSlot.line_show_titles) : (slotDef.id === "slot_1" ? {} : undefined),
-            item_gap_mm: defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : (defSlot.item_gap !== undefined ? defSlot.item_gap : (slotDef.id === "slot_1" ? 2 : undefined)),
-            item_gap: defSlot.item_gap !== undefined ? defSlot.item_gap : (defSlot.item_gap_mm !== undefined ? defSlot.item_gap_mm : (slotDef.id === "slot_1" ? 2 : undefined)),
-            opacity: defSlot.opacity !== undefined ? defSlot.opacity : 0.9,
-            x: defSlot.x !== undefined ? defSlot.x : slotDef.x,
-            y: defSlot.y !== undefined ? defSlot.y : slotDef.y,
-            w: defSlot.w !== undefined ? defSlot.w : slotDef.w,
-            h: defSlot.h !== undefined ? defSlot.h : slotDef.h
-          };
+        state.pdf_settings.custom_layouts[tplKey] = Object.assign({}, prevMeta, {
+          image_4_3: deepClone(defTpl.image_4_3 || DEFAULT_IMAGE_SLOT),
+          params: []
         });
 
         renderTemplateSettingsList();
         renderTemplatesList();
         showNotification(`Настройки шаблона «${tplDefObj.name}» сброшены к стандартам`, "success");
         notifyChange();
+      });
+    }
+
+    // Параметр шаблона: модал создания/редактирования
+    const btnCancelParam = document.getElementById("btnCancelParam");
+    if (btnCancelParam) {
+      btnCancelParam.addEventListener("click", closeParamModal);
+    }
+    const btnConfirmParam = document.getElementById("btnConfirmParam");
+    if (btnConfirmParam) {
+      btnConfirmParam.addEventListener("click", confirmParamModal);
+    }
+    const paramModalEl = document.getElementById("paramModal");
+    if (paramModalEl) {
+      paramModalEl.addEventListener("keydown", (e) => {
+        if (e.key === "Escape") closeParamModal();
+      });
+    }
+    const paramSourceSel = document.getElementById("paramModalSource");
+    if (paramSourceSel) {
+      paramSourceSel.addEventListener("change", updateParamModalPreview);
+    }
+    const paramLabelInp = document.getElementById("paramModalLabel");
+    if (paramLabelInp) {
+      paramLabelInp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (btnConfirmParam) btnConfirmParam.click();
+        }
       });
     }
 

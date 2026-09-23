@@ -1,0 +1,125 @@
+---
+layout:
+  cover:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params:
+    - id: g_muekdk20_zpmc6
+      label: ''
+      show_label: true
+      align: left
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      group: true
+      params:
+      - id: p_mueke8dj_uvves
+        label: ''
+        show_label: true
+        align: left
+        valign: top
+        font_family: ''
+        font_size: 10.0
+        color: "#0F172A"
+        visible: true
+        source: workflow.revision
+      - id: p_muekdqgm_m4o9k
+        label: ''
+        show_label: true
+        align: left
+        valign: top
+        font_family: ''
+        font_size: 10.0
+        color: "#0F172A"
+        visible: true
+        source: project.articul
+      - id: p_muekgbns_sjktp
+        label: ''
+        show_label: true
+        align: left
+        valign: top
+        font_family: ''
+        font_size: 10.0
+        color: "#0F172A"
+        visible: true
+        source: page.number_total
+  description:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params: []
+  explain:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params: []
+  general:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params:
+    - id: p_muehjz89_hf7x5
+      label: ''
+      show_label: true
+      align: center
+      valign: bottom
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: project.articul
+  visual:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params: []
+  blank:
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '16:9'
+      scale_pct: 100
+    params: []
