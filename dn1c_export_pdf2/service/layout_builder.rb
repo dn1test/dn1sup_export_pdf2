@@ -942,6 +942,71 @@ module DN1Code
         # Отступ между параметрами в одной зоне (мм)
         PARAM_ZONE_GAP_MM = 2.5
 
+        # Авто-подпись параметра, когда «Заголовок» включён, а текст подписи
+        # (label) не задан: короткие печатные формулировки без эмодзи.
+        # Зеркало AUTO_PARAM_LABELS в dialog/html/app.js — держать синхронно.
+        AUTO_PARAM_LABELS = {
+          "project.articul"      => "Артикул",
+          "project.furniture_name" => "Изделие",
+          "project.room_name"    => "Помещение",
+          "project.address"      => "Адрес",
+          "project.company"      => "Компания",
+          "project.description"  => "Описание проекта",
+          "customer.id"          => "ID заказчика",
+          "customer.name"        => "Заказчик",
+          "customer.phone"       => "Телефон",
+          "customer.email"       => "Email",
+          "workflow.author"      => "Автор",
+          "workflow.price"       => "Стоимость",
+          "workflow.start_date"  => "Дата начала",
+          "workflow.end_date"    => "Дата сдачи",
+          "workflow.duration"    => "Длительность",
+          "workflow.version"     => "Версия",
+          "workflow.revision"    => "Ревизия",
+          "workflow.date"        => "Дата",
+          "workflow.status"      => "Статус",
+          "workflow.stadia"      => "Стадии проекта",
+          "workflow.last_edit"   => "Последние изменения",
+          "workflow.history"     => "История правок",
+          "scene.name"           => "Сцена",
+          "scene.description"    => "Описание",
+          "page.number_total"    => "Страница",
+          "page.toc"             => "Содержание"
+        }.freeze
+
+        # Текст подписи параметра: поле label без хвостовых «:» (двоеточие после
+        # метки добавляет рендерер, иначе на листе печатается «Артикул:: значение»)
+        def param_label_text(param)
+          raw = (param[:label] || param["label"]).to_s.strip
+          raw.empty? ? "" : raw.sub(/:+\s*\z/, "").strip
+        end
+
+        # Флаг «Заголовок» параметра: отсутствие поля трактуется как включено
+        # (для детей блоков normalize_template_params проставляет false явно)
+        def param_show_label?(param, default: true)
+          raw = param.key?(:show_label) ? param[:show_label] : param["show_label"]
+          raw.nil? ? default : !(raw == false || raw.to_s.strip.downcase == "false")
+        end
+
+        # Эффективная подпись параметра на листе: заданный label, иначе
+        # авто-подпись из источника; для папок спецификаций — название раздела.
+        # Пустая строка — заголовок не печатается даже при включённом «Заголовок».
+        def effective_param_label(source, label, rctx)
+          return label unless label.empty?
+
+          src = source.to_s.strip
+          return AUTO_PARAM_LABELS[src] if AUTO_PARAM_LABELS.key?(src)
+
+          m = src.match(/\Adir\.(\d+)\.(title|description)\z/)
+          if m
+            idx = m[1].to_i
+            base = InfoLineResolver.dir_field(rctx, idx, :title).to_s.strip
+            base = "Раздел #{idx + 1}" if base.empty?
+            return m[2] == "title" ? "#{base} — название" : "#{base} — спецификация"
+          end
+          ""
+        end
+
         # Колонка зоны по выравниванию: «слева» — колонка у левого края,
         # «справа» — у правого края, «центр» — симметрично относительно середины.
         # y_top/box_h задаются расчетом высоты группы (в pt, y — верх коробки).
@@ -979,8 +1044,10 @@ module DN1Code
         # выравниваниями: лево/центр/право задает колонку, верх/низ — привязку
         # группы к верхнему или нижнему краю рабочей области. Параметры одной
         # зоны складываются в столбик в порядке списка с отступом PARAM_ZONE_GAP_MM.
-        # Формат строки: [Заголовок: ]Значение; пустое значение или visible: false —
-        # параметр не выводится. Стадии проекта (чек-лист) рисуются с квадратами.
+        # Формат строки: [Заголовок: ]Значение — при включённом «Заголовок» и пустом
+        # label подпись берётся из AUTO_PARAM_LABELS (у детей блоков аналогично);
+        # пустое значение или visible: false — параметр не выводится. Стадии
+        # проекта (чек-лист) рисуются с квадратами.
         def render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, ctx, rctx)
           params = page_cfg[:params] || page_cfg["params"]
           return unless params.is_a?(Array)
@@ -1007,7 +1074,14 @@ module DN1Code
                 child_val = InfoLineResolver.resolve_param(rctx, child_src)
                 next if child_val.nil? || child_val.to_s.strip.empty?
 
-                child_val.to_s.strip
+                child_val = child_val.to_s.strip
+                # Подпись ребёнка печатается перед его значением внутри строки
+                # блока («Помещение: Гостиная | Адрес: …»)
+                if param_show_label?(child, default: false)
+                  eff = effective_param_label(child_src, param_label_text(child), rctx)
+                  child_val = "#{eff}: #{child_val}" unless eff.empty?
+                end
+                child_val
               end
               next if values.empty?
               value = values.join(" | ")
@@ -1019,11 +1093,12 @@ module DN1Code
               value = value.to_s
             end
 
-            raw_show_label = param.key?(:show_label) ? param[:show_label] : param["show_label"]
-            show_label = raw_show_label.nil? ? true : !(raw_show_label == false || raw_show_label.to_s.strip.downcase == "false")
+            show_label = param_show_label?(param)
             # Двоеточие после метки добавляет рендерер: хвостовые «:» из ввода пользователя срезаем,
-            # иначе на листе печатается «Артикул:: значение»
-            label = (param[:label] || param["label"]).to_s.strip.sub(/:+\s*\z/, "").strip
+            # иначе на листе печатается «Артикул:: значение». «Заголовок» включён, а текст
+            # не задан — берём авто-подпись из источника (у блока своего источника нет).
+            label = param_label_text(param)
+            label = effective_param_label(source, label, rctx) if show_label && !is_group
 
             # Итоговый текст с заголовком: высота блока считается по нему, иначе
             # длинный заголовок не учитывается и строки наезжают друг на друга

@@ -27,8 +27,8 @@
     scale_pct: 100
   };
 
-  // Векторная иконка крестика закрытия/удаления в стиле Trimble Modus
-  const MODUS_CROSS_SVG = '<svg class="icon-close-cross" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
+  // Иконка крестика закрытия/удаления (шрифт Modus Icons, набор connect)
+  const MODUS_CROSS_SVG = '<i class="modus-icons icon-close-cross" style="font-size: 11px;">content-close</i>';
 
   // Дата в превью — в печатном формате PDF (dd.mm.yyyy), а не в локали браузера (9/22/2026)
   const previewDate = (d) => {
@@ -148,6 +148,56 @@
       if (opt) return opt.label;
     }
     return s || "—";
+  }
+
+  // Авто-подпись параметра на листе: короткие печатные формулировки для
+  // чекбокса «Заголовок», когда текст подписи (label) не задан вручную.
+  // Зеркало AUTO_PARAM_LABELS в service/layout_builder.rb — держать синхронно.
+  const AUTO_PARAM_LABELS = {
+    "project.articul":      "Артикул",
+    "project.furniture_name": "Изделие",
+    "project.room_name":    "Помещение",
+    "project.address":      "Адрес",
+    "project.company":      "Компания",
+    "project.description":  "Описание проекта",
+    "customer.id":          "ID заказчика",
+    "customer.name":        "Заказчик",
+    "customer.phone":       "Телефон",
+    "customer.email":       "Email",
+    "workflow.author":      "Автор",
+    "workflow.price":       "Стоимость",
+    "workflow.start_date":  "Дата начала",
+    "workflow.end_date":    "Дата сдачи",
+    "workflow.duration":    "Длительность",
+    "workflow.version":     "Версия",
+    "workflow.revision":    "Ревизия",
+    "workflow.date":        "Дата",
+    "workflow.status":      "Статус",
+    "workflow.stadia":      "Стадии проекта",
+    "workflow.last_edit":   "Последние изменения",
+    "workflow.history":     "История правок",
+    "scene.name":           "Сцена",
+    "scene.description":    "Описание",
+    "page.number_total":    "Страница",
+    "page.toc":             "Содержание"
+  };
+
+  // Эффективная подпись параметра: заданный label, иначе авто-подпись из
+  // источника; для папок спецификаций — название раздела. Пусто — заголовок
+  // не печатается даже при включённом «Заголовок».
+  function effectiveParamLabel(source, label) {
+    const l = tval(label).replace(/:+\s*$/, "").trim();
+    if (l) return l;
+    const s = tval(source);
+    if (AUTO_PARAM_LABELS[s]) return AUTO_PARAM_LABELS[s];
+    const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+    if (m) {
+      const idx = parseInt(m[1], 10);
+      const d = (state.directories || [])[idx];
+      const base = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
+      return m[2] === "title" ? `${base} — название` : `${base} — спецификация`;
+    }
+    return "";
   }
 
   // Живое значение источника для превью (зеркало InfoLineResolver#resolve_param).
@@ -1595,7 +1645,8 @@ function setTemplateParams(params, tplKey) {
     const renderParamRowHtml = (p) => {
       const preview = paramPreviewValue(p.source);
       const previewShort = preview.replace(/\n+/g, " ⏎ ");
-      const shownLabel = p.show_label && p.label ? p.label : "";
+      // Подпись, которая реально печатается на листе: label или авто-подпись
+      const shownLabel = p.show_label ? effectiveParamLabel(p.source, p.label) : "";
       return `
         <div class="tpl-param-row ${p.visible ? "" : "disabled-block"}" data-id="${p.id}">
           <div class="tpl-param-head">
@@ -1649,11 +1700,17 @@ function setTemplateParams(params, tplKey) {
       const children = Array.isArray(g.params) ? g.params : [];
       const childRows = children.map((c) => {
         const cPrev = paramPreviewValue(c.source).replace(/\n+/g, " ⏎ ");
+        const cLabel = c.show_label ? effectiveParamLabel(c.source, c.label) : "";
         return `
           <div class="tpl-param-child" data-id="${c.id}">
             <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
             <span class="tpl-param-child-label">${paramSourceLabel(c.source)}</span>
+            ${cLabel ? `<span class="tpl-param-caption">«${cLabel}»</span>` : ""}
             ${cPrev ? `<span class="tpl-line-preview">(${cPrev})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
+            <label class="tpl-param-vis tpl-param-child-vis" title="Выводить заголовок перед значением внутри блока">
+              <input type="checkbox" class="tpl-param-child-show-label" data-id="${c.id}" ${c.show_label ? "checked" : ""}>
+              <span>Заголовок</span>
+            </label>
             <button type="button" class="tpl-param-child-out" data-id="${c.id}" data-group="${g.id}" title="Вывести из блока">${MODUS_CROSS_SVG}</button>
           </div>`;
       }).join("");
@@ -1674,7 +1731,7 @@ function setTemplateParams(params, tplKey) {
             <div class="tpl-param-actions">
               <button type="button" class="tpl-param-btn tpl-param-up" data-id="${g.id}" title="Выше в списке">↑</button>
               <button type="button" class="tpl-param-btn tpl-param-down" data-id="${g.id}" title="Ниже в списке">↓</button>
-              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${g.id}" title="Удалить блок вместе с его параметрами">🗑️</button>
+              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${g.id}" title="Удалить блок вместе с его параметрами"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
             </div>
           </div>
           <div class="tpl-param-controls">
@@ -2124,6 +2181,21 @@ function setTemplateParams(params, tplKey) {
         notifyChange();
       });
     });
+
+    // «Заголовок» у параметра внутри блока: подпись ребёнка печатается перед
+    // его значением внутри строки блока («Помещение: Гостиная | Адрес: …»)
+    container.querySelectorAll(".tpl-param-child-show-label").forEach((chk) => {
+      chk.addEventListener("change", () => {
+        const params = getTemplateParams(tplKey);
+        const group = params.find((p) => p.group && Array.isArray(p.params) && p.params.some((c) => c.id === chk.dataset.id));
+        if (!group) return;
+        group.params = group.params.map((c) => (c.id === chk.dataset.id ? Object.assign({}, c, { show_label: chk.checked }) : c));
+        setTemplateParams(params, tplKey);
+        notifyChange();
+        // Подпись в строке ребёнка могла появиться или исчезнуть — перерисуем
+        renderTemplateSettingsList();
+      });
+    });
   }
 
 // -------------------------------------------------------------
@@ -2149,6 +2221,12 @@ function updateParamModalPreview() {
   const val = paramPreviewValue(sel.value).replace(/\n+/g, " ⏎ ");
   box.textContent = val ? `Пример: ${val}` : "Данные не заполнены — параметр не будет выведен на лист";
   box.classList.toggle("empty", !val);
+  // Подсказка в поле заголовка: что напечатается, если оставить его пустым
+  const lbl = document.getElementById("paramModalLabel");
+  if (lbl) {
+    const auto = effectiveParamLabel(sel.value, "");
+    lbl.placeholder = auto ? `Авто: ${auto}` : "Заголовок (авто-подпись недоступна)";
+  }
 }
 
   function openParamModal(mode, paramId, tplKey) {
@@ -2541,7 +2619,7 @@ function updateParamModalPreview() {
     const isCommercial = currentTradeValue === "1";
     els.headerTradeBadge.innerHTML = !hasArticul
       ? "Тип не выбран"
-      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">business</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
+      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">user-group</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
     els.headerTradeBadge.classList.toggle("trade-unset", !hasArticul);
     els.headerTradeBadge.classList.toggle("trade-commercial", hasArticul && isCommercial);
     els.headerTradeBadge.classList.toggle("trade-household", hasArticul && !isCommercial);
@@ -2818,7 +2896,7 @@ function updateParamModalPreview() {
     if (ext === "PDF") return '<i class="modus-icons">file</i>';
     if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">tune</i>';
     if (ext === "SKP") return '<i class="modus-icons">views</i>';
-    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">note</i>';
+    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">short-text</i>';
     if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return '<i class="modus-icons">table</i>';
     return '<i class="modus-icons">file</i>';
   }
@@ -3188,7 +3266,7 @@ function updateParamModalPreview() {
       const previewTitle = document.createElement("div");
       previewTitle.className = "dir-section-title";
       previewTitle.innerHTML = `
-        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">photo</i> Файлы и предпросмотр в папке:</span>
+        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">insert-photo</i> Файлы и предпросмотр в папке:</span>
         <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>`;
 
       const sizeGroup = document.createElement("div");
@@ -3336,14 +3414,14 @@ function updateParamModalPreview() {
           img.remove();
           const docIcon = document.createElement("div");
           docIcon.className = "dir-preview-doc-icon";
-          docIcon.innerHTML = `<span><i class="modus-icons">photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+          docIcon.innerHTML = `<span><i class="modus-icons">insert-photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
           thumbWrap.appendChild(docIcon);
         };
         thumbWrap.appendChild(img);
       } else if (file.is_image) {
         const docIcon = document.createElement("div");
         docIcon.className = "dir-preview-doc-icon";
-        docIcon.innerHTML = `<span><i class="modus-icons">photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+        docIcon.innerHTML = `<span><i class="modus-icons">insert-photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
         thumbWrap.appendChild(docIcon);
       } else {
         const docIcon = document.createElement("div");
@@ -3399,7 +3477,7 @@ function updateParamModalPreview() {
 
       const icon = document.createElement("span");
       icon.className = "api-target-icon";
-      icon.innerHTML = '<i class="modus-icons">web</i>';
+      icon.innerHTML = '<i class="modus-icons">web-link</i>';
 
       const badge = document.createElement("span");
       badge.className = "api-target-badge";
@@ -3525,8 +3603,15 @@ function updateParamModalPreview() {
     const subParts = [customer, address].filter(Boolean);
     const subText = subParts.length ? subParts.join(" — ") : "Заказчик — Адрес объекта";
 
-    if (els.headerProjectTitle) els.headerProjectTitle.textContent = pTitle;
-    if (els.headerProjectSubtitle) els.headerProjectSubtitle.textContent = subText;
+    if (els.headerProjectTitle) {
+      els.headerProjectTitle.textContent = pTitle;
+      // Плейсхолдер приглушается, чтобы не выглядеть настоящими данными
+      els.headerProjectTitle.classList.toggle("is-placeholder", parts.length === 0);
+    }
+    if (els.headerProjectSubtitle) {
+      els.headerProjectSubtitle.textContent = subText;
+      els.headerProjectSubtitle.classList.toggle("is-placeholder", subParts.length === 0);
+    }
 
     // Refresh previews in layout canvas
     const tplTab = document.getElementById("tab-templates");
@@ -3658,7 +3743,7 @@ function updateParamModalPreview() {
     } else {
       const placeholder = document.createElement("div");
       placeholder.className = "mini-sheet-placeholder";
-      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">photo</i></span>`;
+      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">insert-photo</i></span>`;
       thumbBox.appendChild(placeholder);
     }
 
@@ -3736,7 +3821,7 @@ function updateParamModalPreview() {
       <div class="tpl-card tpl-panel-left scene-viewport-card ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
         <div class="tpl-card-header">
           <div class="tpl-card-title-group">
-            <span class="tpl-card-icon"><i class="modus-icons">photo</i></span>
+            <span class="tpl-card-icon"><i class="modus-icons">insert-photo</i></span>
             <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D) • Сцена ${idx + 1}: «${safeSceneName}»</span>
           </div>
           <div class="tpl-card-header-actions" style="display: flex; align-items: center; gap: 12px;">

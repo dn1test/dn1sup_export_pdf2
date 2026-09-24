@@ -41,7 +41,7 @@ layout:
         show_label: true
     - id: g_mufh6cio_dtcyj
       label: ''
-      show_label: false
+      show_label: true
       align: center
       valign: top
       font_family: ''
@@ -80,7 +80,7 @@ layout:
       source: page.number_total
     - id: p_mufhm0t9_zb0q0
       label: ''
-      show_label: true
+      show_label: false
       align: left
       valign: top
       font_family: ''
@@ -90,7 +90,7 @@ layout:
       source: workflow.last_edit
     - id: p_mufhmdd2_rhqwg
       label: ''
-      show_label: true
+      show_label: false
       align: left
       valign: top
       font_family: ''
@@ -134,20 +134,9 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params:
-    - id: g_mufe1daf_0uazg
-      label: ''
-      show_label: false
-      align: left
-      valign: top
-      font_family: ''
-      font_size: 10.0
-      color: "#0F172A"
-      visible: true
-      group: true
-      params: []
     - id: p_mufe1eri_jbh8l
       label: ''
-      show_label: true
+      show_label: false
       align: left
       valign: top
       font_family: ''

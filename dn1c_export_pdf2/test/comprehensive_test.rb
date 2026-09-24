@@ -222,6 +222,7 @@ class TestRunner
     test_82_template_params_data_contract_and_js_guards
     test_83_template_params_render_reads_new_config_only
     test_84_template_params_group_block
+    test_85_template_params_auto_labels
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -2116,6 +2117,30 @@ class TestRunner
     assert(File.exist?(icon_path), "Файл иконки frame_overlay.svg существует")
     icon_content = File.read(icon_path, encoding: "utf-8")
     assert(icon_content.include?("<svg") && icon_content.include?("</svg>"), "frame_overlay.svg является валидным SVG")
+
+    # 10.1 Комплект иконочного шрифта Modus Icons v1.20.0 (набор connect):
+    # без файлов шрифта все иконки диалога печатаются как текст-лигатуры
+    fonts_dir = File.join(__dir__, "../dialog/html/fonts")
+    %w[modus-icons.woff2 modus-icons.woff].each do |font_file|
+      assert(File.exist?(File.join(fonts_dir, font_file)), "Иконочный шрифт #{font_file} лежит в dialog/html/fonts")
+    end
+    icons_css = File.read(File.join(fonts_dir, "modus-icons.css"), encoding: "utf-8")
+    assert(icons_css.include?('url("modus-icons.woff2'), "modus-icons.css ссылается на файл шрифта woff2")
+    assert(!File.exist?(File.join(fonts_dir, "open-sans.css")), "Мёртвый open-sans.css удалён (30 @font-face без файлов шрифта)")
+    assert(!js_text.include?('>photo<') && !js_text.include?('>business<') && !js_text.include?('>dashboard<'),
+           "app.js не использует имена-лигатуры, отсутствующие в наборе connect")
+    # Все имена-лигатуры в разметке и JS входят в набор connect
+    index_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    used_icons = (index_text.scan(/modus-icons[^>]*>([a-z0-9-]+)</).flatten +
+                  js_text.scan(/modus-icons[^>]*>([a-z0-9-]+)</).flatten).uniq
+    connect_icons = %w[
+      account action-undo add-circle autorenew browser check-circle check-mark content-close
+      dashboard-customize delete edit file file-download file-template file-upload folder
+      insert-photo launch layers project refresh save settings short-text table time tune
+      user-group views warning web-link
+    ]
+    unknown_icons = used_icons - connect_icons
+    assert(unknown_icons.empty?, "Все имена иконок входят в набор connect (неизвестные: #{unknown_icons.join(', ')})")
 
     # 11. Проверка размещения включателя рамки в настройке Картинка чертежа и привязки пропорций к блоку шаблона
     assert(js_text.include?("chk_tpl_aspect_overlay"), "app.js содержит включатель оверлея chk_tpl_aspect_overlay в блоке Картинка чертежа")

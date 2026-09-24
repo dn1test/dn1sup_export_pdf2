@@ -4,10 +4,9 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DN1C Export PDF 2</title>
-  <link rel="stylesheet" href="fonts/open-sans.css">
 <link rel="stylesheet" href="fonts/modus-icons.css">
 <link rel="stylesheet" href="modus-bootstrap.min.css">
-<link rel="stylesheet" href="app.css?v=20260924_modus3">
+<link rel="stylesheet" href="app.css?v=20260924_headers1">
 </head>
 <body>
   <div class="app-container">
@@ -41,7 +40,7 @@
         <span class="badge" id="sceneCountBadge">0</span>
       </button>
       <button class="tab-btn" data-tab="tab-templates">
-        <span class="tab-icon"><i class="modus-icons">dashboard</i></span> Шаблоны
+        <span class="tab-icon"><i class="modus-icons">dashboard-customize</i></span> Шаблоны
       </button>
       <button class="tab-btn" data-tab="tab-directories">
         <span class="tab-icon"><i class="modus-icons">folder</i></span> Папки и спецификации
@@ -187,7 +186,7 @@
             <div class="workflow-right-col">
               <div class="workflow-stadia-panel">
                 <div class="workflow-stadia-header">
-                  <span class="workflow-stadia-icon"><i class="modus-icons">check</i></span>
+                  <span class="workflow-stadia-icon"><i class="modus-icons">check-mark</i></span>
                   <span class="workflow-stadia-title">Стадии проекта (workflow.stadia):</span>
                 </div>
                 <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-vertical">
@@ -195,7 +194,7 @@
                 </div>
                 <div class="stadia-add-row">
                   <input type="text" id="inputNewStadia" class="form-control" placeholder="Название новой стадии...">
-                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка"><i class="modus-icons">add</i> Добавить</button>
+                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка"><i class="modus-icons">add-circle</i> Добавить</button>
                 </div>
               </div>
             </div>
@@ -249,7 +248,7 @@
         <aside class="templates-sidebar" id="templatesSidebar">
           <div class="templates-sidebar-header">
             <div class="sidebar-title-group">
-              <span class="sidebar-title-icon"><i class="modus-icons">dashboard</i></span>
+              <span class="sidebar-title-icon"><i class="modus-icons">dashboard-customize</i></span>
               <span class="sidebar-title-text">Название шаблона</span>
             </div>
             <div class="sidebar-header-actions">
@@ -279,7 +278,7 @@
           <div class="template-settings-toolbar">
             <div class="toolbar-row toolbar-main-row">
               <div class="toolbar-group template-header-info">
-                <span class="current-template-title" id="currentTemplateTitle"><i class="modus-icons">template</i> Титульный лист (Cover)</span>
+                <span class="current-template-title" id="currentTemplateTitle"><i class="modus-icons">file-template</i> Титульный лист (Cover)</span>
                 <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
                   <option value="cover">🏷️ Титульный лист (Cover)</option>
                   <option value="description">📝 Описание и спецификации (Description)</option>
@@ -324,7 +323,7 @@
                   <span class="unit-text">мм</span>
                 </div>
                 <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                  <i class="modus-icons">undo</i> Сбросить
+                  <i class="modus-icons">action-undo</i> Сбросить
                 </button>
                 <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
                   <i class="modus-icons">delete</i> Удалить шаблон
@@ -353,7 +352,7 @@
               <span class="card-header-icon"><i class="modus-icons">folder</i></span>
               <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add</i> Добавить папку</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add-circle</i> Добавить папку</button>
           </div>
           <p class="field-hint">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
           
@@ -367,16 +366,16 @@
       <section id="tab-history" class="tab-pane">
         <div class="history-toolbar">
           <span class="info-text">Журнал изменений проекта (workflow.history_edit):</span>
-          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry"><i class="modus-icons">add</i> Добавить правку</button>
+          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry"><i class="modus-icons">add-circle</i> Добавить правку</button>
         </div>
 
         <div class="table-container">
           <table class="history-table" id="historyTable">
             <thead>
               <tr>
-                <th width="140">Дата - Время (data)</th>
+                <th width="140">Дата и время</th>
                 <th width="95">Версия # Ревизия</th>
-                <th>Название правки (edit)</th>
+                <th>Название правки</th>
                 <th width="85">Открыть</th>
                 <th width="85">Удалить</th>
               </tr>
@@ -539,7 +538,7 @@
               <span class="card-header-icon"><i class="modus-icons">browser</i></span>
               <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add</i> + Добавить URL</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add-circle</i> + Добавить URL</button>
           </div>
           <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
           <div id="apiTargetsList" class="api-targets-container">
@@ -620,7 +619,7 @@
         <div class="modal-actions revision-modal-actions">
           <button type="button" class="btn btn-secondary" id="btnArticulTypeLater">Позже</button>
           <div class="rev-modal-action-group">
-            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">business</i> Коммерческий проект</button>
+            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">user-group</i> Коммерческий проект</button>
             <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС"><i class="modus-icons">account</i> Бытовой проект</button>
           </div>
         </div>
@@ -648,7 +647,7 @@
 
         <div class="modal-actions revision-modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt">Отмена (не сохранять)</button>
-          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check</i> Создать и сохранить</button>
+          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check-mark</i> Создать и сохранить</button>
         </div>
       </div>
     </div>
@@ -670,7 +669,7 @@
     <div id="newTemplateModal" class="modal-overlay hidden">
       <div class="modal-card modal-form-card">
         <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">add</i></span>
+          <span class="modal-card-icon"><i class="modus-icons">add-circle</i></span>
           <h3>Создание нового шаблона страницы</h3>
         </div>
         <p class="field-hint">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
@@ -771,8 +770,8 @@
     <footer class="app-footer">
       <div class="footer-left">
         <button class="btn btn-secondary" id="btnSaveYaml" title="Принудительно сохранить: YAML проекта рядом с .skp + настройки PDF и шаблоны в YAML расширения (также сохраняется при экспорте PDF и закрытии SketchUp)"><i class="modus-icons">save</i> Принудительно сохранить</button>
-        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)"><i class="modus-icons">download</i> Импорт YAML</button>
-        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML"><i class="modus-icons">upload</i> Экспорт YAML</button>
+        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)"><i class="modus-icons">file-download</i> Импорт YAML</button>
+        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML"><i class="modus-icons">file-upload</i> Экспорт YAML</button>
         <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
           <span class="autosave-dot" id="autosaveDot"></span>
           <span class="autosave-text" id="autosaveText">YAML сохранен</span>

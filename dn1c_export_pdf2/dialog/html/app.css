@@ -1,7 +1,7 @@
 /* -------------------------------------------------------------------------------
    DN1C Export PDF 2 — Trimble Modus Bootstrap Design System Theme
    Official UI styling based on Trimble Modus (https://modus-bootstrap.trimble.com/)
-   Precision engineering, clean desktop ergonomics, Open Sans typography,
+   Precision engineering, clean desktop ergonomics, system-ui typography,
    and Trimble Modus Blue (#0063a3) brand identity.
 ------------------------------------------------------------------------------- */
 
@@ -54,8 +54,8 @@
    ========================================================================== */
 :root {
   /* Trimble Modus Typography Tokens */
-  --font-family-modus: "Open Sans", system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-  --font-family-base: "Roboto Condensed", "Open Sans", sans-serif;
+  --font-family-modus: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --font-family-base: "Roboto Condensed", system-ui, sans-serif;
   --font-stretch-base: ultra-condensed;
   --letter-spacing-base: -0.025em;
   --bs-body-font-family: var(--font-family-base);
@@ -162,7 +162,7 @@
 }
 
 /* ==========================================================================
-   Base Styles & Reset (Pure Open Sans Typography)
+   Base Styles & Reset (System UI Typography)
    ========================================================================== */
 *, *::before, *::after {
   box-sizing: border-box;
@@ -290,6 +290,20 @@ body {
   text-overflow: ellipsis;
   line-height: 1.25;
   margin-top: 1px;
+}
+
+/* Плейсхолдеры шапки («Новый проект», «Заказчик — Адрес объекта») — приглушённые
+   курсивом, чтобы не выглядеть заполненными данными */
+.header-titles h1.is-placeholder {
+  color: var(--text-muted);
+  font-weight: 600;
+  font-style: italic;
+}
+
+.header-titles .subtitle.is-placeholder {
+  color: var(--text-muted);
+  opacity: 0.75;
+  font-style: italic;
 }
 
 .header-status-group {
@@ -1992,6 +2006,19 @@ tr:hover td {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.tpl-param-child .tpl-param-caption {
+  flex-shrink: 0;
+  max-width: 140px;
+  font-size: 10.5px;
+}
+
+/* «Заголовок» у параметра внутри блока — компактный чекбокс */
+.tpl-param-child .tpl-param-child-vis {
+  font-size: 10px;
+  gap: 3px;
+  margin-left: auto;
 }
 
 .tpl-params-empty {

@@ -102,8 +102,18 @@ module DN1Code
           doc
         end
 
+        # Сущности документа: мок возвращает записи {entity: ...}, реальный LayOut API
+        # (SU 2026) — сущности постранично через Layout::Page#entities
+        def tp_entities(doc)
+          if doc.respond_to?(:entities) && doc.method(:entities).arity.zero?
+            doc.entities.map { |rec| rec[:entity] }
+          else
+            doc.pages.flat_map { |page| page.entities.to_a }
+          end
+        end
+
         def tp_texts(doc)
-          doc.entities.map { |rec| rec[:entity] }.grep(::Layout::FormattedText)
+          tp_entities(doc).grep(::Layout::FormattedText)
         end
 
         def tp_find_text(doc, fragment)
@@ -111,11 +121,11 @@ module DN1Code
         end
 
         def tp_rects(doc)
-          doc.entities.map { |rec| rec[:entity] }.grep(::Layout::Rectangle)
+          tp_entities(doc).grep(::Layout::Rectangle)
         end
 
         def tp_paths(doc)
-          doc.entities.map { |rec| rec[:entity] }.grep(::Layout::Path)
+          tp_entities(doc).grep(::Layout::Path)
         end
 
         # ------------------------------------------------------------------
@@ -297,9 +307,15 @@ module DN1Code
           assert(row, "Стадия в центральной колонке выведена")
           assert(row.style.text_alignment == ::Layout::Style::ALIGN_CENTER,
                  "Стадия в центральной колонке: текст ALIGN_CENTER на всю ширину зоны")
-          box_c = (row.bounds.x + row.bounds.width / 2.0) * 72.0
-          assert((box_c - PAGE_W_PT / 2.0).abs < 1.0,
-                 "Бокс строки стадии совпадает с центром колонки (#{box_c.round(1)} ≈ #{(PAGE_W_PT / 2.0).round(1)} pt)")
+          # Реальный Geom::Bounds2d хранит upper_left/lower_right, мок — x/width;
+          # ширина страницы берётся из документа (дефолт реального LayOut — Letter,
+          # у мока — A4): центр колонки всегда совпадает с центром страницы
+          b = row.bounds
+          cx = b.respond_to?(:upper_left) ? b.upper_left.x + b.width / 2.0 : b.x + b.width / 2.0
+          box_c = cx * 72.0
+          page_c = doc_sc.page_info.width * 36.0
+          assert((box_c - page_c).abs < 1.0,
+                 "Бокс строки стадии совпадает с центром колонки (#{box_c.round(1)} ≈ #{page_c.round(1)} pt)")
 
           # 6. Неизвестный источник → nil (параметр молча не выводится)
           assert(res.resolve_param(dctx, "legacy.unknown_key").nil?, "Неизвестный источник → nil")
@@ -364,6 +380,64 @@ module DN1Code
           g[:params] = [{ id: "c1", source: "project.room_name", label: "", show_label: false }]
           g[:visible] = false
           assert(tp_texts(tp_render(pd)).empty?, "«Вкл» off (visible=false) убирает блок со страницы")
+        end
+
+        # ------------------------------------------------------------------
+        # 85. Авто-подписи заголовков: пустой label при включённом «Заголовок»
+        # берётся из AUTO_PARAM_LABELS, у детей блока — аналогично
+        # ------------------------------------------------------------------
+        def test_85_template_params_auto_labels
+          puts "\n--- 85. Авто-подписи заголовков (пустой label + «Заголовок») ---"
+
+          # 1. Плоский параметр: «Заголовок» включен, label пуст — авто-подпись источника
+          pd = tp_make_project
+          tp_add_param(pd, :cover, "project.articul")
+          ent = tp_find_text(tp_render(pd), "CF#260922_100000")
+          assert(ent, "Параметр с авто-подписью выводится на страницу")
+          assert(ent.plain_text.include?("Артикул: CF#260922_100000"),
+                 "Пустой label заменяется авто-подписью «Артикул» (#{ent.plain_text.inspect})")
+
+          # 2. «Заголовок» выключен — печатается только значение
+          tp_params(pd, :cover).first[:show_label] = false
+          ent2 = tp_find_text(tp_render(pd), "CF#260922_100000")
+          assert(ent2 && ent2.plain_text == "CF#260922_100000",
+                 "show_label=false печатает значение без заголовка (#{ent2&.plain_text.inspect})")
+
+          # 3. Заданный label сильнее авто-подписи; хвостовые «:» срезаются
+          tp_params(pd, :cover).first[:show_label] = true
+          tp_params(pd, :cover).first[:label] = "Код проекта:"
+          ent3 = tp_find_text(tp_render(pd), "CF#260922_100000")
+          assert(ent3.plain_text.include?("Код проекта: CF#260922_100000") && !ent3.plain_text.include?("Артикул"),
+                 "Явный label перекрывает авто-подпись (#{ent3.plain_text.inspect})")
+
+          # 4. Дети блока: включённый «Заголовок» ребёнка печатается перед значением
+          pd4 = tp_make_project
+          pd4.project_info[:phone] = "+7 999 000-00-00"
+          tp_params(pd4, :cover) << {
+            id: "g85", group: true, label: "", show_label: false,
+            align: "left", valign: "top", font_family: "", font_size: 10.0,
+            color: "#0F172A", visible: true,
+            params: [
+              { id: "c85a", source: "project.room_name", label: "", show_label: true },
+              { id: "c85b", source: "customer.phone",    label: "", show_label: false }
+            ]
+          }
+          ent4 = tp_find_text(tp_render(pd4), "Прихожая")
+          assert(ent4, "Блок с детьми и авто-подписями выводится")
+          assert(ent4.plain_text.include?("Помещение: Прихожая"),
+                 "Ребёнок с «Заголовок» печатается как «Помещение: значение» (#{ent4.plain_text.inspect})")
+          assert(ent4.plain_text.include?("+7 999"),
+                 "Ребёнок без «Заголовок» печатается просто значением")
+          assert(ent4.plain_text.include?(" | "), "Дети блока по-прежнему объединены « | »")
+
+          # 5. Папки спецификаций: авто-подпись из названия раздела
+          pd5 = tp_make_project
+          pd5.directories = [{ path: "C:/job", title: "Материалы", description: "ЛДСП 16 мм, Blum" }]
+          tp_add_param(pd5, :cover, "dir.0.description")
+          ent5 = tp_find_text(tp_render(pd5), "ЛДСП 16 мм, Blum")
+          assert(ent5, "Параметр папки выводится на страницу")
+          assert(ent5.plain_text.include?("Материалы — спецификация: ЛДСП 16 мм, Blum"),
+                 "Авто-подпись папки = «<название> — спецификация» (#{ent5.plain_text.inspect})")
         end
 
         # ------------------------------------------------------------------
