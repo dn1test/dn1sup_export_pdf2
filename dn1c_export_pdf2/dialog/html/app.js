@@ -27,6 +27,9 @@
     scale_pct: 100
   };
 
+  // Векторная иконка крестика закрытия/удаления в стиле Trimble Modus
+  const MODUS_CROSS_SVG = '<svg class="icon-close-cross" width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round"><path d="M2 2l8 8M10 2l-8 8"/></svg>';
+
   // Дата в превью — в печатном формате PDF (dd.mm.yyyy), а не в локали браузера (9/22/2026)
   const previewDate = (d) => {
     const s = String(d || "").trim();
@@ -562,6 +565,124 @@ const DEFAULT_LAYOUTS = {
       }
     } else {
       console.log(`[Mock Ruby Call] action=${action}, param=`, param);
+      if (action === "getData") {
+        setTimeout(() => {
+          if (window.app && window.app.loadData) {
+            const scenesList = [
+              { name: "Титульный лист", page_type: "cover", description: "Обложка проекта", enabled: true, aspect_ratio: "4:3", scale_pct: 100, viewport_visible: true },
+              { name: "Содержание и материалы", page_type: "explain", description: "Пояснительная записка и перечень спецификаций", enabled: true, aspect_ratio: "4:3", scale_pct: 90, viewport_visible: true },
+              { name: "Перспективный вид", page_type: "visual", description: "Визуализация интерьера в дневном освещении", enabled: true, aspect_ratio: "16:9", scale_pct: 100, viewport_visible: true },
+              { name: "План расстановки мебели", page_type: "general", description: "Техническая схема с габаритными размерами", enabled: true, aspect_ratio: "4:3", scale_pct: 80, viewport_visible: true }
+            ];
+            window.app.loadData({
+              project: {
+                articul: "HF#260924_104500",
+                articul_locked: true,
+                furniture_name: "Шкаф купе, Тумба прикроватная, Зеркало",
+                place: "Прихожая и Спальня",
+                adress: "г. Москва, ул. Арбат, д. 24, кв. 12",
+                description: "Комплексный дизайн-проект интерьера с технической документацией",
+                commercial: false
+              },
+              customer: {
+                id: "CUST-2609241045",
+                name: "Алексей Смирнов",
+                phone: "+7 (999) 123-45-67",
+                email: "alex@example.com"
+              },
+              workflow: {
+                author: "Иванов И.И.",
+                price: "245 000",
+                start_date: "2026-09-01",
+                end_date: "2026-09-30",
+                total_duration: "14 дней / 65 часов",
+                version: "02",
+                revision: "003",
+                last_edit: "Добавлены замки и скорректированы габариты тумбы",
+                stadia: [
+                  { name: "Предварительный проект", status: true },
+                  { name: "Правки проекта (история правок)", status: true },
+                  { name: "Выбраны материалы и фурнитура", status: true },
+                  { name: "Предварительно Утвержден", status: true },
+                  { name: "Проверка технологом", status: false },
+                  { name: "Утвержден в производство", status: false }
+                ]
+              },
+              project_info: {
+                articul: "HF#260924_104500",
+                articul_locked: true,
+                furniture_name: "Шкаф купе, Тумба прикроватная, Зеркало",
+                room_name: "Прихожая и Спальня",
+                address: "г. Москва, ул. Арбат, д. 24, кв. 12",
+                company: "ООО \"Интерьер-Дизайн\"",
+                project_description: "Комплексный дизайн-проект интерьера с технической документацией",
+                customer_id: "CUST-2609241045",
+                name_customer: "Алексей Смирнов",
+                phone: "+7 (999) 123-45-67",
+                email: "alex@example.com",
+                author: "Иванов И.И.",
+                price: "245 000",
+                start_date: "2026-09-01",
+                end_date: "2026-09-30",
+                total_duration: "14 дней / 65 часов",
+                version: "02",
+                revision: "003",
+                last_edit: "Добавлены замки и скорректированы габариты тумбы",
+                stadia: [
+                  { name: "Предварительный проект", status: true },
+                  { name: "Правки проекта (история правок)", status: true },
+                  { name: "Выбраны материалы и фурнитура", status: true },
+                  { name: "Предварительно Утвержден", status: true },
+                  { name: "Проверка технологом", status: false },
+                  { name: "Утвержден в производство", status: false }
+                ]
+              },
+              scenes: scenesList,
+              pdf_settings: {
+                page_size: "A3",
+                page_layout: "landscape",
+                margin_mm: 5,
+                show_aspect_overlay: true,
+                image_aspect_ratio: "4:3",
+                font_family: "Sofia Sans Condensed",
+                font_weight: "normal",
+                font_width: "condensed",
+                layout_render_mode: "image",
+                image_format: "png",
+                quality: "medium",
+                scale_multiplier: "2.0",
+                save_layout_file: true,
+                save_backup: true,
+                antialias: true
+              },
+              directories: [
+                { path: "U:/dn1code/projects/specifications", title: "Рабочие спецификации", description: "Чертежи раскроя, список кромки и фурнитуры Blum" },
+                { path: "U:/dn1code/projects/photos", title: "Фотографии объекта", description: "Замеры стен, розеток и вентиляции" }
+              ],
+              history: [
+                { data: "2026-09-24 10:30", edit: "Корректировка фасадов шкафа (rev. 003)", pdf_link: "project_rev003.pdf" },
+                { data: "2026-09-20 15:45", edit: "Первоначальное согласование (rev. 002)", pdf_link: "project_rev002.pdf" },
+                { data: "2026-09-15 11:20", edit: "Создание проекта (rev. 001)", pdf_link: "project_rev001.pdf" }
+              ],
+              vips_available: true
+            });
+          }
+        }, 50);
+      }
+      if (action === "refreshScenes") {
+        setTimeout(() => {
+          if (window.app && window.app.onScenesRefreshed) {
+            window.app.onScenesRefreshed(state.scenes || []);
+          }
+        }, 50);
+      }
+      if (action === "getSceneThumbnails") {
+        setTimeout(() => {
+          if (window.app && window.app.onSceneThumbnailsLoaded) {
+            window.app.onSceneThumbnailsLoaded({});
+          }
+        }, 50);
+      }
       if (action === "getFolderFiles") {
         try {
           const p = typeof param === "string" ? JSON.parse(param) : param;
@@ -1006,7 +1127,7 @@ const DEFAULT_LAYOUTS = {
         btnRename.type = "button";
         btnRename.className = "tpl-item-action-btn";
         btnRename.title = "Переименовать шаблон";
-        btnRename.textContent = "✏️";
+        btnRename.innerHTML = '<i class="modus-icons" style="font-size: 14px;">edit</i>';
         btnRename.addEventListener("click", (e) => {
           e.stopPropagation();
           promptRenameTemplate(tpl.key);
@@ -1016,7 +1137,7 @@ const DEFAULT_LAYOUTS = {
         btnDel.type = "button";
         btnDel.className = "tpl-item-action-btn delete";
         btnDel.title = "Удалить шаблон";
-        btnDel.textContent = "🗑️";
+        btnDel.innerHTML = '<i class="modus-icons" style="font-size: 14px;">delete</i>';
         btnDel.addEventListener("click", (e) => {
           e.stopPropagation();
           deleteCustomTemplate(tpl.key);
@@ -1491,8 +1612,8 @@ function setTemplateParams(params, tplKey) {
             <div class="tpl-param-actions">
               <button type="button" class="tpl-param-btn tpl-param-up" data-id="${p.id}" title="Выше в списке">↑</button>
               <button type="button" class="tpl-param-btn tpl-param-down" data-id="${p.id}" title="Ниже в списке">↓</button>
-              <button type="button" class="tpl-param-btn tpl-param-edit" data-id="${p.id}" title="Изменить источник и заголовок">✏️</button>
-              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${p.id}" title="Удалить параметр">🗑️</button>
+              <button type="button" class="tpl-param-btn tpl-param-edit" data-id="${p.id}" title="Изменить источник и заголовок"><i class="modus-icons" style="font-size: 13px;">edit</i></button>
+              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${p.id}" title="Удалить параметр"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
             </div>
           </div>
           <div class="tpl-param-controls">
@@ -1533,7 +1654,7 @@ function setTemplateParams(params, tplKey) {
             <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
             <span class="tpl-param-child-label">${paramSourceLabel(c.source)}</span>
             ${cPrev ? `<span class="tpl-line-preview">(${cPrev})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
-            <button type="button" class="tpl-param-child-out" data-id="${c.id}" data-group="${g.id}" title="Вывести из блока">✕</button>
+            <button type="button" class="tpl-param-child-out" data-id="${c.id}" data-group="${g.id}" title="Вывести из блока">${MODUS_CROSS_SVG}</button>
           </div>`;
       }).join("");
 
@@ -1546,7 +1667,7 @@ function setTemplateParams(params, tplKey) {
               <span>Вкл</span>
             </label>
             <div class="tpl-param-main">
-              <span class="tpl-param-label">📦 Блок</span>
+              <span class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">layers</i> Блок</span>
               <input type="text" class="form-control tpl-param-group-label" data-id="${g.id}" placeholder="Название блока (необязательно)" value="${g.label || ""}">
               <span class="tpl-param-count">${paramCountText(children.length)}</span>
             </div>
@@ -1593,7 +1714,7 @@ function setTemplateParams(params, tplKey) {
       <div class="tpl-card" id="card_params">
         <div class="tpl-card-header">
           <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">🧩</span>
+            <span class="tpl-card-icon"><i class="modus-icons">tune</i></span>
             <span class="tpl-card-title">Параметры страницы</span>
           </div>
           <div class="tpl-card-header-actions">
@@ -2418,9 +2539,9 @@ function updateParamModalPreview() {
     if (!els.headerTradeBadge) return;
     const hasArticul = articulValue() !== "";
     const isCommercial = currentTradeValue === "1";
-    els.headerTradeBadge.textContent = !hasArticul
+    els.headerTradeBadge.innerHTML = !hasArticul
       ? "Тип не выбран"
-      : (isCommercial ? "🏢 Коммерческий" : "🏠 Бытовой");
+      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">business</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
     els.headerTradeBadge.classList.toggle("trade-unset", !hasArticul);
     els.headerTradeBadge.classList.toggle("trade-commercial", hasArticul && isCommercial);
     els.headerTradeBadge.classList.toggle("trade-household", hasArticul && !isCommercial);
@@ -2694,12 +2815,12 @@ function updateParamModalPreview() {
   // Helper: Get icon for document extensions
   function getDocIcon(ext) {
     ext = (ext || "").toUpperCase();
-    if (ext === "PDF") return "📑";
-    if (ext === "DWG" || ext === "DXF") return "📐";
-    if (ext === "SKP") return "🏠";
-    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return "📝";
-    if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return "📊";
-    return "📄";
+    if (ext === "PDF") return '<i class="modus-icons">file</i>';
+    if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">tune</i>';
+    if (ext === "SKP") return '<i class="modus-icons">views</i>';
+    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">note</i>';
+    if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return '<i class="modus-icons">table</i>';
+    return '<i class="modus-icons">file</i>';
   }
 
   // Helper: Extract folder basename from directory path
@@ -2819,7 +2940,7 @@ function updateParamModalPreview() {
     if (state.directories.length === 0) {
       els.directoriesCardsContainer.innerHTML = `
         <div class="empty-dirs-placeholder">
-          <div style="font-size: 32px; margin-bottom: 8px;">📁</div>
+          <div style="font-size: 32px; margin-bottom: 8px;"><i class="modus-icons" style="font-size: 36px; color: var(--text-dim, #6a6e79);">folder</i></div>
           <div style="font-weight: 600; color: var(--text-color); font-size: 14px;">Папки проекта не заданы</div>
           <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Нажмите «+ Добавить папку», чтобы создать раздел спецификаций и привязать рабочие файлы.</div>
         </div>`;
@@ -2936,7 +3057,7 @@ function updateParamModalPreview() {
       const btnRefresh = document.createElement("button");
       btnRefresh.type = "button";
       btnRefresh.className = "btn btn-xs btn-secondary";
-      btnRefresh.textContent = "🔄 Обновить";
+      btnRefresh.innerHTML = '<i class="modus-icons" style="font-size: 13px; vertical-align: -2px; margin-right: 4px;">refresh</i> Обновить';
       btnRefresh.title = "Пересканировать файлы в папке";
       btnRefresh.addEventListener("click", () => {
         if (d.path) {
@@ -3012,7 +3133,7 @@ function updateParamModalPreview() {
       const btnDelete = document.createElement("button");
       btnDelete.type = "button";
       btnDelete.className = "btn-icon btn-delete";
-      btnDelete.textContent = "✕";
+      btnDelete.innerHTML = MODUS_CROSS_SVG;
       btnDelete.title = "Удалить этот раздел папки";
       btnDelete.addEventListener("click", () => {
         state.directories.splice(index, 1);
@@ -3067,7 +3188,7 @@ function updateParamModalPreview() {
       const previewTitle = document.createElement("div");
       previewTitle.className = "dir-section-title";
       previewTitle.innerHTML = `
-        <span>🖼️ Файлы и предпросмотр в папке:</span>
+        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">photo</i> Файлы и предпросмотр в папке:</span>
         <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>`;
 
       const sizeGroup = document.createElement("div");
@@ -3159,7 +3280,7 @@ function updateParamModalPreview() {
           badge.textContent = "0 файлов";
           badge.className = "badge badge-tag badge-list";
         }
-        previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">📁 Путь к папке не задан. Нажмите «📂 Обзор», чтобы выбрать рабочую папку с файлами.</div>`;
+        previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;"><i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">folder</i> Путь к папке не задан. Нажмите «Обзор», чтобы выбрать рабочую папку с файлами.</div>`;
       }
     });
   }
@@ -3178,7 +3299,7 @@ function updateParamModalPreview() {
       }
       gridEl.innerHTML = `
         <div class="dir-empty-state" style="grid-column: 1 / -1; color: #b45309;">
-          ⚠️ Папка не найдена на диске. Нажмите «📂 Обзор», чтобы указать существующий каталог.
+          <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">warning</i> Папка не найдена на диске. Нажмите «Обзор», чтобы указать существующий каталог.
         </div>`;
       return;
     }
@@ -3192,7 +3313,7 @@ function updateParamModalPreview() {
     if (files.length === 0) {
       gridEl.innerHTML = `
         <div class="dir-empty-state" style="grid-column: 1 / -1;">
-          📁 Папка существует, но файлов в ней пока нет. Вы можете поместить в неё фото, замеры или спецификации.
+          <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">folder</i> Папка существует, но файлов в ней пока нет. Вы можете поместить в неё фото, замеры или спецификации.
         </div>`;
       return;
     }
@@ -3215,14 +3336,14 @@ function updateParamModalPreview() {
           img.remove();
           const docIcon = document.createElement("div");
           docIcon.className = "dir-preview-doc-icon";
-          docIcon.innerHTML = `<span>🖼️</span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+          docIcon.innerHTML = `<span><i class="modus-icons">photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
           thumbWrap.appendChild(docIcon);
         };
         thumbWrap.appendChild(img);
       } else if (file.is_image) {
         const docIcon = document.createElement("div");
         docIcon.className = "dir-preview-doc-icon";
-        docIcon.innerHTML = `<span>🖼️</span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+        docIcon.innerHTML = `<span><i class="modus-icons">photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
         thumbWrap.appendChild(docIcon);
       } else {
         const docIcon = document.createElement("div");
@@ -3278,7 +3399,7 @@ function updateParamModalPreview() {
 
       const icon = document.createElement("span");
       icon.className = "api-target-icon";
-      icon.textContent = "🌐";
+      icon.innerHTML = '<i class="modus-icons">web</i>';
 
       const badge = document.createElement("span");
       badge.className = "api-target-badge";
@@ -3301,7 +3422,7 @@ function updateParamModalPreview() {
       const btnDelete = document.createElement("button");
       btnDelete.type = "button";
       btnDelete.className = "btn-icon btn-delete";
-      btnDelete.textContent = "✕";
+      btnDelete.innerHTML = MODUS_CROSS_SVG;
       btnDelete.title = "Удалить этот адрес API";
       btnDelete.addEventListener("click", () => {
         state.api_targets.splice(index, 1);
@@ -3537,7 +3658,7 @@ function updateParamModalPreview() {
     } else {
       const placeholder = document.createElement("div");
       placeholder.className = "mini-sheet-placeholder";
-      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon">🖼️</span>`;
+      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">photo</i></span>`;
       thumbBox.appendChild(placeholder);
     }
 
@@ -3615,7 +3736,7 @@ function updateParamModalPreview() {
       <div class="tpl-card tpl-panel-left scene-viewport-card ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
         <div class="tpl-card-header">
           <div class="tpl-card-title-group">
-            <span class="tpl-card-icon">🖼️</span>
+            <span class="tpl-card-icon"><i class="modus-icons">photo</i></span>
             <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D) • Сцена ${idx + 1}: «${safeSceneName}»</span>
           </div>
           <div class="tpl-card-header-actions" style="display: flex; align-items: center; gap: 12px;">
@@ -4054,7 +4175,7 @@ function updateParamModalPreview() {
       btnEditTpl.type = "button";
       btnEditTpl.className = "btn-goto-template";
       btnEditTpl.title = "Перейти к настройке этого шаблона страницы";
-      btnEditTpl.textContent = "⚙️";
+      btnEditTpl.innerHTML = '<i class="modus-icons" style="font-size: 13px;">settings</i>';
       btnEditTpl.addEventListener("click", (e) => {
         e.stopPropagation();
         layoutState.selectedSceneIndex = index;
@@ -4239,7 +4360,7 @@ function updateParamModalPreview() {
       const btnDel = document.createElement("button");
       btnDel.type = "button";
       btnDel.className = "stadia-delete";
-      btnDel.textContent = "×";
+      btnDel.innerHTML = MODUS_CROSS_SVG;
       btnDel.title = "Удалить стадию";
       if (stadia.length <= 1) btnDel.style.display = "none";
       btnDel.addEventListener("click", (e) => {

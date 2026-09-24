@@ -6,7 +6,7 @@ layout:
       "y": 12
       w: 50
       h: 82
-      visible: true
+      visible: false
       content: render_viewport
       show_background: false
       aspect_ratio: '4:3'
@@ -17,42 +17,87 @@ layout:
       show_label: true
       align: center
       valign: top
-      font_family: Roboto Condensed
-      font_size: 16.0
-      color: "#f316ca"
+      font_family: ''
+      font_size: 8.0
+      color: "#9e9e9e"
       visible: true
       group: true
       params:
-      - id: p_muelnqn5_e6y4l
+      - id: p_mufh3k0o_w6snt
+        source: project.room_name
         label: ''
         show_label: true
-        align: left
-        valign: top
-        font_family: ''
-        font_size: 10.0
-        color: "#0F172A"
-        visible: true
-        source: project.articul
-      - id: p_mueltvh7_sop5n
+      - id: p_muelx881_5m0bk
+        source: project.address
         label: ''
         show_label: true
-        align: left
-        valign: top
-        font_family: ''
-        font_size: 10.0
-        color: "#0F172A"
-        visible: true
-        source: project.company
-    - id: p_muelx881_5m0bk
+      - id: p_mufh2xi8_z1byg
+        source: customer.name
+        label: ''
+        show_label: true
+      - id: p_mufh4eux_6yjdn
+        source: project.furniture_name
+        label: ''
+        show_label: true
+    - id: g_mufh6cio_dtcyj
+      label: ''
+      show_label: false
+      align: center
+      valign: top
+      font_family: ''
+      font_size: 12.0
+      color: "#4366b6"
+      visible: true
+      group: true
+      params:
+      - id: p_mufh6onl_b7ise
+        source: scene.name
+        label: ''
+        show_label: true
+      - id: p_mufh6zkv_hzia5
+        source: scene.description
+        label: ''
+        show_label: true
+    - id: p_muelnqn5_e6y4l
       label: ''
       show_label: true
       align: center
+      valign: bottom
+      font_family: ''
+      font_size: 8.0
+      color: "#9e9e9e"
+      visible: true
+      source: project.articul
+    - id: p_mufhkzd7_lq6d6
+      label: ''
+      show_label: true
+      align: right
+      valign: bottom
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: page.number_total
+    - id: p_mufhm0t9_zb0q0
+      label: ''
+      show_label: true
+      align: left
       valign: top
       font_family: ''
       font_size: 10.0
       color: "#0F172A"
       visible: true
-      source: project.address
+      source: workflow.last_edit
+    - id: p_mufhmdd2_rhqwg
+      label: ''
+      show_label: true
+      align: left
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: workflow.history
   description:
     image_4_3:
       x: 25
@@ -88,7 +133,28 @@ layout:
       show_background: false
       aspect_ratio: '4:3'
       scale_pct: 100
-    params: []
+    params:
+    - id: g_mufe1daf_0uazg
+      label: ''
+      show_label: false
+      align: left
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      group: true
+      params: []
+    - id: p_mufe1eri_jbh8l
+      label: ''
+      show_label: true
+      align: left
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: project.articul
   visual:
     image_4_3:
       x: 25

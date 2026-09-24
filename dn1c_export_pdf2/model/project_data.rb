@@ -520,7 +520,8 @@ module DN1Code
             description: { image_4_3: default_image_block.dup, params: [] },
             explain:     { image_4_3: default_image_block.dup, params: [] },
             general:     { image_4_3: default_image_block.dup, params: [] },
-            visual:      { image_4_3: default_image_block.dup, params: [] }
+            visual:      { image_4_3: default_image_block.dup, params: [] },
+            blank:       { image_4_3: default_image_block.merge(aspect_ratio: "16:9"), params: [] }
           }
         end
 
@@ -1346,13 +1347,19 @@ module DN1Code
         end
 
         # Нормализация списка параметров шаблона: приведение полей к допустимым
-        # значениям (строки, числа, кламп координат 0..100, булев флаги).
-        # Запись с group: true — блок объединения параметров: вложенные параметры
-        # выводятся одной строкой с разделителем « | ».
+        # значениям (строки, числа, булевы флаги). Размещение задается парой
+        # align (left/center/right) × valign (top/bottom) — свободных координат нет.
+        # Запись с group: true — блок объединения параметров: дети выводятся одной
+        # строкой с разделителем « | » и стилем самого блока, поэтому у ребенка
+        # хранятся только id/source/label/show_label (зеркало normalizeTemplateParam).
         # @param raw [Array] сырой список параметров (из payload диалога или YAML)
         # @return [Array<Hash>]
         def normalize_template_params(raw)
           return [] unless raw.is_a?(Array)
+
+          bool_val = lambda do |v, def_val|
+            v.nil? ? def_val : !(v == false || v.to_s == "false" || v == 0 || v.to_s == "0")
+          end
 
           raw.filter_map do |p|
             next unless p.is_a?(Hash)
@@ -1361,26 +1368,35 @@ module DN1Code
             is_group = p[:group] == true || p["group"] == true || p[:group].to_s == "true"
             next if !is_group && src.empty?
 
-            label     = (p[:label] || p["label"]).to_s.strip
-            show_l    = p.key?(:show_label) ? p[:show_label] : p["show_label"]
-            visible   = p.key?(:visible) ? p[:visible] : p["visible"]
             align_raw = (p[:align] || p["align"] || "left").to_s.strip.downcase
             valign_raw = (p[:valign] || p["valign"] || "top").to_s.strip.downcase
 
             base = {
               id:         (p[:id] || p["id"]).to_s.strip,
-              label:      label,
-              show_label: !(show_l == false || show_l.to_s == "false" || show_l == 0 || show_l.to_s == "0"),
+              label:      (p[:label] || p["label"]).to_s.strip,
+              show_label: bool_val.call(p.key?(:show_label) ? p[:show_label] : p["show_label"], !is_group),
               align:      %w[left center right].include?(align_raw) ? align_raw : "left",
               valign:     %w[top bottom].include?(valign_raw) ? valign_raw : "top",
               font_family: (p[:font_family] || p["font_family"]).to_s.strip,
               font_size:  (p[:font_size] || p["font_size"] || 10.0).to_f.clamp(4.0, 72.0),
               color:      (p[:color] || p["color"] || "#0F172A").to_s.strip,
-              visible:    !(visible == false || visible.to_s == "false" || visible == 0 || visible.to_s == "0")
+              visible:    bool_val.call(p.key?(:visible) ? p[:visible] : p["visible"], true)
             }
 
             if is_group
-              children = normalize_template_params(p[:params] || p["params"] || [])
+              children = Array(p[:params] || p["params"]).filter_map do |c|
+                next unless c.is_a?(Hash)
+
+                child_src = (c[:source] || c["source"]).to_s.strip
+                next if child_src.empty?
+
+                {
+                  id:         (c[:id] || c["id"]).to_s.strip,
+                  source:     child_src,
+                  label:      (c[:label] || c["label"]).to_s.strip,
+                  show_label: bool_val.call(c.key?(:show_label) ? c[:show_label] : c["show_label"], false)
+                }
+              end
               base.merge!(group: true, params: children)
             else
               base.merge!(source: src)

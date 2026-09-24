@@ -491,11 +491,14 @@ module DN1Code
               text_box = { x: box[:x], y: y_top, width: box[:width] - side - gap, height: pitch }
               text_align = :right
             when :center
+              # Имя центрируется самим LayOut на ширину зоны — точно по центру
+              # колонки при любой фактической ширине строки; квадрат-чекбокс
+              # ставится слева от оценочного начала текста.
               w_est = [name.length * size * font_char_width_ratio(font_name), box[:width] * 0.85].min
-              text_x = box[:x] + (box[:width] - w_est) / 2.0
-              sq_x = [text_x - side - gap, box[:x]].max
-              text_box = { x: text_x, y: y_top, width: [[w_est + size, box[:x] + box[:width] - text_x].min, 1.0].max, height: pitch }
-              text_align = :left
+              text_box = { x: box[:x], y: y_top, width: box[:width], height: pitch }
+              text_align = :center
+              sq_x = [[box[:x] + (box[:width] - w_est) / 2.0 - side - gap, box[:x]].max,
+                      box[:x] + box[:width] - side].min
             else
               sq_x = box[:x]
               text_box = { x: box[:x] + side + gap, y: y_top, width: box[:width] - side - gap, height: pitch }
@@ -1022,6 +1025,10 @@ module DN1Code
             # иначе на листе печатается «Артикул:: значение»
             label = (param[:label] || param["label"]).to_s.strip.sub(/:+\s*\z/, "").strip
 
+            # Итоговый текст с заголовком: высота блока считается по нему, иначе
+            # длинный заголовок не учитывается и строки наезжают друг на друга
+            render_text = (show_label && !label.empty?) ? "#{label}: #{value}" : value
+
             align = case (param[:align] || param["align"] || "left").to_s.downcase.strip
                     when "center" then :center
                     when "right"  then :right
@@ -1040,33 +1047,67 @@ module DN1Code
             raw_col = PARAM_TEXT_COLOR if raw_col.empty?
 
             (zones[[align, valign]] ||= []) << {
-              stadia:     stadia,
-              text:       value,
-              label:      label,
-              show_label: show_label,
-              size:       size,
-              color:      raw_col,
-              font:       font
+              stadia:      stadia,
+              text:        value,
+              render_text: render_text,
+              label:       label,
+              show_label:  show_label,
+              size:        size,
+              color:       raw_col,
+              font:        font
             }
           end
           return if zones.empty?
 
           gap_pt = (PARAM_ZONE_GAP_MM * PT_PER_INCH / 25.4).round(2)
 
-          # 2. Отрисовка зон: группа «верх» начинается от верхнего края рабочей
-          #    области, группа «низ» заканчивается у нижнего края
-          zones.each do |(align, valign), items|
+          # 2. Высоты зон считаются заранее: они нужны и для расчета позиции
+          #    группы, и для защиты от наложения верхней и нижней групп колонки
+          layout = {}
+          zones.each do |key, items|
             heights = items.map do |it|
-              w = param_zone_box(content, align, 0.0, 1.0)[:width]
-              h = estimate_text_height(it[:text], it[:size], w, it[:font], ctx[:text_bold])
+              w = param_zone_box(content, key.first, 0.0, 1.0)[:width]
+              est_text = it[:stadia] ? it[:text] : it[:render_text]
+              h = estimate_text_height(est_text, it[:size], w, it[:font], ctx[:text_bold])
               if it[:stadia] && it[:show_label] && !it[:label].empty?
                 h += it[:size] * font_line_pitch_ratio(it[:font])
               end
               h
             end
-            total_h = heights.sum + ([items.size - 1, 0].max * gap_pt)
+            layout[key] = { heights: heights, total_h: heights.sum + ([items.size - 1, 0].max * gap_pt) }
+          end
 
-            cur_y = valign == :bottom ? (content[:top] - content[:h] + total_h) : content[:top]
+          # 3. Отрисовка зон: группа «верх» начинается от верхнего края рабочей
+          #    области, группа «низ» заканчивается у нижнего края. Если верхняя
+          #    группа колонки занимает столько места, что нижней не хватает,
+          #    нижняя прижимается вниз — тексты не должны накладываться.
+          top_used = Hash.new(0.0)
+          layout.each { |(al, va), l| top_used[al] += l[:total_h] if va == :top }
+
+          zones.each do |(align, valign), items|
+            heights = layout[[align, valign]][:heights]
+            total_h = layout[[align, valign]][:total_h]
+
+            cur_y =
+              if valign != :bottom
+                content[:top]
+              else
+                floor_y = content[:top] - content[:h]
+                start_y = floor_y + total_h
+                limit_y = content[:top] - top_used[align] - gap_pt
+                if limit_y < floor_y
+                  # Колонка переполнена целиком: оставляем честную привязку к
+                  # нижнему краю, в полосе столкновения возможно наложение
+                  warn "Параметры шаблона: колонка «#{align}» переполнена — нижняя группа выведена от нижнего края, возможно наложение на верхнюю группу"
+                  start_y
+                else
+                  clamped = [start_y, limit_y].min
+                  if clamped < start_y
+                    warn "Параметры шаблона: нижняя группа колонки «#{align}» не помещается после верхней — прижата вниз, последние строки могут уйти за нижнее поле"
+                  end
+                  clamped
+                end
+              end
 
             items.each_with_index do |it, i|
               h = heights[i]
@@ -1086,8 +1127,7 @@ module DN1Code
                                        { text: it[:text], size: it[:size], color: it[:color], align: align },
                                        box, it[:font], 1.0, (gfx_layer || cnt_layer))
               else
-                text = (it[:show_label] && !it[:label].empty?) ? "#{it[:label]}: #{it[:text]}" : it[:text]
-                add_bounded_text(ctx, doc, page, cnt_layer, text, box,
+                add_bounded_text(ctx, doc, page, cnt_layer, it[:render_text], box,
                                  size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
               end
 

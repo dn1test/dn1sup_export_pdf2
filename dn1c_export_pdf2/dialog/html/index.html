@@ -4,11 +4,10 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>DN1C Export PDF 2</title>
-  <link rel="preconnect" href="https://fonts.googleapis.com">
-  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-  <link href="https://fonts.googleapis.com/css2?family=Open+Sans:ital,wght@0,300..800;1,300..800&family=Roboto+Condensed:ital,wght@0,100..900;1,100..900&display=swap" rel="stylesheet">
-  <link rel="stylesheet" href="modus-bootstrap.min.css">
-  <link rel="stylesheet" href="app.css?v=20260915_roboto">
+  <link rel="stylesheet" href="fonts/open-sans.css">
+<link rel="stylesheet" href="fonts/modus-icons.css">
+<link rel="stylesheet" href="modus-bootstrap.min.css">
+<link rel="stylesheet" href="app.css?v=20260924_modus3">
 </head>
 <body>
   <div class="app-container">
@@ -35,23 +34,23 @@
     <!-- Navigation Tabs -->
     <nav class="nav-tabs">
       <button class="tab-btn active" data-tab="tab-project">
-        <span class="tab-icon">📋</span> Данные проекта
+        <span class="tab-icon"><i class="modus-icons">project</i></span> Данные проекта
       </button>
       <button class="tab-btn" data-tab="tab-scenes">
-        <span class="tab-icon">📄</span> Страницы
+        <span class="tab-icon"><i class="modus-icons">layers</i></span> Страницы
         <span class="badge" id="sceneCountBadge">0</span>
       </button>
       <button class="tab-btn" data-tab="tab-templates">
-        <span class="tab-icon">📐</span> Шаблоны
+        <span class="tab-icon"><i class="modus-icons">dashboard</i></span> Шаблоны
       </button>
       <button class="tab-btn" data-tab="tab-directories">
-        <span class="tab-icon">📁</span> Папки и спецификации
+        <span class="tab-icon"><i class="modus-icons">folder</i></span> Папки и спецификации
       </button>
       <button class="tab-btn" data-tab="tab-history">
-        <span class="tab-icon">📜</span> История
+        <span class="tab-icon"><i class="modus-icons">time</i></span> История
       </button>
       <button class="tab-btn tab-btn-settings" data-tab="tab-settings">
-        <span class="tab-icon">⚙️</span> Настройки
+        <span class="tab-icon"><i class="modus-icons">settings</i></span> Настройки
       </button>
     </nav>
 
@@ -67,7 +66,7 @@
           <!-- Column 1: Паспорт объекта (Project) -->
           <div class="settings-card project-col-card">
             <div class="card-header">
-              <span class="card-header-icon">🏢</span>
+              <span class="card-header-icon"><i class="modus-icons">project</i></span>
               <span class="card-header-title">Паспорт объекта (Project)</span>
             </div>
             <div class="form-grid">
@@ -102,7 +101,7 @@
           <!-- Column 2: Карточка заказчика (Customer) -->
           <div class="settings-card project-col-card">
             <div class="card-header">
-              <span class="card-header-icon">👤</span>
+              <span class="card-header-icon"><i class="modus-icons">account</i></span>
               <span class="card-header-title">Карточка заказчика (Customer)</span>
             </div>
             <div class="form-grid">
@@ -110,7 +109,7 @@
                 <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
                 <div class="input-action-group">
                   <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
-                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента">⚡ Создать ID</button>
+                  <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента"><i class="modus-icons">autorenew</i> Создать ID</button>
                 </div>
               </div>
 
@@ -135,7 +134,7 @@
         <!-- Section 3: Ход работы и жизненный цикл (Workflow) -->
         <div class="settings-card workflow-card">
           <div class="card-header">
-            <span class="card-header-icon">⏱️</span>
+            <span class="card-header-icon"><i class="modus-icons">time</i></span>
             <span class="card-header-title">Ход работы и жизненный цикл (Workflow)</span>
           </div>
           <div class="workflow-split-layout">
@@ -188,7 +187,7 @@
             <div class="workflow-right-col">
               <div class="workflow-stadia-panel">
                 <div class="workflow-stadia-header">
-                  <span class="workflow-stadia-icon">📋</span>
+                  <span class="workflow-stadia-icon"><i class="modus-icons">check</i></span>
                   <span class="workflow-stadia-title">Стадии проекта (workflow.stadia):</span>
                 </div>
                 <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-vertical">
@@ -196,7 +195,7 @@
                 </div>
                 <div class="stadia-add-row">
                   <input type="text" id="inputNewStadia" class="form-control" placeholder="Название новой стадии...">
-                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка">+ Добавить</button>
+                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка"><i class="modus-icons">add</i> Добавить</button>
                 </div>
               </div>
             </div>
@@ -211,7 +210,7 @@
             <div class="scenes-quick-actions">
               <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены">Все</button>
               <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор">Снять</button>
-              <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0 0 0 12px;" title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах и на эскизах">
+              <label class="checkbox-label" title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах и на эскизах">
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
               </label>
@@ -250,7 +249,7 @@
         <aside class="templates-sidebar" id="templatesSidebar">
           <div class="templates-sidebar-header">
             <div class="sidebar-title-group">
-              <span class="sidebar-title-icon">📐</span>
+              <span class="sidebar-title-icon"><i class="modus-icons">dashboard</i></span>
               <span class="sidebar-title-text">Название шаблона</span>
             </div>
             <div class="sidebar-header-actions">
@@ -258,7 +257,7 @@
                 + Новый
               </button>
               <button type="button" class="btn btn-xs btn-danger-outline btn-delete-template-sb" id="btnDeleteTemplateSidebar" title="Удалить выбранный пользовательский шаблон" style="display: none;">
-                🗑️
+                <i class="modus-icons">delete</i>
               </button>
             </div>
           </div>
@@ -272,7 +271,7 @@
           <!-- Panel Header -->
           <div class="template-settings-header">
             <div class="sidebar-title-group">
-              <span class="sidebar-title-icon">⚙️</span>
+              <span class="sidebar-title-icon"><i class="modus-icons">tune</i></span>
               <span class="sidebar-title-text">Параметры шаблона</span>
             </div>
           </div>
@@ -280,7 +279,7 @@
           <div class="template-settings-toolbar">
             <div class="toolbar-row toolbar-main-row">
               <div class="toolbar-group template-header-info">
-                <span class="current-template-title" id="currentTemplateTitle">🏷️ Титульный лист (Cover)</span>
+                <span class="current-template-title" id="currentTemplateTitle"><i class="modus-icons">template</i> Титульный лист (Cover)</span>
                 <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
                   <option value="cover">🏷️ Титульный лист (Cover)</option>
                   <option value="description">📝 Описание и спецификации (Description)</option>
@@ -289,7 +288,7 @@
                   <option value="visual">👁️ Визуализация (Visual)</option>
                 </select>
                 <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
-                  ✏️ Переименовать
+                  <i class="modus-icons">edit</i> Переименовать
                 </button>
                 <span class="layout-page-info" id="layoutPageInfoBadge">A3 Альбомная</span>
               </div>
@@ -325,10 +324,10 @@
                   <span class="unit-text">мм</span>
                 </div>
                 <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                  ↺ Сбросить
+                  <i class="modus-icons">undo</i> Сбросить
                 </button>
                 <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
-                  🗑️ Удалить шаблон
+                  <i class="modus-icons">delete</i> Удалить шаблон
                 </button>
               </div>
             </div>
@@ -349,14 +348,14 @@
       <section id="tab-directories" class="tab-pane">
         <!-- Section 1: Каталоги и спецификации проекта -->
         <div class="settings-card">
-          <div class="card-header" style="justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="card-header-icon">📁</span>
+          <div class="card-header">
+            <div class="card-header-title-wrap">
+              <span class="card-header-icon"><i class="modus-icons">folder</i></span>
               <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory">+ Добавить папку</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add</i> Добавить папку</button>
           </div>
-          <p class="field-hint" style="margin-bottom: 14px;">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
+          <p class="field-hint">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
           
           <div id="directoriesCardsContainer" class="directories-cards-container">
             <!-- Dynamically populated via JS -->
@@ -368,7 +367,7 @@
       <section id="tab-history" class="tab-pane">
         <div class="history-toolbar">
           <span class="info-text">Журнал изменений проекта (workflow.history_edit):</span>
-          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry">+ Добавить правку</button>
+          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry"><i class="modus-icons">add</i> Добавить правку</button>
         </div>
 
         <div class="table-container">
@@ -392,9 +391,9 @@
       <!-- TAB 6: SETTINGS -->
       <section id="tab-settings" class="tab-pane">
         <!-- General Settings Card -->
-        <div class="settings-card" style="margin-bottom: 16px;">
+        <div class="settings-card">
           <div class="card-header">
-            <span class="card-header-icon">🗂️</span>
+            <span class="card-header-icon"><i class="modus-icons">settings</i></span>
             <span class="card-header-title">Общие настройки</span>
           </div>
           <div class="form-grid">
@@ -412,9 +411,9 @@
         </div>
 
         <!-- LayOut Parameters Card -->
-        <div class="settings-card" style="margin-bottom: 16px;">
+        <div class="settings-card">
           <div class="card-header">
-            <span class="card-header-icon">📐</span>
+            <span class="card-header-icon"><i class="modus-icons">layers</i></span>
             <span class="card-header-title">Параметры SketchUp LayOut API</span>
           </div>
           <div class="form-grid">
@@ -469,7 +468,7 @@
 
 
             <div class="form-group" id="layoutSaveFileGroup">
-              <label class="checkbox-label" style="margin-top: 26px;">
+              <label class="checkbox-label">
                 <input type="checkbox" id="chkSaveLayoutFile" checked>
                 <span>Сохранять проект (.layout) рядом с PDF</span>
               </label>
@@ -479,9 +478,9 @@
         </div>
 
         <!-- Page and Document Parameters Card -->
-        <div class="settings-card" style="margin-bottom: 16px;">
+        <div class="settings-card">
           <div class="card-header">
-            <span class="card-header-icon">📄</span>
+            <span class="card-header-icon"><i class="modus-icons">file</i></span>
             <span class="card-header-title">Параметры страницы и документа</span>
           </div>
           <div class="form-grid">
@@ -535,14 +534,14 @@
 
         <!-- Section: Адресаты API -->
         <div class="settings-card">
-          <div class="card-header" style="justify-content: space-between;">
-            <div style="display: flex; align-items: center; gap: 8px;">
-              <span class="card-header-icon">🌐</span>
+          <div class="card-header">
+            <div class="card-header-title-wrap">
+              <span class="card-header-icon"><i class="modus-icons">browser</i></span>
               <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget">+ Добавить URL</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add</i> + Добавить URL</button>
           </div>
-          <p class="field-hint" style="margin-bottom: 12px;">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
+          <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
           <div id="apiTargetsList" class="api-targets-container">
             <!-- Dynamically populated via JS -->
           </div>
@@ -567,7 +566,7 @@
     <div id="revisionPromptModal" class="modal-overlay hidden">
       <div class="modal-card revision-modal-card">
         <div class="modal-header-with-icon">
-          <div class="modal-badge-icon">📋</div>
+          <div class="modal-badge-icon"><i class="modus-icons">edit</i></div>
           <div class="modal-header-text">
             <h3 class="modal-title">Внесение правок в проект</h3>
             <p class="modal-subtitle">Зафиксируйте выполненные изменения перед созданием PDF</p>
@@ -577,11 +576,11 @@
         <div class="revision-modal-body">
           <div class="revision-meta-grid">
             <div class="rev-meta-item">
-              <span class="rev-meta-label">📅 Точная дата и время</span>
+              <span class="rev-meta-label">Точная дата и время</span>
               <span class="rev-meta-value font-mono" id="revPromptDateTime">2026-09-07 00:30</span>
             </div>
             <div class="rev-meta-item">
-              <span class="rev-meta-label">🔖 Номер ревизии</span>
+              <span class="rev-meta-label">Номер ревизии</span>
               <span class="rev-meta-value font-mono"><span id="revPromptCurrentRev">r002</span> &rarr; <span class="rev-next-badge" id="revPromptNextRev">r003</span></span>
             </div>
           </div>
@@ -597,7 +596,7 @@
           <button type="button" class="btn btn-secondary" id="btnCancelExportModal">Отмена</button>
           <div class="rev-modal-action-group">
             <button type="button" class="btn btn-secondary" id="btnSkipRevisionExport" title="Создать PDF без внесения новой записи в историю">Без записи правок</button>
-            <button type="button" class="btn btn-success" id="btnConfirmRevisionExport" title="Записать правки в историю с точным временем и датой и создать PDF">💾 Записать и создать PDF</button>
+            <button type="button" class="btn btn-success" id="btnConfirmRevisionExport" title="Записать правки в историю с точным временем и датой и создать PDF"><i class="modus-icons">save</i> Записать и создать PDF</button>
           </div>
         </div>
       </div>
@@ -607,7 +606,7 @@
     <div id="articulTypeModal" class="modal-overlay hidden">
       <div class="modal-card revision-modal-card">
         <div class="modal-header-with-icon">
-          <div class="modal-badge-icon">🏷️</div>
+          <div class="modal-badge-icon"><i class="modus-icons">project</i></div>
           <div class="modal-header-text">
             <h3 class="modal-title">Создать артикул проекта</h3>
             <p class="modal-subtitle">Выберите тип проекта — артикул будет сгенерирован автоматически</p>
@@ -621,8 +620,8 @@
         <div class="modal-actions revision-modal-actions">
           <button type="button" class="btn btn-secondary" id="btnArticulTypeLater">Позже</button>
           <div class="rev-modal-action-group">
-            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС">💼 Коммерческий проект</button>
-            <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС">🏠 Бытовой проект</button>
+            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">business</i> Коммерческий проект</button>
+            <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС"><i class="modus-icons">account</i> Бытовой проект</button>
           </div>
         </div>
       </div>
@@ -632,7 +631,7 @@
     <div id="articulPromptModal" class="modal-overlay hidden">
       <div class="modal-card revision-modal-card">
         <div class="modal-header-with-icon">
-          <div class="modal-badge-icon">🏷️</div>
+          <div class="modal-badge-icon"><i class="modus-icons">project</i></div>
           <div class="modal-header-text">
             <h3 class="modal-title">Не указан артикул проекта</h3>
             <p class="modal-subtitle">Без артикула данные проекта не сохраняются — нельзя создать папку проекта</p>
@@ -649,7 +648,7 @@
 
         <div class="modal-actions revision-modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt">Отмена (не сохранять)</button>
-          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула">✅ Создать и сохранить</button>
+          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check</i> Создать и сохранить</button>
         </div>
       </div>
     </div>
@@ -657,11 +656,11 @@
     <!-- Export Success Modal -->
     <div id="successModal" class="modal-overlay hidden">
       <div class="modal-card">
-        <div class="modal-icon">🎉</div>
+        <div class="modal-icon"><i class="modus-icons" style="font-size: 40px; color: var(--bs-success);">check-circle</i></div>
         <h3>PDF успешно создан!</h3>
         <p class="modal-file-path" id="successPdfPath"></p>
         <div class="modal-actions">
-          <button class="btn btn-secondary" id="btnOpenPdfFolder">📂 Открыть папку</button>
+          <button class="btn btn-secondary" id="btnOpenPdfFolder"><i class="modus-icons">folder</i> Открыть папку</button>
           <button class="btn btn-primary" id="btnCloseSuccessModal">Готово</button>
         </div>
       </div>
@@ -671,19 +670,19 @@
     <div id="newTemplateModal" class="modal-overlay hidden">
       <div class="modal-card modal-form-card">
         <div class="modal-header-row">
-          <span class="modal-card-icon">✨</span>
-          <h3 style="margin: 0; font-size: 15px;">Создание нового шаблона страницы</h3>
+          <span class="modal-card-icon"><i class="modus-icons">add</i></span>
+          <h3>Создание нового шаблона страницы</h3>
         </div>
-        <p class="field-hint" style="margin: 8px 0 14px 0;">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
+        <p class="field-hint">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
         
-        <div class="form-group" style="margin-bottom: 12px;">
-          <label for="inputNewTemplateName" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Название шаблона *</label>
-          <input type="text" id="inputNewTemplateName" class="form-control" placeholder="Например: План расстановки мебели" style="width: 100%; box-sizing: border-box;">
+        <div class="form-group">
+          <label for="inputNewTemplateName">Название шаблона *</label>
+          <input type="text" id="inputNewTemplateName" class="form-control" placeholder="Например: План расстановки мебели">
         </div>
 
-        <div class="form-group" style="margin-bottom: 18px;">
-          <label for="selectNewTemplateBase" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Базовая структура / основа *</label>
-          <select id="selectNewTemplateBase" class="form-control" style="width: 100%; box-sizing: border-box;">
+        <div class="form-group">
+          <label for="selectNewTemplateBase">Базовая структура / основа *</label>
+          <select id="selectNewTemplateBase" class="form-control">
             <option value="general" selected>🖼️ Общий вид (General) — универсальный чертеж / вид</option>
             <option value="visual">👁️ Визуализация (Visual) — широкоформатный видовой экран</option>
             <option value="description">📝 Описание и спецификации (Description) — со спецификациями</option>
@@ -693,7 +692,7 @@
           </select>
         </div>
 
-        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+        <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate">Отмена</button>
           <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate">Создать шаблон</button>
         </div>
@@ -703,17 +702,17 @@
     <!-- Delete Template Confirmation Modal -->
     <div id="deleteTemplateModal" class="modal-overlay hidden">
       <div class="modal-card modal-form-card">
-        <div class="modal-header-row" style="color: #dc2626;">
-          <span class="modal-card-icon">🗑️</span>
-          <h3 style="margin: 0; font-size: 15px;">Удаление шаблона страницы</h3>
+        <div class="modal-header-row modal-header-danger">
+          <span class="modal-card-icon"><i class="modus-icons">delete</i></span>
+          <h3>Удаление шаблона страницы</h3>
         </div>
-        <p id="deleteTemplateMsg" style="margin: 12px 0 8px 0; font-size: 13px; font-weight: 500; color: #1e293b;">
+        <p id="deleteTemplateMsg" class="modal-msg">
           Вы действительно хотите удалить выбранный шаблон?
         </p>
-        <div class="field-hint" style="margin-bottom: 16px; background-color: #fef2f2; border: 1px solid #fecaca; padding: 8px 10px; border-radius: 4px; color: #991b1b;">
+        <div class="field-hint modal-alert-danger">
           ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на стандартный шаблон «Общий вид (General)».
         </div>
-        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+        <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate">Отмена</button>
           <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate">Удалить шаблон</button>
         </div>
@@ -724,17 +723,17 @@
     <div id="renameTemplateModal" class="modal-overlay hidden">
       <div class="modal-card modal-form-card">
         <div class="modal-header-row">
-          <span class="modal-card-icon">✏️</span>
-          <h3 style="margin: 0; font-size: 15px;">Переименование шаблона страницы</h3>
+          <span class="modal-card-icon"><i class="modus-icons">edit</i></span>
+          <h3>Переименование шаблона страницы</h3>
         </div>
-        <p class="field-hint" style="margin: 8px 0 14px 0;">Укажите новое название для этого шаблона страницы:</p>
+        <p class="field-hint">Укажите новое название для этого шаблона страницы:</p>
 
-        <div class="form-group" style="margin-bottom: 18px;">
-          <label for="inputRenameTemplateName" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Название шаблона *</label>
-          <input type="text" id="inputRenameTemplateName" class="form-control" style="width: 100%; box-sizing: border-box;">
+        <div class="form-group">
+          <label for="inputRenameTemplateName">Название шаблона *</label>
+          <input type="text" id="inputRenameTemplateName" class="form-control">
         </div>
 
-        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+        <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate">Отмена</button>
           <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate">Сохранить</button>
         </div>
@@ -745,23 +744,23 @@
     <div id="paramModal" class="modal-overlay hidden" tabindex="-1">
       <div class="modal-card modal-form-card param-modal-card">
         <div class="modal-header-row">
-          <span class="modal-card-icon">🧩</span>
-          <h3 id="paramModalTitle" style="margin: 0; font-size: 15px;">Создать параметр</h3>
+          <span class="modal-card-icon"><i class="modus-icons">tune</i></span>
+          <h3 id="paramModalTitle">Создать параметр</h3>
         </div>
-        <p class="field-hint" style="margin: 8px 0 12px 0;">Выберите источник данных параметра. Шрифт, размер, выравнивания (задают место на странице), цвет и заголовок настраиваются в строке параметра.</p>
+        <p class="field-hint">Выберите источник данных параметра. Шрифт, размер, выравнивания (задают место на странице), цвет и заголовок настраиваются в строке параметра.</p>
 
-        <div class="form-group" style="margin-bottom: 10px;">
-          <label for="paramModalSource" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;">Источник данных *</label>
-          <select id="paramModalSource" class="form-control" style="width: 100%; box-sizing: border-box;"></select>
+        <div class="form-group">
+          <label for="paramModalSource">Источник данных *</label>
+          <select id="paramModalSource" class="form-control"></select>
           <div id="paramModalPreview" class="param-modal-preview"></div>
         </div>
 
-        <div class="form-group" style="margin-bottom: 14px;">
-          <label for="paramModalLabel" style="font-weight: 600; font-size: 11px; display: block; margin-bottom: 4px;" title="Текст перед значением на листе (показ включается галкой «Заголовок» в строке параметра)">Заголовок</label>
-          <input type="text" id="paramModalLabel" class="form-control" placeholder="Например: Помещение" style="width: 100%; box-sizing: border-box;">
+        <div class="form-group">
+          <label for="paramModalLabel" title="Текст перед значением на листе (показ включается галкой «Заголовок» в строке параметра)">Заголовок</label>
+          <input type="text" id="paramModalLabel" class="form-control" placeholder="Например: Помещение">
         </div>
 
-        <div class="modal-actions" style="justify-content: flex-end; gap: 8px;">
+        <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelParam">Отмена</button>
           <button type="button" class="btn btn-primary" id="btnConfirmParam">Сохранить параметр</button>
         </div>
@@ -771,9 +770,9 @@
     <!-- Footer Action Bar -->
     <footer class="app-footer">
       <div class="footer-left">
-        <button class="btn btn-secondary" id="btnSaveYaml" title="Принудительно сохранить: YAML проекта рядом с .skp + настройки PDF и шаблоны в YAML расширения (также сохраняется при экспорте PDF и закрытии SketchUp)">💾 Принудительно сохранить</button>
-        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)">📥 Импорт YAML</button>
-        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML">📤 Экспорт YAML</button>
+        <button class="btn btn-secondary" id="btnSaveYaml" title="Принудительно сохранить: YAML проекта рядом с .skp + настройки PDF и шаблоны в YAML расширения (также сохраняется при экспорте PDF и закрытии SketchUp)"><i class="modus-icons">save</i> Принудительно сохранить</button>
+        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)"><i class="modus-icons">download</i> Импорт YAML</button>
+        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML"><i class="modus-icons">upload</i> Экспорт YAML</button>
         <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
           <span class="autosave-dot" id="autosaveDot"></span>
           <span class="autosave-text" id="autosaveText">YAML сохранен</span>
@@ -784,11 +783,11 @@
           <input type="checkbox" id="chkAutoOpen" checked>
           <span>Открыть после экспорта</span>
         </label>
-        <button class="btn btn-success" id="btnStartExport">🚀 Экспорт в PDF</button>
+        <button class="btn btn-success" id="btnStartExport"><i class="modus-icons">launch</i> Экспорт в PDF</button>
       </div>
     </footer>
   </div>
 
-  <script src="app.js?v=20260908_222200"></script>
+  <script src="app.js?v=20260924_modus3"></script>
 </body>
 </html>

@@ -5,8 +5,9 @@
 # «Параметры страницы» → «+ Создать параметр»).
 #
 # Готовых списков параметров больше нет: параметр создается из источника данных
-# («Данные проекта», «Папки спецификации», сцена, страница) и размещается
-# свободно на странице (X/Y в %, выравнивание, кегль, цвет, заголовок, Вкл).
+# («Данные проекта», «Папки спецификации», сцена, страница). Размещение — одна из
+# шести зон страницы: колонка слева/по центру/справа (align) × верх/низ (valign);
+# в строке параметра задаются кегль, цвет, заголовок и флаг «Вкл».
 #
 # Каждый тест проверяет ФАКТИЧЕСКИЙ результат в документе LayOut (мок): тексты,
 # позиции (bounds), стили (размер/цвет/выравнивание), чекбоксы стадий, а также
@@ -203,8 +204,8 @@ module DN1Code
 
           # 9. Выравнивание печатается в стиле текста (ALIGN_*)
           pd_al = tp_make_project
-          tp_add_param(pd_al, :cover, "project.articul", label: "A", x: 50.0, align: "center")
-          tp_add_param(pd_al, :cover, "project.room_name", label: "B", x: 95.0, align: "right")
+          tp_add_param(pd_al, :cover, "project.articul", label: "A", align: "center")
+          tp_add_param(pd_al, :cover, "project.room_name", label: "B", align: "right")
           doc_al = tp_render(pd_al)
           assert(tp_find_text(doc_al, "CF#").style.text_alignment == ::Layout::Style::ALIGN_CENTER,
                  "Выравнивание «Центр» → ALIGN_CENTER в стиле")
@@ -214,7 +215,7 @@ module DN1Code
           # 10. Шрифт параметра (font_family); пусто — шрифт страницы
           pd_ff = tp_make_project
           tp_add_param(pd_ff, :cover, "project.room_name", label: "Помещение", font_family: "Oswald")
-          tp_add_param(pd_ff, :cover, "project.articul", label: "A", y: 30.0, font_family: "")
+          tp_add_param(pd_ff, :cover, "project.articul", label: "A", font_family: "")
           doc_ff = tp_render(pd_ff)
           expected_ff = ::DN1Code::ExportPdf2::Service::FontService.layout_font_family("Oswald")
           assert(tp_find_text(doc_ff, "Прихожая").style.font_family == expected_ff,
@@ -279,12 +280,26 @@ module DN1Code
             { name: "Рабочая документация", status: false },
             { name: "Детализация",          status: false }
           ]
-          tp_add_param(pd_st, :cover, "workflow.stadia", label: "Стадии", y: 30.0)
+          tp_add_param(pd_st, :cover, "workflow.stadia", label: "Стадии")
           doc_st = tp_render(pd_st)
           assert(tp_find_text(doc_st, "Эскизный проект") && tp_find_text(doc_st, "Рабочая документация"),
                  "Названия стадий выводятся строками")
           assert(tp_rects(doc_st).size == 3, "На каждую стадию рисуется квадрат-чекбокс (3 шт)")
           assert(tp_paths(doc_st).size == 1, "Галочка рисуется только для отмеченной стадии (1 шт)")
+
+          # 5b. Стадии в центральной колонке: текст центрируется самим LayOut
+          # на всю ширину зоны — точно по центру колонки при любой ширине строки
+          pd_sc = tp_make_project
+          pd_sc.workflow[:stadia] = [{ name: "Эскизный проект", status: true }, { name: "РД", status: false }]
+          tp_add_param(pd_sc, :cover, "workflow.stadia", label: "Стадии", align: "center")
+          doc_sc = tp_render(pd_sc)
+          row = tp_find_text(doc_sc, "Эскизный проект")
+          assert(row, "Стадия в центральной колонке выведена")
+          assert(row.style.text_alignment == ::Layout::Style::ALIGN_CENTER,
+                 "Стадия в центральной колонке: текст ALIGN_CENTER на всю ширину зоны")
+          box_c = (row.bounds.x + row.bounds.width / 2.0) * 72.0
+          assert((box_c - PAGE_W_PT / 2.0).abs < 1.0,
+                 "Бокс строки стадии совпадает с центром колонки (#{box_c.round(1)} ≈ #{(PAGE_W_PT / 2.0).round(1)} pt)")
 
           # 6. Неизвестный источник → nil (параметр молча не выводится)
           assert(res.resolve_param(dctx, "legacy.unknown_key").nil?, "Неизвестный источник → nil")
@@ -459,10 +474,14 @@ module DN1Code
           child = g[:params].first
           assert(child[:source] == "project.room_name" && !child.key?(:x),
                  "Дитя блока нормализуется: источник сохранен, X/Y удалены")
+          assert(child.key?(:id) && child.key?(:source) && child.key?(:label) && child.key?(:show_label) &&
+                 !child.key?(:align) && !child.key?(:valign) && !child.key?(:font_size) && !child.key?(:color) &&
+                 !child.key?(:visible),
+                 "Дитя блока хранит только id/source/label/show_label — зона и стиль у самого блока")
 
           # 5. save_to_layout_yaml: параметры сохраняются и читаются обратно
           pd4 = tp_make_project
-          tp_add_param(pd4, :cover, "customer.name", label: "Заказчик", x: 42.0, y: 96.0, align: "right")
+          tp_add_param(pd4, :cover, "customer.name", label: "Заказчик", align: "right")
           out_path = File.join(dir, "layout_out.yaml")
           assert(pd4.send(:save_to_layout_yaml, out_path), "layout.yaml сохраняется")
           pd5 = tp_make_project
@@ -575,10 +594,68 @@ module DN1Code
                  "Старые блоки header/slot_1/footer в конфиге не рендерятся (чистый лист)")
 
           # 2. Новый параметр рендерится рядом с «мусорными» ключами
-          tp_add_param(pd, :cover, "project.room_name", label: "Помещение", y: 10.0)
+          tp_add_param(pd, :cover, "project.room_name", label: "Помещение")
           doc2 = tp_render(pd)
           assert(tp_find_text(doc2, "Прихожая"), "Новый параметр выводится независимо от легаси-ключей")
           assert(tp_texts(doc2).size == 1, "На странице ровно один текстовый блок — созданный параметр")
+        end
+
+        # ------------------------------------------------------------------
+        # 85. Высота блока учитывает заголовок; переполнение колонки не дает
+        #     наложения верхней и нижней групп; дефолты блоков и blank
+        # ------------------------------------------------------------------
+        def test_85_template_params_height_label_and_overflow_clamp
+          puts "\n--- 85. Высота с заголовком / клампинг переполнения колонки / дефолты ---"
+
+          # 1. Высота бокса считается по итоговому тексту «Заголовок: значение»
+          pd = tp_make_project
+          long_label = "Очень длинный заголовок параметра для проверки"
+          tp_add_param(pd, :cover, "project.articul", label: long_label)
+          doc = tp_render(pd)
+          ent = tp_find_text(doc, "CF#")
+          assert(ent, "Параметр с длинным заголовком выведен")
+          expected_h = LB.send(:estimate_text_height, "#{long_label}: CF#260922_100000",
+                               10.0, CONTENT_W * 0.45, "Sofia Sans Condensed", false) + 1.5
+          actual_h = ent.bounds.height * 72.0
+          assert((actual_h - expected_h).abs < 0.6,
+                 "Высота бокса = оценка итогового текста с заголовком (#{actual_h.round(1)} ≈ #{expected_h.round(1)} pt)")
+
+          # 2. Переполнение колонки: нижняя группа прижимается вниз,
+          #    наложения текстов верхней и нижней групп нет
+          pd2 = tp_make_project
+          pd2.project_info[:description] = "Корпусная мебель из ЛДСП 16 мм с фасадами МДФ, наполнение Blum. " * 6
+          pd2.workflow[:stadia] = Array.new(8) { |i| { name: "Этап №#{i + 1}", status: i.even? } }
+          list2 = tp_params(pd2, :cover)
+          4.times do |i|
+            list2 << { id: "t#{i}", source: "project.description", label: "Описание", align: "left", valign: "top",
+                       show_label: true, font_family: "", font_size: 10.0, color: "#0F172A", visible: true }
+          end
+          2.times do |i|
+            list2 << { id: "b#{i}", source: "workflow.stadia", label: "", align: "left", valign: "bottom",
+                       show_label: false, font_family: "", font_size: 10.0, color: "#0F172A", visible: true }
+          end
+          doc2 = tp_render(pd2)
+          texts2 = tp_texts(doc2)
+          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Описание:") }
+                           .map { |t| (t.bounds.y + t.bounds.height) * 72.0 }.max
+          bot_first = texts2.select { |t| t.plain_text.to_s.strip == "Этап №1" }
+                            .map { |t| t.bounds.y * 72.0 }.min
+          assert(top_last && bot_first, "Верхний и нижний стеки выведены (режим переполнения)")
+          clearance = bot_first - top_last
+          # зазор между нижней кромкой верхнего стека и первой строкой нижнего;
+          # у верхнего бокса в bounds уже сидит запас +1.5 pt, поэтому ~5.6, а не 7.1
+          assert(clearance >= 4.0 && clearance <= 9.0,
+                 "Нижний стек прижат вниз и начинается ниже верхнего (зазор #{clearance.round(1)} pt)")
+
+          # 3. Дефолт show_label: у обычного параметра — true, у блока — false
+          norm_p = pd2.send(:normalize_template_params, [{ source: "a.a" }])
+          assert(norm_p.first[:show_label] == true, "Параметр без show_label → true")
+          norm_g = pd2.send(:normalize_template_params, [{ group: true, label: "Блок", params: [{ source: "a.a" }] }])
+          assert(norm_g.first[:show_label] == false, "Блок без show_label → false (как в диалоге)")
+
+          # 4. Шаблон blank есть в Ruby-дефолтах (как в диалоге и layout.yaml)
+          assert(tp_make_project.pdf_settings[:custom_layouts].key?(:blank),
+                 "Шаблон blank присутствует в default_custom_layouts")
         end
       end
     end
@@ -621,6 +698,7 @@ if __FILE__ == $PROGRAM_NAME
         test_82_template_params_data_contract_and_js_guards
         test_83_template_params_render_reads_new_config_only
         test_84_template_params_group_block
+        test_85_template_params_height_label_and_overflow_clamp
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
