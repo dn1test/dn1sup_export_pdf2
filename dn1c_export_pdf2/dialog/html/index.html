@@ -6,14 +6,14 @@
   <title>DN1C Export PDF 2 v2.3.0</title>
 <link rel="stylesheet" href="fonts/modus-icons.css">
 <link rel="stylesheet" href="modus-bootstrap.min.css">
-<link rel="stylesheet" href="app.css?v=20260924_headers1">
+<link rel="stylesheet" href="app.css?v=20260924_design2">
 </head>
 <body>
   <div class="app-container">
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="logo-badge" title="Версия плагина: v2.3.0"><i class="modus-icons">file-template</i> PDF <span class="logo-version" id="logoVersion">v2.3.0</span></div>
+        <div class="logo-badge" title="Версия плагина: v2.3.0"><i class="modus-icons">file_template</i> PDF <span class="logo-version" id="logoVersion">v2.3.0</span></div>
         <div class="header-titles">
           <h1 id="headerProjectTitle">Новый проект</h1>
           <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>
@@ -40,7 +40,7 @@
         <span class="badge" id="sceneCountBadge">0</span>
       </button>
       <button class="tab-btn" data-tab="tab-templates">
-        <span class="tab-icon"><i class="modus-icons">dashboard-customize</i></span> Шаблоны
+        <span class="tab-icon"><i class="modus-icons">dashboard_customize</i></span> Шаблоны
       </button>
       <button class="tab-btn" data-tab="tab-directories">
         <span class="tab-icon"><i class="modus-icons">folder</i></span> Папки и спецификации
@@ -186,7 +186,7 @@
             <div class="workflow-right-col">
               <div class="workflow-stadia-panel">
                 <div class="workflow-stadia-header">
-                  <span class="workflow-stadia-icon"><i class="modus-icons">check-mark</i></span>
+                  <span class="workflow-stadia-icon"><i class="modus-icons">check_mark</i></span>
                   <span class="workflow-stadia-title">Стадии проекта (workflow.stadia):</span>
                 </div>
                 <div id="stadiaCheckboxesContainer" class="stadia-checkboxes-vertical">
@@ -194,7 +194,7 @@
                 </div>
                 <div class="stadia-add-row">
                   <input type="text" id="inputNewStadia" class="form-control" placeholder="Название новой стадии...">
-                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка"><i class="modus-icons">add-circle</i> Добавить</button>
+                  <button class="btn btn-xs btn-primary" id="btnAddStadia" title="Добавить стадию в конец списка"><i class="modus-icons">add_circle</i> Добавить</button>
                 </div>
               </div>
             </div>
@@ -207,8 +207,8 @@
         <div class="scenes-panel" id="scenesPanel">
           <div class="scenes-toolbar">
             <div class="scenes-quick-actions">
-              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check-mark</i> Все</button>
-              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content-close</i> Снять</button>
+              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check_mark</i> Все</button>
+              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content_close</i> Снять</button>
               <label class="checkbox-label" title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах и на эскизах">
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
@@ -248,12 +248,12 @@
         <aside class="templates-sidebar" id="templatesSidebar">
           <div class="templates-sidebar-header">
             <div class="sidebar-title-group">
-              <span class="sidebar-title-icon"><i class="modus-icons">dashboard-customize</i></span>
+              <span class="sidebar-title-icon"><i class="modus-icons">dashboard_customize</i></span>
               <span class="sidebar-title-text">Название шаблона</span>
             </div>
             <div class="sidebar-header-actions">
               <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
-                <i class="modus-icons">add-circle</i> Новый
+                <i class="modus-icons">add_circle</i> Новый
               </button>
               <button type="button" class="btn btn-xs btn-danger-outline btn-delete-template-sb" id="btnDeleteTemplateSidebar" title="Удалить выбранный пользовательский шаблон" style="display: none;">
                 <i class="modus-icons">delete</i>
@@ -278,13 +278,13 @@
           <div class="template-settings-toolbar">
             <div class="toolbar-row toolbar-main-row">
               <div class="toolbar-group template-header-info">
-                <span class="current-template-title" id="currentTemplateTitle"><i class="modus-icons">file-template</i> Титульный лист (Cover)</span>
+                <span class="current-template-title" id="currentTemplateTitle">Титульный лист (Cover)</span>
                 <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
-                  <option value="cover">🏷️ Титульный лист (Cover)</option>
-                  <option value="description">📝 Описание и спецификации (Description)</option>
-                  <option value="explain">📋 Содержание и ведомость (Explain)</option>
-                  <option value="general">🖼️ Общий вид (General)</option>
-                  <option value="visual">👁️ Визуализация (Visual)</option>
+                  <option value="cover">Титульный лист (Cover)</option>
+                  <option value="description">Описание и спецификации (Description)</option>
+                  <option value="explain">Содержание и ведомость (Explain)</option>
+                  <option value="general">Общий вид (General)</option>
+                  <option value="visual">Визуализация (Visual)</option>
                 </select>
                 <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
                   <i class="modus-icons">edit</i> Переименовать
@@ -323,7 +323,7 @@
                   <span class="unit-text">мм</span>
                 </div>
                 <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                  <i class="modus-icons">action-undo</i> Сбросить
+                  <i class="modus-icons">action_undo</i> Сбросить
                 </button>
                 <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
                   <i class="modus-icons">delete</i> Удалить шаблон
@@ -352,7 +352,7 @@
               <span class="card-header-icon"><i class="modus-icons">folder</i></span>
               <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add-circle</i> Добавить папку</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add_circle</i> Добавить папку</button>
           </div>
           <p class="field-hint">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
           
@@ -366,7 +366,7 @@
       <section id="tab-history" class="tab-pane">
         <div class="history-toolbar">
           <span class="info-text">Журнал изменений проекта (workflow.history_edit):</span>
-          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry"><i class="modus-icons">add-circle</i> Добавить правку</button>
+          <button class="btn btn-xs btn-primary" id="btnAddHistoryEntry"><i class="modus-icons">add_circle</i> Добавить правку</button>
         </div>
 
         <div class="table-container">
@@ -538,7 +538,7 @@
               <span class="card-header-icon"><i class="modus-icons">browser</i></span>
               <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
             </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add-circle</i> + Добавить URL</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add_circle</i> + Добавить URL</button>
           </div>
           <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
           <div id="apiTargetsList" class="api-targets-container">
@@ -613,7 +613,7 @@
         </div>
 
         <div class="modal-actions revision-modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelExportModal"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelExportModal"><i class="modus-icons">content_close</i> Отмена</button>
           <div class="rev-modal-action-group">
             <button type="button" class="btn btn-secondary" id="btnSkipRevisionExport" title="Создать PDF без внесения новой записи в историю"><i class="modus-icons">launch</i> Без записи правок</button>
             <button type="button" class="btn btn-success" id="btnConfirmRevisionExport" title="Записать правки в историю с точным временем и датой и создать PDF"><i class="modus-icons">save</i> Записать и создать PDF</button>
@@ -640,7 +640,7 @@
         <div class="modal-actions revision-modal-actions">
           <button type="button" class="btn btn-secondary" id="btnArticulTypeLater"><i class="modus-icons">time</i> Позже</button>
           <div class="rev-modal-action-group">
-            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">user-group</i> Коммерческий проект</button>
+            <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">user_group</i> Коммерческий проект</button>
             <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС"><i class="modus-icons">account</i> Бытовой проект</button>
           </div>
         </div>
@@ -667,21 +667,24 @@
         </div>
 
         <div class="modal-actions revision-modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt"><i class="modus-icons">content-close</i> Отмена</button>
-          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check-mark</i> Создать и сохранить</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check_mark</i> Создать и сохранить</button>
         </div>
       </div>
     </div>
 
     <!-- Export Success Modal -->
     <div id="successModal" class="modal-overlay hidden">
-      <div class="modal-card">
-        <div class="modal-icon"><i class="modus-icons" style="font-size: 40px; color: var(--bs-success);">check-circle</i></div>
-        <h3>PDF успешно создан!</h3>
-        <p class="modal-file-path" id="successPdfPath"></p>
-        <div class="modal-actions">
+      <div class="modal-card success-modal-card">
+        <div class="success-modal-icon"><i class="modus-icons">check_circle</i></div>
+        <h3 class="success-modal-title">PDF успешно создан!</h3>
+        <div class="success-modal-path-box">
+          <span class="success-path-label">Файл документа:</span>
+          <p class="modal-file-path font-mono" id="successPdfPath" title="Путь к созданному PDF"></p>
+        </div>
+        <div class="modal-actions success-modal-actions">
           <button class="btn btn-secondary" id="btnOpenPdfFolder"><i class="modus-icons">folder</i> Открыть папку</button>
-          <button class="btn btn-primary" id="btnCloseSuccessModal"><i class="modus-icons">check-mark</i> Готово</button>
+          <button class="btn btn-primary" id="btnCloseSuccessModal"><i class="modus-icons">check_mark</i> Готово</button>
         </div>
       </div>
     </div>
@@ -690,7 +693,7 @@
     <div id="newTemplateModal" class="modal-overlay hidden">
       <div class="modal-card modal-form-card">
         <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">add-circle</i></span>
+          <span class="modal-card-icon"><i class="modus-icons">add_circle</i></span>
           <h3>Создание нового шаблона страницы</h3>
         </div>
         <p class="field-hint">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
@@ -703,18 +706,18 @@
         <div class="form-group">
           <label for="selectNewTemplateBase">Базовая структура / основа *</label>
           <select id="selectNewTemplateBase" class="form-control">
-            <option value="general" selected>🖼️ Общий вид (General) — универсальный чертеж / вид</option>
-            <option value="visual">👁️ Визуализация (Visual) — широкоформатный видовой экран</option>
-            <option value="description">📝 Описание и спецификации (Description) — со спецификациями</option>
-            <option value="explain">📋 Содержание и ведомость (Explain) — с ведомостью страниц</option>
-            <option value="cover">🏷️ Титульный лист (Cover) — крупный титульный лист</option>
-            <option value="blank">⬜ Без шаблона (Blank) — чистая страница без рамок и текста</option>
+            <option value="general" selected>Общий вид (General) — универсальный чертеж / вид</option>
+            <option value="visual">Визуализация (Visual) — широкоформатный видовой экран</option>
+            <option value="description">Описание и спецификации (Description) — со спецификациями</option>
+            <option value="explain">Содержание и ведомость (Explain) — с ведомостью страниц</option>
+            <option value="cover">Титульный лист (Cover) — крупный титульный лист</option>
+            <option value="blank">Без шаблона (Blank) — чистая страница без рамок и текста</option>
           </select>
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate"><i class="modus-icons">content-close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate"><i class="modus-icons">check-mark</i> Создать шаблон</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate"><i class="modus-icons">check_mark</i> Создать шаблон</button>
         </div>
       </div>
     </div>
@@ -733,7 +736,7 @@
           ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на стандартный шаблон «Общий вид (General)».
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate"><i class="modus-icons">content_close</i> Отмена</button>
           <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate"><i class="modus-icons">delete</i> Удалить шаблон</button>
         </div>
       </div>
@@ -754,8 +757,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate"><i class="modus-icons">content-close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate"><i class="modus-icons">check-mark</i> Сохранить</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate"><i class="modus-icons">check_mark</i> Сохранить</button>
         </div>
       </div>
     </div>
@@ -781,8 +784,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelParam"><i class="modus-icons">content-close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmParam"><i class="modus-icons">check-mark</i> Сохранить параметр</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelParam"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmParam"><i class="modus-icons">check_mark</i> Сохранить параметр</button>
         </div>
       </div>
     </div>
@@ -791,8 +794,8 @@
     <footer class="app-footer">
       <div class="footer-left">
         <button class="btn btn-secondary" id="btnSaveYaml" title="Принудительно сохранить: YAML проекта рядом с .skp + настройки PDF и шаблоны в YAML расширения (также сохраняется при экспорте PDF и закрытии SketchUp)"><i class="modus-icons">save</i> Принудительно сохранить</button>
-        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)"><i class="modus-icons">file-download</i> Импорт YAML</button>
-        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML"><i class="modus-icons">file-upload</i> Экспорт YAML</button>
+        <button class="btn btn-secondary" id="btnImportYaml" title="Импортировать данные проекта из YAML в память (запись на диск — кнопкой принудительного сохранения)"><i class="modus-icons">file_download</i> Импорт YAML</button>
+        <button class="btn btn-secondary" id="btnExportYaml" title="Экспортировать настройки в YAML"><i class="modus-icons">file_upload</i> Экспорт YAML</button>
         <div class="autosave-status" id="autosaveStatus" title="Автосохранение данных в YAML">
           <span class="autosave-dot" id="autosaveDot"></span>
           <span class="autosave-text" id="autosaveText">YAML сохранен</span>
@@ -808,6 +811,6 @@
     </footer>
   </div>
 
-  <script src="app.js?v=20260924_modus3"></script>
+  <script src="app.js?v=20260924_noicons"></script>
 </body>
 </html>

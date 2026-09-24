@@ -1060,12 +1060,12 @@ const DEFAULT_LAYOUTS = {
   // -----------------------------------------------------------------------------
   function getAllTemplates() {
     const builtins = [
-      { key: "cover", name: "Титульный лист (Cover)", modusIcon: "layout-cover", icon: "🏷️", isDefault: true },
-      { key: "description", name: "Описание и спецификации (Description)", modusIcon: "list-alt", icon: "📝", isDefault: true },
-      { key: "explain", name: "Содержание и ведомость (Explain)", modusIcon: "table-view", icon: "📋", isDefault: true },
-      { key: "general", name: "Общий вид (General)", modusIcon: "views", icon: "🖼️", isDefault: true },
-      { key: "visual", name: "Визуализация (Visual)", modusIcon: "panorama", icon: "👁️", isDefault: true },
-      { key: "blank", name: "Без шаблона (Blank)", modusIcon: "single-pane", icon: "⬜", isDefault: true }
+      { key: "cover", name: "Титульный лист (Cover)", isDefault: true },
+      { key: "description", name: "Описание и спецификации (Description)", isDefault: true },
+      { key: "explain", name: "Содержание и ведомость (Explain)", isDefault: true },
+      { key: "general", name: "Общий вид (General)", isDefault: true },
+      { key: "visual", name: "Визуализация (Visual)", isDefault: true },
+      { key: "blank", name: "Без шаблона (Blank)", isDefault: true }
     ];
 
     const result = [...builtins];
@@ -1075,13 +1075,11 @@ const DEFAULT_LAYOUTS = {
       if (!builtins.some((b) => b.key === key)) {
         const tplObj = customLayouts[key];
         const customName = tplObj?._name || tplObj?.name || state.pdf_settings?.template_names?.[key] || `Шаблон (${key})`;
-        const customIcon = tplObj?._icon || "📄";
-        const customModusIcon = tplObj?._modus_icon || "file-template";
         result.push({
           key: key,
           name: customName,
-          icon: customIcon,
-          modusIcon: customModusIcon,
+          icon: "",
+          modusIcon: "",
           isDefault: false,
           baseType: tplObj?._base_type || "general"
         });
@@ -1092,28 +1090,12 @@ const DEFAULT_LAYOUTS = {
   }
 
   function getTemplateDef(tplKey) {
-    const modusIconMap = {
-      cover: "file-template",
-      description: "short-text",
-      explain: "table",
-      general: "views",
-      visual: "insert-photo",
-      blank: "file"
-    };
     if (DEFAULT_LAYOUTS[tplKey]) {
-      const iconMap = {
-        cover: "🏷️",
-        description: "📝",
-        explain: "📋",
-        general: "🖼️",
-        visual: "👁️",
-        blank: "⬜"
-      };
       return {
         key: tplKey,
         name: DEFAULT_LAYOUTS[tplKey].name,
-        icon: iconMap[tplKey] || "📄",
-        modusIcon: modusIconMap[tplKey] || "file-template",
+        icon: "",
+        modusIcon: "",
         isDefault: true,
         image_def: DEFAULT_LAYOUTS[tplKey].image_4_3 || DEFAULT_IMAGE_SLOT
       };
@@ -1123,14 +1105,12 @@ const DEFAULT_LAYOUTS = {
     const baseKey = custom._base_type || "general";
     const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
     const name = custom._name || custom.name || state.pdf_settings?.template_names?.[tplKey] || `Шаблон (${tplKey})`;
-    const icon = custom._icon || "📄";
-    const modusIcon = custom._modus_icon || modusIconMap[baseKey] || "file-template";
 
     return {
       key: tplKey,
       name: name,
-      icon: icon,
-      modusIcon: modusIcon,
+      icon: "",
+      modusIcon: "",
       isDefault: false,
       baseType: baseKey,
       image_def: baseDef.image_4_3 || DEFAULT_IMAGE_SLOT
@@ -1161,14 +1141,6 @@ const DEFAULT_LAYOUTS = {
       const mainDiv = document.createElement("div");
       mainDiv.className = "tpl-item-main";
 
-      const iconSpan = document.createElement("span");
-      iconSpan.className = "tpl-item-icon";
-      if (tpl.modusIcon) {
-        iconSpan.innerHTML = `<i class="modus-icons">${tpl.modusIcon}</i>`;
-      } else {
-        iconSpan.textContent = tpl.icon || "📄";
-      }
-
       const textDiv = document.createElement("div");
       textDiv.className = "tpl-item-text";
 
@@ -1182,7 +1154,6 @@ const DEFAULT_LAYOUTS = {
 
       textDiv.appendChild(nameSpan);
       textDiv.appendChild(subSpan);
-      mainDiv.appendChild(iconSpan);
       mainDiv.appendChild(textDiv);
       item.appendChild(mainDiv);
 
@@ -1244,7 +1215,7 @@ const DEFAULT_LAYOUTS = {
     }
 
     if (els.currentTemplateTitle) {
-      els.currentTemplateTitle.innerHTML = `<i class="modus-icons">${tplDef.modusIcon || "file-template"}</i> ${tplDef.name}`;
+      els.currentTemplateTitle.textContent = tplDef.name;
     }
 
     if (els.selectLayoutTemplate) {
@@ -1276,7 +1247,7 @@ const DEFAULT_LAYOUTS = {
       templates.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = t.key;
-        opt.textContent = `${t.icon || "📄"} ${t.name}`;
+        opt.textContent = t.name;
         if (t.key === currentVal) opt.selected = true;
         els.selectLayoutTemplate.appendChild(opt);
       });
@@ -1627,7 +1598,7 @@ function setTemplateParams(params, tplKey) {
   const params = getTemplateParams(tplKey);
 
   if (els.currentTemplateTitle) {
-    els.currentTemplateTitle.innerHTML = `<i class="modus-icons">${tplDefObj.modusIcon || "file-template"}</i> ${tplDefObj.name}`;
+    els.currentTemplateTitle.textContent = tplDefObj.name;
   }
   const isCustom = !DEFAULT_LAYOUTS[tplKey];
   if (els.btnDeleteCurrentTemplate) {
@@ -1794,7 +1765,7 @@ function setTemplateParams(params, tplKey) {
           </div>
           <div class="tpl-card-header-actions">
             <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »"><i class="modus-icons">layers</i> Блок</button>
-            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона"><i class="modus-icons">add-circle</i> Создать параметр</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона"><i class="modus-icons">add_circle</i> Создать параметр</button>
           </div>
         </div>
         <div class="tpl-card-body">
@@ -2637,7 +2608,7 @@ function updateParamModalPreview() {
     const isCommercial = currentTradeValue === "1";
     els.headerTradeBadge.innerHTML = !hasArticul
       ? "Тип не выбран"
-      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">user-group</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
+      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">user_group</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
     els.headerTradeBadge.classList.toggle("trade-unset", !hasArticul);
     els.headerTradeBadge.classList.toggle("trade-commercial", hasArticul && isCommercial);
     els.headerTradeBadge.classList.toggle("trade-household", hasArticul && !isCommercial);
@@ -2911,10 +2882,10 @@ function updateParamModalPreview() {
   // Helper: Get icon for document extensions
   function getDocIcon(ext) {
     ext = (ext || "").toUpperCase();
-    if (ext === "PDF") return '<i class="modus-icons">file-template</i>';
+    if (ext === "PDF") return '<i class="modus-icons">file_template</i>';
     if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">views</i>';
     if (ext === "SKP") return '<i class="modus-icons">views</i>';
-    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">short-text</i>';
+    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">short_text</i>';
     if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return '<i class="modus-icons">table</i>';
     return '<i class="modus-icons">file</i>';
   }
@@ -3284,7 +3255,7 @@ function updateParamModalPreview() {
       const previewTitle = document.createElement("div");
       previewTitle.className = "dir-section-title";
       previewTitle.innerHTML = `
-        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">insert-photo</i> Файлы и предпросмотр в папке:</span>
+        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">insert_photo</i> Файлы и предпросмотр в папке:</span>
         <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>`;
 
       const sizeGroup = document.createElement("div");
@@ -3432,14 +3403,14 @@ function updateParamModalPreview() {
           img.remove();
           const docIcon = document.createElement("div");
           docIcon.className = "dir-preview-doc-icon";
-          docIcon.innerHTML = `<span><i class="modus-icons">insert-photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+          docIcon.innerHTML = `<span><i class="modus-icons">insert_photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
           thumbWrap.appendChild(docIcon);
         };
         thumbWrap.appendChild(img);
       } else if (file.is_image) {
         const docIcon = document.createElement("div");
         docIcon.className = "dir-preview-doc-icon";
-        docIcon.innerHTML = `<span><i class="modus-icons">insert-photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
+        docIcon.innerHTML = `<span><i class="modus-icons">insert_photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
         thumbWrap.appendChild(docIcon);
       } else {
         const docIcon = document.createElement("div");
@@ -3495,7 +3466,7 @@ function updateParamModalPreview() {
 
       const icon = document.createElement("span");
       icon.className = "api-target-icon";
-      icon.innerHTML = '<i class="modus-icons">web-link</i>';
+      icon.innerHTML = '<i class="modus-icons">web_link</i>';
 
       const badge = document.createElement("span");
       badge.className = "api-target-badge";
@@ -3736,9 +3707,6 @@ function updateParamModalPreview() {
   function createMiniPagePreview(scene, index) {
     const tplKey = scene.page_type || "cover";
     const tplDefObj = getTemplateDef(tplKey);
-    const tplIcon = tplDefObj.icon || "📄";
-    const tplName = tplDefObj.name || tplKey;
-
     const wrap = document.createElement("div");
     wrap.className = "scene-mini-preview-wrap";
 
@@ -3761,7 +3729,7 @@ function updateParamModalPreview() {
     } else {
       const placeholder = document.createElement("div");
       placeholder.className = "mini-sheet-placeholder";
-      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">insert-photo</i></span>`;
+      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">insert_photo</i></span>`;
       thumbBox.appendChild(placeholder);
     }
 
@@ -3839,7 +3807,7 @@ function updateParamModalPreview() {
       <div class="tpl-card tpl-panel-left scene-viewport-card ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
         <div class="tpl-card-header">
           <div class="tpl-card-title-group">
-            <span class="tpl-card-icon"><i class="modus-icons">insert-photo</i></span>
+            <span class="tpl-card-icon"><i class="modus-icons">insert_photo</i></span>
             <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D) • Сцена ${idx + 1}: «${safeSceneName}»</span>
           </div>
           <div class="tpl-card-header-actions" style="display: flex; align-items: center; gap: 12px;">
@@ -4241,7 +4209,7 @@ function updateParamModalPreview() {
       allTemplates.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = t.key;
-        opt.textContent = `${t.icon || "📄"} ${t.name}`;
+        opt.textContent = t.name;
         if (scene.page_type === t.key) opt.selected = true;
         selType.appendChild(opt);
       });
@@ -5470,14 +5438,46 @@ function updateParamModalPreview() {
     }
 
     // Success Modal
-    els.btnOpenPdfFolder.addEventListener("click", () => {
-      if (state.lastExportedPdf) {
-        callRuby("openFolder", state.lastExportedPdf);
-      }
-    });
+    if (els.btnOpenPdfFolder) {
+      els.btnOpenPdfFolder.addEventListener("click", () => {
+        if (state.lastExportedPdf) {
+          callRuby("openFolder", state.lastExportedPdf);
+        }
+      });
+    }
 
-    els.btnCloseSuccessModal.addEventListener("click", () => {
-      els.successModal.classList.add("hidden");
+    if (els.btnCloseSuccessModal) {
+      els.btnCloseSuccessModal.addEventListener("click", () => {
+        if (els.successModal) els.successModal.classList.add("hidden");
+      });
+    }
+
+    if (els.successPdfPath) {
+      els.successPdfPath.addEventListener("click", () => {
+        const text = (els.successPdfPath.textContent || "").trim();
+        if (text) {
+          if (navigator.clipboard && navigator.clipboard.writeText) {
+            navigator.clipboard.writeText(text).then(() => {
+              showNotification("Путь к PDF скопирован в буфер обмена", "success");
+            }).catch(() => {
+              showNotification(text, "info");
+            });
+          } else {
+            showNotification("Файл: " + text, "info");
+          }
+        }
+      });
+    }
+
+    document.addEventListener("keydown", (e) => {
+      if (els.successModal && !els.successModal.classList.contains("hidden")) {
+        if (e.key === "Escape" || e.key === "Enter") {
+          els.successModal.classList.add("hidden");
+        }
+      }
+      if (e.key === "Escape" && els.articulTypeModal && !els.articulTypeModal.classList.contains("hidden")) {
+        closeArticulTypeModal();
+      }
     });
 
     // Auto-save listeners for all dialog input fields across tabs
