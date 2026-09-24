@@ -396,6 +396,7 @@ module UI
     def initialize(name); end
     def add_submenu(name); self; end
     def add_item(name, &block); self; end
+    def add_separator; self; end
     def set_validation_proc(item = nil, &block); true; end
   end
 

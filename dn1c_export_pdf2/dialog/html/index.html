@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>DN1C Export PDF 2</title>
+  <title>DN1C Export PDF 2 v2.3.0</title>
 <link rel="stylesheet" href="fonts/modus-icons.css">
 <link rel="stylesheet" href="modus-bootstrap.min.css">
 <link rel="stylesheet" href="app.css?v=20260924_headers1">
@@ -13,7 +13,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="logo-badge">PDF</div>
+        <div class="logo-badge" title="Версия плагина: v2.3.0"><i class="modus-icons">file-template</i> PDF <span class="logo-version" id="logoVersion">v2.3.0</span></div>
         <div class="header-titles">
           <h1 id="headerProjectTitle">Новый проект</h1>
           <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>
@@ -21,7 +21,7 @@
       </div>
       <div class="header-status-group">
         <div class="header-articul" id="headerArticulBlock">
-          <span class="header-articul-label">АРТИКУЛ</span>
+          <span class="header-articul-label"><i class="modus-icons">project</i> АРТИКУЛ</span>
           <div class="header-articul-controls articul-locked">
             <input type="text" id="inputArticul" class="form-control font-mono header-articul-input" placeholder="CF#260905_142650" readonly title="Артикул создаётся один раз при выборе типа проекта и не изменяется">
             <span class="header-trade-badge trade-unset" id="headerTradeBadge" title="Тип проекта — выбирается при создании артикула и больше не меняется">Тип не выбран</span>
@@ -207,8 +207,8 @@
         <div class="scenes-panel" id="scenesPanel">
           <div class="scenes-toolbar">
             <div class="scenes-quick-actions">
-              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены">Все</button>
-              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор">Снять</button>
+              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check-mark</i> Все</button>
+              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content-close</i> Снять</button>
               <label class="checkbox-label" title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах и на эскизах">
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
@@ -253,7 +253,7 @@
             </div>
             <div class="sidebar-header-actions">
               <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
-                + Новый
+                <i class="modus-icons">add-circle</i> Новый
               </button>
               <button type="button" class="btn btn-xs btn-danger-outline btn-delete-template-sb" id="btnDeleteTemplateSidebar" title="Удалить выбранный пользовательский шаблон" style="display: none;">
                 <i class="modus-icons">delete</i>
@@ -545,6 +545,27 @@
             <!-- Dynamically populated via JS -->
           </div>
         </div>
+
+        <!-- Section: Dev Tools & Обновление из папки разработки -->
+        <div class="settings-card" id="cardDevUpdater">
+          <div class="card-header">
+            <div class="card-header-title-wrap">
+              <span class="card-header-icon"><i class="modus-icons">tune</i></span>
+              <span class="card-header-title">Папка разработки и обновление (Dev Tools)</span>
+            </div>
+            <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.3.0</span>
+          </div>
+          <p class="field-hint">Быстрое обновление плагина из рабочей dev-папки в каталог Plugins SketchUp без ручного копирования файлов:</p>
+          <div class="form-group" style="margin-bottom: 8px;">
+            <label for="inputDevDir">Каталог разработки плагина (Dev Directory):</label>
+            <div style="display: flex; gap: 8px; margin-top: 4px;">
+              <input type="text" id="inputDevDir" class="form-control font-mono" placeholder="U:/dn1code/su_plugs_app/dn1c_export_pdf2" style="flex: 1;" />
+              <button type="button" class="btn btn-xs btn-primary" id="btnUpdateFromDev" title="Скопировать свежие файлы из dev-папки и перезагрузить плагин"><i class="modus-icons">autorenew</i> Обновить из dev-папки</button>
+              <button type="button" class="btn btn-xs btn-secondary" id="btnHotReload" title="Перезагрузить код плагина в памяти SketchUp"><i class="modus-icons">refresh</i> Перезагрузить</button>
+            </div>
+          </div>
+          <div id="devUpdateStatus" class="field-hint" style="font-size: 11px; margin-top: 4px; min-height: 16px;"></div>
+        </div>
       </section>
     </main>
 
@@ -592,9 +613,9 @@
         </div>
 
         <div class="modal-actions revision-modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelExportModal">Отмена</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelExportModal"><i class="modus-icons">content-close</i> Отмена</button>
           <div class="rev-modal-action-group">
-            <button type="button" class="btn btn-secondary" id="btnSkipRevisionExport" title="Создать PDF без внесения новой записи в историю">Без записи правок</button>
+            <button type="button" class="btn btn-secondary" id="btnSkipRevisionExport" title="Создать PDF без внесения новой записи в историю"><i class="modus-icons">launch</i> Без записи правок</button>
             <button type="button" class="btn btn-success" id="btnConfirmRevisionExport" title="Записать правки в историю с точным временем и датой и создать PDF"><i class="modus-icons">save</i> Записать и создать PDF</button>
           </div>
         </div>
@@ -617,7 +638,7 @@
         </div>
 
         <div class="modal-actions revision-modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnArticulTypeLater">Позже</button>
+          <button type="button" class="btn btn-secondary" id="btnArticulTypeLater"><i class="modus-icons">time</i> Позже</button>
           <div class="rev-modal-action-group">
             <button type="button" class="btn btn-primary" id="btnArticulTypeCommercial" title="Артикул коммерческого проекта: CF#ГГММДД_ЧЧММСС"><i class="modus-icons">user-group</i> Коммерческий проект</button>
             <button type="button" class="btn btn-success" id="btnArticulTypeHousehold" title="Артикул бытового проекта: HF#ГГММДД_ЧЧММСС"><i class="modus-icons">account</i> Бытовой проект</button>
@@ -646,7 +667,7 @@
         </div>
 
         <div class="modal-actions revision-modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt">Отмена (не сохранять)</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelArticulPrompt"><i class="modus-icons">content-close</i> Отмена</button>
           <button type="button" class="btn btn-success" id="btnConfirmArticulSave" title="Создать артикул и сохранить данные проекта в папку артикула"><i class="modus-icons">check-mark</i> Создать и сохранить</button>
         </div>
       </div>
@@ -660,7 +681,7 @@
         <p class="modal-file-path" id="successPdfPath"></p>
         <div class="modal-actions">
           <button class="btn btn-secondary" id="btnOpenPdfFolder"><i class="modus-icons">folder</i> Открыть папку</button>
-          <button class="btn btn-primary" id="btnCloseSuccessModal">Готово</button>
+          <button class="btn btn-primary" id="btnCloseSuccessModal"><i class="modus-icons">check-mark</i> Готово</button>
         </div>
       </div>
     </div>
@@ -692,8 +713,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate">Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate">Создать шаблон</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate"><i class="modus-icons">check-mark</i> Создать шаблон</button>
         </div>
       </div>
     </div>
@@ -712,8 +733,8 @@
           ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на стандартный шаблон «Общий вид (General)».
         </div>
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate">Отмена</button>
-          <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate">Удалить шаблон</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate"><i class="modus-icons">delete</i> Удалить шаблон</button>
         </div>
       </div>
     </div>
@@ -733,8 +754,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate">Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate">Сохранить</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate"><i class="modus-icons">check-mark</i> Сохранить</button>
         </div>
       </div>
     </div>
@@ -760,8 +781,8 @@
         </div>
 
         <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelParam">Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmParam">Сохранить параметр</button>
+          <button type="button" class="btn btn-secondary" id="btnCancelParam"><i class="modus-icons">content-close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmParam"><i class="modus-icons">check-mark</i> Сохранить параметр</button>
         </div>
       </div>
     </div>

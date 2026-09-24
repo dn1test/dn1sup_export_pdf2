@@ -222,11 +222,100 @@ body {
 .btn .modus-icons {
   font-size: 15px;
   margin-right: 4px;
+  vertical-align: -1px;
 }
 
 .btn-xs .modus-icons {
   font-size: 13px;
   margin-right: 3px;
+  vertical-align: -1px;
+}
+
+/* Icon-only buttons: reset right margin for perfect centering */
+.btn-icon .modus-icons,
+.btn-delete .modus-icons,
+.btn-goto-template .modus-icons,
+.tpl-param-btn .modus-icons,
+.tpl-item-action-btn .modus-icons,
+.btn-move-dir .modus-icons {
+  margin-right: 0 !important;
+}
+
+.logo-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+
+.logo-badge .modus-icons {
+  font-size: 14px;
+  margin-right: 4px;
+  vertical-align: -1px;
+}
+
+.logo-badge .logo-version {
+  font-size: 11px;
+  font-weight: 600;
+  opacity: 0.9;
+  letter-spacing: 0.2px;
+}
+
+.header-articul-label .modus-icons {
+  font-size: 12px;
+  margin-right: 3px;
+  vertical-align: -1px;
+}
+
+.tpl-item-icon .modus-icons {
+  font-size: 16px;
+  color: var(--bs-primary);
+  vertical-align: middle;
+}
+
+.template-list-item.active .tpl-item-icon .modus-icons {
+  color: var(--bs-primary);
+}
+
+.drag-handle .modus-icons,
+.dir-drag-handle .modus-icons,
+.tpl-param-drag .modus-icons {
+  font-size: 16px;
+  line-height: 1;
+  vertical-align: middle;
+}
+
+.btn-move-dir .modus-icons {
+  font-size: 14px;
+  line-height: 1;
+}
+
+.toast {
+  display: flex;
+  align-items: center;
+}
+
+.toast .modus-icons {
+  font-size: 18px;
+  margin-right: 8px;
+  flex-shrink: 0;
+}
+
+.toast.success .modus-icons,
+.toast.toast-success .modus-icons {
+  color: var(--bs-success);
+}
+
+.toast.error .modus-icons,
+.toast.toast-error .modus-icons {
+  color: var(--bs-danger);
+}
+
+.toast.warning .modus-icons {
+  color: #f59e0b;
+}
+
+.toast.info .modus-icons {
+  color: var(--bs-primary);
 }
 
 /* ==========================================================================

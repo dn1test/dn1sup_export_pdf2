@@ -926,7 +926,8 @@ const DEFAULT_LAYOUTS = {
   let toastTimer = null;
   function showNotification(msg, type = "success") {
     clearTimeout(toastTimer);
-    els.toast.textContent = msg;
+    const iconName = type === "error" ? "cancel" : (type === "warning" ? "warning" : (type === "info" ? "info" : "check-circle"));
+    els.toast.innerHTML = `<i class="modus-icons">${iconName}</i> <span>${msg}</span>`;
     els.toast.className = `toast ${type}`;
     els.toast.classList.remove("hidden");
 
@@ -1059,12 +1060,12 @@ const DEFAULT_LAYOUTS = {
   // -----------------------------------------------------------------------------
   function getAllTemplates() {
     const builtins = [
-      { key: "cover", name: "Титульный лист (Cover)", icon: "🏷️", isDefault: true },
-      { key: "description", name: "Описание и спецификации (Description)", icon: "📝", isDefault: true },
-      { key: "explain", name: "Содержание и ведомость (Explain)", icon: "📋", isDefault: true },
-      { key: "general", name: "Общий вид (General)", icon: "🖼️", isDefault: true },
-      { key: "visual", name: "Визуализация (Visual)", icon: "👁️", isDefault: true },
-      { key: "blank", name: "Без шаблона (Blank)", icon: "⬜", isDefault: true }
+      { key: "cover", name: "Титульный лист (Cover)", modusIcon: "layout-cover", icon: "🏷️", isDefault: true },
+      { key: "description", name: "Описание и спецификации (Description)", modusIcon: "list-alt", icon: "📝", isDefault: true },
+      { key: "explain", name: "Содержание и ведомость (Explain)", modusIcon: "table-view", icon: "📋", isDefault: true },
+      { key: "general", name: "Общий вид (General)", modusIcon: "views", icon: "🖼️", isDefault: true },
+      { key: "visual", name: "Визуализация (Visual)", modusIcon: "panorama", icon: "👁️", isDefault: true },
+      { key: "blank", name: "Без шаблона (Blank)", modusIcon: "single-pane", icon: "⬜", isDefault: true }
     ];
 
     const result = [...builtins];
@@ -1075,10 +1076,12 @@ const DEFAULT_LAYOUTS = {
         const tplObj = customLayouts[key];
         const customName = tplObj?._name || tplObj?.name || state.pdf_settings?.template_names?.[key] || `Шаблон (${key})`;
         const customIcon = tplObj?._icon || "📄";
+        const customModusIcon = tplObj?._modus_icon || "file-template";
         result.push({
           key: key,
           name: customName,
           icon: customIcon,
+          modusIcon: customModusIcon,
           isDefault: false,
           baseType: tplObj?._base_type || "general"
         });
@@ -1089,6 +1092,14 @@ const DEFAULT_LAYOUTS = {
   }
 
   function getTemplateDef(tplKey) {
+    const modusIconMap = {
+      cover: "file-template",
+      description: "short-text",
+      explain: "table",
+      general: "views",
+      visual: "insert-photo",
+      blank: "file"
+    };
     if (DEFAULT_LAYOUTS[tplKey]) {
       const iconMap = {
         cover: "🏷️",
@@ -1102,6 +1113,7 @@ const DEFAULT_LAYOUTS = {
         key: tplKey,
         name: DEFAULT_LAYOUTS[tplKey].name,
         icon: iconMap[tplKey] || "📄",
+        modusIcon: modusIconMap[tplKey] || "file-template",
         isDefault: true,
         image_def: DEFAULT_LAYOUTS[tplKey].image_4_3 || DEFAULT_IMAGE_SLOT
       };
@@ -1112,11 +1124,13 @@ const DEFAULT_LAYOUTS = {
     const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
     const name = custom._name || custom.name || state.pdf_settings?.template_names?.[tplKey] || `Шаблон (${tplKey})`;
     const icon = custom._icon || "📄";
+    const modusIcon = custom._modus_icon || modusIconMap[baseKey] || "file-template";
 
     return {
       key: tplKey,
       name: name,
       icon: icon,
+      modusIcon: modusIcon,
       isDefault: false,
       baseType: baseKey,
       image_def: baseDef.image_4_3 || DEFAULT_IMAGE_SLOT
@@ -1149,7 +1163,11 @@ const DEFAULT_LAYOUTS = {
 
       const iconSpan = document.createElement("span");
       iconSpan.className = "tpl-item-icon";
-      iconSpan.textContent = tpl.icon;
+      if (tpl.modusIcon) {
+        iconSpan.innerHTML = `<i class="modus-icons">${tpl.modusIcon}</i>`;
+      } else {
+        iconSpan.textContent = tpl.icon || "📄";
+      }
 
       const textDiv = document.createElement("div");
       textDiv.className = "tpl-item-text";
@@ -1226,7 +1244,7 @@ const DEFAULT_LAYOUTS = {
     }
 
     if (els.currentTemplateTitle) {
-      els.currentTemplateTitle.textContent = `${tplDef.icon || "📄"} ${tplDef.name}`;
+      els.currentTemplateTitle.innerHTML = `<i class="modus-icons">${tplDef.modusIcon || "file-template"}</i> ${tplDef.name}`;
     }
 
     if (els.selectLayoutTemplate) {
@@ -1609,7 +1627,7 @@ function setTemplateParams(params, tplKey) {
   const params = getTemplateParams(tplKey);
 
   if (els.currentTemplateTitle) {
-    els.currentTemplateTitle.textContent = `${tplDefObj.icon || "📄"} ${tplDefObj.name}`;
+    els.currentTemplateTitle.innerHTML = `<i class="modus-icons">${tplDefObj.modusIcon || "file-template"}</i> ${tplDefObj.name}`;
   }
   const isCustom = !DEFAULT_LAYOUTS[tplKey];
   if (els.btnDeleteCurrentTemplate) {
@@ -1661,8 +1679,8 @@ function setTemplateParams(params, tplKey) {
               ${previewShort ? `<span class="tpl-line-preview">(${previewShort})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
             </div>
             <div class="tpl-param-actions">
-              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${p.id}" title="Выше в списке">↑</button>
-              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${p.id}" title="Ниже в списке">↓</button>
+              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${p.id}" title="Выше в списке">▲</button>
+              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${p.id}" title="Ниже в списке">▼</button>
               <button type="button" class="tpl-param-btn tpl-param-edit" data-id="${p.id}" title="Изменить источник и заголовок"><i class="modus-icons" style="font-size: 13px;">edit</i></button>
               <button type="button" class="tpl-param-btn tpl-param-del" data-id="${p.id}" title="Удалить параметр"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
             </div>
@@ -1729,8 +1747,8 @@ function setTemplateParams(params, tplKey) {
               <span class="tpl-param-count">${paramCountText(children.length)}</span>
             </div>
             <div class="tpl-param-actions">
-              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${g.id}" title="Выше в списке">↑</button>
-              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${g.id}" title="Ниже в списке">↓</button>
+              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${g.id}" title="Выше в списке">▲</button>
+              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${g.id}" title="Ниже в списке">▼</button>
               <button type="button" class="tpl-param-btn tpl-param-del" data-id="${g.id}" title="Удалить блок вместе с его параметрами"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
             </div>
           </div>
@@ -1775,8 +1793,8 @@ function setTemplateParams(params, tplKey) {
             <span class="tpl-card-title">Параметры страницы</span>
           </div>
           <div class="tpl-card-header-actions">
-            <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »">📦 Блок</button>
-            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона">+ Создать параметр</button>
+            <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »"><i class="modus-icons">layers</i> Блок</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона"><i class="modus-icons">add-circle</i> Создать параметр</button>
           </div>
         </div>
         <div class="tpl-card-body">
@@ -2893,8 +2911,8 @@ function updateParamModalPreview() {
   // Helper: Get icon for document extensions
   function getDocIcon(ext) {
     ext = (ext || "").toUpperCase();
-    if (ext === "PDF") return '<i class="modus-icons">file</i>';
-    if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">tune</i>';
+    if (ext === "PDF") return '<i class="modus-icons">file-template</i>';
+    if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">views</i>';
     if (ext === "SKP") return '<i class="modus-icons">views</i>';
     if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">short-text</i>';
     if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return '<i class="modus-icons">table</i>';
@@ -4573,7 +4591,7 @@ function updateParamModalPreview() {
       tdOpen.className = "history-action-cell";
       const btnOpenPdf = document.createElement("button");
       btnOpenPdf.className = "btn btn-xs btn-secondary";
-      btnOpenPdf.textContent = "Открыть";
+      btnOpenPdf.innerHTML = '<i class="modus-icons">launch</i> Открыть';
       const pdfLink = (item.pdf_link || "").trim();
       btnOpenPdf.disabled = !pdfLink;
       btnOpenPdf.title = pdfLink ? `Открыть PDF: ${pdfLink}` : "PDF ещё не создан для этой правки";
@@ -4588,7 +4606,7 @@ function updateParamModalPreview() {
       tdDelete.className = "history-action-cell";
       const btnDel = document.createElement("button");
       btnDel.className = "btn btn-xs btn-danger";
-      btnDel.textContent = "Удалить";
+      btnDel.innerHTML = '<i class="modus-icons">delete</i> Удалить';
       btnDel.title = "Удалить запись";
       btnDel.addEventListener("click", () => {
         state.history.splice(index, 1);
@@ -5424,6 +5442,33 @@ function updateParamModalPreview() {
       callRuby("exportYaml", JSON.stringify(data));
     });
 
+    // Dev Tools Update & Hot Reload listeners
+    const btnDevUpdate = document.getElementById("btnUpdateFromDev");
+    if (btnDevUpdate) {
+      btnDevUpdate.addEventListener("click", () => {
+        const devInput = document.getElementById("inputDevDir");
+        const devPath = (devInput ? devInput.value : "").trim();
+        const statusEl = document.getElementById("devUpdateStatus");
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-primary)";
+          statusEl.textContent = "Синхронизация файлов из dev-папки и перезагрузка...";
+        }
+        callRuby("updateFromDev", devPath);
+      });
+    }
+
+    const btnDevReload = document.getElementById("btnHotReload");
+    if (btnDevReload) {
+      btnDevReload.addEventListener("click", () => {
+        const statusEl = document.getElementById("devUpdateStatus");
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-primary)";
+          statusEl.textContent = "Перезагрузка плагина в памяти SketchUp...";
+        }
+        callRuby("hotReload");
+      });
+    }
+
     // Success Modal
     els.btnOpenPdfFolder.addEventListener("click", () => {
       if (state.lastExportedPdf) {
@@ -5469,6 +5514,19 @@ function updateParamModalPreview() {
     loadData: function (data) {
       if (!data) return;
       Object.assign(state, data);
+      if (data.plugin_version) {
+        state.plugin_version = data.plugin_version;
+        const vEl = document.getElementById("logoVersion");
+        if (vEl) vEl.textContent = `v${data.plugin_version}`;
+        const devBadge = document.getElementById("badgeDevVersion");
+        if (devBadge) devBadge.textContent = `v${data.plugin_version}`;
+        document.title = `DN1C Export PDF 2 v${data.plugin_version}`;
+      }
+      if (data.dev_dir) {
+        state.dev_dir = data.dev_dir;
+        const inputDev = document.getElementById("inputDevDir");
+        if (inputDev && !inputDev.value) inputDev.value = data.dev_dir;
+      }
       ensureCustomLayouts();
       syncDirectoriesSpecifications();
       renderUI();
@@ -5480,6 +5538,29 @@ function updateParamModalPreview() {
       }
       // При открытии панели предлагаем создать артикул (если проект еще без артикула)
       setTimeout(maybeOfferArticulCreation, 300);
+    },
+
+    onDevUpdateResult: function (res) {
+      const statusEl = document.getElementById("devUpdateStatus");
+      if (res && res.success) {
+        const msg = res.same_dir
+          ? "Плагин работает напрямую из рабочей dev-папки. Перезагрузка выполнена!"
+          : (res.files_copied !== undefined
+              ? `Успешно обновлено из dev-папки (${res.files_copied} файлов скопировано). Плагин перезагружен!`
+              : "Плагин успешно перезагружен!");
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-success)";
+          statusEl.textContent = `✅ ${msg} [${res.updated_at || res.reloaded_at || ""}]`;
+        }
+        showNotification(msg, "success");
+      } else {
+        const errMsg = res ? res.error : "Неизвестная ошибка";
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-danger)";
+          statusEl.textContent = `❌ Ошибка: ${errMsg}`;
+        }
+        showNotification(`Ошибка обновления: ${errMsg}`, "error");
+      }
     },
 
     showNotification: showNotification,

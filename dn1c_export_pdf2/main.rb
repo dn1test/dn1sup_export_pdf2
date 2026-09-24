@@ -18,6 +18,7 @@ require_relative "service/observer_service"
 require_relative "service/overlay_service"
 require_relative "service/vips_service"
 require_relative "service/snapshot_worker"
+require_relative "service/dev_updater"
 
 # Загрузка моделей данных
 require_relative "model/path_util"
@@ -87,14 +88,44 @@ module DN1Code
       end
     end
 
+    # Выполняет обновление плагина из рабочей dev-папки в Plugins и перезагружает его
+    # @param dev_dir [String, nil] опциональный путь к папке разработки
+    # @return [Hash]
+    def update_from_dev(dev_dir = nil)
+      res = Service::DevUpdater.update_and_reload!(dev_dir)
+      if res[:success]
+        msg = "✅ #{NAME_EXTENSION} (v#{PLUGIN_VERSION}) успешно обновлен из dev-папки!\n\n" \
+              "Откуда: #{res[:dev_dir]}\n" \
+              "Куда: #{res[:plugins_dir]}\n" \
+              "Скопировано файлов: #{res[:files_copied]}"
+        UI.messagebox(msg, defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
+      else
+        err = "❌ Ошибка обновления из dev-папки:\n#{res[:error]}"
+        UI.messagebox(err, defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
+      end
+      res
+    end
+
+    # Выполняет быструю горячую перезагрузку кода плагина в памяти SketchUp
+    # @return [Hash]
+    def hot_reload
+      res = Service::DevUpdater.reload!
+      if res[:success]
+        UI.messagebox("⚡ Плагин #{NAME_EXTENSION} v#{PLUGIN_VERSION} перезагружен!", defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
+      else
+        UI.messagebox("❌ Ошибка перезагрузки:\n#{res[:error]}", defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
+      end
+      res
+    end
+
     # Регистрация команд, меню, панели инструментов и наблюдателей SketchUp
     unless file_loaded?(__FILE__)
       # Регистрация наблюдателя сохранения и открытия моделей SketchUp
       Service::ObserverService.register!
 
-      # Создание пункта меню в Plugins
+      # Создание пункта меню в Plugins с версией в заголовке
       menu = UI.menu("Plugins")
-      submenu = menu.add_submenu(NAME_EXTENSION)
+      submenu = menu.add_submenu("#{NAME_EXTENSION} v#{PLUGIN_VERSION}")
 
       submenu.add_item("Экспорт сцен в PDF (Диалог)...") do
         open_export_dialog
@@ -110,6 +141,14 @@ module DN1Code
       submenu.set_validation_proc(item_overlay) do
         model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
         Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
+      end
+
+      submenu.add_separator if submenu.respond_to?(:add_separator)
+      submenu.add_item("🔄 Обновить из dev-папки...") do
+        update_from_dev
+      end
+      submenu.add_item("⚡ Перезагрузить расширение (Hot Reload)") do
+        hot_reload
       end
 
       # Создание панели инструментов

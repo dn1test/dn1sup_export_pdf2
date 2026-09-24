@@ -39,7 +39,7 @@ module DN1Code
           end
 
           options = {
-            dialog_title:    "DN1C Export PDF 2 — Экспорт сцен в PDF",
+            dialog_title:    "#{NAME_EXTENSION} v#{PLUGIN_VERSION} — Экспорт сцен в PDF",
             preferences_key: "DN1C_ExportPdf2_Pref",
             scrollable:      true,
             resizable:       true,
@@ -81,6 +81,9 @@ module DN1Code
             # Флаг передается отдельным ключом верхнего уровня (to_h возвращает живые ссылки —
             # писать внутрь pdf_settings нельзя, иначе ключ уйдёт в settings.yaml).
             payload = project_data.to_h
+            payload[:plugin_version] = PLUGIN_VERSION
+            payload[:dev_dir] = Service::DevUpdater.resolve_dev_dir if defined?(Service::DevUpdater)
+            payload[:plugins_dir] = Service::DevUpdater.resolve_plugins_dir if defined?(Service::DevUpdater)
             payload[:vips_available] = Service::VipsService.available? if defined?(Service::VipsService)
             json_str = JSON.generate(payload)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
@@ -695,6 +698,20 @@ module DN1Code
                 dialog.execute_script("window.app && window.app.showNotification('Не удалось прочитать YAML файл: #{File.basename(yaml_file.to_s)}', 'error');")
               end
             end
+          end
+
+          # Обновление из dev-папки
+          dialog.add_action_callback("updateFromDev") do |_action_context, custom_dev_path|
+            res = Service::DevUpdater.update_and_reload!(custom_dev_path.to_s.strip)
+            json_res = JSON.generate(res)
+            dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
+          end
+
+          # Быстрая горячая перезагрузка плагина
+          dialog.add_action_callback("hotReload") do |_action_context|
+            res = Service::DevUpdater.reload!
+            json_res = JSON.generate(res)
+            dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
           end
         end
       end
