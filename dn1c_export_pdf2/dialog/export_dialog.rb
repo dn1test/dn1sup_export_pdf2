@@ -129,7 +129,8 @@ module DN1Code
                   end
                 end
               end
-            rescue StandardError
+            rescue StandardError => e
+              warn "[DN1C Export PDF] Ошибка updateAspectSettings: #{e.class}: #{e.message}"
             end
           end
 
@@ -403,11 +404,21 @@ module DN1Code
                   end
                 ensure
                   if ro
-                    ro["DisplayDims"] = orig_dims unless orig_dims.nil? rescue nil
-                    ro["DisplayText"] = orig_text unless orig_text.nil? rescue nil
-                    ro["DisplaySketchAxes"] = orig_axes unless orig_axes.nil? rescue nil
-                    ro["HideConstructionGeometry"] = orig_guides unless orig_guides.nil? rescue nil
-                    ro["DisplaySectionPlanes"] = orig_sec_planes unless orig_sec_planes.nil? rescue nil
+                    {
+                      "DisplayDims" => orig_dims,
+                      "DisplayText" => orig_text,
+                      "DisplaySketchAxes" => orig_axes,
+                      "HideConstructionGeometry" => orig_guides,
+                      "DisplaySectionPlanes" => orig_sec_planes
+                    }.each do |ro_key, ro_val|
+                      next if ro_val.nil?
+
+                      begin
+                        ro[ro_key] = ro_val
+                      rescue StandardError => e
+                        warn "[DN1C Export PDF] Не удалось восстановить #{ro_key} после эскизов: #{e.message}"
+                      end
+                    end
                   end
                   if cur_page && model.pages.respond_to?(:selected_page=)
                     model.pages.selected_page = cur_page rescue nil

@@ -183,7 +183,12 @@ module DN1Code
               compress:        true
             }
             if doc.method(:export).arity.abs > 1 || doc.method(:export).parameters.any? { |p| p[0] == :rest || p[0] == :opt }
-              doc.export(pdf_path, export_opts) rescue doc.export(pdf_path)
+              begin
+                doc.export(pdf_path, export_opts)
+              rescue StandardError, ScriptError => e
+                warn "[DN1C Export PDF] Экспорт с опциями сжатия не удался (#{e.message}) — повтор без опций"
+                doc.export(pdf_path)
+              end
             else
               doc.export(pdf_path)
             end
@@ -234,7 +239,7 @@ module DN1Code
 
             # 6. Резервная копия .skp
             if settings[:save_skp_backup] && model && model.respond_to?(:path) && !model.path.empty?
-              controller.send(:save_skp_backup)
+              controller.save_skp_backup
             end
 
             # 7. Запись данных в YAML (проект + настройки/шаблоны расширения)

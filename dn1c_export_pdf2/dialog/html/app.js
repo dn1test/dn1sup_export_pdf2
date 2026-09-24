@@ -5626,10 +5626,6 @@ function updateParamModalPreview() {
       notifyChange();
     },
 
-    onAutoSaved: function (yamlName) {
-      updateAutoSaveIndicator("saved", yamlName ? `Сохранено (${yamlName})` : "Сохранено");
-    },
-
     onSceneThumbnailsLoaded: function (thumbs) {
       sceneThumbnailsInFlight = false;
       if (thumbs && typeof thumbs === "object") {

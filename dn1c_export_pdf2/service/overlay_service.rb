@@ -588,7 +588,6 @@ module DN1Code
             false
           else
             enable(model)
-            true
           end
         end
 
