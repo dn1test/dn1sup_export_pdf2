@@ -729,6 +729,8 @@ module DN1Code
                          when "3:2"  then 3.0 / 2.0
                          when "16:9" then 16.0 / 9.0
                          when "1:1"  then 1.0
+                         when "5:4"  then 5.0 / 4.0
+                         when "4:5"  then 4.0 / 5.0
                          when "page" then content[:w] / content[:h]
                          else 4.0 / 3.0
                          end
@@ -740,6 +742,17 @@ module DN1Code
                       end
           raw_scale = 100.0 if raw_scale <= 0.0 || raw_scale > 100.0
           scale_factor = raw_scale / 100.0
+
+          align_h = if scene_item && scene_item.respond_to?(:align_h) && !scene_item.align_h.to_s.strip.empty?
+                      scene_item.align_h.to_s.strip.downcase
+                    else
+                      (img_cfg[:align_h] || img_cfg["align_h"] || "center").to_s.strip.downcase
+                    end
+          align_v = if scene_item && scene_item.respond_to?(:align_v) && !scene_item.align_v.to_s.strip.empty?
+                      scene_item.align_v.to_s.strip.downcase
+                    else
+                      (img_cfg[:align_v] || img_cfg["align_v"] || "center").to_s.strip.downcase
+                    end
 
           avail_w = content[:w] * scale_factor
           avail_h = content[:h] * scale_factor
@@ -753,9 +766,17 @@ module DN1Code
             img_h = avail_w / target_ratio
           end
 
-          # Центрирование на странице
-          img_x = content[:left] + ((content[:w] - img_w) / 2.0)
-          img_y = content[:top] - ((content[:h] - img_h) / 2.0)
+          # Размещение на странице по выравниванию сцены (по умолчанию — по центру)
+          img_x = case align_h
+                  when "left"  then content[:left]
+                  when "right" then content[:left] + content[:w] - img_w
+                  else content[:left] + ((content[:w] - img_w) / 2.0)
+                  end
+          img_y = case align_v
+                  when "top"    then content[:top]
+                  when "bottom" then content[:top] - content[:h] + img_h
+                  else content[:top] - ((content[:h] - img_h) / 2.0)
+                  end
 
           vp_layer = layer.is_a?(Hash) ? (layer[:viewport] || layer[:default]) : layer
 

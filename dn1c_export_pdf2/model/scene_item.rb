@@ -24,10 +24,17 @@ module DN1Code
         attr_accessor :viewport_visible
         # @return [Boolean] флаг отображения фона сцены (небо/земля) в видовом экране
         attr_accessor :viewport_background
-        # @return [String] пропорции видового экрана ('3:2', '4:3', '16:9', '1:1', 'page')
+        # @return [String] пропорции видового экрана ('3:2', '4:3', '5:4', '4:5', '16:9', '1:1', 'page')
         attr_accessor :aspect_ratio
         # @return [Integer] процент масштабирования/размещения на листе (60-100)
         attr_accessor :scale_pct
+        # @return [String] выравнивание эскиза по горизонтали ('left', 'center', 'right')
+        attr_accessor :align_h
+        # @return [String] выравнивание эскиза по вертикали ('top', 'center', 'bottom')
+        attr_accessor :align_v
+
+        VALID_ALIGN_H = %w[left center right].freeze
+        VALID_ALIGN_V = %w[top center bottom].freeze
 
         # Инициализирует новый элемент сцены
         # @param name [String] название сцены
@@ -39,9 +46,11 @@ module DN1Code
         # @param enabled [Boolean] включена ли сцена в экспорт
         # @param viewport_visible [Boolean] включен ли 3D видовой экран на этой странице
         # @param viewport_background [Boolean] отображать ли фон сцены (небо/земля) в видовом экране (по умолчанию выключен)
-        # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 16:9, 1:1, page)
+        # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 5:4, 4:5, 16:9, 1:1, page)
         # @param scale_pct [Integer] масштаб/размещение кадра на листе в % (60-100)
-        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100)
+        # @param align_h [String] выравнивание эскиза по горизонтали (left, center, right)
+        # @param align_v [String] выравнивание эскиза по вертикали (top, center, bottom)
+        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100, align_h: "center", align_v: "center")
           @name             = name.to_s
           @original_name    = (original_name || name).to_s
           @scene_ref        = scene_ref
@@ -52,7 +61,18 @@ module DN1Code
           @viewport_background = (viewport_background == true || viewport_background.to_s == "true")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
           @scale_pct        = (scale_pct || 100).to_i
+          @align_h          = normalize_alignment(align_h, VALID_ALIGN_H)
+          @align_v          = normalize_alignment(align_v, VALID_ALIGN_V)
           @page_type        = page_type ? page_type.to_sym : detect_page_type(@name)
+        end
+
+        # Нормализует значение выравнивания по белому списку
+        # @param value [Object] исходное значение
+        # @param allowed [Array<String>] допустимые значения
+        # @return [String] нормализованное значение или "center"
+        def normalize_alignment(value, allowed)
+          str = value.to_s.strip.downcase
+          allowed.include?(str) ? str : "center"
         end
 
         # Автоматически определяет подходящий тип шаблона страницы на основе имени сцены
@@ -89,7 +109,9 @@ module DN1Code
             viewport_visible: @viewport_visible,
             viewport_background: @viewport_background,
             aspect_ratio:     @aspect_ratio,
-            scale_pct:        @scale_pct
+            scale_pct:        @scale_pct,
+            align_h:          @align_h,
+            align_v:          @align_v
           }
         end
 
@@ -109,7 +131,9 @@ module DN1Code
             viewport_visible: hash.fetch(:viewport_visible, hash.fetch("viewport_visible", true)),
             viewport_background: hash.fetch(:viewport_background, hash.fetch("viewport_background", false)),
             aspect_ratio:     hash[:aspect_ratio] || hash["aspect_ratio"] || "4:3",
-            scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100
+            scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100,
+            align_h:          hash[:align_h] || hash["align_h"] || "center",
+            align_v:          hash[:align_v] || hash["align_v"] || "center"
           )
         end
       end

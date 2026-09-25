@@ -294,6 +294,8 @@ module DN1Code
           when "3:2"  then 3.0 / 2.0
           when "16:9" then 16.0 / 9.0
           when "1:1"  then 1.0
+          when "5:4"  then 5.0 / 4.0
+          when "4:5"  then 4.0 / 5.0
           else nil
           end
         end

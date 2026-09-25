@@ -1177,7 +1177,9 @@ tr:hover td {
 .th-check { width: 34px; text-align: center; }
 .th-order { width: 44px; text-align: center; }
 .th-preview { width: 108px; text-align: center; }
-.th-aspect { width: 75px; text-align: center; }
+.th-aspect { width: 92px; text-align: center; }
+.th-scale { width: 74px; text-align: center; }
+.th-align { width: 88px; text-align: center; }
 
 .scene-check-cell { text-align: center; }
 .scene-num-cell { text-align: center; font-weight: 700; color: var(--text-muted); font-size: 11px; }
@@ -1245,16 +1247,109 @@ tr:hover td {
   box-shadow: var(--shadow-focus);
 }
 
-.scene-aspect-cell { text-align: center; }
-.badge-aspect {
-  display: inline-block;
-  padding: 2px 7px;
-  background: var(--bs-gray-100);
-  border: 1px solid var(--border-light);
-  border-radius: 10px;
-  font-size: 11px;
-  font-weight: 600;
+.scene-aspect-cell,
+.scene-scale-cell,
+.scene-align-cell { text-align: center; }
+
+/* Постраничные настройки эскиза: пропорции / масштаб */
+.scene-aspect-select,
+.scene-scale-select {
+  width: 100%;
+  max-width: 84px;
+  padding: 3px 4px;
+  font-size: 12px;
+  background: var(--bg-app);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
   color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scene-scale-select { max-width: 68px; }
+
+.scene-aspect-select:hover:not(:disabled),
+.scene-scale-select:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--border-color);
+  color: var(--text-main);
+}
+
+.scene-aspect-select:focus:not(:disabled),
+.scene-scale-select:focus:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--bs-primary);
+  color: var(--text-main);
+  box-shadow: var(--shadow-focus);
+  outline: none;
+}
+
+.scene-ctrl-disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+
+/* Постраничное выравнивание эскиза: кнопка + поповер с сеткой 3×3 */
+.scene-align-btn {
+  min-width: 36px;
+  height: 26px;
+  padding: 0 6px;
+  font-size: 14px;
+  line-height: 1;
+  background: var(--bg-app);
+  border: 1px solid transparent;
+  border-radius: var(--radius-sm);
+  color: var(--text-secondary);
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+
+.scene-align-btn:hover:not(:disabled) {
+  background: #ffffff;
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
+.scene-align-pop {
+  display: grid;
+  grid-template-columns: repeat(3, 30px);
+  grid-auto-rows: 30px;
+  gap: 3px;
+  padding: 6px;
+  background: #ffffff;
+  border: 1px solid var(--border-color);
+  border-radius: var(--radius-sm);
+  box-shadow: var(--shadow-lg);
+  z-index: 3000;
+}
+
+.scene-align-opt {
+  width: 30px;
+  height: 30px;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg-app);
+  border: 1px solid var(--border-light);
+  border-radius: 4px;
+  color: var(--text-muted);
+  cursor: pointer;
+  transition: all 0.12s ease;
+}
+
+.scene-align-opt:hover {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+  background: var(--modus-blue-subtle);
+}
+
+.scene-align-opt.active {
+  background: var(--bs-primary);
+  border-color: var(--bs-primary);
+  color: #ffffff;
 }
 
 .scene-template-cell-wrap {

@@ -338,6 +338,12 @@ module DN1Code
           when "1:1"
             ratio = 1.0
             label = "1:1"
+          when "5:4"
+            ratio = 5.0 / 4.0
+            label = "5:4"
+          when "4:5"
+            ratio = 4.0 / 5.0
+            label = "4:5"
           when "custom"
             cw = (settings[:custom_ratio_w] || settings["custom_ratio_w"] || 16).to_f
             ch = (settings[:custom_ratio_h] || settings["custom_ratio_h"] || 9).to_f

@@ -623,10 +623,10 @@ const DEFAULT_LAYOUTS = {
         setTimeout(() => {
           if (window.app && window.app.loadData) {
             const scenesList = [
-              { name: "Титульный лист", page_type: "cover", description: "Обложка проекта", enabled: true, aspect_ratio: "4:3", scale_pct: 100, viewport_visible: true },
-              { name: "Содержание и материалы", page_type: "explain", description: "Пояснительная записка и перечень спецификаций", enabled: true, aspect_ratio: "4:3", scale_pct: 90, viewport_visible: true },
-              { name: "Перспективный вид", page_type: "visual", description: "Визуализация интерьера в дневном освещении", enabled: true, aspect_ratio: "16:9", scale_pct: 100, viewport_visible: true },
-              { name: "План расстановки мебели", page_type: "general", description: "Техническая схема с габаритными размерами", enabled: true, aspect_ratio: "4:3", scale_pct: 80, viewport_visible: true }
+              { name: "Титульный лист", page_type: "cover", description: "Обложка проекта", enabled: true, aspect_ratio: "4:3", scale_pct: 100, viewport_visible: true, align_h: "center", align_v: "center" },
+              { name: "Содержание и материалы", page_type: "explain", description: "Пояснительная записка и перечень спецификаций", enabled: true, aspect_ratio: "4:3", scale_pct: 90, viewport_visible: true, align_h: "center", align_v: "center" },
+              { name: "Перспективный вид", page_type: "visual", description: "Визуализация интерьера в дневном освещении", enabled: true, aspect_ratio: "16:9", scale_pct: 100, viewport_visible: true, align_h: "center", align_v: "center" },
+              { name: "План расстановки мебели", page_type: "general", description: "Техническая схема с габаритными размерами", enabled: true, aspect_ratio: "4:3", scale_pct: 80, viewport_visible: true, align_h: "center", align_v: "center" }
             ];
             window.app.loadData({
               project: {
@@ -1451,7 +1451,7 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       return;
     }
 
-    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
     let ratio = overrideRatio || scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
     ratio = String(ratio).trim();
     if (!VALID_ASPECT_RATIOS.includes(ratio)) {
@@ -1531,7 +1531,7 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       return;
     }
 
-    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
     let ratio = overrideRatio || imgCfg.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
     ratio = String(ratio).trim();
     if (!VALID_ASPECT_RATIOS.includes(ratio)) {
@@ -2872,7 +2872,7 @@ function updateParamModalPreview() {
     if (els.selectFontWidth) els.selectFontWidth.value = curFontWidth;
     document.documentElement.style.setProperty("--page-font-family", `"${previewFontFamilyFor(curFontFamily, curFontWidth)}", sans-serif`);
     document.documentElement.style.setProperty("--page-font-weight", curFontWeight === "bold" ? "700" : "400");
-    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
     let initialAspect = settings.image_aspect_ratio;
     if (!VALID_ASPECT_RATIOS.includes(initialAspect)) {
       initialAspect = "4:3";
@@ -3585,7 +3585,7 @@ function updateParamModalPreview() {
   // Update Aspect Ratio UI & SketchUp Overlay state
   function updateAspectUI(isUserAction = false) {
     let aspectMode = els.selectImageAspect ? els.selectImageAspect.value : "4:3";
-    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+    const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
     if (!VALID_ASPECT_RATIOS.includes(aspectMode)) {
       aspectMode = "4:3";
       if (els.selectImageAspect) els.selectImageAspect.value = "4:3";
@@ -3613,6 +3613,12 @@ function updateParamModalPreview() {
     } else if (aspectMode === "1:1") {
       ratio = 1.0;
       label = "1:1 (Квадрат)";
+    } else if (aspectMode === "5:4") {
+      ratio = 5.0 / 4.0;
+      label = "5:4 (Альбомный)";
+    } else if (aspectMode === "4:5") {
+      ratio = 4.0 / 5.0;
+      label = "4:5 (Портретный)";
     } else if (aspectMode === "custom") {
       const cw = parseFloat(els.inputAspectCustomW ? els.inputAspectCustomW.value : 16) || 16;
       const ch = parseFloat(els.inputAspectCustomH ? els.inputAspectCustomH.value : 9) || 9;
@@ -3766,17 +3772,61 @@ function updateParamModalPreview() {
     });
   }
 
-  // Update aspect ratio badge in scenes table row
+  // Update per-scene controls state in scenes table row (aspect select, scale select, align button)
   function updateSceneTableAspectCell(index, ratio, isVis) {
     if (!els.scenesTableBody) return;
     const row = els.scenesTableBody.querySelector(`tr[data-index="${index}"]`);
     if (!row) return;
-    const cell = row.querySelector(".scene-aspect-cell");
-    if (!cell) return;
     const visible = isVis !== undefined ? isVis : true;
-    const r = (ratio || "4:3").trim();
-    const displayRatio = r === "page" ? "Лист" : r;
-    cell.innerHTML = `<span class="badge badge-aspect ${!visible ? 'badge-aspect-disabled' : ''}" title="${visible ? 'Пропорции кадра: ' + displayRatio : 'Видовой экран выключен'}">${visible ? displayRatio : 'Выкл'}</span>`;
+    const sel = row.querySelector(".scene-aspect-select");
+    if (sel) {
+      const r = (ratio || "4:3").trim();
+      if (Array.from(sel.options).some((o) => o.value === r)) sel.value = r;
+      sel.disabled = !visible;
+      sel.classList.toggle("scene-ctrl-disabled", !visible);
+      sel.title = visible ? "Пропорции кадра для этой страницы" : "Видовой экран выключен";
+    }
+    const selScale = row.querySelector(".scene-scale-select");
+    if (selScale) {
+      selScale.disabled = !visible;
+      selScale.classList.toggle("scene-ctrl-disabled", !visible);
+    }
+    const alignBtn = row.querySelector(".scene-align-btn");
+    if (alignBtn) {
+      alignBtn.disabled = !visible;
+      alignBtn.classList.toggle("scene-ctrl-disabled", !visible);
+    }
+  }
+
+  // -------------------------------------------------------------
+  // Выравнивание эскиза на странице — постраничная настройка, сетка 3×3
+  // -------------------------------------------------------------
+  const ALIGN_GLYPHS = {
+    "left|top": "↖", "center|top": "↑", "right|top": "↗",
+    "left|center": "←", "center|center": "•", "right|center": "→",
+    "left|bottom": "↙", "center|bottom": "↓", "right|bottom": "↘"
+  };
+  const SCENE_ALIGN_H = ["left", "center", "right"];
+  const SCENE_ALIGN_V = ["top", "center", "bottom"];
+
+  function alignGlyph(h, v) {
+    return ALIGN_GLYPHS[`${h}|${v}`] || "•";
+  }
+
+  function sceneAlignTitle(h, v) {
+    const H = { left: "по левому краю", center: "по центру", right: "по правому краю" };
+    const V = { top: "по верху", center: "по центру", bottom: "по низу" };
+    if (h === "center" && v === "center") return "по центру страницы";
+    if (v === "center") return `по горизонтали ${H[h] || h}`;
+    if (h === "center") return `по вертикали ${V[v] || v}`;
+    return `${H[h] || h} · ${V[v] || v}`;
+  }
+
+  function closeSceneAlignPopover() {
+    const pop = document.getElementById("sceneAlignPopover");
+    if (pop) pop.remove();
+    document.removeEventListener("click", closeSceneAlignPopover);
+    document.removeEventListener("keydown", closeSceneAlignPopover);
   }
 
   // Create mini page preview element for a scene (3:2 clean image, no blue lines)
@@ -3863,11 +3913,10 @@ function updateParamModalPreview() {
     }
 
     const isImageVis = scene.viewport_visible !== false;
-    const VALID_ASPECTS = ["3:2", "4:3", "16:9", "1:1", "page"];
+    const VALID_ASPECTS = ["3:2", "4:3", "5:4", "16:9", "1:1", "4:5", "page"];
     let rawRatio = (scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
     const imageAspectRatio = VALID_ASPECTS.includes(rawRatio) ? rawRatio : "4:3";
     const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
-    const imageScalePct = parseInt(scene.scale_pct !== undefined ? scene.scale_pct : 100, 10) || 100;
     const isOverlayOn = isImageVis && Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
     const rawBorderColor = (state.pdf_settings && state.pdf_settings.overlay_border_color) || "#0EA5E9";
     const overlayBorderColor = rawBorderColor.startsWith("#") ? rawBorderColor : `#${rawBorderColor}`;
@@ -3898,29 +3947,6 @@ function updateParamModalPreview() {
           </div>
         </div>
         <div class="tpl-card-body">
-          <div class="tpl-image-controls-row">
-            <div class="tpl-control-item">
-              <span class="tpl-control-label">Пропорции картинки:</span>
-              <div class="tpl-btn-group" id="grp_image_aspect_ratio">
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '3:2' ? 'active' : ''}" data-ratio="3:2" title="Пропорция 3:2 (фотокадр)">3:2</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '4:3' ? 'active' : ''}" data-ratio="4:3" title="Пропорция 4:3 (стандарт)">4:3</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '16:9' ? 'active' : ''}" data-ratio="16:9" title="Пропорция 16:9 (широкоформатный)">16:9</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === '1:1' ? 'active' : ''}" data-ratio="1:1" title="Пропорция 1:1 (квадрат)">1:1</button>
-                <button type="button" class="tpl-btn-align btn-aspect-ratio ${imageAspectRatio === 'page' ? 'active' : ''}" data-ratio="page" title="По пропорциям страницы листа">По листу</button>
-              </div>
-            </div>
-            <div class="tpl-control-item">
-              <span class="tpl-control-label">Размещение на странице:</span>
-              <div class="tpl-btn-group" id="grp_image_scale_pct">
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 60 ? 'active' : ''}" data-scale="60" title="60% от размера листа">60%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 70 ? 'active' : ''}" data-scale="70" title="70% от размера листа">70%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 80 ? 'active' : ''}" data-scale="80" title="80% от размера листа">80%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 90 ? 'active' : ''}" data-scale="90" title="90% от размера листа">90%</button>
-                <button type="button" class="tpl-btn-align btn-scale-pct ${imageScalePct === 100 ? 'active' : ''}" data-scale="100" title="100% (во весь лист)">100%</button>
-              </div>
-            </div>
-          </div>
-
           <div class="tpl-overlay-styling-row">
             <div class="tpl-overlay-style-item" title="Цвет контурной рамки в окне SketchUp">
               <span class="tpl-overlay-style-label">Контур рамки:</span>
@@ -3990,42 +4016,6 @@ function updateParamModalPreview() {
         }
         updateSceneTableAspectCell(sceneIndex, scene.aspect_ratio, isVis);
         notifyChange();
-      });
-    }
-
-    const grpRatio = document.getElementById("grp_image_aspect_ratio");
-    if (grpRatio) {
-      grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          const ratio = btn.dataset.ratio;
-          grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          scene.aspect_ratio = ratio;
-          updateBlockSlot("image_4_3", { aspect_ratio: ratio });
-          updateSceneTableAspectCell(sceneIndex, ratio, scene.viewport_visible !== false);
-          const tplAspectText = document.getElementById("tplAspectOverlayText");
-          if (tplAspectText) {
-            const disp = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
-            tplAspectText.textContent = `📐 Рамка: ${disp}`;
-          }
-          syncCurrentSceneOverlay(scene, ratio, true);
-          notifyChange();
-        });
-      });
-    }
-
-    const grpScale = document.getElementById("grp_image_scale_pct");
-    if (grpScale) {
-      grpScale.querySelectorAll(".btn-scale-pct").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          grpScale.querySelectorAll(".btn-scale-pct").forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          const scale = parseInt(btn.dataset.scale, 10) || 100;
-          scene.scale_pct = scale;
-          updateBlockSlot("image_4_3", { scale_pct: scale });
-          syncCurrentSceneOverlay(scene, null, true);
-          notifyChange();
-        });
       });
     }
 
@@ -4260,18 +4250,138 @@ function updateParamModalPreview() {
       infoWrap.appendChild(inputDesc);
       tdInfo.appendChild(infoWrap);
 
-      // 4. Aspect Ratio Cell (Кадр)
+      // 4. Aspect Ratio Cell (Кадр) — постраничные пропорции
       const tdAspect = document.createElement("td");
       tdAspect.className = "scene-aspect-cell";
-      const aspectBadge = document.createElement("span");
-      aspectBadge.className = "badge badge-aspect";
       const isVpVis = scene.viewport_visible !== false;
+      const ASPECT_OPTIONS = [["3:2", "3:2"], ["4:3", "4:3"], ["5:4", "5:4"], ["16:9", "16:9"], ["1:1", "1:1"], ["4:5", "4:5"], ["page", "По листу"]];
+      const selAspect = document.createElement("select");
+      selAspect.className = "table-select scene-aspect-select";
+      ASPECT_OPTIONS.forEach(([val, label]) => {
+        const opt = document.createElement("option");
+        opt.value = val;
+        opt.textContent = label;
+        selAspect.appendChild(opt);
+      });
       const curRatio = (scene.aspect_ratio || "4:3").trim();
-      const displayRatio = curRatio === "page" ? "Лист" : curRatio;
-      aspectBadge.textContent = isVpVis ? displayRatio : "Выкл";
-      aspectBadge.title = isVpVis ? `Пропорции кадра: ${displayRatio}` : "Видовой экран выключен";
-      if (!isVpVis) aspectBadge.classList.add("badge-aspect-disabled");
-      tdAspect.appendChild(aspectBadge);
+      selAspect.value = ASPECT_OPTIONS.some(([val]) => val === curRatio) ? curRatio : "4:3";
+      selAspect.disabled = !isVpVis;
+      if (!isVpVis) selAspect.classList.add("scene-ctrl-disabled");
+      selAspect.title = isVpVis ? "Пропорции кадра для этой страницы" : "Видовой экран выключен";
+      selAspect.addEventListener("focus", () => {
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+      });
+      selAspect.addEventListener("change", (e) => {
+        const ratio = e.target.value;
+        scene.aspect_ratio = ratio;
+        updateBlockSlot("image_4_3", { aspect_ratio: ratio });
+        if (layoutState.selectedSceneIndex === index) {
+          syncCurrentSceneOverlay(scene, ratio, true);
+        }
+        notifyChange();
+      });
+      selAspect.addEventListener("click", (e) => e.stopPropagation());
+      tdAspect.appendChild(selAspect);
+
+      // 5. Scale Cell (Масштаб) — постраничное размещение на листе
+      const tdScale = document.createElement("td");
+      tdScale.className = "scene-scale-cell";
+      const selScale = document.createElement("select");
+      selScale.className = "table-select scene-scale-select";
+      selScale.title = "Размещение картинки на странице (% от листа)";
+      [60, 70, 80, 90, 100].forEach((pct) => {
+        const opt = document.createElement("option");
+        opt.value = String(pct);
+        opt.textContent = `${pct}%`;
+        selScale.appendChild(opt);
+      });
+      selScale.value = String(parseInt(scene.scale_pct, 10) || 100);
+      selScale.disabled = !isVpVis;
+      if (!isVpVis) selScale.classList.add("scene-ctrl-disabled");
+      selScale.addEventListener("focus", () => {
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+      });
+      selScale.addEventListener("change", (e) => {
+        const scale = parseInt(e.target.value, 10) || 100;
+        scene.scale_pct = scale;
+        updateBlockSlot("image_4_3", { scale_pct: scale });
+        if (layoutState.selectedSceneIndex === index) {
+          syncCurrentSceneOverlay(scene, null, true);
+        }
+        notifyChange();
+      });
+      selScale.addEventListener("click", (e) => e.stopPropagation());
+      tdScale.appendChild(selScale);
+
+      // 6. Align Cell (Выравнивание) — постраничное выравнивание эскиза (сетка 3×3)
+      const tdAlign = document.createElement("td");
+      tdAlign.className = "scene-align-cell";
+      const alignBtn = document.createElement("button");
+      alignBtn.type = "button";
+      alignBtn.className = "scene-align-btn";
+      const sceneAlignH = SCENE_ALIGN_H.includes(scene.align_h) ? scene.align_h : "center";
+      const sceneAlignV = SCENE_ALIGN_V.includes(scene.align_v) ? scene.align_v : "center";
+      alignBtn.textContent = alignGlyph(sceneAlignH, sceneAlignV);
+      alignBtn.title = `Выравнивание эскиза: ${sceneAlignTitle(sceneAlignH, sceneAlignV)}`;
+      if (!isVpVis) {
+        alignBtn.disabled = true;
+        alignBtn.classList.add("scene-ctrl-disabled");
+      }
+      alignBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        const existing = document.getElementById("sceneAlignPopover");
+        if (existing) {
+          closeSceneAlignPopover();
+          return;
+        }
+        const pop = document.createElement("div");
+        pop.id = "sceneAlignPopover";
+        pop.className = "scene-align-pop";
+        pop.addEventListener("click", (ev) => ev.stopPropagation());
+        [
+          ["left", "top"], ["center", "top"], ["right", "top"],
+          ["left", "center"], ["center", "center"], ["right", "center"],
+          ["left", "bottom"], ["center", "bottom"], ["right", "bottom"]
+        ].forEach(([h, v]) => {
+          const optBtn = document.createElement("button");
+          optBtn.type = "button";
+          optBtn.className = "scene-align-opt" + (h === sceneAlignH && v === sceneAlignV ? " active" : "");
+          optBtn.textContent = alignGlyph(h, v);
+          optBtn.title = sceneAlignTitle(h, v);
+          optBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            scene.align_h = h;
+            scene.align_v = v;
+            alignBtn.textContent = alignGlyph(h, v);
+            alignBtn.title = `Выравнивание эскиза: ${sceneAlignTitle(h, v)}`;
+            closeSceneAlignPopover();
+            notifyChange();
+          });
+          pop.appendChild(optBtn);
+        });
+        pop.style.position = "fixed";
+        document.body.appendChild(pop);
+        const btnRect = alignBtn.getBoundingClientRect();
+        const popRect = pop.getBoundingClientRect();
+        pop.style.left = `${Math.round(btnRect.left + btnRect.width / 2)}px`;
+        pop.style.transform = "translateX(-50%)";
+        const spaceBelow = window.innerHeight - btnRect.bottom;
+        if (spaceBelow < popRect.height + 8) {
+          pop.style.top = `${Math.round(btnRect.top)}px`;
+          pop.style.transform = "translate(-50%, -100%)";
+        } else {
+          pop.style.top = `${Math.round(btnRect.bottom + 4)}px`;
+        }
+        setTimeout(() => {
+          document.addEventListener("click", closeSceneAlignPopover, { once: true });
+          document.addEventListener("keydown", closeSceneAlignPopover, { once: true });
+        }, 0);
+      });
+      tdAlign.appendChild(alignBtn);
 
       // 5. Page Type Select
       const tdType = document.createElement("td");
@@ -4429,6 +4539,8 @@ function updateParamModalPreview() {
       tr.appendChild(tdPreview);
       tr.appendChild(tdInfo);
       tr.appendChild(tdAspect);
+      tr.appendChild(tdScale);
+      tr.appendChild(tdAlign);
       tr.appendChild(tdType);
 
       els.scenesTableBody.appendChild(tr);
@@ -5752,15 +5864,9 @@ function updateParamModalPreview() {
     },
 
     setAspectRatio: function (ratio) {
-      const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "1:1", "custom"];
+      const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
       if (!VALID_ASPECT_RATIOS.includes(ratio)) {
         ratio = "4:3";
-      }
-      const grpRatio = document.getElementById("grp_image_aspect_ratio");
-      if (grpRatio) {
-        grpRatio.querySelectorAll(".btn-aspect-ratio").forEach((b) => {
-          b.classList.toggle("active", b.dataset.ratio === ratio);
-        });
       }
       const idx = layoutState.selectedSceneIndex || 0;
       const scene = (state.scenes || [])[idx];

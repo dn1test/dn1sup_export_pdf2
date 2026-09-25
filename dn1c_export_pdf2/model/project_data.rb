@@ -29,7 +29,7 @@ module DN1Code
         PROJECT_YAML_NAME     = "project.yaml"
 
         # Допустимые пропорции кадра в настройках плагина
-        VALID_ASPECT_RATIOS   = %w[page 16:9 4:3 3:2 1:1 custom].freeze
+        VALID_ASPECT_RATIOS   = %w[page 16:9 4:3 3:2 5:4 4:5 1:1 custom].freeze
 
         # Прокси-хэш для фасада @project_info: перенаправляет изменения напрямую
         # в модульные структуры (@project, @customer, @workflow) и синхронизирует синонимы полей
