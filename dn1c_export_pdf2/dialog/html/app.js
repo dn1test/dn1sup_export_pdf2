@@ -497,6 +497,7 @@ const DEFAULT_LAYOUTS = {
     scenesTableBody: document.getElementById("scenesTableBody"),
     btnSelectAllScenes: document.getElementById("btnSelectAllScenes"),
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
+    btnRefreshThumbs: document.getElementById("btnRefreshThumbs"),
     chkScenesBackground: document.getElementById("chk_scenes_background"),
     chkScenesFrameAll: document.getElementById("chk_scenes_frame_all"),
     scenesPanel: document.getElementById("scenesPanel"),
@@ -3689,10 +3690,21 @@ function updateParamModalPreview() {
   const sceneThumbnails = {};
   let requestedSceneThumbnails = false;
   let sceneThumbnailsInFlight = false;
+  let sceneThumbnailsSig = null;
+  let sceneThumbsManualRequest = false;
+
+  // Сигнатура набора сцен: состав/имена/порядок страниц и флаг «Фон».
+  // Эскизы перегенерируются автоматически только когда она меняется —
+  // иначе SketchUp зря «перелистывает» все страницы при каждом открытии вкладки
+  function sceneThumbnailsSignature() {
+    const scenes = state.scenes || [];
+    return JSON.stringify(scenes.map((s) => [s.name || "", s.original_name || "", s.viewport_background === true]));
+  }
 
   function requestSceneThumbnails(force) {
     if (sceneThumbnailsInFlight) return;
-    if (!force && requestedSceneThumbnails) return;
+    const sig = sceneThumbnailsSignature();
+    if (!force && requestedSceneThumbnails && sig === sceneThumbnailsSig) return;
     requestedSceneThumbnails = true;
     sceneThumbnailsInFlight = true;
     callRuby("getSceneThumbnails");
@@ -5037,6 +5049,15 @@ function updateParamModalPreview() {
       notifyChange();
     });
 
+    // Обновить эскизы сцен вручную: SketchUp перелистывает страницы и снимает свежие мини-превью
+    if (els.btnRefreshThumbs) {
+      els.btnRefreshThumbs.addEventListener("click", () => {
+        if (sceneThumbnailsInFlight) return;
+        sceneThumbsManualRequest = true;
+        requestSceneThumbnails(true);
+      });
+    }
+
     // Добавление пользовательской стадии в конец списка (кнопка или Enter)
     const addStadiaFromInput = () => {
       if (!els.inputNewStadia) return;
@@ -5607,6 +5628,18 @@ function updateParamModalPreview() {
       state.pdf_settings.show_aspect_overlay = Boolean(isActive);
     },
 
+    // Нативная смена активной страницы в SketchUp (вкладки сцен): панель следует
+    // за моделью — выделение в таблице сцен переезжает на новую страницу.
+    // Вызывается из Ruby (notify_active_scene) только когда страница совпадает
+    // со сценой проекта; сырые страницы SketchUp выделение не меняют.
+    onActiveSceneChanged: function (index) {
+      const scenes = state.scenes || [];
+      if (typeof index !== "number" || index < 0 || index >= scenes.length) return;
+      if (layoutState.selectedSceneIndex === index) return;
+      layoutState.selectedSceneIndex = index;
+      highlightActiveSceneRow(index);
+    },
+
     updateAspectInfo: function (info) {
       // Параметры кадра отображаются в меню кадра таблицы страниц —
       // отдельных бейджей и подписей в диалоге больше нет
@@ -5633,9 +5666,19 @@ function updateParamModalPreview() {
 
     onSceneThumbnailsLoaded: function (thumbs) {
       sceneThumbnailsInFlight = false;
+      const gotThumbs = thumbs && typeof thumbs === "object" && Object.keys(thumbs).length > 0;
       if (thumbs && typeof thumbs === "object") {
         Object.assign(sceneThumbnails, thumbs);
         updateSceneTablePreviews();
+      }
+      sceneThumbnailsSig = sceneThumbnailsSignature();
+      if (sceneThumbsManualRequest) {
+        sceneThumbsManualRequest = false;
+        if (gotThumbs) {
+          showNotification("Эскизы сцен обновлены", "success");
+        } else {
+          showNotification("Не удалось получить эскизы сцен", "error");
+        }
       }
     },
 
@@ -5647,8 +5690,10 @@ function updateParamModalPreview() {
         }
       }
       renderScenesTable();
-      // Список мог измениться — всегда перегенерируем эскизы заново
-      requestSceneThumbnails(true);
+      // Эскизы перегенерируются только если набор сцен изменился
+      // (состав/имена/порядок страниц, флаг «Фон») — иначе SketchUp
+      // зря перелистывает страницы; вручную — кнопка «Обновить эскизы»
+      requestSceneThumbnails(false);
     },
 
     syncCurrentTemplateOverlay: syncCurrentTemplateOverlay

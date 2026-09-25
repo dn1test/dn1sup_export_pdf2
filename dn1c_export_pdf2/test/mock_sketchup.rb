@@ -87,10 +87,12 @@ module Sketchup
 
   class MockPages
     include Enumerable
+    attr_accessor :parent
 
     def initialize(pages = [])
       @pages = pages
       @selected = pages.first
+      @observers = []
     end
 
     def each(&block)
@@ -111,12 +113,23 @@ module Sketchup
 
     def selected_page=(page)
       @selected = page
+      @observers.each { |o| o.onContentsModified(self) if o.respond_to?(:onContentsModified) }
     end
 
     def add(name)
       p = MockPage.new(name)
       @pages << p
       p
+    end
+
+    def add_observer(obs)
+      @observers << obs unless @observers.include?(obs)
+      true
+    end
+
+    def remove_observer(obs)
+      @observers.delete(obs)
+      true
     end
   end
 
@@ -219,12 +232,21 @@ module Sketchup
     def onErase(model); end
   end
 
+  # Мок интерфейса наблюдателя коллекции страниц (как в реальном SketchUp
+  # переключение активной страницы вызывает onContentsModified)
+  class PagesObserver
+    def onContentsModified(pages); end
+    def onElementAdded(pages, page); end
+    def onElementRemoved(pages, page); end
+  end
+
   class MockModel
     attr_accessor :path, :pages, :active_view, :attributes, :observers, :overlays, :rendering_options, :styles, :entities
 
     def initialize(path = "U:/Projects/SampleProject/model.skp")
       @path = path
       @pages = MockPages.new
+      @pages.parent = self
       @active_view = MockView.new
       @overlays = MockOverlaysCollection.new
       @styles = MockStyles.new

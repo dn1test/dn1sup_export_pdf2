@@ -171,6 +171,11 @@ module DN1Code
           load loader if File.exist?(loader)
           load main_rb if File.exist?(main_rb)
 
+          # main.rb регистрирует наблюдателей только при первичной загрузке
+          # (unless file_loaded?) — при горячей перезагрузке повторяем регистрацию
+          # вручную (register! идемпотентен: дедупликация по WeakRef)
+          Service::ObserverService.register! if defined?(Service::ObserverService)
+
           # Обновление открытого диалога, если есть
           if defined?(Dialog::ExportDialog)
             Dialog::ExportDialog.refresh_if_open rescue nil

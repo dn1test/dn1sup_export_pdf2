@@ -1,5 +1,7 @@
 # frozen_string_literal: true
 
+require "weakref"
+
 module DN1Code
   module ExportPdf2
     module Service
@@ -9,8 +11,15 @@ module DN1Code
         OVERLAY_ID   = "dn1code.export_pdf2.safe_frame_overlay"
         OVERLAY_NAME = "DN1C: Рамка экспорта PDF (Safe Frame)"
 
+        # Постраничные ключи session-настроек: описывают конкретную страницу и
+        # сбрасываются при смене активной страницы, чтобы пропорции/шаблон/флаги
+        # резолвились заново по новой странице
+        PAGE_SCOPED_KEYS = %i[aspect_ratio image_aspect_ratio template_key scene_index scene_name show_aspect_overlay].freeze
+
         @active_overlay = nil
         @current_settings = nil
+        @applying_page = false
+        @last_page_applied = nil
 
         class << self
           attr_accessor :current_settings
@@ -253,6 +262,14 @@ module DN1Code
             end
           end
 
+          # Индекс совпавшей сцены (для синхронизации выделения в панели)
+          scene_index = nil
+          if override_settings && (override_settings[:scene_index] || override_settings["scene_index"])
+            scene_index = (override_settings[:scene_index] || override_settings["scene_index"]).to_i
+          elsif matched_sc && pdata && pdata.scenes
+            scene_index = pdata.scenes.index(matched_sc)
+          end
+
           tpl_key = settings[:template_key] || settings["template_key"]
           unless tpl_key
             tpl_key = matched_sc.page_type if matched_sc
@@ -302,7 +319,7 @@ module DN1Code
                          v == true || v.to_s == "true"
                        end
 
-          valid_modes = %w[page 16:9 4:3 3:2 1:1 custom].freeze
+          valid_modes = %w[page 16:9 4:3 3:2 1:1 5:4 4:5 custom].freeze
 
           gui_aspect = (settings[:image_aspect_ratio] || settings["image_aspect_ratio"]).to_s.strip
           gui_aspect = "4:3" if !gui_aspect.empty? && !valid_modes.include?(gui_aspect)
@@ -418,6 +435,9 @@ module DN1Code
             ratio:          ratio,
             label:          label,
             aspect_ratio:   aspect_mode,
+            template_key:   tpl_key.to_s,
+            scene_aspect:   scene_aspect,
+            scene_index:    scene_index,
             render_w:       img_w,
             render_h:       img_h,
             border_color:   border_color_val,
@@ -602,6 +622,89 @@ module DN1Code
           end
         end
 
+        # Применяет рамку пропорций к активной странице модели. Вызывается при смене
+        # страницы любым способом: вкладками сцен SketchUp (PagesObserver), из панели
+        # расширения (selectScene) или скриптом. Постраничные настройки сессии
+        # перечитываются по новой активной странице — так же, как при переключении
+        # сцены из панели.
+        # @param model [Sketchup::Model, nil]
+        # @return [Hash, nil] целевые параметры кадра (nil, если применять не к чему
+        #   или страница уже применена)
+        def self.on_page_changed(model = nil)
+          return nil if @applying_page
+
+          @applying_page = true
+          m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
+          return nil unless m && m.respond_to?(:pages) && m.pages && m.pages.respond_to?(:selected_page)
+
+          sel_page = m.pages.selected_page
+          return nil unless sel_page
+
+          page_name = sel_page.name.to_s
+          if page_applied?(m, page_name)
+            return nil
+          end
+          @last_page_applied = [WeakRef.new(m), page_name]
+
+          # Постраничные ключи описывают предыдущую страницу — снимаем их, чтобы
+          # calculate_target_info резолвил пропорции/шаблон/флаги по новой странице
+          if @current_settings
+            PAGE_SCOPED_KEYS.each do |key|
+              @current_settings.delete(key)
+              @current_settings.delete(key.to_s)
+            end
+          end
+
+          info = calculate_target_info(m)
+
+          # Пропорция самой страницы приоритетнее глобальной настройки формы
+          # (как при переключении из панели: пропорция сцены уходит в сессию явной)
+          if info[:scene_aspect] && info[:scene_aspect] != info[:aspect_ratio]
+            info = calculate_target_info(m, aspect_ratio: info[:scene_aspect])
+          end
+
+          # Зеркалим payload панели (syncCurrentSceneOverlay): сессия всегда описывает
+          # активную страницу
+          @current_settings ||= {}
+          @current_settings[:template_key]        = info[:template_key]
+          @current_settings[:scene_name]          = page_name
+          @current_settings[:scene_index]         = info[:scene_index] unless info[:scene_index].nil?
+          @current_settings[:aspect_ratio]        = info[:aspect_ratio]
+          @current_settings[:image_aspect_ratio]  = info[:aspect_ratio]
+          @current_settings[:show_aspect_overlay] = info[:overlay_on] == true
+
+          if info[:visible] == false || info[:overlay_on] == false
+            disable(m)
+          elsif overlay_active?(m)
+            refresh(m)
+          else
+            enable(m)
+          end
+          info
+        ensure
+          @applying_page = false
+        end
+
+        # Проверяет, была ли уже применена эта страница модели (дедупликация
+        # повторных уведомлений SketchUp: onContentsModified приходит дважды
+        # на одно переключение)
+        # @param model [Sketchup::Model]
+        # @param page_name [String]
+        # @return [Boolean]
+        def self.page_applied?(model, page_name)
+          ref, name = @last_page_applied
+          return false unless ref.is_a?(WeakRef) && ref.weakref_alive?
+
+          begin
+            # WeakRef делегирует == цели и на Ruby 3.x (SketchUp), и на Ruby 4.x (тесты);
+            # обращение к мёртвой ссылке поднимает RefError — считаем страницу непримененной
+            return false unless ref == model
+          rescue StandardError
+            return false
+          end
+          name == page_name
+        end
+
         # Обновляет параметры кадра и принудительно перерисовывает активный вид
         # @param new_settings [Hash]
         # @param model [Sketchup::Model, nil]
@@ -686,6 +789,8 @@ module DN1Code
         def self.on_model_opened(model = nil, project_data = nil)
           m = model || (defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil)
           @current_settings = nil
+          @applying_page = false
+          @last_page_applied = nil
 
           pdata = project_data
           if pdata.nil? && m && defined?(Model::SessionStore)

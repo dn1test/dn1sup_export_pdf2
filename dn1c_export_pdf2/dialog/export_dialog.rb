@@ -26,6 +26,32 @@ module DN1Code
           end
         end
 
+        # Синхронизирует открытую панель со сменой активной страницы SketchUp
+        # (нативное переключение вкладками сцен): выделение сцены, подписи рамки,
+        # состояние переключателя оверлея. info — результат OverlayService.on_page_changed.
+        # info == nil значит «страница не изменилась» (дедупликация повторного
+        # уведомления) — правильное состояние уже отправлено, пушить нечего.
+        # @param info [Hash, nil]
+        # @return [void]
+        def self.notify_active_scene(info)
+          return unless info.is_a?(Hash)
+
+          dlg = @dialog
+          return unless dlg && dlg.visible?
+
+          idx = info[:scene_index]
+          idx_js = idx.nil? ? "null" : idx.to_i.to_s
+          overlay_on = info[:overlay_on] == true && info[:visible] != false
+
+          begin
+            dlg.execute_script("window.app && window.app.onActiveSceneChanged && window.app.onActiveSceneChanged(#{idx_js});")
+            dlg.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});")
+            dlg.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{overlay_on});")
+          rescue StandardError => e
+            warn "[DN1C Export PDF] Не удалось синхронизировать панель со сменой страницы: #{e.message}"
+          end
+        end
+
         def self.show_dialog
           model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
           if model && model.respond_to?(:path) && !model.path.to_s.empty?
@@ -496,20 +522,11 @@ module DN1Code
               if page && model.pages.respond_to?(:selected_page=)
                 model.pages.selected_page = page
 
-                # Если активен Overlay безопасной рамки кадра, обновляем его под пропорции выбранной сцены.
-                # Рамка теперь постраничная: включаем/выключаем по флагу frame_overlay выбранной сцены.
+                # Рамка кадра обновляется под выбранную страницу той же логикой,
+                # что и при нативном переключении сцен (OverlayService.on_page_changed)
                 if defined?(Service::OverlayService)
-                  info = Service::OverlayService.calculate_target_info(model)
-                  if info[:visible] == false || info[:overlay_on] == false
-                    Service::OverlayService.disable(model)
-                    dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(false);") rescue nil
-                  elsif Service::OverlayService.overlay_active?(model)
-                    Service::OverlayService.refresh(model)
-                    dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});") rescue nil
-                  else
-                    Service::OverlayService.enable(model)
-                    dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(true);") rescue nil
-                  end
+                  info = Service::OverlayService.on_page_changed(model)
+                  notify_active_scene(info)
                 end
               end
             rescue StandardError => e

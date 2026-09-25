@@ -224,6 +224,8 @@ class TestRunner
     test_83_template_params_render_reads_new_config_only
     test_84_template_params_group_block
     test_85_template_params_auto_labels
+    test_86_overlay_follows_native_page_switch
+    test_87_refresh_thumbnails_button_and_sig_guard
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -2777,7 +2779,7 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     # 1. Проверка экшн-коллбэка selectScene в export_dialog.rb
     assert(dialog_rb_content.include?('add_action_callback("selectScene")'), "export_dialog.rb содержит экшн-коллбэк selectScene")
     assert(dialog_rb_content.include?('selected_page = page'), "export_dialog.rb переключает страницу через model.pages.selected_page = page")
-    assert(dialog_rb_content.include?('OverlayService.refresh') || dialog_rb_content.include?('calculate_target_info'), "export_dialog.rb обновляет безопасную рамку кадра при смене сцены")
+    assert(dialog_rb_content.include?('Service::OverlayService.on_page_changed(model)'), "export_dialog.rb обновляет безопасную рамку кадра при смене сцены (OverlayService.on_page_changed)")
 
     # 2. Проверка моста JavaScript и обработчиков выбора страниц в app.js
     assert(js_content.include?('function switchToSketchupScene(scene, index)'), "app.js содержит функцию switchToSketchupScene")
@@ -2995,10 +2997,16 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(!js_content.include?("Видовой экран</span>"), "переключатель 'Видовой экран' удалён из меню кадра")
     assert(js_content.include?('callRuby("toggleAspectOverlay", false)'), "app.js отключает оверлей для шаблонов без блока картинки")
 
-    # 6. Проверка Ruby коллбэков в export_dialog.rb
+    # 6. Проверка Ruby коллбэков: selectScene делегирует OverlayService.on_page_changed,
+    #    а условие гарантированного отключения оверлея находится в OverlayService
     dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
     dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
-    assert(dialog_rb_content.include?('if info[:visible] == false') && dialog_rb_content.include?('Service::OverlayService.disable(model)'), "export_dialog.rb гарантированно отключает оверлей при info[:visible] == false")
+    overlay_rb_path = File.expand_path(File.join(__dir__, "..", "service", "overlay_service.rb"))
+    overlay_rb_content = File.read(overlay_rb_path, encoding: "UTF-8")
+    assert(dialog_rb_content.include?('Service::OverlayService.on_page_changed(model)') &&
+           overlay_rb_content.include?('if info[:visible] == false || info[:overlay_on] == false') &&
+           overlay_rb_content.include?('disable(m)'),
+           "отключение оверлея при info[:visible] == false выполняется в OverlayService.on_page_changed (вызывается из export_dialog.rb)")
 
     # 7. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
@@ -5256,6 +5264,125 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(reopened.project_info[:articul].to_s == "CF#260922_100000", "Проект с папкой открывается повторно")
 
     FileUtils.rm_rf(test_dir)
+  end
+
+  def test_86_overlay_follows_native_page_switch
+    puts "\n--- 86. Тест: рамка пропорций следует за сменой активной страницы SketchUp ---"
+
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
+    obs_svc = DN1Code::ExportPdf2::Service::ObserverService
+
+    # 0. Чистые настройки сессии для юнит-проверок calculate_target_info
+    overlay_svc.current_settings = nil
+
+    info_ext = overlay_svc.calculate_target_info(nil, {
+      template_key: :cover,
+      custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "4:3" } } },
+      scene_index: 2
+    })
+    assert(info_ext[:scene_index] == 2, "calculate_target_info возвращает scene_index из override-настроек")
+    assert(info_ext[:template_key] == "cover", "calculate_target_info возвращает resolved template_key")
+    assert(info_ext.key?(:scene_aspect), "calculate_target_info возвращает scene_aspect")
+
+    # Пропорции 5:4/4:5 валидны и на уровне сцены (регрессия: valid_modes без 5:4/4:5)
+    scene_54 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "План 5:4", page_type: :cover, aspect_ratio: "5:4", frame_overlay: true)
+    info_54 = overlay_svc.calculate_target_info(nil, {
+      scene_item: scene_54,
+      template_key: :cover,
+      custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "4:3" } } }
+    })
+    assert(info_54[:aspect_ratio] == "5:4" && info_54[:scene_aspect] == "5:4", "пропорция сцены 5:4 резолвится (valid_modes содержит 5:4/4:5)")
+
+    # 1. Модель с тремя страницами: две сцены проекта + одна «сырая» страница SketchUp
+    model = Sketchup::MockModel.new("U:/Projects/SampleProject/FrameSwitch/Model.skp")
+    page_plan  = model.pages.add("План")
+    page_front = model.pages.add("Фасад")
+    page_raw   = model.pages.add("Сырая страница")
+
+    pdata = DN1Code::ExportPdf2::Model::SessionStore.data(model)
+    pdata.scenes = [
+      DN1Code::ExportPdf2::Model::SceneItem.new(name: "План", page_type: :cover, aspect_ratio: "16:9", frame_overlay: true),
+      DN1Code::ExportPdf2::Model::SceneItem.new(name: "Фасад", page_type: :visual, aspect_ratio: "1:1", frame_overlay: false)
+    ]
+
+    overlay_svc.on_model_opened(model)
+
+    # 2. Нативная смена страницы на "План": рамка 16:9 включается
+    model.pages.selected_page = page_plan
+    info_plan = overlay_svc.on_page_changed(model)
+    assert(info_plan && info_plan[:aspect_ratio] == "16:9", "on_page_changed резолвит пропорцию страницы 'План' (16:9)")
+    assert(info_plan[:scene_index] == 0, "on_page_changed возвращает индекс совпавшей сцены")
+    assert(overlay_svc.overlay_instance.ratio_cache == (16.0 / 9.0), "кэш рамки обновлен на 16:9")
+    assert(overlay_svc.overlay_active?(model) == true, "рамка включена на странице с frame_overlay=true")
+    assert(overlay_svc.current_settings[:scene_name] == "План", "сессия оверлея описывает активную страницу 'План'")
+    assert(overlay_svc.current_settings[:template_key].to_s == "cover", "сессия оверлея обновила template_key по странице")
+    assert(overlay_svc.current_settings[:aspect_ratio] == "16:9", "сессия оверлея запомнила пропорцию активной страницы")
+
+    # 3. Нативная смена на "Фасад": рамка выключается по флагу страницы
+    model.pages.selected_page = page_front
+    info_front = overlay_svc.on_page_changed(model)
+    assert(info_front && info_front[:aspect_ratio] == "1:1", "on_page_changed резолвит пропорцию страницы 'Фасад' (1:1)")
+    assert(overlay_svc.overlay_active?(model) == false, "рамка выключена на странице с frame_overlay=false")
+
+    # 4. Обратно на "План": рамка снова включается и пересчитывается
+    model.pages.selected_page = page_plan
+    info_back = overlay_svc.on_page_changed(model)
+    assert(info_back && info_back[:aspect_ratio] == "16:9" && overlay_svc.overlay_active?(model), "обратное переключение включает рамку с 16:9")
+
+    # 5. Дедупликация повторного уведомления о той же странице
+    assert(overlay_svc.on_page_changed(model).nil?, "повторное уведомление о той же странице игнорируется (дедупликация)")
+
+    # 6. Наблюдатель страниц SketchUp: selected_page= вызывает onContentsModified → рамка следует
+    assert(obs_svc.attach_pages_observer(model) == true, "наблюдатель страниц подключен к модели")
+    assert(obs_svc.attach_pages_observer(model) == true, "повторное подключение наблюдателя к той же модели дедуплицируется")
+    model.pages.selected_page = page_front
+    assert(overlay_svc.overlay_active?(model) == false, "через PagesObserver рамка выключилась на странице с frame_overlay=false")
+    assert(overlay_svc.current_settings[:scene_name] == "Фасад", "наблюдатель обновил сессию под страницу 'Фасад'")
+    model.pages.selected_page = page_plan
+    assert(overlay_svc.overlay_active?(model) == true, "через PagesObserver рамка включилась на странице с frame_overlay=true")
+
+    # 7. Сырая страница вне списка сцен проекта: мягкий fallback без ошибок.
+    #    Наблюдатель из п.6 уже применил страницу при selected_page= (дедупликация),
+    #    поэтому сбрасываем состояние оверлея, как при переоткрытии модели
+    model.pages.selected_page = page_raw
+    overlay_svc.on_model_opened(model)
+    info_raw = overlay_svc.on_page_changed(model)
+    assert(info_raw.is_a?(Hash), "для сырой страницы возвращаются параметры кадра без ошибок")
+    assert(overlay_svc.current_settings[:scene_name] == "Сырая страница", "сессия описывает сырую страницу")
+
+    # 8. Делегирование selectScene и JS-мост синхронизации панели
+    rb = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
+    assert(rb.include?("Service::OverlayService.on_page_changed(model)"), "selectScene применяет рамку через OverlayService.on_page_changed")
+    assert(rb.include?("def self.notify_active_scene"), "ExportDialog.notify_active_scene синхронизирует панель при нативной смене страницы")
+    osvc = File.read(File.join(__dir__, "../service/overlay_service.rb"), encoding: "utf-8")
+    assert(osvc.include?("def self.on_page_changed"), "OverlayService.on_page_changed — единая точка применения рамки к странице")
+    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js.include?("onActiveSceneChanged"), "app.js содержит обработчик onActiveSceneChanged (панель следует за SketchUp)")
+
+    # 9. КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  def test_87_refresh_thumbnails_button_and_sig_guard
+    puts "\n--- 87. Тест: кнопка «Обновить эскизы» и защита от лишней перегенерации ---"
+
+    html = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html.include?('id="btnRefreshThumbs"'), "index.html содержит кнопку btnRefreshThumbs")
+
+    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js.include?("btnRefreshThumbs: document.getElementById"), "app.js регистрирует элемент btnRefreshThumbs")
+    assert(js.include?("function sceneThumbnailsSignature"), "app.js содержит сигнатуру набора сцен sceneThumbnailsSignature")
+    assert(js.include?("sig === sceneThumbnailsSig") && js.include?("sceneThumbnailsSig = sceneThumbnailsSignature()"),
+           "app.js пропускает перегенерацию эскизов, если сигнатура сцен не изменилась")
+    assert(js.include?("sceneThumbsManualRequest = true") && js.include?("requestSceneThumbnails(true)"),
+           "app.js по клику «Обновить эскизы» форсирует перегенерацию")
+    assert(js.include?("Эскизы сцен обновлены"), "app.js уведомляет об успешном обновлении эскизов")
+    assert(js.include?("requestSceneThumbnails(false)"), "onScenesRefreshed больше не форсирует перегенерацию эскизов (сигнатура решает)")
   end
 end
 
