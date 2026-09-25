@@ -259,9 +259,6 @@
               <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
                 <i class="modus-icons">add_circle</i> Новый
               </button>
-              <button type="button" class="btn btn-xs btn-danger-outline btn-delete-template-sb" id="btnDeleteTemplateSidebar" title="Удалить выбранный пользовательский шаблон" style="display: none;">
-                <i class="modus-icons">delete</i>
-              </button>
             </div>
           </div>
           <div class="templates-list" id="templatesList">
@@ -276,6 +273,14 @@
             <div class="sidebar-title-group">
               <span class="sidebar-title-icon"><i class="modus-icons">tune</i></span>
               <span class="sidebar-title-text">Параметры шаблона</span>
+            </div>
+            <div class="template-settings-actions">
+              <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
+                <i class="modus-icons">action_undo</i> Сбросить
+              </button>
+              <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
+                <i class="modus-icons">delete</i> Удалить шаблон
+              </button>
             </div>
           </div>
           <!-- Toolbar -->
@@ -322,12 +327,6 @@
                   <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
                   <span class="unit-text">мм</span>
                 </div>
-                <button class="btn btn-xs btn-secondary" id="btnResetLayout" title="Сбросить настройки текущего шаблона к стандартным">
-                  <i class="modus-icons">action_undo</i> Сбросить
-                </button>
-                <button class="btn btn-xs btn-danger-outline" id="btnDeleteCurrentTemplate" title="Удалить этот пользовательский шаблон" style="display: none;">
-                  <i class="modus-icons">delete</i> Удалить шаблон
-                </button>
               </div>
             </div>
 

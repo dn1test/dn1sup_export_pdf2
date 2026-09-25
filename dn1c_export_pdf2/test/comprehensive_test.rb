@@ -2578,7 +2578,6 @@ class TestRunner
     assert(html_content.include?('id="templatesSidebar"'), "index.html содержит боковую панель templatesSidebar")
     assert(html_content.include?('id="templatesList"'), "index.html содержит контейнер списка шаблонов templatesList")
     assert(html_content.include?('id="btnCreateTemplate"'), "index.html содержит кнопку создания шаблона btnCreateTemplate")
-    assert(html_content.include?('id="btnDeleteTemplateSidebar"'), "index.html содержит кнопку удаления в сайдбаре btnDeleteTemplateSidebar")
     assert(html_content.include?('id="currentTemplateTitle"'), "index.html содержит заголовок выбранного шаблона currentTemplateTitle")
     assert(html_content.include?('id="btnRenameCurrentTemplate"'), "index.html содержит кнопку переименования btnRenameCurrentTemplate")
     assert(html_content.include?('id="btnDeleteCurrentTemplate"'), "index.html содержит кнопку удаления btnDeleteCurrentTemplate")
@@ -4195,11 +4194,15 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     # Начертание и ширина размещаются только на тулбаре панели шаблонов,
     # а не на вкладке настроек страницы
-    tpl_toolbar = html_text[/toolbar-font-control.*?btnResetLayout/m]
+    tpl_toolbar = html_text[/toolbar-font-control.*?id="inputLayoutMargin"/m]
     assert(tpl_toolbar, "Тулбар панели шаблонов присутствует в index.html")
     assert(tpl_toolbar.include?('id="selectLayoutFontFamily"'), "Тулбар шаблонов содержит выбор шрифта")
     assert(tpl_toolbar.include?('id="selectFontWeight"'), "Начертание (selectFontWeight) находится на тулбаре панели шаблонов")
     assert(tpl_toolbar.include?('id="selectFontWidth"'), "Ширина (selectFontWidth) находится на тулбаре панели шаблонов")
+
+    # Кнопки «Сбросить»/«Удалить шаблон» вынесены в шапку «Параметры шаблона»
+    tpl_header = html_text[/template-settings-header.*?btnResetLayout.*?template-settings-toolbar/m]
+    assert(tpl_header, "Кнопка btnResetLayout находится в шапке template-settings-header")
     settings_font_card = html_text[/id="fontFamilyGroup".*?id="chkSaveBackup"/m]
     assert(settings_font_card, "Карточка настроек страницы присутствует в index.html")
     assert(!settings_font_card.include?('id="selectFontWeight"'), "На вкладке настроек нет селекта начертания")

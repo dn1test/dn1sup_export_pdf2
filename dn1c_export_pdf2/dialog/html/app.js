@@ -514,7 +514,6 @@ const DEFAULT_LAYOUTS = {
     templatesSidebar: document.getElementById("templatesSidebar"),
     templatesList: document.getElementById("templatesList"),
     btnCreateTemplate: document.getElementById("btnCreateTemplate"),
-    btnDeleteTemplateSidebar: document.getElementById("btnDeleteTemplateSidebar"),
     currentTemplateTitle: document.getElementById("currentTemplateTitle"),
     btnRenameCurrentTemplate: document.getElementById("btnRenameCurrentTemplate"),
     btnDeleteCurrentTemplate: document.getElementById("btnDeleteCurrentTemplate"),
@@ -1241,9 +1240,6 @@ const DEFAULT_LAYOUTS = {
     // Все шаблоны равнозначны: удалить/переименовать можно любой
     if (els.btnDeleteCurrentTemplate) {
       els.btnDeleteCurrentTemplate.style.display = "inline-flex";
-    }
-    if (els.btnDeleteTemplateSidebar) {
-      els.btnDeleteTemplateSidebar.style.display = "inline-flex";
     }
     if (els.btnRenameCurrentTemplate) {
       els.btnRenameCurrentTemplate.style.display = "inline-flex";
@@ -2418,13 +2414,6 @@ function updateParamModalPreview() {
     // Delete Template Modal Handlers
     if (els.btnDeleteCurrentTemplate) {
       els.btnDeleteCurrentTemplate.addEventListener("click", () => {
-        const tplKey = layoutState.currentTemplate;
-        openDeleteTemplateModal(tplKey);
-      });
-    }
-
-    if (els.btnDeleteTemplateSidebar) {
-      els.btnDeleteTemplateSidebar.addEventListener("click", () => {
         const tplKey = layoutState.currentTemplate;
         openDeleteTemplateModal(tplKey);
       });
