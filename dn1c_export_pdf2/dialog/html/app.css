@@ -129,6 +129,7 @@
   /* Borders & Dividers */
   --border-color: #b7b9c3;
   --border-light: #e0e1e9;
+  --border-input: #edeff5;
   --border-dark: #7d808d;
   --border-focus: #0063a3;
 
@@ -432,7 +433,7 @@ body {
   font-weight: 600 !important;
   padding: 2px 8px !important;
   background-color: var(--bg-input-readonly) !important;
-  border: 1px solid var(--border-light) !important;
+  border: 1px solid var(--border-input) !important;
   border-radius: var(--radius-sm) !important;
   color: var(--text-main) !important;
 }
@@ -693,7 +694,7 @@ label {
 
 .form-control {
   background-color: var(--bg-input);
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-input);
   border-radius: var(--radius-sm);
   color: var(--text-main);
   padding: 4px 10px;
@@ -705,7 +706,22 @@ label {
 }
 
 .form-control:hover {
-  border-color: var(--bs-gray-600);
+  border-color: var(--border-light);
+}
+
+/* modus-bootstrap задаёт рамку покоя цепочкой :not() (.form-control → 0,6,0 и
+   input.form-control → 0,7,1), поэтому селекторы приходится зеркалить, а не просто усиливать */
+.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]) {
+  border-color: var(--border-input);
+}
+
+input.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]) {
+  border-color: var(--border-input);
+}
+
+.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]):hover,
+input.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]):hover {
+  border-color: var(--border-light);
 }
 
 .form-control:focus {
@@ -926,6 +942,8 @@ textarea.form-control {
 
 .workflow-right-col {
   flex: 2;
+  display: flex;
+  flex-direction: column;
   border-left: 1px solid var(--border-light);
   padding-left: 20px;
 }
@@ -934,6 +952,7 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   gap: 10px;
+  flex: 1;
 }
 
 .workflow-stadia-header {
@@ -956,8 +975,7 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   gap: 4px;
-  max-height: 240px;
-  overflow-y: auto;
+  flex: 1;
   padding: 4px;
   background: var(--bg-app);
   border: 1px solid var(--border-light);
@@ -1236,8 +1254,22 @@ tr:hover td {
 
 .scene-desc-input:hover {
   background: #ffffff;
-  border-color: var(--border-color);
+  border-color: var(--border-light);
   color: var(--text-main);
+}
+
+/* Имя сцены — обычный инпут без класса .form-control, рамку задаём явно */
+.scene-name-input {
+  border: 1px solid var(--border-input);
+}
+
+.scene-name-input:hover {
+  border-color: var(--border-light);
+}
+
+.scene-name-input:focus {
+  border-color: var(--bs-primary);
+  outline: none;
 }
 
 .scene-desc-input:focus {
@@ -1278,7 +1310,7 @@ tr:hover td {
 .scene-aspect-select:hover:not(:disabled),
 .scene-scale-select:hover:not(:disabled) {
   background: #ffffff;
-  border-color: var(--border-color);
+  border-color: var(--border-light);
   color: var(--text-main);
 }
 
@@ -1917,11 +1949,20 @@ tr:hover td {
   height: 26px;
   font-size: 11.5px;
   padding: 2px 18px 2px 6px;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-input);
   border-radius: var(--radius-sm);
   background: #ffffff;
   max-width: 160px;
   cursor: pointer;
+}
+
+.tpl-param-select:hover {
+  border-color: var(--border-light);
+}
+
+.tpl-param-select:focus {
+  border-color: var(--bs-primary);
+  outline: none;
 }
 
 .tpl-param-btn {
@@ -2671,6 +2712,16 @@ tr:hover td {
 
 .history-table .table-input {
   width: 100%;
+  border: 1px solid var(--border-input);
+}
+
+.history-table .table-input:hover {
+  border-color: var(--border-light);
+}
+
+.history-table .table-input:focus {
+  border-color: var(--bs-primary);
+  outline: none;
 }
 
 .history-desc-input {
@@ -2682,9 +2733,13 @@ tr:hover td {
   font-size: 12.5px;
 }
 
-.history-desc-input:hover,
+.history-desc-input:hover {
+  border-color: var(--border-light);
+  background: #ffffff;
+}
+
 .history-desc-input:focus {
-  border-color: var(--border-color);
+  border-color: var(--bs-primary);
   background: #ffffff;
 }
 
@@ -2722,7 +2777,7 @@ tr:hover td {
   height: 28px;
   font-size: 12px;
   background: #ffffff;
-  border: 1px solid var(--border-color);
+  border: 1px solid var(--border-input);
   border-radius: var(--radius-sm);
   padding: 2px 8px;
 }
