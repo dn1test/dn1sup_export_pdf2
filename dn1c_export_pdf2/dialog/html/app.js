@@ -125,14 +125,14 @@
       ] }
     ];
 
-    // Динамические источники по папкам спецификаций
+    // Динамические источники по папкам спецификаций: один параметр на папку,
+    // значение — «заголовок — описание» (dir.N.line)
     const dirs = Array.isArray(state.directories) ? state.directories : [];
     const dirOptions = [];
     dirs.forEach((d, idx) => {
       if (!d) return;
       const t = tval(d.title) || getFolderName(d.path) || `Раздел #${idx + 1}`;
-      dirOptions.push({ value: `dir.${idx}.title`, label: `📁 ${t} — название папки` });
-      dirOptions.push({ value: `dir.${idx}.description`, label: `📁 ${t} — спецификация папки` });
+      dirOptions.push({ value: `dir.${idx}.line`, label: `📁 ${t}` });
     });
     if (dirOptions.length > 0) {
       groups.splice(3, 0, { title: "Папки спецификации", options: dirOptions });
@@ -143,11 +143,12 @@
   // Человекочитаемое название источника (для списка созданных параметров)
   function paramSourceLabel(source) {
     const s = tval(source);
-    const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+    const m = s.match(/^dir\.(\d+)\.(title|description|line)$/);
     if (m) {
       const idx = parseInt(m[1], 10);
       const d = (state.directories || [])[idx];
       const t = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
+      if (m[2] === "line") return `📁 ${t}`;
       return m[2] === "title" ? `📁 ${t} — название` : `📁 ${t} — спецификация`;
     }
     for (const g of buildParamSources()) {
@@ -190,15 +191,17 @@
   };
 
   // Эффективная подпись параметра: заданный label, иначе авто-подпись из
-  // источника; для папок спецификаций — название раздела. Пусто — заголовок
-  // не печатается даже при включённом «Заголовок».
+  // источника; для папок спецификаций — название раздела (dir.N.line без
+  // подписи — заголовок уже внутри значения). Пусто — заголовок не печатается
+  // даже при включённом «Заголовок».
   function effectiveParamLabel(source, label) {
     const l = tval(label).replace(/:+\s*$/, "").trim();
     if (l) return l;
     const s = tval(source);
     if (AUTO_PARAM_LABELS[s]) return AUTO_PARAM_LABELS[s];
-    const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+    const m = s.match(/^dir\.(\d+)\.(title|description|line)$/);
     if (m) {
+      if (m[2] === "line") return "";
       const idx = parseInt(m[1], 10);
       const d = (state.directories || [])[idx];
       const base = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
@@ -269,10 +272,14 @@
         return sc.length > 0 ? sc.map((x, i) => `${i + 1}. ${x.name}`).join("\n") : "";
       }
       default: {
-        const m = s.match(/^dir\.(\d+)\.(title|description)$/);
+        const m = s.match(/^dir\.(\d+)\.(title|description|line)$/);
         if (m) {
           const d = (state.directories || [])[parseInt(m[1], 10)];
-          return d ? tval(d[m[2] === "title" ? "title" : "description"]) : "";
+          if (!d) return "";
+          if (m[2] === "line") {
+            return [tval(d.title), tval(d.description)].filter(Boolean).join(" — ");
+          }
+          return tval(d[m[2] === "title" ? "title" : "description"]);
         }
         return "";
       }

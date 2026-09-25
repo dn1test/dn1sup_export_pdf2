@@ -1093,7 +1093,8 @@ module DN1Code
         end
 
         # Эффективная подпись параметра на листе: заданный label, иначе
-        # авто-подпись из источника; для папок спецификаций — название раздела.
+        # авто-подпись из источника; для папок спецификаций — название раздела
+        # (объединённый dir.N.line без подписи — заголовок уже внутри значения).
         # Пустая строка — заголовок не печатается даже при включённом «Заголовок».
         def effective_param_label(source, label, rctx)
           return label unless label.empty?
@@ -1101,8 +1102,10 @@ module DN1Code
           src = source.to_s.strip
           return AUTO_PARAM_LABELS[src] if AUTO_PARAM_LABELS.key?(src)
 
-          m = src.match(/\Adir\.(\d+)\.(title|description)\z/)
+          m = src.match(/\Adir\.(\d+)\.(title|description|line)\z/)
           if m
+            return "" if m[2] == "line"
+
             idx = m[1].to_i
             base = InfoLineResolver.dir_field(rctx, idx, :title).to_s.strip
             base = "Раздел #{idx + 1}" if base.empty?

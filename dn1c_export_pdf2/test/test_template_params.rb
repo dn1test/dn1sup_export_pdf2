@@ -262,12 +262,21 @@ module DN1Code
                  "workflow.history → все записи")
           assert(hist.include?("\n"), "История многострочная")
 
-          # 3. Папки спецификации: название и описание по индексу
+          # 3. Папки спецификации: одна строка «заголовок — описание» по индексу
           pd.directories = [{ path: "C:/job", title: "Материалы", description: "ЛДСП 16 мм, Blum" }]
           dctx = LB.send(:resolver_context, ctx, nil, 1, 4)
           assert(res.resolve_param(dctx, "dir.0.title") == "Материалы", "dir.0.title → название папки")
           assert(res.resolve_param(dctx, "dir.0.description") == "ЛДСП 16 мм, Blum", "dir.0.description → спецификация папки")
+          assert(res.resolve_param(dctx, "dir.0.line") == "Материалы — ЛДСП 16 мм, Blum",
+                 "dir.0.line → «заголовок — описание» одной строкой")
+          pd.directories = [{ path: "C:/job2", description: "Только описание" }]
+          assert(res.resolve_param(dctx, "dir.0.line") == "Только описание",
+                 "dir.0.line без заголовка → только описание")
+          pd.directories = [{ path: "C:/job3" }]
+          assert(res.resolve_param(dctx, "dir.0.line").nil?, "dir.0.line без полей → nil")
           assert(res.resolve_param(dctx, "dir.5.description").nil?, "Несуществующая папка → nil")
+          assert(LB.send(:effective_param_label, "dir.0.line", "", dctx) == "",
+                 "dir.0.line → без авто-подписи (заголовок уже в значении)")
 
           # 4. Сцена и страница (сцена берется из scene_item контекста текущей страницы)
           scene = ::DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Тестовая сцена", page_type: :cover)
@@ -617,7 +626,7 @@ module DN1Code
           assert(js.include?("function normalizeTemplateParam"), "app.js: normalizeTemplateParam нормализует параметр")
           assert(js.include?("function openParamModal"), "app.js: openParamModal открывает модал создания/правки")
           assert(js.include?("btnCreateParam"), "app.js: кнопка «+ Создать параметр» на месте")
-          assert(js.include?('dir.${idx}.description'), "app.js: источники папок строятся динамически (dir.N.description)")
+          assert(js.include?('dir.${idx}.line'), "app.js: источники папок строятся динамически (dir.N.line)")
 
           # 2c. Настройки параметра: источник/заголовок — в модале, остальное —
           #     в строке параметра; X/Y убраны, место задается выравниваниями
