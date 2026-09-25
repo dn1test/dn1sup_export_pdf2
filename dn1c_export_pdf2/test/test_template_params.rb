@@ -133,13 +133,14 @@ module DN1Code
         def test_79_template_params_placement
           puts "\n--- 79. Параметр страницы: Вкл / заголовок / X/Y / выравнивание / кегль / цвет ---"
 
-          # 1. Параметр по умолчанию: «Заголовок: значение»
+          # 1. Параметр по умолчанию: заголовок на своей строке, значение на следующей
           pd = tp_make_project
           tp_add_param(pd, :cover, "project.furniture_name", label: "Изделие")
           doc = tp_render(pd)
           ent = tp_find_text(doc, "Шкаф-купе АЛЬФА")
           assert(ent, "Параметр с заполненным источником выводится на страницу")
-          assert(ent.plain_text.include?("Изделие:"), "Заголовок параметра выводится перед значением")
+          assert(ent.plain_text.split("\n", -1) == ["Изделие", "Шкаф-купе АЛЬФА"],
+                 "Заголовок параметра выводится на своей строке, значение — на следующей (#{ent.plain_text.inspect})")
 
           # 2. Чекбокс «Вкл» (param.visible)
           tp_params(pd, :cover).first[:visible] = false
@@ -152,8 +153,8 @@ module DN1Code
           doc_no_label = tp_render(pd)
           no_label = tp_texts(doc_no_label).find { |t| t.plain_text.strip == "Шкаф-купе АЛЬФА" }
           assert(no_label, "«Показывать» off — на листе только значение")
-          assert(!tp_texts(doc_no_label).any? { |t| t.plain_text.include?("Изделие:") },
-                 "«Показывать» off — заголовка «Изделие:» на листе нет")
+          assert(!tp_texts(doc_no_label).any? { |t| t.plain_text.include?("Изделие") },
+                 "«Показывать» off — заголовка «Изделие» на листе нет")
 
           # 4. Пустое значение источника — параметр не выводится (без заглушек)
           pd_empty = tp_make_project
@@ -366,12 +367,12 @@ module DN1Code
           assert(ent2.plain_text == "Прихожая | CF#260922_100000",
                  "Пустой источник в блоке пропускается (получено: #{ent2.plain_text.inspect})")
 
-          # 3. Заголовок блока выводится перед строкой значений
+          # 3. Заголовок блока выводится на своей строке над строкой значений
           g = tp_params(pd, :cover).first
           g[:label] = "Реквизиты"
           g[:show_label] = true
-          ent3 = tp_find_text(tp_render(pd), "Реквизиты: Прихожая")
-          assert(ent3, "Заголовок блока выводится перед объединенной строкой")
+          ent3 = tp_find_text(tp_render(pd), "Реквизиты\nПрихожая")
+          assert(ent3, "Заголовок блока выводится на своей строке перед объединенной строкой")
 
           # 4. Порядок детей внутри блока = порядок в строке
           c = g[:params]
@@ -402,8 +403,8 @@ module DN1Code
           tp_add_param(pd, :cover, "project.articul")
           ent = tp_find_text(tp_render(pd), "CF#260922_100000")
           assert(ent, "Параметр с авто-подписью выводится на страницу")
-          assert(ent.plain_text.include?("Артикул: CF#260922_100000"),
-                 "Пустой label заменяется авто-подписью «Артикул» (#{ent.plain_text.inspect})")
+          assert(ent.plain_text.include?("Артикул\nCF#260922_100000"),
+                 "Пустой label заменяется авто-подписью «Артикул» на своей строке (#{ent.plain_text.inspect})")
 
           # 2. «Заголовок» выключен — печатается только значение
           tp_params(pd, :cover).first[:show_label] = false
@@ -415,8 +416,8 @@ module DN1Code
           tp_params(pd, :cover).first[:show_label] = true
           tp_params(pd, :cover).first[:label] = "Код проекта:"
           ent3 = tp_find_text(tp_render(pd), "CF#260922_100000")
-          assert(ent3.plain_text.include?("Код проекта: CF#260922_100000") && !ent3.plain_text.include?("Артикул"),
-                 "Явный label перекрывает авто-подпись (#{ent3.plain_text.inspect})")
+          assert(ent3.plain_text.include?("Код проекта\nCF#260922_100000") && !ent3.plain_text.include?("Артикул"),
+                 "Явный label перекрывает авто-подпись, хвостовое «:» срезано (#{ent3.plain_text.inspect})")
 
           # 4. Дети блока: включённый «Заголовок» ребёнка печатается перед значением
           pd4 = tp_make_project
@@ -444,8 +445,8 @@ module DN1Code
           tp_add_param(pd5, :cover, "dir.0.description")
           ent5 = tp_find_text(tp_render(pd5), "ЛДСП 16 мм, Blum")
           assert(ent5, "Параметр папки выводится на страницу")
-          assert(ent5.plain_text.include?("Материалы — спецификация: ЛДСП 16 мм, Blum"),
-                 "Авто-подпись папки = «<название> — спецификация» (#{ent5.plain_text.inspect})")
+          assert(ent5.plain_text.include?("Материалы — спецификация\nЛДСП 16 мм, Blum"),
+                 "Авто-подпись папки = «<название> — спецификация» на своей строке (#{ent5.plain_text.inspect})")
         end
 
         # ------------------------------------------------------------------
@@ -717,14 +718,14 @@ module DN1Code
         def test_85_template_params_height_label_and_overflow_clamp
           puts "\n--- 85. Высота с заголовком / клампинг переполнения колонки / дефолты ---"
 
-          # 1. Высота бокса считается по итоговому тексту «Заголовок: значение»
+          # 1. Высота бокса считается по итоговому тексту «заголовок + перенос + значение»
           pd = tp_make_project
           long_label = "Очень длинный заголовок параметра для проверки"
           tp_add_param(pd, :cover, "project.articul", label: long_label)
           doc = tp_render(pd)
           ent = tp_find_text(doc, "CF#")
           assert(ent, "Параметр с длинным заголовком выведен")
-          expected_h = LB.send(:estimate_text_height, "#{long_label}: CF#260922_100000",
+          expected_h = LB.send(:estimate_text_height, "#{long_label}\nCF#260922_100000",
                                10.0, CONTENT_W * 0.45, "Sofia Sans Condensed", false) + 1.5
           actual_h = ent.bounds.height * 72.0
           assert((actual_h - expected_h).abs < 0.6,
@@ -746,7 +747,7 @@ module DN1Code
           end
           doc2 = tp_render(pd2)
           texts2 = tp_texts(doc2)
-          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Описание:") }
+          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Описание") }
                            .map { |t| (t.bounds.y + t.bounds.height) * 72.0 }.max
           bot_first = texts2.select { |t| t.plain_text.to_s.strip == "Этап №1" }
                             .map { |t| t.bounds.y * 72.0 }.min

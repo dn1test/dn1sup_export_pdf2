@@ -1683,7 +1683,7 @@ function setTemplateLineSettings(tplKey, updates) {
               <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "center" ? "active" : ""}" data-id="${p.id}" data-align="center" title="По центру">↔</button>
               <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "right" ? "active" : ""}" data-id="${p.id}" data-align="right" title="Справа">⇥</button>
             </div>
-            <label class="tpl-param-vis" title="Выводить заголовок перед значением на листе">
+            <label class="tpl-param-vis" title="Выводить заголовок на отдельной строке над значением на листе">
               <input type="checkbox" class="tpl-param-show-label" data-id="${p.id}" ${p.show_label ? "checked" : ""}>
               <span>Заголовок</span>
             </label>

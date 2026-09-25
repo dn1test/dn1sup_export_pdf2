@@ -1154,8 +1154,10 @@ module DN1Code
         # задает общая настройка шаблона line_gap («размер между строками», мм),
         # по умолчанию PARAM_ZONE_GAP_MM, а галочка «Линия» (line_enabled)
         # рисует тонкий разделитель между каждой парой соседних строк.
-        # Формат строки: [Заголовок: ]Значение — при включённом «Заголовок» и пустом
-        # label подпись берётся из AUTO_PARAM_LABELS (у детей блоков аналогично);
+        # Формат: заголовок на своей строке, значение на следующей
+        # ([Заголовок\n]Значение) — при включённом «Заголовок» и пустом label
+        # подпись берётся из AUTO_PARAM_LABELS; у детей блока подпись печатается
+        # перед значением внутри общей строки блока («Помещение: Гостиная | …»);
         # пустое значение или visible: false — параметр не выводится. Стадии
         # проекта (чек-лист) рисуются с квадратами.
         def render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, ctx, rctx)
@@ -1204,15 +1206,17 @@ module DN1Code
             end
 
             show_label = param_show_label?(param)
-            # Двоеточие после метки добавляет рендерер: хвостовые «:» из ввода пользователя срезаем,
-            # иначе на листе печатается «Артикул:: значение». «Заголовок» включён, а текст
-            # не задан — берём авто-подпись из источника (у блока своего источника нет).
+            # Хвостовые «:» из ввода пользователя срезаем (param_label_text):
+            # разделитель заголовка и значения — перенос строки, двоеточие не нужно.
+            # «Заголовок» включён, а текст не задан — берём авто-подпись из
+            # источника (у блока своего источника нет).
             label = param_label_text(param)
             label = effective_param_label(source, label, rctx) if show_label && !is_group
 
-            # Итоговый текст с заголовком: высота блока считается по нему, иначе
-            # длинный заголовок не учитывается и строки наезжают друг на друга
-            render_text = (show_label && !label.empty?) ? "#{label}: #{value}" : value
+            # Итоговый текст с заголовком: заголовок на своей строке, значение —
+            # на следующей. Высота блока считается по нему, иначе длинный
+            # заголовок не учитывается и строки наезжают друг на друга
+            render_text = (show_label && !label.empty?) ? "#{label}\n#{value}" : value
 
             align = case (param[:align] || param["align"] || "left").to_s.downcase.strip
                     when "center" then :center
@@ -1308,7 +1312,7 @@ module DN1Code
                 # чтобы не ломать разбор строк "[✓]/[ ]" с квадратами-чекбоксами.
                 if it[:show_label] && !it[:label].empty?
                   pitch = it[:size] * font_line_pitch_ratio(it[:font])
-                  add_bounded_text(ctx, doc, page, cnt_layer, "#{it[:label]}:",
+                  add_bounded_text(ctx, doc, page, cnt_layer, it[:label],
                                    { x: box[:x], y: box[:y], width: box[:width], height: pitch },
                                    size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
                   box = box.merge(y: box[:y] - pitch, height: [box[:height] - pitch, 10.0].max)
