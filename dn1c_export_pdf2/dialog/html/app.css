@@ -2669,6 +2669,10 @@ tr:hover td {
   color: var(--bs-primary);
 }
 
+.history-table .table-input {
+  width: 100%;
+}
+
 .history-desc-input {
   width: 100%;
   border: 1px solid transparent;
