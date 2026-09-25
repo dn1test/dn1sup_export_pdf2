@@ -555,6 +555,79 @@ module DN1Code
           nil
         end
 
+        # Тонкая горизонтальная линия-разделитель между параметрами зоны
+        # («Линия» в шапке карточки). Небольшая — шириной с текст строки,
+        # выравнивается по колонке. Координаты в pt, y — уровень линии.
+        def add_thin_line(ctx, doc, page, layer, x_pt, y_pt, width_pt, color_hex)
+          return if width_pt <= 0
+
+          p1 = ::Geom::Point2d.new(pt2in(x_pt), pt2in(lay_y(ctx, y_pt)))
+          p2 = ::Geom::Point2d.new(pt2in(x_pt + width_pt), pt2in(lay_y(ctx, y_pt)))
+          path = ::Layout::Path.new(p1, p2)
+          style = path.style
+          style.stroked = true if style.respond_to?(:stroked=)
+          style.solid_filled = false if style.respond_to?(:solid_filled=)
+          style.stroke_width = pt2in(0.3) if style.respond_to?(:stroke_width=)
+          style.stroke_color = layout_color(color_hex) if style.respond_to?(:stroke_color=)
+          path.style = style
+          doc.add_entity(path, layer, page)
+        rescue StandardError => e
+          warn "Ошибка отрисовки линии-разделителя параметров: #{e.message}"
+          nil
+        end
+
+        # Ширина маленького разделителя «Линия» — ширина текста строки (не всей
+        # колонки). Точное измерение: пробный текст добавляется в документ —
+        # LayOut пересчитывает bounds с учетом шрифта и кегля — и удаляется.
+        # Если измерение недоступно (тестовые моки), оценка по числу символов.
+        def separator_width_pt(ctx, doc, page, layer, item, max_width_pt)
+          est_text =
+            if item[:stadia]
+              item[:text].to_s.gsub(/^\[[✓ ]\]\s*/, "")
+            else
+              item[:render_text].to_s
+            end
+          w = measure_text_width_pt(doc, page, layer, est_text, item[:size], item[:font], ctx[:text_bold])
+          w = est_line_width_pt(est_text, item[:size], item[:font]) if w.nil?
+          # У стадий впереди еще квадрат-чекбокс
+          w += item[:size] * 1.15 if item[:stadia]
+          w.round(2).clamp(1.0, max_width_pt)
+        end
+
+        # Фактическая ширина текста в pt: bounds у Layout::FormattedText
+        # пересчитывается только после добавления в документ, поэтому пробу
+        # добавляем и тут же убираем. Вне реального LayOut вернет nil.
+        def measure_text_width_pt(doc, page, layer, text, size_pt, font_name, bold)
+          return nil if text.nil? || text.to_s.empty?
+
+          probe = ::Layout::FormattedText.new(text.to_s, ::Geom::Point2d.new(0, 0), ::Layout::FormattedText::ANCHOR_TYPE_TOP_LEFT)
+          style = probe.style(0)
+          apply_text_style!(style, { size: size_pt, font: font_name, bold: bold, align: :left, anchor: :top })
+          probe.apply_style(style)
+          doc.add_entity(probe, layer, page)
+          w =
+            begin
+              probe.bounds.width * PT_PER_INCH
+            rescue StandardError
+              nil
+            end
+          # Пробу убираем при любом исходе — она не должна попасть в экспорт
+          begin
+            doc.remove_entity(probe)
+          rescue StandardError
+            nil
+          end
+          w
+        rescue StandardError
+          nil
+        end
+
+        # Оценка ширины текста по числу символов самой длинной строки
+        def est_line_width_pt(text, size_pt, font_name)
+          longest = text.to_s.split("\n", -1).map(&:length).max.to_i
+          longest * size_pt * font_char_width_ratio(font_name)
+        end
+
         # Повернутый текст (штамп): привязка в точке + поворот вокруг нее.
         # Положительный угол в геометрии — против часовой стрелки;
         # в LayOut y направлен вниз, поэтому знак угла инвертируется.
@@ -944,7 +1017,9 @@ module DN1Code
         # Параметры шаблона: размещение по зонам страницы
         # ------------------------------------------------------------------
 
-        # Отступ между параметрами в одной зоне (мм)
+        # Отступ между параметрами в одной зоне по умолчанию (мм);
+        # переопределяется общей настройкой шаблона line_gap
+        # («размер между строками» в шапке карточки «Параметры страницы»)
         PARAM_ZONE_GAP_MM = 2.5
 
         # Авто-подпись параметра, когда «Заголовок» включён, а текст подписи
@@ -1048,7 +1123,10 @@ module DN1Code
         # Рендер всех параметров шаблона. Место параметра определяется его
         # выравниваниями: лево/центр/право задает колонку, верх/низ — привязку
         # группы к верхнему или нижнему краю рабочей области. Параметры одной
-        # зоны складываются в столбик в порядке списка с отступом PARAM_ZONE_GAP_MM.
+        # зоны складываются в столбик в порядке списка; зазор между строками
+        # задает общая настройка шаблона line_gap («размер между строками», мм),
+        # по умолчанию PARAM_ZONE_GAP_MM, а галочка «Линия» (line_enabled)
+        # рисует тонкий разделитель между каждой парой соседних строк.
         # Формат строки: [Заголовок: ]Значение — при включённом «Заголовок» и пустом
         # label подпись берётся из AUTO_PARAM_LABELS (у детей блоков аналогично);
         # пустое значение или visible: false — параметр не выводится. Стадии
@@ -1139,7 +1217,12 @@ module DN1Code
           end
           return if zones.empty?
 
-          gap_pt = (PARAM_ZONE_GAP_MM * PT_PER_INCH / 25.4).round(2)
+          # Общие настройки стека параметров на уровне шаблона: «размер между
+          # строками» (мм, один для всех параметров и блоков) и галочка «Линия»
+          line_gap_mm = (page_cfg[:line_gap] || page_cfg["line_gap"] || PARAM_ZONE_GAP_MM).to_f.clamp(0.0, 50.0)
+          raw_line = page_cfg.key?(:line_enabled) ? page_cfg[:line_enabled] : page_cfg["line_enabled"]
+          line_on = !raw_line.nil? && !(raw_line == false || raw_line.to_s.strip.downcase == "false" || raw_line.to_s.strip == "0")
+          gap_pt = (line_gap_mm * PT_PER_INCH / 25.4).round(2)
 
           # 2. Высоты зон считаются заранее: они нужны и для расчета позиции
           #    группы, и для защиты от наложения верхней и нижней групп колонки
@@ -1209,6 +1292,20 @@ module DN1Code
               else
                 add_bounded_text(ctx, doc, page, cnt_layer, it[:render_text], box,
                                  size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
+              end
+
+              # Небольшая линия-разделитель «Линия» — в зазоре между соседними
+              # строками зоны, шириной с текст строки и выровненная по тексту
+              # (слева / по центру / справа колонки), а не на всю ширину колонки
+              if line_on && i < items.size - 1
+                w_line = separator_width_pt(ctx, doc, page, (gfx_layer || cnt_layer), it, box[:width])
+                x_line = case align
+                         when :center then box[:x] + (box[:width] - w_line) / 2.0
+                         when :right  then box[:x] + box[:width] - w_line
+                         else box[:x]
+                         end
+                add_thin_line(ctx, doc, page, (gfx_layer || cnt_layer),
+                              x_line, cur_y - h - gap_pt / 2.0, w_line, it[:color])
               end
 
               cur_y -= h + gap_pt

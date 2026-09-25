@@ -496,6 +496,8 @@ module DN1Code
             ---
             layout:
               cover:
+                line_gap: 99
+                line_enabled: "true"
                 image_4_3:
                   x: 25.0
                   visible: true
@@ -534,12 +536,19 @@ module DN1Code
           assert(p1[:align] == "left", "Недопустимое выравнивание → left")
           assert(p1[:font_size] <= 72.0, "Кегль ограничен сверху (#{p1[:font_size]})")
           assert(p1[:color] == "#005EB0", "Цвет сохраняется")
+          assert(cover3[:line_gap] == 50.0, "«Размер между строками» шаблона ограничен сверху (99 → 50 мм)")
+          assert(cover3[:line_enabled] == true, "line_enabled: \"true\" → true (линия-разделитель включена)")
+          assert(!p1.key?(:line_gap) && !p1.key?(:line_enabled),
+                 "line_gap/line_enabled — не поля параметра, а общие настройки шаблона")
           assert(cover3[:image_4_3][:scale_pct] == 120 && cover3[:image_4_3][:aspect_ratio] == "16:9",
                  "Настройки видовоего окна сохраняются (ограничение масштаба — на рендере)")
           p2 = params3[1]
           assert(p2[:visible] == false, "visible: \"false\" → false")
           assert(p2[:font_size] == 10.0, "Отсутствующие поля получают дефолты")
           assert(p2[:valign] == "top" && p2[:font_family] == "", "valign и шрифт по умолчанию: top / «» (шрифт страницы)")
+          assert(pd3.pdf_settings[:custom_layouts][:visual][:line_gap] == 2.5 &&
+                 pd3.pdf_settings[:custom_layouts][:visual][:line_enabled] == false,
+                 "Шаблон без настроек в YAML получает дефолты: 2,5 мм, линия выключена")
 
           # 6. Блок (group: true): нормализуется вместе с вложенными параметрами
           g = params3.find { |p| p[:group] == true }
@@ -556,13 +565,16 @@ module DN1Code
           # 5. save_to_layout_yaml: параметры сохраняются и читаются обратно
           pd4 = tp_make_project
           tp_add_param(pd4, :cover, "customer.name", label: "Заказчик", align: "right")
+          pd4.pdf_settings[:custom_layouts][:cover][:line_gap] = 4
           out_path = File.join(dir, "layout_out.yaml")
           assert(pd4.send(:save_to_layout_yaml, out_path), "layout.yaml сохраняется")
           pd5 = tp_make_project
           pd5.send(:load_from_layout_yaml, out_path)
-          saved = pd5.pdf_settings[:custom_layouts][:cover][:params]
+          saved_cfg = pd5.pdf_settings[:custom_layouts][:cover]
+          saved = saved_cfg[:params]
           assert(saved.size == 1 && saved.first[:source] == "customer.name" && saved.first[:align] == "right",
                  "Сохраненный параметр читается обратно без потерь")
+          assert(saved_cfg[:line_gap] == 4.0, "«Размер между строками» шаблона переживает цикл сохранения/загрузки layout.yaml")
 
           FileUtils.rm_rf(dir)
         end
@@ -641,6 +653,22 @@ module DN1Code
           assert(js.include?("PARAM_FONT_FAMILIES"), "app.js: выбор шрифта параметра из комплекта плагина")
           assert(js.include?('["top", "bottom"].includes(valignRaw)'),
                  "app.js: вертикальная привязка параметра — верх/низ")
+          assert(js.include?("PARAM_LINE_GAPS") && js.include?("tpl-header-linegap"),
+                 "app.js: «размер между строками» (мм) — общий селект в шапке карточки")
+          assert(js.include?("tpl-header-line") && js.include?("getTemplateLineSettings") && js.include?("setTemplateLineSettings"),
+                 "app.js: «Линия» — общая галочка в шапке карточки, чтение/запись настроек шаблона")
+          assert(!js.include?("tpl-param-linegap") && !js.include?("tpl-param-line"),
+                 "app.js: у строки параметра нет отдельных контролов зазора/линии — настройка общая")
+          assert(pd_rb.include?("def normalize_line_settings!") && pd_rb.include?("line_gap") && pd_rb.include?("line_enabled"),
+                 "project_data.rb: line_gap/line_enabled — нормализация настроек уровня шаблона")
+          assert(lb_text.include?("page_cfg[:line_gap] || page_cfg[\"line_gap\"]"),
+                 "layout_builder.rb: зазор и линия читаются из настроек шаблона (page_cfg)")
+          assert(lb_text.include?("def add_thin_line"),
+                 "layout_builder.rb: тонкая линия-разделитель рисуется через add_thin_line")
+          assert(js.include?('k !== "line_gap" && k !== "line_enabled"'),
+                 "app.js: ensureCustomLayouts не стирает line_gap/line_enabled — настройки шапки не сбрасываются")
+          assert(js.include?("cfg.line_gap") && js.include?("cfg.line_enabled"),
+                 "app.js: line_gap/line_enabled нормализуются при каждом проходе ensureCustomLayouts")
 
           # 2d. Прочие гарантии качества
           assert(!js.include?("Фасады МДФ, ЛДСП, Blum") && !js.include?("CF#260905_160129"),
@@ -724,12 +752,81 @@ module DN1Code
           # 3. Дефолт show_label: у обычного параметра — true, у блока — false
           norm_p = pd2.send(:normalize_template_params, [{ source: "a.a" }])
           assert(norm_p.first[:show_label] == true, "Параметр без show_label → true")
+          assert(!norm_p.first.key?(:line_gap) && !norm_p.first.key?(:line_enabled),
+                 "У параметра нет line_gap/line_enabled — настройка общая, на уровне шаблона")
+          cover85 = pd2.pdf_settings[:custom_layouts][:cover]
+          assert(cover85[:line_gap] == 2.5 && cover85[:line_enabled] == false,
+                 "Дефолт шаблона: 2,5 мм, линия выключена")
           norm_g = pd2.send(:normalize_template_params, [{ group: true, label: "Блок", params: [{ source: "a.a" }] }])
           assert(norm_g.first[:show_label] == false, "Блок без show_label → false (как в диалоге)")
 
           # 4. Шаблон blank есть в Ruby-дефолтах (как в диалоге и layout.yaml)
           assert(tp_make_project.pdf_settings[:custom_layouts].key?(:blank),
                  "Шаблон blank присутствует в default_custom_layouts")
+        end
+
+        # ------------------------------------------------------------------
+        # 86. «Размер между строками» и «Линия» — общие настройки шаблона
+        # ------------------------------------------------------------------
+        def test_86_template_params_line_gap_and_separator
+          puts "\n--- 86. Размер между строками / линия-разделитель (настройки шаблона) ---"
+
+          # 1. Дефолты на уровне шаблона; у параметров полей больше нет
+          pd0 = tp_make_project
+          cover0 = pd0.pdf_settings[:custom_layouts][:cover]
+          assert(cover0[:line_gap] == 2.5 && cover0[:line_enabled] == false,
+                 "Дефолт шаблона: размер между строками 2,5 мм, линия выключена")
+          norm0 = pd0.send(:normalize_template_params, [{ source: "a.a" }])
+          assert(!norm0.first.key?(:line_gap) && !norm0.first.key?(:line_enabled),
+                 "line_gap/line_enabled — не поля параметра, а общие настройки шаблона")
+
+          # 2. line_gap шаблона задает зазор между всеми строками зоны:
+          #    расстояние между верхами двух текстов = высота первого + зазор
+          pd = tp_make_project
+          tp_add_param(pd, :cover, "project.room_name", label: "Помещение")
+          tp_add_param(pd, :cover, "project.articul")
+          tops = lambda do |doc|
+            texts = tp_texts(doc)
+            room = texts.find { |t| t.plain_text.to_s.include?("Помещение") }
+            art = texts.find { |t| t.plain_text.to_s.include?("CF#") }
+            [room.bounds.y * 72.0, art.bounds.y * 72.0]
+          end
+          y_default = tops.call(tp_render(pd))
+          d_default = y_default[1] - y_default[0]
+          pd.pdf_settings[:custom_layouts][:cover][:line_gap] = 10.0
+          y_wide = tops.call(tp_render(pd))
+          d_wide = y_wide[1] - y_wide[0]
+          delta_mm = (d_wide - d_default) * 25.4 / 72.0
+          assert((delta_mm - 7.5).abs < 0.2,
+                 "line_gap=10 мм раздвигает строки на 7,5 мм относительно дефолта 2,5 (#{delta_mm.round(2)} мм)")
+
+          # 3. «Линия» — ровно по одному разделителю между парами соседних
+          #    строк зоны (параметры и блок), после последней строки линии нет
+          assert(tp_entities(tp_render(pd)).grep(::Layout::Path).empty?,
+                 "Без «Линии» разделителей на странице нет")
+          pd.pdf_settings[:custom_layouts][:cover][:line_enabled] = true
+          pd.project_info[:phone] = "+7 999 000-00-00"
+          tp_params(pd, :cover) << {
+            id: "g_test", group: true, label: "", show_label: false,
+            align: "left", valign: "top", font_family: "", font_size: 10.0,
+            color: "#0F172A", visible: true,
+            params: [{ id: "c1", source: "customer.phone", label: "", show_label: false }]
+          }
+          doc3 = tp_render(pd)
+          paths = tp_entities(doc3).grep(::Layout::Path)
+          assert(paths.size == 2, "Три строки зоны (два параметра + блок) — два разделителя, между парами")
+          assert(paths.all? { |l| l.points.size == 2 && l.points.first.y == l.points.last.y && l.points.last.x > l.points.first.x },
+                 "Разделители — горизонтальные отрезки из двух точек")
+          tops3 = tp_texts(doc3).map { |t| t.bounds.y * 72.0 }.sort
+          ys = paths.map { |l| l.points.first.y * 72.0 }.sort
+          assert(tops3.size == 3 && tops3[0] < ys[0] && ys[0] < tops3[1] && tops3[1] < ys[1] && ys[1] < tops3[2],
+                 "Разделители лежат в зазорах между соседними строками зоны")
+
+          # 4. Разделитель небольшой — шириной с текст строки, а не на всю колонку
+          lens = paths.map { |l| (l.points.last.x - l.points.first.x) * 72.0 }
+          page_w_pt = doc3.page_info.width * 72.0
+          assert(lens.all? { |l| l.positive? && l < page_w_pt * 0.25 },
+                 "Разделитель небольшой — шириной с текст строки (#{lens.map { |l| l.round(1) }.inspect} pt при странице #{page_w_pt.round} pt)")
         end
       end
     end
@@ -773,6 +870,7 @@ if __FILE__ == $PROGRAM_NAME
         test_83_template_params_render_reads_new_config_only
         test_84_template_params_group_block
         test_85_template_params_height_label_and_overflow_clamp
+        test_86_template_params_line_gap_and_separator
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"

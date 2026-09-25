@@ -836,6 +836,10 @@ module Layout
       @entities << { entity: entity, layer: layer, page: page }
     end
 
+    def remove_entity(entity)
+      @entities.reject! { |rec| rec[:entity].equal?(entity) }
+    end
+
     def export(pdf_path, options = nil)
       ::FileUtils.mkdir_p(File.dirname(pdf_path))
 

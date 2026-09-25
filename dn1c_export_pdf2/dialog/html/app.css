@@ -1762,7 +1762,28 @@ tr:hover td {
 
 .tpl-card-header-actions {
   display: flex;
+  align-items: center;
   gap: 4px;
+}
+
+/* Общие настройки стека параметров в шапке карточки:
+   «Между строками» (общий зазор, мм) и «Линия» (разделитель) */
+.tpl-header-ctl {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  margin-right: 8px;
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-secondary);
+  white-space: nowrap;
+  cursor: pointer;
+  user-select: none;
+}
+
+.tpl-header-ctl input[type="checkbox"] {
+  margin: 0;
+  cursor: pointer;
 }
 
 .tpl-card-body {

@@ -515,13 +515,16 @@ module DN1Code
             show_background: false, aspect_ratio: "4:3", scale_pct: 100
           }
 
+          # line_gap / line_enabled — общие настройки стека параметров шаблона:
+          # «размер между строками» (мм) и тонкая линия-разделитель между
+          # параметрами и блоками (задаются в шапке карточки «Параметры страницы»)
           {
-            cover:       { image_4_3: default_image_block.dup, params: [] },
-            description: { image_4_3: default_image_block.dup, params: [] },
-            explain:     { image_4_3: default_image_block.dup, params: [] },
-            general:     { image_4_3: default_image_block.dup, params: [] },
-            visual:      { image_4_3: default_image_block.dup, params: [] },
-            blank:       { image_4_3: default_image_block.merge(aspect_ratio: "16:9"), params: [] }
+            cover:       { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
+            description: { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
+            explain:     { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
+            general:     { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
+            visual:      { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
+            blank:       { image_4_3: default_image_block.merge(aspect_ratio: "16:9"), params: [], line_gap: 2.5, line_enabled: false }
           }
         end
 
@@ -1352,6 +1355,25 @@ module DN1Code
         # Запись с group: true — блок объединения параметров: дети выводятся одной
         # строкой с разделителем « | » и стилем самого блока, поэтому у ребенка
         # хранятся только id/source/label/show_label (зеркало normalizeTemplateParam).
+        # Нормализует общие настройки стека параметров на уровне шаблона:
+        # line_gap — «размер между строками» (мм, 0..50, по умолчанию 2.5),
+        # line_enabled — тонкая линия-разделитель между параметрами и блоками.
+        # Ключи приводит к символам, значения — к числу и булеву флагу.
+        # @param page [Hash] конфиг одного шаблона (custom_layouts[key])
+        # @return [Hash] тот же хэш с нормализованными полями
+        def normalize_line_settings!(page)
+          return page unless page.is_a?(Hash)
+
+          gap = page[:line_gap] || page["line_gap"] || 2.5
+          page.delete("line_gap")
+          page[:line_gap] = gap.to_f.clamp(0.0, 50.0)
+
+          raw = page.key?(:line_enabled) ? page[:line_enabled] : page["line_enabled"]
+          page.delete("line_enabled")
+          page[:line_enabled] = !raw.nil? && !(raw == false || raw.to_s.strip.downcase == "false" || raw.to_s.strip == "0")
+          page
+        end
+
         # @param raw [Array] сырой список параметров (из payload диалога или YAML)
         # @return [Array<Hash>]
         def normalize_template_params(raw)
@@ -1451,9 +1473,12 @@ module DN1Code
                   page[:image_4_3][:show_background] = !(raw_bg == false || raw_bg.to_s == "false" || raw_bg == 0 || raw_bg.to_s == "0")
                 elsif slot_id.to_s == "params" && slot_cfg.is_a?(Array)
                   page[:params] = normalize_template_params(slot_cfg)
+                elsif slot_id.to_s == "line_gap" || slot_id.to_s == "line_enabled"
+                  page[slot_id.to_sym] = slot_cfg
                 end
               end
               page[:params] ||= []
+              normalize_line_settings!(page)
             end
             true
           rescue StandardError => e
@@ -1476,6 +1501,7 @@ module DN1Code
 
               params = page_blocks[:params] || page_blocks["params"]
               page_blocks[:params] = normalize_template_params(params) if params.is_a?(Array)
+              normalize_line_settings!(page_blocks)
             end
           end
 

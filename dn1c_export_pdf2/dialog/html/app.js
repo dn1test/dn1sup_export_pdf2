@@ -285,6 +285,10 @@
 
   const PARAM_FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32];
 
+  // Варианты «размера между строками» (мм) — общий отступ между параметрами
+  // и блоками на листе; задается один раз в шапке карточки «Параметры страницы»
+  const PARAM_LINE_GAPS = [0, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
+
   // Шрифты комплекта плагина для построчного выбора («По умолчанию» = шрифт страницы)
   const PARAM_FONT_FAMILIES = [
     { value: "", label: "По умолчанию" },
@@ -1006,8 +1010,9 @@ const DEFAULT_LAYOUTS = {
   // -----------------------------------------------------------------------------
 
   // Нормализация конфигов шаблонов. Чистый лист: блоки старой модели
-  // (header/slot_1..4/footer) удаляются; остаются только image_4_3, params
-  // и метаданные пользовательского шаблона (name/_name/_base_type/_icon).
+  // (header/slot_1..4/footer) удаляются; остаются только image_4_3, params,
+  // общие настройки стека параметров (line_gap/line_enabled) и метаданные
+  // пользовательского шаблона (name/_name/_base_type/_icon).
   function ensureCustomLayouts() {
     if (!state.pdf_settings) state.pdf_settings = {};
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
@@ -1024,7 +1029,7 @@ const DEFAULT_LAYOUTS = {
       }
 
       Object.keys(cfg).forEach((k) => {
-        if (k !== "image_4_3" && k !== "params" && !metaKeys.has(k)) {
+        if (k !== "image_4_3" && k !== "params" && k !== "line_gap" && k !== "line_enabled" && !metaKeys.has(k)) {
           delete cfg[k];
         }
       });
@@ -1052,6 +1057,15 @@ const DEFAULT_LAYOUTS = {
           .filter((p) => p && typeof p === "object" && (p.group === true || p.group === "true" || tval(p.source)))
           .map(normalizeTemplateParam);
       }
+
+      // Общие настройки стека параметров (шапка карточки) нормализуются здесь,
+      // зеркально normalize_line_settings! в project_data.rb — иначе выбранное
+      // значение сбрасывалось бы при каждой перерисовке и не попадало в layout.yaml
+      const rawGap = parseFloat(cfg.line_gap);
+      cfg.line_gap = isNaN(rawGap) ? 2.5 : Math.min(50, Math.max(0, rawGap));
+      const rawLine = cfg.line_enabled;
+      cfg.line_enabled = rawLine !== undefined && rawLine !== null &&
+                         !(rawLine === false || rawLine === "false" || rawLine === 0 || rawLine === "0");
     });
   }
 
@@ -1588,6 +1602,36 @@ function setTemplateParams(params, tplKey) {
   state.pdf_settings.custom_layouts[key].params = (params || []).map(normalizeTemplateParam);
 }
 
+// Общие настройки стека параметров шаблона: «размер между строками» (мм) и
+// галочка «Линия» (тонкий разделитель между параметрами и блоками на листе).
+// Задаются один раз в шапке карточки «Параметры страницы» и действуют на все
+// строки шаблона (зеркало normalize_line_settings! в project_data.rb).
+function getTemplateLineSettings(tplKey) {
+  ensureCustomLayouts();
+  const key = tplKey || layoutState.currentTemplate || "cover";
+  const cfg = state.pdf_settings.custom_layouts[key] || {};
+  const num = (v, def, min, max) => {
+    const n = parseFloat(v);
+    return isNaN(n) ? def : Math.min(max, Math.max(min, n));
+  };
+  const raw = cfg.line_enabled;
+  return {
+    line_gap: num(cfg.line_gap, 2.5, 0, 50),
+    line_enabled: raw !== undefined && raw !== null &&
+                  !(raw === false || raw === "false" || raw === 0 || raw === "0")
+  };
+}
+
+function setTemplateLineSettings(tplKey, updates) {
+  ensureCustomLayouts();
+  const key = tplKey || layoutState.currentTemplate || "cover";
+  if (!state.pdf_settings.custom_layouts[key]) {
+    state.pdf_settings.custom_layouts[key] = {};
+  }
+  Object.assign(state.pdf_settings.custom_layouts[key], updates);
+  notifyChange();
+}
+
   function renderTemplateSettingsList(isUserAction = false) {
   if (!els.templateSettingsContainer) return;
   ensureCustomLayouts();
@@ -1596,6 +1640,7 @@ function setTemplateParams(params, tplKey) {
   const tplKey = layoutState.currentTemplate || "cover";
   const tplDefObj = getTemplateDef(tplKey);
   const params = getTemplateParams(tplKey);
+  const tplLine = getTemplateLineSettings(tplKey);
 
   if (els.currentTemplateTitle) {
     els.currentTemplateTitle.textContent = tplDefObj.name;
@@ -1626,6 +1671,11 @@ function setTemplateParams(params, tplKey) {
     const sizeOptionsHtml = (current) => {
       const sizes = PARAM_FONT_SIZES.includes(current) ? PARAM_FONT_SIZES : PARAM_FONT_SIZES.concat([current]).sort((a, b) => a - b);
       return sizes.map((s) => `<option value="${s}" ${s === current ? "selected" : ""}>${s} pt</option>`).join("");
+    };
+
+    const gapOptionsHtml = (current) => {
+      const gaps = PARAM_LINE_GAPS.includes(current) ? PARAM_LINE_GAPS : PARAM_LINE_GAPS.concat([current]).sort((a, b) => a - b);
+      return gaps.map((g) => `<option value="${g}" ${g === current ? "selected" : ""}>${g} мм</option>`).join("");
     };
 
     const fontOptionsHtml = (current) => PARAM_FONT_FAMILIES
@@ -1764,12 +1814,20 @@ function setTemplateParams(params, tplKey) {
             <span class="tpl-card-title">Параметры страницы</span>
           </div>
           <div class="tpl-card-header-actions">
+            <label class="tpl-header-ctl" title="Размер между строками (мм) — общий отступ между параметрами и блоками на листе, один для всего шаблона">
+              <span>Между строками</span>
+              <select class="tpl-param-select tpl-header-linegap">${gapOptionsHtml(tplLine.line_gap)}</select>
+            </label>
+            <label class="tpl-header-ctl" title="Небольшая линия-разделитель между соседними строками параметров на листе, шириной с текст строки">
+              <input type="checkbox" class="tpl-header-line" ${tplLine.line_enabled ? "checked" : ""}>
+              <span>Линия</span>
+            </label>
             <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »"><i class="modus-icons">layers</i> Блок</button>
             <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона"><i class="modus-icons">add_circle</i> Создать параметр</button>
           </div>
         </div>
         <div class="tpl-card-body">
-            <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. Дополнительные настройки задаются в строке параметра: шрифт, размер, привязка по вертикали (⬆/⬇), выравнивание (⇤/↔/⇥), цвет и заголовок. Место на странице определяется выравниваниями: колонка слева/по центру/справа и привязка группы к верхнему или нижнему краю листа. 📦 Блок объединяет параметры в одну строку через « | ».</p>
+            <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. Дополнительные настройки задаются в строке параметра: шрифт, размер, привязка по вертикали (⬆/⬇), выравнивание (⇤/↔/⇥), цвет и заголовок. «Размер между строками» и линия-разделитель «Линия» — общие для всех параметров и блоков, задаются в шапке карточки. Место на странице определяется выравниваниями: колонка слева/по центру/справа и привязка группы к верхнему или нижнему краю листа. 📦 Блок объединяет параметры в одну строку через « | ».</p>
           <div class="tpl-params-list">
             ${rowsHtml || `<div class="tpl-params-empty">Параметров пока нет — нажмите «+ Создать параметр».</div>`}
           </div>
@@ -2094,6 +2152,7 @@ function setTemplateParams(params, tplKey) {
 
     // Дополнительные настройки параметра задаются прямо в строке:
     // шрифт, размер, привязка по вертикали, выравнивание, цвет, заголовок.
+    // «Размер между строками» и «Линия» — общие, в шапке карточки.
     const updateParam = (id, updates) => {
       const params = getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, updates) : p));
       setTemplateParams(params, tplKey);
@@ -2117,6 +2176,23 @@ function setTemplateParams(params, tplKey) {
         if (!isNaN(sz) && sz > 0) updateParam(sel.dataset.id, { font_size: sz });
       });
     });
+
+    // Общие настройки стека параметров (шапка карточки): линия-разделитель
+    // и размер между строками — одни на все параметры и блоки шаблона
+    const headerLineChk = container.querySelector(".tpl-header-line");
+    if (headerLineChk) {
+      headerLineChk.addEventListener("change", () => {
+        setTemplateLineSettings(tplKey, { line_enabled: headerLineChk.checked });
+      });
+    }
+
+    const headerGapSel = container.querySelector(".tpl-header-linegap");
+    if (headerGapSel) {
+      headerGapSel.addEventListener("change", () => {
+        const g = parseFloat(headerGapSel.value);
+        if (!isNaN(g) && g >= 0) setTemplateLineSettings(tplKey, { line_gap: g });
+      });
+    }
 
     container.querySelectorAll(".tpl-param-valign").forEach((btn) => {
       btn.addEventListener("click", () => {
