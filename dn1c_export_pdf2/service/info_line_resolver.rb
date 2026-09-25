@@ -5,8 +5,9 @@ module DN1Code
     module Service
       # Разрешение источника параметра шаблона в значение для отображения на листе.
       # Источник — строка вида "project.articul", "customer.phone", "workflow.price",
-      # "dir.<индекс>.line" («заголовок — описание» папки; прежние отдельные
-      # "dir.<индекс>.title" и "dir.<индекс>.description" тоже поддерживаются),
+      # "dir.<индекс>.line" (заголовок папки на своей строке, описание — на
+      # следующей; прежние отдельные "dir.<индекс>.title" и
+      # "dir.<индекс>.description" тоже поддерживаются),
       # "scene.name", "page.number_total".
       # Возвращает «сырое» значение БЕЗ заголовка-префикса: заголовок задаётся
       # настройкой самого параметра (label/show_label в конфиге шаблона).
@@ -115,7 +116,7 @@ module DN1Code
             idx = Regexp.last_match(1).to_i
             parts = [non_blank(dir_field(context, idx, :title)),
                      non_blank(dir_field(context, idx, :description))].compact
-            parts.empty? ? nil : parts.join(" — ")
+            parts.empty? ? nil : parts.join("\n")
           when "scene.name"        then scene_value(context, :name)
           when "scene.description" then scene_value(context, :description)
           when "page.number_total"

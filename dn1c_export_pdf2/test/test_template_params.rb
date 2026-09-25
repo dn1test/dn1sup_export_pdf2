@@ -262,13 +262,13 @@ module DN1Code
                  "workflow.history → все записи")
           assert(hist.include?("\n"), "История многострочная")
 
-          # 3. Папки спецификации: одна строка «заголовок — описание» по индексу
+          # 3. Папки спецификации: заголовок на своей строке, описание на следующей
           pd.directories = [{ path: "C:/job", title: "Материалы", description: "ЛДСП 16 мм, Blum" }]
           dctx = LB.send(:resolver_context, ctx, nil, 1, 4)
           assert(res.resolve_param(dctx, "dir.0.title") == "Материалы", "dir.0.title → название папки")
           assert(res.resolve_param(dctx, "dir.0.description") == "ЛДСП 16 мм, Blum", "dir.0.description → спецификация папки")
-          assert(res.resolve_param(dctx, "dir.0.line") == "Материалы — ЛДСП 16 мм, Blum",
-                 "dir.0.line → «заголовок — описание» одной строкой")
+          assert(res.resolve_param(dctx, "dir.0.line") == "Материалы\nЛДСП 16 мм, Blum",
+                 "dir.0.line → заголовок на своей строке, описание на следующей")
           pd.directories = [{ path: "C:/job2", description: "Только описание" }]
           assert(res.resolve_param(dctx, "dir.0.line") == "Только описание",
                  "dir.0.line без заголовка → только описание")

@@ -126,7 +126,7 @@
     ];
 
     // Динамические источники по папкам спецификаций: один параметр на папку,
-    // значение — «заголовок — описание» (dir.N.line)
+    // значение — заголовок на своей строке, описание на следующей (dir.N.line)
     const dirs = Array.isArray(state.directories) ? state.directories : [];
     const dirOptions = [];
     dirs.forEach((d, idx) => {
@@ -277,7 +277,7 @@
           const d = (state.directories || [])[parseInt(m[1], 10)];
           if (!d) return "";
           if (m[2] === "line") {
-            return [tval(d.title), tval(d.description)].filter(Boolean).join(" — ");
+            return [tval(d.title), tval(d.description)].filter(Boolean).join("\n");
           }
           return tval(d[m[2] === "title" ? "title" : "description"]);
         }
