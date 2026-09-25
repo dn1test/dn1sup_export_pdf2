@@ -88,14 +88,42 @@ module DN1Code
             json_str = JSON.generate(payload)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
-          # Переключение видимости рамки пропорций кадра через Sketchup::Overlay
+          # Переключение рамки кадра в окне SketchUp. Принимает булево (только
+          # вкл/выкл оверлея) либо JSON: { enabled, scene_index, all } — тогда
+          # перед пересчётом сразу обновляется постраничный флаг frame_overlay
+          # в сессии (не дожидаясь автосохранения из диалога).
           dialog.add_action_callback("toggleAspectOverlay") do |_action_context, enabled_val|
             model = Sketchup.active_model
             is_on = enabled_val == true || enabled_val.to_s == "true"
+
+            scope_idx = nil
+            apply_all = false
+            if enabled_val.is_a?(String) && enabled_val.include?("{")
+              parsed = begin
+                JSON.parse(enabled_val, symbolize_names: true)
+              rescue StandardError
+                {}
+              end
+              is_on = parsed[:enabled] == true || parsed[:enabled].to_s == "true"
+              apply_all = parsed[:all] == true
+              scope_idx = parsed[:scene_index].to_i if parsed[:scene_index]
+            end
+
+            if defined?(Model::SessionStore)
+              pdata = Model::SessionStore.data(model)
+              if pdata && pdata.scenes
+                if apply_all
+                  pdata.scenes.each { |sc| sc.frame_overlay = is_on }
+                elsif scope_idx && scope_idx >= 0 && scope_idx < pdata.scenes.size
+                  pdata.scenes[scope_idx].frame_overlay = is_on
+                end
+              end
+            end
+
             if defined?(Service::OverlayService)
               if is_on
                 info = Service::OverlayService.calculate_target_info(model)
-                if info[:visible] == false
+                if info[:visible] == false || info[:overlay_on] == false
                   Service::OverlayService.disable(model)
                   is_on = false
                 else
@@ -468,15 +496,19 @@ module DN1Code
               if page && model.pages.respond_to?(:selected_page=)
                 model.pages.selected_page = page
 
-                # Если активен Overlay безопасной рамки кадра, обновляем его под пропорции выбранной сцены
+                # Если активен Overlay безопасной рамки кадра, обновляем его под пропорции выбранной сцены.
+                # Рамка теперь постраничная: включаем/выключаем по флагу frame_overlay выбранной сцены.
                 if defined?(Service::OverlayService)
                   info = Service::OverlayService.calculate_target_info(model)
-                  if info[:visible] == false
+                  if info[:visible] == false || info[:overlay_on] == false
                     Service::OverlayService.disable(model)
                     dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(false);") rescue nil
                   elsif Service::OverlayService.overlay_active?(model)
                     Service::OverlayService.refresh(model)
                     dialog.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});") rescue nil
+                  else
+                    Service::OverlayService.enable(model)
+                    dialog.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(true);") rescue nil
                   end
                 end
               end

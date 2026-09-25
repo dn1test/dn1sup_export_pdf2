@@ -20,8 +20,12 @@ module DN1Code
         attr_accessor :order
         # @return [Boolean] флаг включения страницы в итоговый PDF
         attr_accessor :enabled
-        # @return [Boolean] флаг включения видового экрана 3D на этой странице
-        attr_accessor :viewport_visible
+        # @return [Boolean] флаг включения видового экрана 3D на этой странице.
+        #   Функция отключения удалена: поле всегда true, хранится для совместимости
+        #   старых project.yaml и внутрирендерных проверок
+        attr_reader :viewport_visible
+        # @return [Boolean] флаг отображения рамки кадра (Safe Frame Overlay) в окне SketchUp для этой страницы
+        attr_accessor :frame_overlay
         # @return [Boolean] флаг отображения фона сцены (небо/земля) в видовом экране
         attr_accessor :viewport_background
         # @return [String] пропорции видового экрана ('3:2', '4:3', '5:4', '4:5', '16:9', '1:1', 'page')
@@ -44,20 +48,22 @@ module DN1Code
         # @param description [String] примечание/описание к сцене
         # @param order [Integer] порядковый индекс сцены
         # @param enabled [Boolean] включена ли сцена в экспорт
-        # @param viewport_visible [Boolean] включен ли 3D видовой экран на этой странице
+        # @param viewport_visible [Boolean] устарел и игнорируется: видовой экран всегда включен
+        # @param frame_overlay [Boolean] показывать ли рамку кадра в окне SketchUp для этой страницы
         # @param viewport_background [Boolean] отображать ли фон сцены (небо/земля) в видовом экране (по умолчанию выключен)
         # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 5:4, 4:5, 16:9, 1:1, page)
         # @param scale_pct [Integer] масштаб/размещение кадра на листе в % (60-100)
         # @param align_h [String] выравнивание эскиза по горизонтали (left, center, right)
         # @param align_v [String] выравнивание эскиза по вертикали (top, center, bottom)
-        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100, align_h: "center", align_v: "center")
+        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, frame_overlay: false, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100, align_h: "center", align_v: "center")
           @name             = name.to_s
           @original_name    = (original_name || name).to_s
           @scene_ref        = scene_ref
           @description      = description.to_s
           @order            = order.to_i
           @enabled          = enabled
-          @viewport_visible = (viewport_visible != false && viewport_visible.to_s != "false" && viewport_visible != 0 && viewport_visible.to_s != "0")
+          @viewport_visible = true
+          @frame_overlay    = (frame_overlay == true || frame_overlay.to_s == "true")
           @viewport_background = (viewport_background == true || viewport_background.to_s == "true")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
           @scale_pct        = (scale_pct || 100).to_i
@@ -107,6 +113,7 @@ module DN1Code
             order:            @order,
             enabled:          @enabled,
             viewport_visible: @viewport_visible,
+            frame_overlay:    @frame_overlay,
             viewport_background: @viewport_background,
             aspect_ratio:     @aspect_ratio,
             scale_pct:        @scale_pct,
@@ -128,7 +135,8 @@ module DN1Code
             description:      hash[:description] || hash["description"] || "",
             order:            hash[:order] || hash["order"] || 0,
             enabled:          hash.fetch(:enabled, hash.fetch("enabled", true)),
-            viewport_visible: hash.fetch(:viewport_visible, hash.fetch("viewport_visible", true)),
+            viewport_visible: true,
+            frame_overlay:    hash.fetch(:frame_overlay, hash.fetch("frame_overlay", false)),
             viewport_background: hash.fetch(:viewport_background, hash.fetch("viewport_background", false)),
             aspect_ratio:     hash[:aspect_ratio] || hash["aspect_ratio"] || "4:3",
             scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100,

@@ -94,7 +94,6 @@ module DN1Code
           doc   = ::Layout::Document.new
           ctx   = LB.send(:build_context, pd, nil, "Sofia Sans Condensed")
           scene = ::DN1Code::ExportPdf2::Model::SceneItem.new(name: "01. Тестовая сцена", page_type: scene_type)
-          scene.viewport_visible = false # без видового экрана — только текстовые блоки
           LB.send(:render_modular_page, doc, doc.pages.first, doc.layers.first, scene,
                   page_index, total_pages,
                   doc.page_info.width, doc.page_info.height, doc.page_info.left_margin,
@@ -487,8 +486,9 @@ module DN1Code
           pd2 = tp_make_project
           assert(pd2.send(:load_from_layout_yaml, legacy_path), "Старый layout.yaml читается без ошибок")
           cover2 = pd2.pdf_settings[:custom_layouts][:cover]
-          assert(cover2[:params] == [], "Чистый лист: строки старой шапки/слотов не переносятся в параметры")
-          assert(!cover2.key?(:header) && !cover2.key?(:slot_1), "Старые блоки в конфиг не попадают")
+          assert(cover2.nil? || cover2[:params] == [],
+                 "Чистый лист: старый layout.yaml не даёт параметров (запись без новой модели игнорируется)")
+          assert(cover2.nil? || (!cover2.key?(:header) && !cover2.key?(:slot_1)), "Старые блоки в конфиг не попадают")
 
           # 4. load_from_layout_yaml: новая структура читается, params нормализуются
           new_path = File.join(dir, "layout_new.yaml")
@@ -546,9 +546,8 @@ module DN1Code
           assert(p2[:visible] == false, "visible: \"false\" → false")
           assert(p2[:font_size] == 10.0, "Отсутствующие поля получают дефолты")
           assert(p2[:valign] == "top" && p2[:font_family] == "", "valign и шрифт по умолчанию: top / «» (шрифт страницы)")
-          assert(pd3.pdf_settings[:custom_layouts][:visual][:line_gap] == 2.5 &&
-                 pd3.pdf_settings[:custom_layouts][:visual][:line_enabled] == false,
-                 "Шаблон без настроек в YAML получает дефолты: 2,5 мм, линия выключена")
+          assert(pd3.pdf_settings[:custom_layouts][:visual].nil?,
+                 "Шаблоны, которых нет в YAML, не досоздаются: список шаблонов задаётся layout.yaml")
 
           # 6. Блок (group: true): нормализуется вместе с вложенными параметрами
           g = params3.find { |p| p[:group] == true }

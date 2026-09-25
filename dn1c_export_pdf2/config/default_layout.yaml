@@ -1,6 +1,8 @@
 ---
 layout:
   cover:
+    name: "Титульный лист (Cover)"
+    description: "Титульный лист: название проекта, заказчик, артикул"
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -12,7 +14,11 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params: []
+    line_gap: 2.5
+    line_enabled: false
   description:
+    name: "Описание и спецификации (Description)"
+    description: "Описание изделия и спецификации"
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -24,7 +30,11 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params: []
+    line_gap: 2.5
+    line_enabled: false
   explain:
+    name: "Содержание и ведомость (Explain)"
+    description: "Содержание и ведомость материалов"
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -36,7 +46,11 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params: []
+    line_gap: 2.5
+    line_enabled: false
   general:
+    name: "Общий вид (General)"
+    description: "Общий вид изделия с основными параметрами"
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -48,7 +62,11 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params: []
+    line_gap: 2.5
+    line_enabled: false
   visual:
+    name: "Визуализация (Visual)"
+    description: "Крупная визуализация вида модели"
     image_4_3:
       x: 25.0
       "y": 12.0
@@ -60,3 +78,21 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params: []
+    line_gap: 2.5
+    line_enabled: false
+  blank:
+    name: "Без шаблона (Blank)"
+    description: "Пустая страница: только видовой экран"
+    image_4_3:
+      x: 25.0
+      "y": 12.0
+      w: 50.0
+      h: 82.0
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '16:9'
+      scale_pct: 100
+    params: []
+    line_gap: 2.5
+    line_enabled: false

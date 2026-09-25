@@ -213,6 +213,10 @@
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
               </label>
+              <label class="checkbox-label" title="Рамка кадра в окне SketchUp: включить/выключить сразу на всех страницах (индивидуально — в меню кадра строки)">
+                <input type="checkbox" id="chk_scenes_frame_all">
+                <span>Кадр все</span>
+              </label>
             </div>
             <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
           </div>
@@ -225,7 +229,7 @@
                   <th width="44" class="th-order" title="Перетащите строку мышью для изменения порядка следования">№</th>
                   <th width="108" class="th-preview" title="Мини предпросмотр страницы (3:2)">Превью</th>
                   <th>Сцена / Описание</th>
-                  <th width="92" class="th-aspect" title="Пропорции кадра видового экрана — индивидуально для каждой страницы">Кадр</th>
+                  <th width="92" class="th-aspect" title="Пропорции кадра, рамка и видовой экран — индивидуально для каждой страницы (меню открывается кликом)">Кадр</th>
                   <th width="74" class="th-scale" title="Размещение картинки на странице, % от листа — индивидуально для каждой страницы">Масштаб</th>
                   <th width="88" class="th-align" title="Выравнивание эскиза на странице — индивидуально для каждой страницы">Выравнивание</th>
                   <th width="210">Шаблон страницы</th>
@@ -235,11 +239,6 @@
                 <!-- Dynamically populated via JS -->
               </tbody>
             </table>
-          </div>
-
-          <!-- Scene Viewport & Safe Frame Card (Dedicated panel for selected scene) -->
-          <div class="scene-viewport-section" id="sceneViewportSection">
-            <!-- Dynamically populated via renderSceneViewportCard() in app.js -->
           </div>
         </div>
       </section>
@@ -282,11 +281,7 @@
               <div class="toolbar-group template-header-info">
                 <span class="current-template-title" id="currentTemplateTitle">Титульный лист (Cover)</span>
                 <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
-                  <option value="cover">Титульный лист (Cover)</option>
-                  <option value="description">Описание и спецификации (Description)</option>
-                  <option value="explain">Содержание и ведомость (Explain)</option>
-                  <option value="general">Общий вид (General)</option>
-                  <option value="visual">Визуализация (Visual)</option>
+                  <!-- Опции заполняются динамически (syncTemplateDropdowns) -->
                 </select>
                 <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
                   <i class="modus-icons">edit</i> Переименовать
@@ -698,22 +693,22 @@
           <span class="modal-card-icon"><i class="modus-icons">add_circle</i></span>
           <h3>Создание нового шаблона страницы</h3>
         </div>
-        <p class="field-hint">Укажите название и выберите базовый макет. Настройки блоков можно будет детально изменить в редакторе:</p>
-        
+        <p class="field-hint">Укажите название и описание, выберите основу. Настройки блоков можно будет детально изменить в редакторе:</p>
+
         <div class="form-group">
           <label for="inputNewTemplateName">Название шаблона *</label>
           <input type="text" id="inputNewTemplateName" class="form-control" placeholder="Например: План расстановки мебели">
         </div>
 
         <div class="form-group">
+          <label for="inputNewTemplateDescription">Описание шаблона</label>
+          <input type="text" id="inputNewTemplateDescription" class="form-control" placeholder="Например: План расстановки с размерами (вид сверху)">
+        </div>
+
+        <div class="form-group">
           <label for="selectNewTemplateBase">Базовая структура / основа *</label>
           <select id="selectNewTemplateBase" class="form-control">
-            <option value="general" selected>Общий вид (General) — универсальный чертеж / вид</option>
-            <option value="visual">Визуализация (Visual) — широкоформатный видовой экран</option>
-            <option value="description">Описание и спецификации (Description) — со спецификациями</option>
-            <option value="explain">Содержание и ведомость (Explain) — с ведомостью страниц</option>
-            <option value="cover">Титульный лист (Cover) — крупный титульный лист</option>
-            <option value="blank">Без шаблона (Blank) — чистая страница без рамок и текста</option>
+            <option value="empty" selected>Пустой шаблон — базовый видовой экран</option>
           </select>
         </div>
 
@@ -735,7 +730,7 @@
           Вы действительно хотите удалить выбранный шаблон?
         </p>
         <div class="field-hint modal-alert-danger">
-          ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на стандартный шаблон «Общий вид (General)».
+          ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на другой доступный шаблон.
         </div>
         <div class="modal-actions">
           <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate"><i class="modus-icons">content_close</i> Отмена</button>
@@ -751,11 +746,16 @@
           <span class="modal-card-icon"><i class="modus-icons">edit</i></span>
           <h3>Переименование шаблона страницы</h3>
         </div>
-        <p class="field-hint">Укажите новое название для этого шаблона страницы:</p>
+        <p class="field-hint">Укажите новое название и описание для этого шаблона страницы:</p>
 
         <div class="form-group">
           <label for="inputRenameTemplateName">Название шаблона *</label>
           <input type="text" id="inputRenameTemplateName" class="form-control">
+        </div>
+
+        <div class="form-group">
+          <label for="inputRenameTemplateDescription">Описание шаблона</label>
+          <input type="text" id="inputRenameTemplateDescription" class="form-control" placeholder="Отображается в подсказке при наведении на шаблон">
         </div>
 
         <div class="modal-actions">

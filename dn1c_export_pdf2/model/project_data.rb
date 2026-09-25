@@ -31,6 +31,10 @@ module DN1Code
         # Допустимые пропорции кадра в настройках плагина
         VALID_ASPECT_RATIOS   = %w[page 16:9 4:3 3:2 5:4 4:5 1:1 custom].freeze
 
+        # Метаданные шаблона, которые переносятся через layout.yaml
+        # (имя, описание, база, иконка) — см. load_from_layout_yaml
+        TEMPLATE_META_KEYS    = %w[name _name description _description _base_type _icon].freeze
+
         # Прокси-хэш для фасада @project_info: перенаправляет изменения напрямую
         # в модульные структуры (@project, @customer, @workflow) и синхронизирует синонимы полей
         class ProjectInfoProxy < Hash
@@ -505,9 +509,11 @@ module DN1Code
           ]
         end
 
-        # Возвращает конфигурацию шаблона страниц по умолчанию (в процентах)
-        # @return [Hash] для каждого типа страницы: видовое окно + пустой список параметров.
-        # Параметры шаблона пользователь создает вручную (свободное размещение на странице).
+        # Возвращает конфигурацию шаблонов страниц по умолчанию (в процентах).
+        # Готовые шаблоны — это обычные шаблоны: пользователь может их удалять,
+        # переименовывать и менять описание; удалённые не восстанавливаются
+        # (сид попадает в layout.yaml при первом сохранении).
+        # @return [Hash] для каждого шаблона: имя, описание, видовое окно, параметры.
         def default_custom_layouts
           default_image_block = {
             x: 25.0, y: 12.0, w: 50.0, h: 82.0,
@@ -519,12 +525,30 @@ module DN1Code
           # «размер между строками» (мм) и тонкая линия-разделитель между
           # параметрами и блоками (задаются в шапке карточки «Параметры страницы»)
           {
-            cover:       { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
-            description: { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
-            explain:     { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
-            general:     { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
-            visual:      { image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false },
-            blank:       { image_4_3: default_image_block.merge(aspect_ratio: "16:9"), params: [], line_gap: 2.5, line_enabled: false }
+            cover: {
+              name: "Титульный лист (Cover)", description: "Титульный лист: название проекта, заказчик, артикул",
+              image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false
+            },
+            description: {
+              name: "Описание и спецификации (Description)", description: "Описание изделия и спецификации",
+              image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false
+            },
+            explain: {
+              name: "Содержание и ведомость (Explain)", description: "Содержание и ведомость материалов",
+              image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false
+            },
+            general: {
+              name: "Общий вид (General)", description: "Общий вид изделия с основными параметрами",
+              image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false
+            },
+            visual: {
+              name: "Визуализация (Visual)", description: "Крупная визуализация вида модели",
+              image_4_3: default_image_block.dup, params: [], line_gap: 2.5, line_enabled: false
+            },
+            blank: {
+              name: "Без шаблона (Blank)", description: "Пустая страница: только видовой экран",
+              image_4_3: default_image_block.merge(aspect_ratio: "16:9"), params: [], line_gap: 2.5, line_enabled: false
+            }
           }
         end
 
@@ -547,10 +571,10 @@ module DN1Code
             custom_ratio_w:     16,
             custom_ratio_h:     9,
             show_aspect_overlay: false,
-            overlay_border_color:   "#0EA5E9",
+            overlay_border_color:   "#FF0000",
             overlay_border_opacity: 100,
             overlay_mask_color:     "#0F172A",
-            overlay_mask_opacity:   55,
+            overlay_mask_opacity:   10,
             scale_factor:       2.0,
             scale_multiplier:   "2.0",
             annotation_font_size: "auto",
@@ -1150,6 +1174,18 @@ module DN1Code
           @project[:background_default_migrated] = true
         end
 
+        # Одноразовый перенос старых проектов: раньше рамка кадра была глобальной
+        # (pdf_settings[:show_aspect_overlay]), теперь она постраничная (SceneItem#frame_overlay).
+        # При первой загрузке проекта, сохраненного старой версией, раздаём всем сценам
+        # текущее глобальное значение. После миграции постраничные выборы сохраняются на диске.
+        def migrate_frame_overlay_default!
+          return if @project[:frame_overlay_default_migrated] == true
+
+          inherited = @pdf_settings[:show_aspect_overlay] == true
+          @scenes.each { |sc| sc.frame_overlay = inherited }
+          @project[:frame_overlay_default_migrated] = true
+        end
+
         # Синхронизирует список сцен с активной моделью SketchUp, сохраняя настроенные параметры
         # @param model [Sketchup::Model] модель SketchUp
         # @return [void]
@@ -1450,7 +1486,12 @@ module DN1Code
 
             return false unless layouts.is_a?(Hash)
 
-            @pdf_settings[:custom_layouts] ||= default_custom_layouts
+            # layout.yaml — единственный источник списка шаблонов: начинаем с
+            # пустого списка, иначе удалённый пользователем готовый шаблон
+            # воскресал бы из default_custom_layouts при каждом запуске.
+            # Дефолтный сид остаётся только для случая, когда файла макетов
+            # нет вовсе (задаётся в default_pdf_settings → default_custom_layouts).
+            @pdf_settings[:custom_layouts] = {}
             layouts.each do |page_key, blocks|
               next unless blocks.is_a?(Hash)
 
@@ -1475,6 +1516,11 @@ module DN1Code
                   page[:params] = normalize_template_params(slot_cfg)
                 elsif slot_id.to_s == "line_gap" || slot_id.to_s == "line_enabled"
                   page[slot_id.to_sym] = slot_cfg
+                elsif TEMPLATE_META_KEYS.include?(slot_id.to_s)
+                  # Метаданные шаблона (имя, описание, база) должны переживать
+                  # перезапуск — раньше они отбрасывались и имя слетало на
+                  # «Шаблон (custom_xxx)» после перезагрузки SketchUp
+                  page[slot_id.to_sym] = slot_cfg.to_s
                 end
               end
               page[:params] ||= []
@@ -1642,6 +1688,7 @@ module DN1Code
               if root[:scenes].is_a?(Array)
                 @scenes = root[:scenes].map { |h| SceneItem.from_h(h) }
                 migrate_legacy_background_default!
+                migrate_frame_overlay_default!
               end
 
               # Проверяем, есть ли рядом файл edit_history.yaml
@@ -1675,6 +1722,7 @@ module DN1Code
             if docs[1].is_a?(Array)
               @scenes = docs[1].map { |h| SceneItem.from_h(h) }
               migrate_legacy_background_default!
+              migrate_frame_overlay_default!
             end
             if docs[2].is_a?(Array)
               @history = docs[2].map do |item|

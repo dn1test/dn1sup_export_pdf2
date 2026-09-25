@@ -732,6 +732,12 @@ module DN1Code
                          when "5:4"  then 5.0 / 4.0
                          when "4:5"  then 4.0 / 5.0
                          when "page" then content[:w] / content[:h]
+                         when "custom"
+                           cw = (ctx[:settings][:custom_ratio_w] || ctx[:settings]["custom_ratio_w"] || 16).to_f
+                           ch = (ctx[:settings][:custom_ratio_h] || ctx[:settings]["custom_ratio_h"] || 9).to_f
+                           cw = 16.0 if cw <= 0.0
+                           ch = 9.0 if ch <= 0.0
+                           cw / ch
                          else 4.0 / 3.0
                          end
 
@@ -926,6 +932,11 @@ module DN1Code
 
           # 2. Резервный растровый рендер высокого разрешения через RenderService
           #    (режим "image": Растровый GPU с Ambient Occlusion и мягкими тенями)
+          # Пропорции снимка = пропорции кадра ЭТОЙ страницы (scene.aspect_ratio,
+          # фолбэк — блок шаблона): target_ratio вычислен выше по scene_item.
+          # Раньше здесь пропорции брались из OverlayService по выбранной
+          # (первой) странице и кэшировались по ключу шаблона — из-за этого все
+          # страницы шаблона получали пропорции первой страницы.
           render_opts = {
             image_width:        ctx[:settings][:image_width],
             render_quality:     ctx[:settings][:render_quality] || "medium",
@@ -940,14 +951,6 @@ module DN1Code
             image_format:       ctx[:settings][:image_format] || "png",
             compress_pdf:       ctx[:settings][:compress_pdf]
           }
-          if defined?(OverlayService)
-            scene_aspect_info = ctx[:aspect_cache][pt]
-            unless scene_aspect_info
-              scene_aspect_info = OverlayService.calculate_target_info(ctx[:model], { template_key: pt }) rescue nil
-              ctx[:aspect_cache][pt] = scene_aspect_info
-            end
-            render_opts[:aspect_ratio] = scene_aspect_info[:ratio] if scene_aspect_info && scene_aspect_info[:ratio]
-          end
           scene_obj = scene_item.respond_to?(:scene_ref) ? scene_item.scene_ref : nil
           if scene_obj.nil? && ctx[:model] && ctx[:model].respond_to?(:pages) && scene_item.respond_to?(:name)
             scene_obj = ctx[:model].pages[scene_item.name.to_s] rescue nil

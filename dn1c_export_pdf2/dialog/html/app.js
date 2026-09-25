@@ -30,6 +30,13 @@
   // Иконка крестика закрытия/удаления (шрифт Modus Icons, набор connect)
   const MODUS_CROSS_SVG = '<i class="modus-icons icon-close-cross" style="font-size: 11px;">content-close</i>';
 
+  // Ключ шаблона по умолчанию: первый доступный шаблон; legacy-ключ cover —
+  // последний фолбэк (готовые шаблоны удаляемы, «cover» может не существовать)
+  function defaultTemplateKey() {
+    const keys = Object.keys(state.pdf_settings?.custom_layouts || {});
+    return keys[0] || "cover";
+  }
+
   // Дата в превью — в печатном формате PDF (dd.mm.yyyy), а не в локали браузера (9/22/2026)
   const previewDate = (d) => {
     const s = String(d || "").trim();
@@ -74,7 +81,7 @@
     if (layoutState.selectedSceneIndex !== undefined && scenes[layoutState.selectedSceneIndex]) {
       return scenes[layoutState.selectedSceneIndex];
     }
-    return scenes.find((s) => s.page_type === (layoutState.currentTemplate || "cover")) || scenes[0] || null;
+    return scenes.find((s) => s.page_type === (layoutState.currentTemplate || defaultTemplateKey())) || scenes[0] || null;
   };
 
   // Группы источников для диалога создания/редактирования параметра
@@ -351,7 +358,7 @@
   // Создание пустого блока объединения параметров
   function createParamGroup(tplKey) {
     ensureCustomLayouts();
-    const key = tplKey || layoutState.currentTemplate || "cover";
+    const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
     if (!state.pdf_settings.custom_layouts[key]) {
       state.pdf_settings.custom_layouts[key] = {};
     }
@@ -401,8 +408,9 @@
     return copy;
   }
 
-// Шаблоны страниц: имя + настройки видового экрана. Параметры (params)
-// создаются пользователем вручную; новые шаблоны стартуют с пустым списком.
+// Структурный фолбэк для известных ключей шаблонов (имя + видовой экран):
+// используется только как источник значений по умолчанию — готовые шаблоны
+// живут в state.pdf_settings.custom_layouts и создаются/удаляются как обычные.
 const DEFAULT_LAYOUTS = {
   cover: {
     name: "Титульный лист (Cover)",
@@ -490,6 +498,7 @@ const DEFAULT_LAYOUTS = {
     btnSelectAllScenes: document.getElementById("btnSelectAllScenes"),
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
     chkScenesBackground: document.getElementById("chk_scenes_background"),
+    chkScenesFrameAll: document.getElementById("chk_scenes_frame_all"),
     scenesPanel: document.getElementById("scenesPanel"),
     scenesSplitResizer: document.getElementById("scenesSplitResizer"),
 
@@ -503,6 +512,7 @@ const DEFAULT_LAYOUTS = {
     btnDeleteCurrentTemplate: document.getElementById("btnDeleteCurrentTemplate"),
     newTemplateModal: document.getElementById("newTemplateModal"),
     inputNewTemplateName: document.getElementById("inputNewTemplateName"),
+    inputNewTemplateDescription: document.getElementById("inputNewTemplateDescription"),
     selectNewTemplateBase: document.getElementById("selectNewTemplateBase"),
     btnConfirmNewTemplate: document.getElementById("btnConfirmNewTemplate"),
     btnCancelNewTemplate: document.getElementById("btnCancelNewTemplate"),
@@ -512,6 +522,7 @@ const DEFAULT_LAYOUTS = {
     btnConfirmDeleteTemplate: document.getElementById("btnConfirmDeleteTemplate"),
     renameTemplateModal: document.getElementById("renameTemplateModal"),
     inputRenameTemplateName: document.getElementById("inputRenameTemplateName"),
+    inputRenameTemplateDescription: document.getElementById("inputRenameTemplateDescription"),
     btnCancelRenameTemplate: document.getElementById("btnCancelRenameTemplate"),
     btnConfirmRenameTemplate: document.getElementById("btnConfirmRenameTemplate"),
     templateSettingsPanel: document.getElementById("templateSettingsPanel"),
@@ -544,8 +555,6 @@ const DEFAULT_LAYOUTS = {
     customAspectGroup: document.getElementById("customAspectGroup"),
     inputAspectCustomW: document.getElementById("inputAspectCustomW"),
     inputAspectCustomH: document.getElementById("inputAspectCustomH"),
-    chkShowAspectOverlay: document.getElementById("chkShowAspectOverlay"),
-    aspectOverlayBadge: document.getElementById("aspectOverlayBadge"),
     selectQuality: document.getElementById("selectQuality"),
     selectScaleMultiplier: document.getElementById("selectScaleMultiplier"),
     selectAnnotationFontSize: document.getElementById("selectAnnotationFontSize"),
@@ -556,10 +565,6 @@ const DEFAULT_LAYOUTS = {
     primaryColorHex: document.getElementById("primaryColorHex"),
     inputStampColor: document.getElementById("inputStampColor"),
     stampColorHex: document.getElementById("stampColorHex"),
-    inputOverlayBorderColor: document.getElementById("inputOverlayBorderColor"),
-    overlayBorderColorHex: document.getElementById("overlayBorderColorHex"),
-    inputOverlayMaskColor: document.getElementById("inputOverlayMaskColor"),
-    overlayMaskColorHex: document.getElementById("overlayMaskColorHex"),
     chkAutoOpen: document.getElementById("chkAutoOpen"),
     chkSaveBackup: document.getElementById("chkSaveBackup"),
     chkAntialias: document.getElementById("chkAntialias"),
@@ -1012,14 +1017,16 @@ const DEFAULT_LAYOUTS = {
   // Нормализация конфигов шаблонов. Чистый лист: блоки старой модели
   // (header/slot_1..4/footer) удаляются; остаются только image_4_3, params,
   // общие настройки стека параметров (line_gap/line_enabled) и метаданные
-  // пользовательского шаблона (name/_name/_base_type/_icon).
+  // шаблона (name/_name/_description/description/_base_type/_icon).
+  // ВАЖНО: ключи из DEFAULT_LAYOUTS здесь не досоздаются — удалённый
+  // пользователем шаблон не должен воскресать при следующей отрисовке.
   function ensureCustomLayouts() {
     if (!state.pdf_settings) state.pdf_settings = {};
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
 
-    const metaKeys = new Set(["name", "_name", "_base_type", "_icon", "_meta"]);
+    const metaKeys = new Set(["name", "_name", "description", "_description", "_base_type", "_icon", "_meta"]);
 
-    const allTplKeys = Array.from(new Set([...Object.keys(DEFAULT_LAYOUTS), ...Object.keys(state.pdf_settings.custom_layouts)]));
+    const allTplKeys = Object.keys(state.pdf_settings.custom_layouts);
 
     allTplKeys.forEach((tplKey) => {
       const cfg = state.pdf_settings.custom_layouts[tplKey];
@@ -1073,56 +1080,45 @@ const DEFAULT_LAYOUTS = {
   // Dynamic Template Registry & Management
   // -----------------------------------------------------------------------------
   function getAllTemplates() {
-    const builtins = [
-      { key: "cover", name: "Титульный лист (Cover)", isDefault: true },
-      { key: "description", name: "Описание и спецификации (Description)", isDefault: true },
-      { key: "explain", name: "Содержание и ведомость (Explain)", isDefault: true },
-      { key: "general", name: "Общий вид (General)", isDefault: true },
-      { key: "visual", name: "Визуализация (Visual)", isDefault: true },
-      { key: "blank", name: "Без шаблона (Blank)", isDefault: true }
-    ];
-
-    const result = [...builtins];
     const customLayouts = state.pdf_settings?.custom_layouts || {};
 
-    Object.keys(customLayouts).forEach((key) => {
-      if (!builtins.some((b) => b.key === key)) {
-        const tplObj = customLayouts[key];
-        const customName = tplObj?._name || tplObj?.name || state.pdf_settings?.template_names?.[key] || `Шаблон (${key})`;
-        result.push({
-          key: key,
-          name: customName,
-          icon: "",
-          modusIcon: "",
-          isDefault: false,
-          baseType: tplObj?._base_type || "general"
-        });
-      }
-    });
+    // Все шаблоны равнозначны (готовые живут в custom_layouts наравне с
+    // пользовательскими); имена legacy-записей без меты берём из DEFAULT_LAYOUTS
+    return Object.keys(customLayouts).map((key) => {
+      const tplObj = customLayouts[key] || {};
+      const name = tplObj._name || tplObj.name ||
+                   state.pdf_settings?.template_names?.[key] ||
+                   (DEFAULT_LAYOUTS[key] && DEFAULT_LAYOUTS[key].name) ||
+                   `Шаблон (${key})`;
+      const description = tplObj._description || tplObj.description || "";
 
-    return result;
+      return {
+        key: key,
+        name: name,
+        description: description,
+        icon: "",
+        modusIcon: "",
+        isDefault: false,
+        baseType: tplObj._base_type || (DEFAULT_LAYOUTS[key] ? key : "general")
+      };
+    });
   }
 
   function getTemplateDef(tplKey) {
-    if (DEFAULT_LAYOUTS[tplKey]) {
-      return {
-        key: tplKey,
-        name: DEFAULT_LAYOUTS[tplKey].name,
-        icon: "",
-        modusIcon: "",
-        isDefault: true,
-        image_def: DEFAULT_LAYOUTS[tplKey].image_4_3 || DEFAULT_IMAGE_SLOT
-      };
-    }
     const customLayouts = state.pdf_settings?.custom_layouts || {};
     const custom = customLayouts[tplKey] || {};
-    const baseKey = custom._base_type || "general";
+    const baseKey = custom._base_type || (DEFAULT_LAYOUTS[tplKey] ? tplKey : "general");
     const baseDef = DEFAULT_LAYOUTS[baseKey] || DEFAULT_LAYOUTS.general;
-    const name = custom._name || custom.name || state.pdf_settings?.template_names?.[tplKey] || `Шаблон (${tplKey})`;
+    const name = custom._name || custom.name ||
+                 state.pdf_settings?.template_names?.[tplKey] ||
+                 (DEFAULT_LAYOUTS[tplKey] && DEFAULT_LAYOUTS[tplKey].name) ||
+                 `Шаблон (${tplKey})`;
+    const description = custom._description || custom.description || "";
 
     return {
       key: tplKey,
       name: name,
+      description: description,
       icon: "",
       modusIcon: "",
       isDefault: false,
@@ -1137,7 +1133,7 @@ const DEFAULT_LAYOUTS = {
     listEl.innerHTML = "";
 
     const templates = getAllTemplates();
-    const currentKey = layoutState.currentTemplate || "cover";
+    const currentKey = layoutState.currentTemplate || (templates[0] ? templates[0].key : "");
     const scenes = state.scenes || [];
 
     templates.forEach((tpl) => {
@@ -1146,11 +1142,13 @@ const DEFAULT_LAYOUTS = {
       item.dataset.tpl = tpl.key;
 
       const matchingScenes = scenes.filter((s) => s.page_type === tpl.key);
-      const usageText = matchingScenes.length > 0 
+      const usageText = matchingScenes.length > 0
         ? `${matchingScenes.length} ${matchingScenes.length === 1 ? "сцена" : (matchingScenes.length < 5 ? "сцены" : "сцен")}`
         : "не используется";
 
-      const subText = tpl.isDefault ? `По умолчанию • ${usageText}` : `Пользовательский • ${usageText}`;
+      // Второй строкой — описание шаблона (мелче); без описания — использование
+      const subText = tpl.description || usageText;
+      item.title = subText;
 
       const mainDiv = document.createElement("div");
       mainDiv.className = "tpl-item-main";
@@ -1171,10 +1169,9 @@ const DEFAULT_LAYOUTS = {
       mainDiv.appendChild(textDiv);
       item.appendChild(mainDiv);
 
-      // Actions (for custom templates)
-      if (!tpl.isDefault) {
-        const actionsDiv = document.createElement("div");
-        actionsDiv.className = "tpl-item-actions";
+      // Actions (rename / delete — доступны для любого шаблона)
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "tpl-item-actions";
 
         const btnRename = document.createElement("button");
         btnRename.type = "button";
@@ -1196,10 +1193,9 @@ const DEFAULT_LAYOUTS = {
           deleteCustomTemplate(tpl.key);
         });
 
-        actionsDiv.appendChild(btnRename);
-        actionsDiv.appendChild(btnDel);
-        item.appendChild(actionsDiv);
-      }
+      actionsDiv.appendChild(btnRename);
+      actionsDiv.appendChild(btnDel);
+      item.appendChild(actionsDiv);
 
       item.addEventListener("click", () => {
         selectTemplate(tpl.key);
@@ -1221,10 +1217,8 @@ const DEFAULT_LAYOUTS = {
     const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
     const tplCfg = customLayouts[tplKey] || {};
     const imgCfg = tplCfg.image_4_3 || {};
-    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
-    if (!isVis) {
+    if (!isSlotVisible(imgCfg, true)) {
       if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
-      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
       callRuby("toggleAspectOverlay", false);
     }
 
@@ -1236,15 +1230,15 @@ const DEFAULT_LAYOUTS = {
       els.selectLayoutTemplate.value = tplKey;
     }
 
-    const isCustom = !DEFAULT_LAYOUTS[tplKey];
+    // Все шаблоны равнозначны: удалить/переименовать можно любой
     if (els.btnDeleteCurrentTemplate) {
-      els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+      els.btnDeleteCurrentTemplate.style.display = "inline-flex";
     }
     if (els.btnDeleteTemplateSidebar) {
-      els.btnDeleteTemplateSidebar.style.display = isCustom ? "inline-flex" : "none";
+      els.btnDeleteTemplateSidebar.style.display = "inline-flex";
     }
     if (els.btnRenameCurrentTemplate) {
-      els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+      els.btnRenameCurrentTemplate.style.display = "inline-flex";
     }
 
     renderTemplateSettingsList(true);
@@ -1268,18 +1262,25 @@ const DEFAULT_LAYOUTS = {
     }
   }
 
-  function createCustomTemplate(name, baseKey = "general") {
+  function createCustomTemplate(name, baseKey = "empty", description = "") {
     if (!name || !name.trim()) return;
     const trimmedName = name.trim();
+    const trimmedDesc = (description || "").trim();
 
     ensureCustomLayouts();
     const newKey = "custom_" + Date.now().toString(36);
 
-    // Копия актуальной конфигурации шаблона-основы (видовое окно + параметры)
-    const baseCfg = state.pdf_settings.custom_layouts[baseKey] || {};
+    // Копия актуальной конфигурации шаблона-основы (видовое окно + параметры);
+    // «Пустой шаблон» стартует с базовым видовым экраном и без параметров
+    const baseCfg = state.pdf_settings.custom_layouts[baseKey] ||
+      { image_4_3: deepClone(DEFAULT_IMAGE_SLOT), params: [], line_gap: 2.5, line_enabled: false };
     state.pdf_settings.custom_layouts[newKey] = deepClone(baseCfg);
     state.pdf_settings.custom_layouts[newKey].name = trimmedName;
     state.pdf_settings.custom_layouts[newKey]._name = trimmedName;
+    if (trimmedDesc) {
+      state.pdf_settings.custom_layouts[newKey].description = trimmedDesc;
+      state.pdf_settings.custom_layouts[newKey]._description = trimmedDesc;
+    }
     state.pdf_settings.custom_layouts[newKey]._base_type = baseKey;
     state.pdf_settings.custom_layouts[newKey]._icon = "📄";
 
@@ -1294,14 +1295,13 @@ const DEFAULT_LAYOUTS = {
   }
 
   function openDeleteTemplateModal(tplKey) {
-    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
-      showNotification("Стандартные шаблоны нельзя удалить", "warning");
+    if (!tplKey) {
       return;
     }
     templatePendingDelete = tplKey;
     const tplDef = getTemplateDef(tplKey);
     if (els.deleteTemplateMsg) {
-      els.deleteTemplateMsg.textContent = `Вы действительно хотите удалить пользовательский шаблон «${tplDef.name}»?`;
+      els.deleteTemplateMsg.textContent = `Вы действительно хотите удалить шаблон «${tplDef.name}»?`;
     }
     if (els.deleteTemplateModal) {
       els.deleteTemplateModal.classList.remove("hidden");
@@ -1317,20 +1317,11 @@ const DEFAULT_LAYOUTS = {
 
   function confirmDeleteTemplate() {
     const tplKey = templatePendingDelete;
-    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+    if (!tplKey) {
       closeDeleteTemplateModal();
       return;
     }
     const tplDef = getTemplateDef(tplKey);
-
-    // Reassign scenes
-    let reassignedCount = 0;
-    (state.scenes || []).forEach((s) => {
-      if (s.page_type === tplKey) {
-        s.page_type = "general";
-        reassignedCount++;
-      }
-    });
 
     if (state.pdf_settings?.custom_layouts) {
       delete state.pdf_settings.custom_layouts[tplKey];
@@ -1339,14 +1330,34 @@ const DEFAULT_LAYOUTS = {
       delete state.pdf_settings.template_names[tplKey];
     }
 
+    // Сцены удалённого шаблона переключаем на первый оставшийся шаблон;
+    // если шаблонов не осталось — ключ страницы оставляем как есть
+    const remaining = Object.keys(state.pdf_settings?.custom_layouts || {});
+    const fallbackKey = remaining[0] || "";
+    let reassignedCount = 0;
+    if (fallbackKey) {
+      (state.scenes || []).forEach((s) => {
+        if (s.page_type === tplKey) {
+          s.page_type = fallbackKey;
+          reassignedCount++;
+        }
+      });
+    }
+
     closeDeleteTemplateModal();
-    layoutState.currentTemplate = "general";
     syncTemplateDropdowns();
     renderTemplatesList();
     renderScenesTable();
-    selectTemplate("general");
+    if (fallbackKey) {
+      layoutState.currentTemplate = fallbackKey;
+      selectTemplate(fallbackKey);
+    } else {
+      layoutState.currentTemplate = "";
+      renderTemplateSettingsList(true);
+      updateLayoutUsageBadge();
+    }
     notifyChange();
-    showNotification(`Шаблон «${tplDef.name}» удален${reassignedCount > 0 ? ` (сцен переключено на Общий вид: ${reassignedCount})` : ""}`, "info");
+    showNotification(`Шаблон «${tplDef.name}» удален${reassignedCount > 0 ? ` (сцен переключено: ${reassignedCount})` : ""}`, "info");
   }
 
   function deleteCustomTemplate(tplKey) {
@@ -1354,14 +1365,16 @@ const DEFAULT_LAYOUTS = {
   }
 
   function openRenameTemplateModal(tplKey) {
-    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
-      showNotification("Стандартные шаблоны нельзя переименовать", "warning");
+    if (!tplKey) {
       return;
     }
     templatePendingRename = tplKey;
     const tplDef = getTemplateDef(tplKey);
     if (els.inputRenameTemplateName) {
       els.inputRenameTemplateName.value = tplDef.name;
+    }
+    if (els.inputRenameTemplateDescription) {
+      els.inputRenameTemplateDescription.value = tplDef.description || "";
     }
     if (els.renameTemplateModal) {
       els.renameTemplateModal.classList.remove("hidden");
@@ -1380,7 +1393,7 @@ const DEFAULT_LAYOUTS = {
 
   function confirmRenameTemplate() {
     const tplKey = templatePendingRename;
-    if (!tplKey || DEFAULT_LAYOUTS[tplKey]) {
+    if (!tplKey) {
       closeRenameTemplateModal();
       return;
     }
@@ -1390,12 +1403,15 @@ const DEFAULT_LAYOUTS = {
       if (els.inputRenameTemplateName) els.inputRenameTemplateName.focus();
       return;
     }
+    const newDesc = els.inputRenameTemplateDescription ? els.inputRenameTemplateDescription.value.trim() : "";
 
     if (!state.pdf_settings) state.pdf_settings = {};
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
     if (!state.pdf_settings.custom_layouts[tplKey]) state.pdf_settings.custom_layouts[tplKey] = {};
     state.pdf_settings.custom_layouts[tplKey].name = newName;
     state.pdf_settings.custom_layouts[tplKey]._name = newName;
+    state.pdf_settings.custom_layouts[tplKey].description = newDesc;
+    state.pdf_settings.custom_layouts[tplKey]._description = newDesc;
     if (!state.pdf_settings.template_names) state.pdf_settings.template_names = {};
     state.pdf_settings.template_names[tplKey] = newName;
 
@@ -1415,7 +1431,7 @@ const DEFAULT_LAYOUTS = {
 // Слияние обновлений в конфиг блока шаблона (видовое окно и др.) с вкладки «Страницы»
 function updateBlockSlot(blockId, updates, targetTplKey) {
   ensureCustomLayouts();
-  const tplKey = targetTplKey || layoutState.currentTemplate || "cover";
+  const tplKey = targetTplKey || layoutState.currentTemplate || defaultTemplateKey();
   if (!state.pdf_settings.custom_layouts[tplKey]) {
     state.pdf_settings.custom_layouts[tplKey] = {};
   }
@@ -1434,38 +1450,11 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       if (!scene) return;
     }
 
-    const isVis = scene.viewport_visible !== false;
-    if (!isVis) {
-      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
-      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
-      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-      if (chkTpl) {
-        chkTpl.checked = false;
-        chkTpl.disabled = true;
-      }
-      const tplBadge = document.getElementById("tplAspectOverlayBadge");
-      if (tplBadge) tplBadge.classList.add("disabled-overlay");
-      if (isUserAction) {
-        callRuby("toggleAspectOverlay", false);
-      }
-      return;
-    }
-
     const VALID_ASPECT_RATIOS = ["page", "16:9", "4:3", "3:2", "5:4", "1:1", "4:5", "custom"];
     let ratio = overrideRatio || scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3";
     ratio = String(ratio).trim();
     if (!VALID_ASPECT_RATIOS.includes(ratio)) {
       ratio = "4:3";
-    }
-
-    const displayRatio = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
-    const tplText = document.getElementById("tplAspectOverlayText");
-    if (tplText) {
-      tplText.textContent = `📐 РАМКА: ${displayRatio}`;
-    }
-    const tplNote = document.querySelector(".tpl-image-note");
-    if (tplNote) {
-      tplNote.textContent = `Рамка в окне SketchUp отображает точные границы кадра для текущей страницы с выбранными пропорциями (${displayRatio}).`;
     }
 
     if (!isUserAction) return;
@@ -1474,27 +1463,18 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
     const baseWidth = getEffectiveRenderWidth();
 
-    const borderColor = state.pdf_settings?.overlay_border_color || "#0EA5E9";
-    const borderOpacity = state.pdf_settings?.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
-    const maskColor = state.pdf_settings?.overlay_mask_color || "#0F172A";
-    const maskOpacity = state.pdf_settings?.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
-
     const payload = {
       template_key: scene.page_type || "cover",
       scene_name: scene.name || "",
       scene_index: layoutState.selectedSceneIndex || 0,
       aspect_ratio: ratio,
       image_aspect_ratio: ratio,
-      visible: isVis,
+      visible: true,
       scale_pct: scene.scale_pct || 100,
       page_size: pageSize,
       page_layout: pageLayout,
       image_width: baseWidth,
-      show_aspect_overlay: true,
-      overlay_border_color: borderColor,
-      overlay_border_opacity: borderOpacity,
-      overlay_mask_color: maskColor,
-      overlay_mask_opacity: maskOpacity
+      show_aspect_overlay: scene.frame_overlay === true
     };
     callRuby("updateAspectSettings", JSON.stringify(payload));
   }
@@ -1508,23 +1488,14 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       return;
     }
 
-    const tplKey = layoutState.currentTemplate || "cover";
+    const tplKey = layoutState.currentTemplate || defaultTemplateKey();
     ensureCustomLayouts();
     const customLayouts = state.pdf_settings ? state.pdf_settings.custom_layouts || {} : {};
     const tplCfg = customLayouts[tplKey] || {};
     const imgCfg = tplCfg.image_4_3 || {};
 
-    const isVis = tplKey !== "blank" && isSlotVisible(imgCfg, true);
-    if (!isVis) {
+    if (!isSlotVisible(imgCfg, true)) {
       if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
-      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
-      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-      if (chkTpl) {
-        chkTpl.checked = false;
-        chkTpl.disabled = true;
-      }
-      const tplBadge = document.getElementById("tplAspectOverlayBadge");
-      if (tplBadge) tplBadge.classList.add("disabled-overlay");
       if (isUserAction) {
         callRuby("toggleAspectOverlay", false);
       }
@@ -1541,16 +1512,6 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       }
     }
 
-    const displayRatio = ratio.toLowerCase() === "page" ? "ПО ЛИСТУ" : ratio.toUpperCase();
-    const tplText = document.getElementById("tplAspectOverlayText");
-    if (tplText) {
-      tplText.textContent = `📐 РАМКА: ${displayRatio}`;
-    }
-    const tplNote = document.querySelector(".tpl-image-note");
-    if (tplNote) {
-      tplNote.textContent = `Рамка в окне SketchUp отображает точные границы кадра для текущего шаблона с выбранными пропорциями (${displayRatio}).`;
-    }
-
     // Отправка настроек в SketchUp происходит только при явном действии пользователя
     if (!isUserAction) {
       return;
@@ -1560,11 +1521,6 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
     const pageLayout = (els.selectPageLayout ? els.selectPageLayout.value : "landscape").toLowerCase();
     const baseWidth = getEffectiveRenderWidth();
 
-    const borderColor = state.pdf_settings?.overlay_border_color || "#0EA5E9";
-    const borderOpacity = state.pdf_settings?.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
-    const maskColor = state.pdf_settings?.overlay_mask_color || "#0F172A";
-    const maskOpacity = state.pdf_settings?.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
-
     const payload = {
       template_key: tplKey,
       aspect_ratio: ratio,
@@ -1573,11 +1529,7 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
       page_size: pageSize,
       page_layout: pageLayout,
       image_width: baseWidth,
-      show_aspect_overlay: true,
-      overlay_border_color: borderColor,
-      overlay_border_opacity: borderOpacity,
-      overlay_mask_color: maskColor,
-      overlay_mask_opacity: maskOpacity
+      show_aspect_overlay: true
     };
     callRuby("updateAspectSettings", JSON.stringify(payload));
   }
@@ -1588,14 +1540,14 @@ function updateBlockSlot(blockId, updates, targetTplKey) {
 
 function getTemplateParams(tplKey) {
   ensureCustomLayouts();
-  const key = tplKey || layoutState.currentTemplate || "cover";
+  const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
   const cfg = state.pdf_settings.custom_layouts[key] || {};
   return Array.isArray(cfg.params) ? cfg.params : [];
 }
 
 function setTemplateParams(params, tplKey) {
   ensureCustomLayouts();
-  const key = tplKey || layoutState.currentTemplate || "cover";
+  const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
   if (!state.pdf_settings.custom_layouts[key]) {
     state.pdf_settings.custom_layouts[key] = {};
   }
@@ -1608,7 +1560,7 @@ function setTemplateParams(params, tplKey) {
 // строки шаблона (зеркало normalize_line_settings! в project_data.rb).
 function getTemplateLineSettings(tplKey) {
   ensureCustomLayouts();
-  const key = tplKey || layoutState.currentTemplate || "cover";
+  const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
   const cfg = state.pdf_settings.custom_layouts[key] || {};
   const num = (v, def, min, max) => {
     const n = parseFloat(v);
@@ -1624,7 +1576,7 @@ function getTemplateLineSettings(tplKey) {
 
 function setTemplateLineSettings(tplKey, updates) {
   ensureCustomLayouts();
-  const key = tplKey || layoutState.currentTemplate || "cover";
+  const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
   if (!state.pdf_settings.custom_layouts[key]) {
     state.pdf_settings.custom_layouts[key] = {};
   }
@@ -1637,20 +1589,20 @@ function setTemplateLineSettings(tplKey, updates) {
   ensureCustomLayouts();
   syncDirectoriesSpecifications();
 
-  const tplKey = layoutState.currentTemplate || "cover";
+  const tplKey = layoutState.currentTemplate || (getAllTemplates()[0] ? getAllTemplates()[0].key : "");
   const tplDefObj = getTemplateDef(tplKey);
   const params = getTemplateParams(tplKey);
   const tplLine = getTemplateLineSettings(tplKey);
 
-  if (els.currentTemplateTitle) {
+  if (els.currentTemplateTitle && tplKey) {
     els.currentTemplateTitle.textContent = tplDefObj.name;
   }
-  const isCustom = !DEFAULT_LAYOUTS[tplKey];
+  // Все шаблоны равнозначны: удалить/переименовать можно любой
   if (els.btnDeleteCurrentTemplate) {
-    els.btnDeleteCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    els.btnDeleteCurrentTemplate.style.display = "inline-flex";
   }
   if (els.btnRenameCurrentTemplate) {
-    els.btnRenameCurrentTemplate.style.display = isCustom ? "inline-flex" : "none";
+    els.btnRenameCurrentTemplate.style.display = "inline-flex";
   }
 
   // Page format badge
@@ -2295,7 +2247,7 @@ function updateParamModalPreview() {
 }
 
   function openParamModal(mode, paramId, tplKey) {
-    paramModalState = { mode: mode, id: paramId || null, tplKey: tplKey || layoutState.currentTemplate || "cover" };
+    paramModalState = { mode: mode, id: paramId || null, tplKey: tplKey || layoutState.currentTemplate || defaultTemplateKey() };
     const modal = document.getElementById("paramModal");
     if (!modal) return;
 
@@ -2378,11 +2330,32 @@ function updateParamModalPreview() {
       });
     }
 
+    // Динамический список основ нового шаблона: текущие шаблоны + «Пустой шаблон»
+    function syncNewTemplateBaseSelect() {
+      if (!els.selectNewTemplateBase) return;
+      const prevVal = els.selectNewTemplateBase.value;
+      els.selectNewTemplateBase.innerHTML = "";
+      const emptyOpt = document.createElement("option");
+      emptyOpt.value = "empty";
+      emptyOpt.textContent = "Пустой шаблон — базовый видовой экран";
+      els.selectNewTemplateBase.appendChild(emptyOpt);
+      getAllTemplates().forEach((t) => {
+        const opt = document.createElement("option");
+        opt.value = t.key;
+        opt.textContent = t.name;
+        els.selectNewTemplateBase.appendChild(opt);
+      });
+      const hasPrev = Array.from(els.selectNewTemplateBase.options).some((o) => o.value === prevVal);
+      els.selectNewTemplateBase.value = hasPrev ? prevVal : "empty";
+    }
+
     // Modal and Template Management Buttons
     if (els.btnCreateTemplate) {
       els.btnCreateTemplate.addEventListener("click", () => {
         if (els.newTemplateModal) {
           if (els.inputNewTemplateName) els.inputNewTemplateName.value = "";
+          if (els.inputNewTemplateDescription) els.inputNewTemplateDescription.value = "";
+          syncNewTemplateBaseSelect();
           els.newTemplateModal.classList.remove("hidden");
           if (els.inputNewTemplateName) {
             setTimeout(() => els.inputNewTemplateName.focus(), 50);
@@ -2400,19 +2373,31 @@ function updateParamModalPreview() {
     if (els.btnConfirmNewTemplate) {
       els.btnConfirmNewTemplate.addEventListener("click", () => {
         const name = els.inputNewTemplateName ? els.inputNewTemplateName.value.trim() : "";
-        const baseType = els.selectNewTemplateBase ? els.selectNewTemplateBase.value : "general";
+        const baseType = els.selectNewTemplateBase ? els.selectNewTemplateBase.value : "empty";
+        const description = els.inputNewTemplateDescription ? els.inputNewTemplateDescription.value.trim() : "";
         if (!name) {
           showNotification("Введите название шаблона", "warning");
           if (els.inputNewTemplateName) els.inputNewTemplateName.focus();
           return;
         }
-        createCustomTemplate(name, baseType);
+        createCustomTemplate(name, baseType, description);
         if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
       });
     }
 
     if (els.inputNewTemplateName) {
       els.inputNewTemplateName.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          if (els.btnConfirmNewTemplate) els.btnConfirmNewTemplate.click();
+        } else if (e.key === "Escape") {
+          if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
+        }
+      });
+    }
+
+    if (els.inputNewTemplateDescription) {
+      els.inputNewTemplateDescription.addEventListener("keydown", (e) => {
         if (e.key === "Enter") {
           e.preventDefault();
           if (els.btnConfirmNewTemplate) els.btnConfirmNewTemplate.click();
@@ -2480,6 +2465,17 @@ function updateParamModalPreview() {
       });
     }
 
+    if (els.inputRenameTemplateDescription) {
+      els.inputRenameTemplateDescription.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          confirmRenameTemplate();
+        } else if (e.key === "Escape") {
+          closeRenameTemplateModal();
+        }
+      });
+    }
+
     // Margin input
     if (els.inputLayoutMargin) {
       els.inputLayoutMargin.addEventListener("change", (e) => {
@@ -2503,7 +2499,7 @@ function updateParamModalPreview() {
         const prevMeta = {};
         const curCfg = state.pdf_settings.custom_layouts[tplKey];
         if (curCfg) {
-          ["name", "_name", "_base_type", "_icon", "_meta"].forEach((k) => {
+          ["name", "_name", "description", "_description", "_base_type", "_icon", "_meta"].forEach((k) => {
             if (curCfg[k] !== undefined) prevMeta[k] = curCfg[k];
           });
         }
@@ -2880,7 +2876,6 @@ function updateParamModalPreview() {
     if (els.selectImageAspect) els.selectImageAspect.value = initialAspect;
     if (els.inputAspectCustomW) els.inputAspectCustomW.value = settings.custom_ratio_w || 16;
     if (els.inputAspectCustomH) els.inputAspectCustomH.value = settings.custom_ratio_h || 9;
-    if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = settings.show_aspect_overlay === true;
     updateAspectUI(false);
     if (els.selectQuality) {
       let qVal = settings.render_quality ? settings.render_quality.toString().toLowerCase().trim() : "";
@@ -2921,14 +2916,6 @@ function updateParamModalPreview() {
     if (els.inputStampColor) els.inputStampColor.value = sColor;
     if (els.stampColorHex) els.stampColorHex.textContent = sColor;
 
-    const obColor = settings.overlay_border_color ? (settings.overlay_border_color.startsWith("#") ? settings.overlay_border_color : `#${settings.overlay_border_color}`) : "#0EA5E9";
-    if (els.inputOverlayBorderColor) els.inputOverlayBorderColor.value = obColor;
-    if (els.overlayBorderColorHex) els.overlayBorderColorHex.textContent = obColor;
-
-    const omColor = settings.overlay_mask_color ? (settings.overlay_mask_color.startsWith("#") ? settings.overlay_mask_color : `#${settings.overlay_mask_color}`) : "#0F172A";
-    if (els.inputOverlayMaskColor) els.inputOverlayMaskColor.value = omColor;
-    if (els.overlayMaskColorHex) els.overlayMaskColorHex.textContent = omColor;
-
     if (els.chkAutoOpen) els.chkAutoOpen.checked = settings.auto_open_pdf !== false;
     if (els.chkSaveBackup) els.chkSaveBackup.checked = settings.save_skp_backup !== false;
     if (els.chkAntialias) els.chkAntialias.checked = settings.antialias !== false;
@@ -2942,7 +2929,7 @@ function updateParamModalPreview() {
     renderHistoryTable();
     renderDirectories();
     renderApiTargets();
-    selectTemplate(layoutState.currentTemplate || "cover");
+    selectTemplate(layoutState.currentTemplate || defaultTemplateKey());
     updateLayoutUsageBadge();
   }
 
@@ -3640,11 +3627,6 @@ function updateParamModalPreview() {
       }
     }
 
-    const renderH = Math.round(baseWidth / ratio);
-    if (els.aspectOverlayBadge) {
-      els.aspectOverlayBadge.textContent = `${label} • ${baseWidth} × ${renderH} px`;
-    }
-
     // Отправка обновленных настроек в SketchUp для оверлея ТОЛЬКО при явном действии пользователя
     if (isUserAction) {
       if (window.sketchup && typeof window.sketchup.updateAspectSettings === "function") {
@@ -3738,25 +3720,8 @@ function updateParamModalPreview() {
     });
     callRuby("selectScene", payload);
 
-    // Рендерим карточку видового экрана для выбранной страницы
-    renderSceneViewportCard(index);
-
-    // Если в выбранной странице выключен видовой экран, выключаем оверлей в GUI
-    const isVis = scene.viewport_visible !== false;
-    if (!isVis) {
-      if (state.pdf_settings) state.pdf_settings.show_aspect_overlay = false;
-      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = false;
-      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-      if (chkTpl) {
-        chkTpl.checked = false;
-        chkTpl.disabled = true;
-      }
-      const tplBadge = document.getElementById("tplAspectOverlayBadge");
-      if (tplBadge) tplBadge.classList.add("disabled-overlay");
-      callRuby("toggleAspectOverlay", false);
-    } else {
-      syncCurrentSceneOverlay(scene, null, true);
-    }
+    // Пересылаем параметры кадра выбранной страницы (рамка теперь постраничная)
+    syncCurrentSceneOverlay(scene, null, true);
   }
 
   // Highlight active scene row in table
@@ -3772,30 +3737,30 @@ function updateParamModalPreview() {
     });
   }
 
-  // Update per-scene controls state in scenes table row (aspect select, scale select, align button)
-  function updateSceneTableAspectCell(index, ratio, isVis) {
+  // Update frame menu button label in scenes table row
+  function updateSceneTableAspectCell(index, ratio) {
     if (!els.scenesTableBody) return;
     const row = els.scenesTableBody.querySelector(`tr[data-index="${index}"]`);
     if (!row) return;
-    const visible = isVis !== undefined ? isVis : true;
-    const sel = row.querySelector(".scene-aspect-select");
-    if (sel) {
+    const frameBtn = row.querySelector(".scene-frame-btn");
+    if (frameBtn) {
       const r = (ratio || "4:3").trim();
-      if (Array.from(sel.options).some((o) => o.value === r)) sel.value = r;
-      sel.disabled = !visible;
-      sel.classList.toggle("scene-ctrl-disabled", !visible);
-      sel.title = visible ? "Пропорции кадра для этой страницы" : "Видовой экран выключен";
+      const label = frameBtn.querySelector(".scene-frame-ratio");
+      if (label) label.textContent = r.toLowerCase() === "page" ? "По листу" : r;
     }
-    const selScale = row.querySelector(".scene-scale-select");
-    if (selScale) {
-      selScale.disabled = !visible;
-      selScale.classList.toggle("scene-ctrl-disabled", !visible);
-    }
-    const alignBtn = row.querySelector(".scene-align-btn");
-    if (alignBtn) {
-      alignBtn.disabled = !visible;
-      alignBtn.classList.toggle("scene-ctrl-disabled", !visible);
-    }
+  }
+
+  // Обновить индикаторы рамки кадра во всех строках таблицы (без перерендера таблицы)
+  function updateSceneTableFrameStates() {
+    if (!els.scenesTableBody) return;
+    const rows = els.scenesTableBody.querySelectorAll("tr");
+    rows.forEach((row) => {
+      const idx = parseInt(row.dataset.index, 10);
+      const scene = (state.scenes || [])[idx];
+      if (!scene) return;
+      const btn = row.querySelector(".scene-frame-btn");
+      if (btn) btn.classList.toggle("frame-on", scene.frame_overlay === true);
+    });
   }
 
   // -------------------------------------------------------------
@@ -3827,6 +3792,13 @@ function updateParamModalPreview() {
     if (pop) pop.remove();
     document.removeEventListener("click", closeSceneAlignPopover);
     document.removeEventListener("keydown", closeSceneAlignPopover);
+  }
+
+  function closeSceneFramePopover() {
+    const pop = document.getElementById("sceneFramePopover");
+    if (pop) pop.remove();
+    document.removeEventListener("click", closeSceneFramePopover);
+    document.removeEventListener("keydown", closeSceneFramePopover);
   }
 
   // Create mini page preview element for a scene (3:2 clean image, no blue lines)
@@ -3866,7 +3838,6 @@ function updateParamModalPreview() {
       selectTemplate(scene.page_type || "cover");
       highlightActiveSceneRow(index);
       switchToSketchupScene(scene, index);
-      renderSceneViewportCard(index);
     });
 
     wrap.appendChild(thumbBox);
@@ -3890,237 +3861,6 @@ function updateParamModalPreview() {
     });
   }
 
-  // -------------------------------------------------------------
-  // RENDER SCENE VIEWPORT & SAFE FRAME CARD (Настройка видового экрана выбранной страницы)
-  // -------------------------------------------------------------
-  function renderSceneViewportCard(sceneIndex) {
-    const container = document.getElementById("sceneViewportSection");
-    if (!container) return;
-
-    const scenes = state.scenes || [];
-    const idx = (sceneIndex !== undefined && sceneIndex >= 0 && sceneIndex < scenes.length)
-      ? sceneIndex
-      : (layoutState.selectedSceneIndex || 0);
-
-    const scene = scenes[idx];
-    if (!scene) {
-      container.innerHTML = `
-        <div class="scene-viewport-empty">
-          <span style="color: #64748b; font-size: 11px;">Выберите страницу в таблице выше для настройки видового экрана</span>
-        </div>
-      `;
-      return;
-    }
-
-    const isImageVis = scene.viewport_visible !== false;
-    const VALID_ASPECTS = ["3:2", "4:3", "5:4", "16:9", "1:1", "4:5", "page"];
-    let rawRatio = (scene.aspect_ratio || state.pdf_settings?.image_aspect_ratio || "4:3").trim();
-    const imageAspectRatio = VALID_ASPECTS.includes(rawRatio) ? rawRatio : "4:3";
-    const displayAspect = imageAspectRatio.toLowerCase() === "page" ? "ПО ЛИСТУ" : imageAspectRatio.toUpperCase();
-    const isOverlayOn = isImageVis && Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
-    const rawBorderColor = (state.pdf_settings && state.pdf_settings.overlay_border_color) || "#0EA5E9";
-    const overlayBorderColor = rawBorderColor.startsWith("#") ? rawBorderColor : `#${rawBorderColor}`;
-    const overlayBorderOpacity = state.pdf_settings && state.pdf_settings.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
-    const rawMaskColor = (state.pdf_settings && state.pdf_settings.overlay_mask_color) || "#0F172A";
-    const overlayMaskColor = rawMaskColor.startsWith("#") ? rawMaskColor : `#${rawMaskColor}`;
-    const rawMaskOpacity = state.pdf_settings && state.pdf_settings.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 70;
-    const MASK_PRESETS = [10, 40, 70, 90];
-    const overlayMaskOpacity = MASK_PRESETS.reduce((prev, curr) => Math.abs(curr - rawMaskOpacity) < Math.abs(prev - rawMaskOpacity) ? curr : prev, 70);
-    const safeSceneName = String(scene.name || `Сцена ${idx + 1}`).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;");
-
-    const cardImageHtml = `
-      <div class="tpl-card tpl-panel-left scene-viewport-card ${!isImageVis ? 'disabled-card disabled-block' : ''}" id="card_image">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon"><i class="modus-icons">insert_photo</i></span>
-            <span class="tpl-card-title">Картинка чертежа под текст (Видовой экран 3D) • Сцена ${idx + 1}: «${safeSceneName}»</span>
-          </div>
-          <div class="tpl-card-header-actions" style="display: flex; align-items: center; gap: 12px;">
-            <label class="tpl-overlay-toggle-btn ${isOverlayOn ? 'active' : ''} ${!isImageVis ? 'disabled-overlay' : ''}" id="tplAspectOverlayBadge" title="Отображать рамку кадра в окне SketchUp (Safe Frame Overlay)" style="margin: 0; cursor: pointer;">
-              <input type="checkbox" id="chk_tpl_aspect_overlay" ${isOverlayOn ? 'checked' : ''} ${!isImageVis ? 'disabled' : ''} style="display: none;">
-              <span id="tplAspectOverlayText">📐 Рамка: ${displayAspect}</span>
-            </label>
-            <label class="checkbox-label" style="font-size: 11px; font-weight: 700; cursor: pointer; margin: 0;">
-              <input type="checkbox" id="chk_image_4_3_visible" ${isImageVis ? 'checked' : ''}>
-              <span>Вкл</span>
-            </label>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-          <div class="tpl-overlay-styling-row">
-            <div class="tpl-overlay-style-item" title="Цвет контурной рамки в окне SketchUp">
-              <span class="tpl-overlay-style-label">Контур рамки:</span>
-              <div class="tpl-color-picker-wrap">
-                <input type="color" id="input_overlay_border_color" value="${overlayBorderColor}" class="tpl-color-picker">
-                <span class="tpl-color-hex" id="val_overlay_border_color">${overlayBorderColor}</span>
-              </div>
-            </div>
-
-            <div class="tpl-overlay-style-item" title="Степень затемнения вне кадра (10%, 40%, 70%, 90%)">
-              <span class="tpl-overlay-style-label">Затемнение:</span>
-              <div class="tpl-btn-group" id="grp_overlay_mask_opacity">
-                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 10 ? 'active' : ''}" data-opacity="10" title="Легкое затемнение 10%">10%</button>
-                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 40 ? 'active' : ''}" data-opacity="40" title="Умеренное затемнение 40%">40%</button>
-                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 70 ? 'active' : ''}" data-opacity="70" title="Стандартное затемнение 70%">70%</button>
-                <button type="button" class="tpl-btn-align btn-mask-opacity ${overlayMaskOpacity === 90 ? 'active' : ''}" data-opacity="90" title="Плотное затемнение 90%">90%</button>
-              </div>
-            </div>
-          </div>
-
-          <p class="tpl-image-note">
-            Рамка в окне SketchUp отображает точные границы кадра для текущей страницы с выбранными пропорциями (${displayAspect}).
-          </p>
-        </div>
-      </div>
-    `;
-
-    container.innerHTML = cardImageHtml;
-    bindSceneViewportEvents(scene, idx);
-  }
-
-  function bindSceneViewportEvents(scene, sceneIndex) {
-    if (!scene) return;
-
-    const chkVis = document.getElementById("chk_image_4_3_visible");
-    if (chkVis) {
-      chkVis.addEventListener("change", (e) => {
-        const isVis = e.target.checked;
-        scene.viewport_visible = isVis;
-        updateBlockSlot("image_4_3", { visible: isVis });
-
-        const card = document.getElementById("card_image");
-        if (card) {
-          card.classList.toggle("disabled-card", !isVis);
-          card.classList.toggle("disabled-block", !isVis);
-        }
-        const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-        const tplBadge = document.getElementById("tplAspectOverlayBadge");
-        if (!isVis) {
-          if (chkTpl) {
-            chkTpl.checked = false;
-            chkTpl.disabled = true;
-          }
-          if (tplBadge) {
-            tplBadge.classList.add("disabled-overlay");
-          }
-          if (state.pdf_settings) {
-            state.pdf_settings.show_aspect_overlay = false;
-          }
-          if (els.chkShowAspectOverlay) {
-            els.chkShowAspectOverlay.checked = false;
-          }
-          callRuby("toggleAspectOverlay", false);
-        } else {
-          if (chkTpl) chkTpl.disabled = false;
-          syncCurrentSceneOverlay(scene, null, true);
-        }
-        updateSceneTableAspectCell(sceneIndex, scene.aspect_ratio, isVis);
-        notifyChange();
-      });
-    }
-
-    const chkOverlay = document.getElementById("chk_tpl_aspect_overlay");
-    if (chkOverlay) {
-      chkOverlay.addEventListener("change", (e) => {
-        const isChecked = e.target.checked;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.show_aspect_overlay = isChecked;
-        if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = isChecked;
-        const tplBadge = document.getElementById("tplAspectOverlayBadge");
-        if (tplBadge) {
-          tplBadge.classList.toggle("active", isChecked);
-          tplBadge.classList.toggle("disabled-overlay", !isChecked);
-        }
-        callRuby("toggleAspectOverlay", isChecked);
-        if (isChecked) {
-          syncCurrentSceneOverlay(scene, null, true);
-        }
-        notifyChange();
-      });
-    }
-
-    const inpBorderColor = document.getElementById("input_overlay_border_color");
-    if (inpBorderColor) {
-      const onBorderColorChange = (e) => {
-        const val = e.target.value.toUpperCase();
-        const lbl = document.getElementById("val_overlay_border_color");
-        if (lbl) lbl.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_border_color = val;
-        if (els.inputOverlayBorderColor) els.inputOverlayBorderColor.value = val;
-        if (els.overlayBorderColorHex) els.overlayBorderColorHex.textContent = val;
-        syncCurrentSceneOverlay(scene, null, true);
-        notifyChange();
-      };
-      inpBorderColor.addEventListener("input", onBorderColorChange);
-      inpBorderColor.addEventListener("change", onBorderColorChange);
-    }
-
-    const grpMaskOpacity = document.getElementById("grp_overlay_mask_opacity");
-    if (grpMaskOpacity) {
-      grpMaskOpacity.querySelectorAll(".btn-mask-opacity").forEach((btn) => {
-        btn.addEventListener("click", () => {
-          grpMaskOpacity.querySelectorAll(".btn-mask-opacity").forEach((b) => b.classList.remove("active"));
-          btn.classList.add("active");
-          const opacity = parseInt(btn.dataset.opacity, 10) || 70;
-          if (!state.pdf_settings) state.pdf_settings = {};
-          state.pdf_settings.overlay_mask_opacity = opacity;
-          if (els.inputOverlayMaskOpacity) els.inputOverlayMaskOpacity.value = opacity;
-          if (els.overlayMaskOpacityVal) els.overlayMaskOpacityVal.textContent = `${opacity}%`;
-          syncCurrentSceneOverlay(scene, null, true);
-          notifyChange();
-        });
-      });
-    }
-
-    const inpBorderOpacity = document.getElementById("input_overlay_border_opacity");
-    if (inpBorderOpacity) {
-      const onBorderOpacityChange = (e) => {
-        const val = parseInt(e.target.value, 10) || 100;
-        const lbl = document.getElementById("val_overlay_border_opacity");
-        if (lbl) lbl.textContent = `${val}%`;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_border_opacity = val;
-        syncCurrentSceneOverlay(scene, null, true);
-        notifyChange();
-      };
-      inpBorderOpacity.addEventListener("input", onBorderOpacityChange);
-      inpBorderOpacity.addEventListener("change", onBorderOpacityChange);
-    }
-
-    const inpMaskColor = document.getElementById("input_overlay_mask_color");
-    if (inpMaskColor) {
-      const onMaskColorChange = (e) => {
-        const val = e.target.value.toUpperCase();
-        const lbl = document.getElementById("val_overlay_mask_color");
-        if (lbl) lbl.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_mask_color = val;
-        if (els.inputOverlayMaskColor) els.inputOverlayMaskColor.value = val;
-        if (els.overlayMaskColorHex) els.overlayMaskColorHex.textContent = val;
-        syncCurrentSceneOverlay(scene, null, true);
-        notifyChange();
-      };
-      inpMaskColor.addEventListener("input", onMaskColorChange);
-      inpMaskColor.addEventListener("change", onMaskColorChange);
-    }
-
-    const inpMaskOpacity = document.getElementById("input_overlay_mask_opacity");
-    if (inpMaskOpacity) {
-      const onMaskOpacityChange = (e) => {
-        const val = parseInt(e.target.value, 10) || 80;
-        const lbl = document.getElementById("val_overlay_mask_opacity");
-        if (lbl) lbl.textContent = `${val}%`;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_mask_opacity = val;
-        syncCurrentSceneOverlay(scene, null, true);
-        notifyChange();
-      };
-      inpMaskOpacity.addEventListener("input", onMaskOpacityChange);
-      inpMaskOpacity.addEventListener("change", onMaskOpacityChange);
-    }
-  }
-
   // Render Scenes Table
   function renderScenesTable() {
     els.scenesTableBody.innerHTML = "";
@@ -4130,6 +3870,11 @@ function updateParamModalPreview() {
     // Синхронизация глобальной галки фона в тулбаре со состоянием сцен
     if (els.chkScenesBackground) {
       els.chkScenesBackground.checked = scenes.some((s) => s.viewport_background === true);
+    }
+
+    // «Кадр все» отмечен, когда рамка включена на всех страницах
+    if (els.chkScenesFrameAll) {
+      els.chkScenesFrameAll.checked = scenes.length > 0 && scenes.every((s) => s.frame_overlay === true);
     }
 
     scenes.forEach((scene, index) => {
@@ -4212,7 +3957,6 @@ function updateParamModalPreview() {
         e.target.value = scene.name;
         renderTemplateSettingsList();
         updateLayoutUsageBadge();
-        renderSceneViewportCard(index);
         notifyChange();
       });
       inputName.addEventListener("keydown", (e) => {
@@ -4250,40 +3994,115 @@ function updateParamModalPreview() {
       infoWrap.appendChild(inputDesc);
       tdInfo.appendChild(infoWrap);
 
-      // 4. Aspect Ratio Cell (Кадр) — постраничные пропорции
+      // 4. Frame Cell (Кадр) — постраничные пропорции и рамка кадра (меню)
       const tdAspect = document.createElement("td");
       tdAspect.className = "scene-aspect-cell";
-      const isVpVis = scene.viewport_visible !== false;
       const ASPECT_OPTIONS = [["3:2", "3:2"], ["4:3", "4:3"], ["5:4", "5:4"], ["16:9", "16:9"], ["1:1", "1:1"], ["4:5", "4:5"], ["page", "По листу"]];
-      const selAspect = document.createElement("select");
-      selAspect.className = "table-select scene-aspect-select";
-      ASPECT_OPTIONS.forEach(([val, label]) => {
-        const opt = document.createElement("option");
-        opt.value = val;
-        opt.textContent = label;
-        selAspect.appendChild(opt);
-      });
       const curRatio = (scene.aspect_ratio || "4:3").trim();
-      selAspect.value = ASPECT_OPTIONS.some(([val]) => val === curRatio) ? curRatio : "4:3";
-      selAspect.disabled = !isVpVis;
-      if (!isVpVis) selAspect.classList.add("scene-ctrl-disabled");
-      selAspect.title = isVpVis ? "Пропорции кадра для этой страницы" : "Видовой экран выключен";
-      selAspect.addEventListener("focus", () => {
+      const sceneRatio = ASPECT_OPTIONS.some(([val]) => val === curRatio) ? curRatio : "4:3";
+      const ratioLabel = (val) => (String(val).toLowerCase() === "page" ? "По листу" : val);
+
+      const frameBtn = document.createElement("button");
+      frameBtn.type = "button";
+      frameBtn.className = "scene-frame-btn" + (scene.frame_overlay === true ? " frame-on" : "");
+      frameBtn.innerHTML =
+        `<span class="scene-frame-ratio">${ratioLabel(sceneRatio)}</span>` +
+        `<span class="scene-frame-dot"></span>` +
+        `<i class="modus-icons scene-frame-caret">expand_more</i>`;
+      frameBtn.title = "Пропорции кадра и рамка для этой страницы";
+      frameBtn.addEventListener("focus", () => {
         layoutState.selectedSceneIndex = index;
         highlightActiveSceneRow(index);
         switchToSketchupScene(scene, index);
       });
-      selAspect.addEventListener("change", (e) => {
-        const ratio = e.target.value;
-        scene.aspect_ratio = ratio;
-        updateBlockSlot("image_4_3", { aspect_ratio: ratio });
-        if (layoutState.selectedSceneIndex === index) {
-          syncCurrentSceneOverlay(scene, ratio, true);
+      frameBtn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+
+        const existing = document.getElementById("sceneFramePopover");
+        if (existing) {
+          closeSceneFramePopover();
+          return;
         }
-        notifyChange();
+        const pop = document.createElement("div");
+        pop.id = "sceneFramePopover";
+        pop.className = "scene-frame-pop";
+        pop.addEventListener("click", (ev) => ev.stopPropagation());
+
+        // Рамка кадра — постраничный флаг отображения Safe Frame Overlay в окне SketchUp
+        const frameRow = document.createElement("label");
+        frameRow.className = "scene-frame-check-row";
+        frameRow.title = "Показывать рамку кадра в окне SketchUp для этой страницы";
+        frameRow.innerHTML = `<span>📐 Рамка кадра</span>`;
+        const frameChk = document.createElement("input");
+        frameChk.type = "checkbox";
+        frameChk.checked = scene.frame_overlay === true;
+        frameChk.addEventListener("change", (ev) => {
+          const on = ev.target.checked;
+          scene.frame_overlay = on;
+          frameBtn.classList.toggle("frame-on", on);
+          callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, scene_index: index }));
+          if (on && layoutState.selectedSceneIndex === index) {
+            syncCurrentSceneOverlay(scene, null, true);
+          }
+          notifyChange();
+        });
+        frameRow.appendChild(frameChk);
+        pop.appendChild(frameRow);
+
+        // Пропорции кадра
+        const ratioTitle = document.createElement("div");
+        ratioTitle.className = "scene-frame-pop-title";
+        ratioTitle.textContent = "Пропорции кадра";
+        pop.appendChild(ratioTitle);
+
+        const ratioGrid = document.createElement("div");
+        ratioGrid.className = "scene-frame-ratio-grid";
+        ASPECT_OPTIONS.forEach(([val, label]) => {
+          const optBtn = document.createElement("button");
+          optBtn.type = "button";
+          optBtn.className = "scene-frame-ratio-opt" + (val === sceneRatio ? " active" : "");
+          optBtn.textContent = label;
+          optBtn.title = `Пропорции кадра ${label}`;
+          optBtn.addEventListener("click", (ev) => {
+            ev.stopPropagation();
+            // Пропорции — персональная настройка страницы (scene.aspect_ratio);
+            // в блок шаблона не пишем, чтобы не менять другие страницы шаблона
+            scene.aspect_ratio = val;
+            const labelSpan = frameBtn.querySelector(".scene-frame-ratio");
+            if (labelSpan) labelSpan.textContent = ratioLabel(val);
+            pop.querySelectorAll(".scene-frame-ratio-opt").forEach((b) => b.classList.toggle("active", b === optBtn));
+            if (layoutState.selectedSceneIndex === index) {
+              syncCurrentSceneOverlay(scene, val, true);
+            }
+            notifyChange();
+            closeSceneFramePopover();
+          });
+          ratioGrid.appendChild(optBtn);
+        });
+        pop.appendChild(ratioGrid);
+
+        pop.style.position = "fixed";
+        document.body.appendChild(pop);
+        const btnRect = frameBtn.getBoundingClientRect();
+        const popRect = pop.getBoundingClientRect();
+        pop.style.left = `${Math.round(btnRect.left + btnRect.width / 2)}px`;
+        pop.style.transform = "translateX(-50%)";
+        const spaceBelow = window.innerHeight - btnRect.bottom;
+        if (spaceBelow < popRect.height + 8) {
+          pop.style.top = `${Math.round(btnRect.top)}px`;
+          pop.style.transform = "translate(-50%, -100%)";
+        } else {
+          pop.style.top = `${Math.round(btnRect.bottom + 4)}px`;
+        }
+        setTimeout(() => {
+          document.addEventListener("click", closeSceneFramePopover, { once: true });
+          document.addEventListener("keydown", closeSceneFramePopover, { once: true });
+        }, 0);
       });
-      selAspect.addEventListener("click", (e) => e.stopPropagation());
-      tdAspect.appendChild(selAspect);
+      tdAspect.appendChild(frameBtn);
 
       // 5. Scale Cell (Масштаб) — постраничное размещение на листе
       const tdScale = document.createElement("td");
@@ -4298,8 +4117,6 @@ function updateParamModalPreview() {
         selScale.appendChild(opt);
       });
       selScale.value = String(parseInt(scene.scale_pct, 10) || 100);
-      selScale.disabled = !isVpVis;
-      if (!isVpVis) selScale.classList.add("scene-ctrl-disabled");
       selScale.addEventListener("focus", () => {
         layoutState.selectedSceneIndex = index;
         highlightActiveSceneRow(index);
@@ -4327,10 +4144,6 @@ function updateParamModalPreview() {
       const sceneAlignV = SCENE_ALIGN_V.includes(scene.align_v) ? scene.align_v : "center";
       alignBtn.textContent = alignGlyph(sceneAlignH, sceneAlignV);
       alignBtn.title = `Выравнивание эскиза: ${sceneAlignTitle(sceneAlignH, sceneAlignV)}`;
-      if (!isVpVis) {
-        alignBtn.disabled = true;
-        alignBtn.classList.add("scene-ctrl-disabled");
-      }
       alignBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         const existing = document.getElementById("sceneAlignPopover");
@@ -4395,7 +4208,8 @@ function updateParamModalPreview() {
       allTemplates.forEach((t) => {
         const opt = document.createElement("option");
         opt.value = t.key;
-        opt.textContent = t.name;
+        opt.textContent = t.name; // в списке страниц — только имя шаблона
+        if (t.description) opt.title = t.description; // описание — в подсказке при наведении
         if (scene.page_type === t.key) opt.selected = true;
         selType.appendChild(opt);
       });
@@ -4405,6 +4219,11 @@ function updateParamModalPreview() {
         opt.textContent = scene.page_type;
         opt.selected = true;
         selType.appendChild(opt);
+      }
+      // Подсказка на закрытом селекте — описание выбранного шаблона
+      const selectedTpl = allTemplates.find((t) => t.key === scene.page_type) || allTemplates[0];
+      if (selectedTpl && selectedTpl.description) {
+        selType.title = selectedTpl.description;
       }
       selType.addEventListener("focus", () => {
         layoutState.selectedSceneIndex = index;
@@ -4436,7 +4255,7 @@ function updateParamModalPreview() {
       btnEditTpl.addEventListener("click", (e) => {
         e.stopPropagation();
         layoutState.selectedSceneIndex = index;
-        selectTemplate(scene.page_type || "cover");
+        selectTemplate(scene.page_type || (allTemplates[0] ? allTemplates[0].key : ""));
         highlightActiveSceneRow(index);
         switchToSketchupScene(scene, index);
         switchToTab("tab-templates");
@@ -4547,7 +4366,6 @@ function updateParamModalPreview() {
     });
 
     updateLayoutUsageBadge();
-    renderSceneViewportCard(layoutState.selectedSceneIndex || 0);
 
     // Trigger thumbnail generation from SketchUp if not done yet
     if (!requestedSceneThumbnails && window.sketchup && typeof window.sketchup.getSceneThumbnails === "function") {
@@ -4936,33 +4754,11 @@ function updateParamModalPreview() {
       image_aspect_ratio: els.selectImageAspect ? els.selectImageAspect.value : (state.pdf_settings?.image_aspect_ratio || "4:3"),
       custom_ratio_w: els.inputAspectCustomW ? parseFloat(els.inputAspectCustomW.value) || 16 : 16,
       custom_ratio_h: els.inputAspectCustomH ? parseFloat(els.inputAspectCustomH.value) || 9 : 9,
-      show_aspect_overlay: (function() {
-        const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-        if (chkTpl) return chkTpl.checked;
-        return Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay);
-      })(),
-      overlay_border_color: (function() {
-        const inpTpl = document.getElementById("input_overlay_border_color");
-        if (inpTpl && inpTpl.value) return inpTpl.value;
-        if (els.inputOverlayBorderColor && els.inputOverlayBorderColor.value) return els.inputOverlayBorderColor.value;
-        return state.pdf_settings?.overlay_border_color || "#0EA5E9";
-      })(),
-      overlay_border_opacity: (function() {
-        const inpTpl = document.getElementById("input_overlay_border_opacity");
-        if (inpTpl && inpTpl.value !== "") return parseInt(inpTpl.value, 10) || 100;
-        return state.pdf_settings?.overlay_border_opacity !== undefined ? parseInt(state.pdf_settings.overlay_border_opacity, 10) : 100;
-      })(),
-      overlay_mask_color: (function() {
-        const inpTpl = document.getElementById("input_overlay_mask_color");
-        if (inpTpl && inpTpl.value) return inpTpl.value;
-        if (els.inputOverlayMaskColor && els.inputOverlayMaskColor.value) return els.inputOverlayMaskColor.value;
-        return state.pdf_settings?.overlay_mask_color || "#0F172A";
-      })(),
-      overlay_mask_opacity: (function() {
-        const inpTpl = document.getElementById("input_overlay_mask_opacity");
-        if (inpTpl && inpTpl.value !== "") return parseInt(inpTpl.value, 10) || 55;
-        return state.pdf_settings?.overlay_mask_opacity !== undefined ? parseInt(state.pdf_settings.overlay_mask_opacity, 10) : 55;
-      })(),
+      show_aspect_overlay: Boolean(state.pdf_settings && state.pdf_settings.show_aspect_overlay),
+      overlay_border_color: state.pdf_settings?.overlay_border_color || "#FF0000",
+      overlay_border_opacity: state.pdf_settings?.overlay_border_opacity !== undefined ? state.pdf_settings.overlay_border_opacity : 100,
+      overlay_mask_color: state.pdf_settings?.overlay_mask_color || "#0F172A",
+      overlay_mask_opacity: state.pdf_settings?.overlay_mask_opacity !== undefined ? state.pdf_settings.overlay_mask_opacity : 10,
       render_quality: els.selectQuality ? els.selectQuality.value : (state.pdf_settings?.render_quality || "medium"),
       image_width: getEffectiveRenderWidth(),
       scale_multiplier: els.selectScaleMultiplier ? els.selectScaleMultiplier.value : (state.pdf_settings?.scale_multiplier || "2.0"),
@@ -5143,13 +4939,6 @@ function updateParamModalPreview() {
     if (els.selectLayoutRenderMode) {
       els.selectLayoutRenderMode.addEventListener("change", () => updateAspectUI(true));
     }
-    if (els.chkShowAspectOverlay) {
-      els.chkShowAspectOverlay.addEventListener("change", (e) => {
-        if (window.sketchup && typeof window.sketchup.toggleAspectOverlay === "function") {
-          callRuby("toggleAspectOverlay", e.target.checked);
-        }
-      });
-    }
 
     const handleMarginChange = (val) => {
       const num = Math.max(0, Math.min(100, parseFloat(val) || 0));
@@ -5235,40 +5024,6 @@ function updateParamModalPreview() {
       });
     }
 
-    if (els.inputOverlayBorderColor) {
-      const handleOverlayBorderColor = (e) => {
-        const val = e.target.value.toUpperCase();
-        if (els.overlayBorderColorHex) els.overlayBorderColorHex.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_border_color = val;
-        const inpTpl = document.getElementById("input_overlay_border_color");
-        if (inpTpl) inpTpl.value = val;
-        const lblTpl = document.getElementById("val_overlay_border_color");
-        if (lblTpl) lblTpl.textContent = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      els.inputOverlayBorderColor.addEventListener("input", handleOverlayBorderColor);
-      els.inputOverlayBorderColor.addEventListener("change", handleOverlayBorderColor);
-    }
-
-    if (els.inputOverlayMaskColor) {
-      const handleOverlayMaskColor = (e) => {
-        const val = e.target.value.toUpperCase();
-        if (els.overlayMaskColorHex) els.overlayMaskColorHex.textContent = val;
-        if (!state.pdf_settings) state.pdf_settings = {};
-        state.pdf_settings.overlay_mask_color = val;
-        const inpTpl = document.getElementById("input_overlay_mask_color");
-        if (inpTpl) inpTpl.value = val;
-        const lblTpl = document.getElementById("val_overlay_mask_color");
-        if (lblTpl) lblTpl.textContent = val;
-        syncCurrentTemplateOverlay();
-        notifyChange();
-      };
-      els.inputOverlayMaskColor.addEventListener("input", handleOverlayMaskColor);
-      els.inputOverlayMaskColor.addEventListener("change", handleOverlayMaskColor);
-    }
-
     // Quick Scene Selection
     els.btnSelectAllScenes.addEventListener("click", () => {
       state.scenes.forEach((s) => (s.enabled = true));
@@ -5314,6 +5069,17 @@ function updateParamModalPreview() {
         (state.scenes || []).forEach((s) => { s.viewport_background = bgOn; });
         updateBlockSlot("image_4_3", { show_background: bgOn });
         requestSceneThumbnails(true);
+        notifyChange();
+      });
+    }
+
+    // «Кадр все»: массовое включение/выключение рамки кадра сразу на всех страницах
+    if (els.chkScenesFrameAll) {
+      els.chkScenesFrameAll.addEventListener("change", (e) => {
+        const on = e.target.checked;
+        (state.scenes || []).forEach((s) => { s.frame_overlay = on; });
+        updateSceneTableFrameStates();
+        callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, all: true }));
         notifyChange();
       });
     }
@@ -5716,6 +5482,11 @@ function updateParamModalPreview() {
         if (inputDev && !inputDev.value) inputDev.value = data.dev_dir;
       }
       ensureCustomLayouts();
+      // Если выбранный шаблон удалён (или список пуст) — выбираем первый доступный
+      const tplKeys = Object.keys(state.pdf_settings?.custom_layouts || {});
+      if (!tplKeys.includes(layoutState.currentTemplate)) {
+        layoutState.currentTemplate = tplKeys[0] || "";
+      }
       syncDirectoriesSpecifications();
       renderUI();
       // Если диалог уже открыт на вкладке «Страницы», актуализируем
@@ -5834,33 +5605,11 @@ function updateParamModalPreview() {
     syncOverlayState: function (isActive) {
       if (!state.pdf_settings) state.pdf_settings = {};
       state.pdf_settings.show_aspect_overlay = Boolean(isActive);
-      if (els.chkShowAspectOverlay) {
-        els.chkShowAspectOverlay.checked = Boolean(isActive);
-      }
-      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-      if (chkTpl) {
-        chkTpl.checked = Boolean(isActive);
-      }
-      const tplBadge = document.getElementById("tplAspectOverlayBadge");
-      if (tplBadge) {
-        tplBadge.classList.toggle("disabled-overlay", !isActive);
-      }
     },
 
     updateAspectInfo: function (info) {
-      if (els.aspectOverlayBadge && info) {
-        els.aspectOverlayBadge.textContent = `${info.label} • ${info.render_w} × ${info.render_h} px`;
-      }
-      const tplText = document.getElementById("tplAspectOverlayText");
-      if (tplText && info) {
-        const displayLabel = info.label ? (info.label === "page" ? "ПО ЛИСТУ" : info.label.toUpperCase()) : "";
-        tplText.textContent = `📐 РАМКА: ${displayLabel}`;
-      }
-      const tplNote = document.querySelector(".tpl-image-note");
-      if (tplNote && info) {
-        const displayLabel = info.label ? (info.label === "page" ? "по листу" : info.label) : "";
-        tplNote.textContent = `Рамка в окне SketchUp отображает точные границы кадра для текущего шаблона с выбранными пропорциями (${displayLabel}).`;
-      }
+      // Параметры кадра отображаются в меню кадра таблицы страниц —
+      // отдельных бейджей и подписей в диалоге больше нет
     },
 
     setAspectRatio: function (ratio) {
@@ -5872,19 +5621,12 @@ function updateParamModalPreview() {
       const scene = (state.scenes || [])[idx];
       if (scene) {
         scene.aspect_ratio = ratio;
-        updateSceneTableAspectCell(idx, ratio, scene.viewport_visible !== false);
+        updateSceneTableAspectCell(idx, ratio);
       }
       updateBlockSlot("image_4_3", { aspect_ratio: ratio });
       if (!state.pdf_settings) state.pdf_settings = {};
-      state.pdf_settings.show_aspect_overlay = true;
       state.pdf_settings.image_aspect_ratio = ratio;
       if (els.selectImageAspect) els.selectImageAspect.value = ratio;
-      if (els.chkShowAspectOverlay) els.chkShowAspectOverlay.checked = true;
-      const chkTpl = document.getElementById("chk_tpl_aspect_overlay");
-      if (chkTpl) chkTpl.checked = true;
-      const tplBadge = document.getElementById("tplAspectOverlayBadge");
-      if (tplBadge) tplBadge.classList.remove("disabled-overlay");
-      callRuby("toggleAspectOverlay", true);
       syncCurrentTemplateOverlay(ratio, true);
       notifyChange();
     },

@@ -191,6 +191,7 @@ class TestRunner
     test_58_line_scale_multiplier
     test_59_line_thickness_parameters_from_style
     test_viewport_background_toggle
+    test_60a_per_page_aspect_ratio_snapshot
     test_60_line_multiplier_consistent_across_all_render_modes
     test_61_page_formats_a4_a3_and_quality_levels
     test_62_auto_scale_font_size_reduction_30_pct
@@ -1588,35 +1589,37 @@ class TestRunner
     app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
     app_js_content = File.read(app_js_path, encoding: "utf-8")
 
-    # 1. Проверка карточки картинки в UI шаблонов (app.js)
-    assert(app_js_content.include?('id="card_image"'), "app.js содержит карточку card_image для картинки чертежа")
-    assert(app_js_content.include?('id="chk_image_4_3_visible"'), "app.js содержит чекбокс включения картинки chk_image_4_3_visible")
-    assert(app_js_content.include?("Картинка чертежа под текст"), "app.js содержит заголовок 'Картинка чертежа под текст'")
+    # 1. Проверка постраничного меню кадра в таблице страниц (app.js)
+    assert(app_js_content.include?("scene-frame-btn"), "app.js содержит кнопку меню кадра scene-frame-btn")
+    assert(app_js_content.include?("sceneFramePopover"), "app.js открывает поповер меню кадра sceneFramePopover")
 
-    # 2. Проверка кнопок пропорций (3:2, 4:3, 16:9)
-    assert(app_js_content.include?('id="grp_image_aspect_ratio"'), "app.js содержит группу кнопок пропорций grp_image_aspect_ratio")
-    assert(app_js_content.include?('data-ratio="3:2"'), "app.js содержит кнопку выбора пропорции 3:2")
-    assert(app_js_content.include?('data-ratio="4:3"'), "app.js содержит кнопку выбора пропорции 4:3")
-    assert(app_js_content.include?('data-ratio="16:9"'), "app.js содержит кнопку выбора пропорции 16:9")
+    # 2. Проверка пропорций в меню кадра (3:2, 4:3, 5:4, 16:9, 1:1, 4:5, По листу)
+    assert(app_js_content.include?('["3:2", "3:2"]'), "меню кадра содержит пропорцию 3:2")
+    assert(app_js_content.include?('["4:3", "4:3"]'), "меню кадра содержит пропорцию 4:3")
+    assert(app_js_content.include?('["5:4", "5:4"]'), "меню кадра содержит пропорцию 5:4")
+    assert(app_js_content.include?('["16:9", "16:9"]'), "меню кадра содержит пропорцию 16:9")
+    assert(app_js_content.include?('["1:1", "1:1"]'), "меню кадра содержит пропорцию 1:1")
+    assert(app_js_content.include?('["4:5", "4:5"]'), "меню кадра содержит пропорцию 4:5")
+    assert(app_js_content.include?('["page", "По листу"]'), "меню кадра содержит пропорцию 'По листу'")
 
-    # 3. Проверка кнопок размещения на странице (60%, 70%, 80%, 90%, 100%)
-    assert(app_js_content.include?('id="grp_image_scale_pct"'), "app.js содержит группу кнопок масштаба grp_image_scale_pct")
-    assert(app_js_content.include?('data-scale="60"'), "app.js содержит кнопку масштаба 60%")
-    assert(app_js_content.include?('data-scale="70"'), "app.js содержит кнопку масштаба 70%")
-    assert(app_js_content.include?('data-scale="80"'), "app.js содержит кнопку масштаба 80%")
-    assert(app_js_content.include?('data-scale="90"'), "app.js содержит кнопку масштаба 90%")
-    assert(app_js_content.include?('data-scale="100"'), "app.js содержит кнопку масштаба 100%")
+    # 3. Проверка масштаба страницы (60-100%)
+    assert(app_js_content.include?("[60, 70, 80, 90, 100]"), "масштаб страницы выбирается из 60-100%")
 
-    # 4. Проверка обработчиков кликов и автосохранения
-    assert(app_js_content.include?("updateBlockSlot(\"image_4_3\", { aspect_ratio: ratio })"), "app.js обновляет aspect_ratio при смене пропорции")
-    assert(app_js_content.include?("updateBlockSlot(\"image_4_3\", { scale_pct: scale })"), "app.js обновляет scale_pct при смене масштаба")
+    # 4. Проверка обработчиков кликов и автосохранения.
+    # Пропорции страницы персональные: сохраняются в scene.aspect_ratio и НЕ
+    # перезаписывают блок image_4_3 шаблона (иначе страницы шаблона получали
+    # пропорции первой отредактированной страницы)
+    assert(app_js_content.include?("scene.aspect_ratio = val;"), "app.js сохраняет пропорцию в настройках страницы (scene.aspect_ratio)")
+    assert(!app_js_content.include?('updateBlockSlot("image_4_3", { aspect_ratio: val })'),
+           "app.js не синхронизирует пропорцию страницы в блок шаблона (постраничные пропорции независимы)")
+    assert(app_js_content.include?('updateBlockSlot("image_4_3", { scale_pct: scale })'), "app.js обновляет scale_pct при смене масштаба")
 
     # 5. Проверка стилей в app.css
     app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
     app_css_content = File.read(app_css_path, encoding: "utf-8")
-    assert(app_css_content.include?("#card_image"), "app.css содержит стили для #card_image")
-    assert(app_css_content.include?(".tpl-image-controls-row"), "app.css содержит стиль .tpl-image-controls-row")
-    assert(app_css_content.include?(".tpl-image-note"), "app.css содержит стиль .tpl-image-note")
+    assert(app_css_content.include?(".scene-frame-btn"), "app.css содержит стиль кнопки меню кадра .scene-frame-btn")
+    assert(app_css_content.include?(".scene-frame-pop"), "app.css содержит стиль поповера меню кадра .scene-frame-pop")
+    assert(app_css_content.include?(".scene-frame-ratio-opt"), "app.css содержит стиль вариантов пропорций .scene-frame-ratio-opt")
 
     # 6. Проверка значений по умолчанию в ProjectData
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2085,17 +2088,17 @@ class TestRunner
     # 8. Проверка JS логики
     js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
     assert(js_text.include?("selectImageAspect"), "app.js содержит selectImageAspect")
-    assert(js_text.include?("chkShowAspectOverlay"), "app.js содержит chkShowAspectOverlay")
+    assert(js_text.include?("chkScenesFrameAll"), "app.js содержит массовый тумблер chkScenesFrameAll")
     assert(js_text.include?("function updateAspectUI"), "app.js содержит function updateAspectUI")
     assert(js_text.include?("syncOverlayState"), "app.js содержит syncOverlayState")
     assert(js_text.include?("updateAspectInfo"), "app.js содержит updateAspectInfo")
-    assert(js_text.include?("callRuby(\"toggleAspectOverlay\""), "app.js отправляет toggleAspectOverlay в SketchUp")
+    assert(js_text.include?('callRuby("toggleAspectOverlay"'), "app.js отправляет toggleAspectOverlay в SketchUp")
 
     # 9. Проверка CSS стилей
     css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
-    assert(css_text.include?(".aspect-overlay-card"), "app.css содержит стили .aspect-overlay-card")
-    assert(css_text.include?(".aspect-custom-inputs"), "app.css содержит стили .aspect-custom-inputs")
-    assert(css_text.include?("#aspectOverlayBadge"), "app.css содержит стили #aspectOverlayBadge")
+    assert(css_text.include?(".scene-frame-btn"), "app.css содержит стили кнопки меню кадра .scene-frame-btn")
+    assert(css_text.include?(".scene-frame-pop"), "app.css содержит стили поповера меню кадра .scene-frame-pop")
+    assert(css_text.include?(".scene-frame-dot"), "app.css содержит стили индикатора рамки .scene-frame-dot")
 
     # 10. Проверка регистрации пункта меню и иконки панели инструментов
     main_text = File.read(File.join(__dir__, "../main.rb"), encoding: "utf-8")
@@ -2142,14 +2145,14 @@ class TestRunner
     unknown_icons = used_icons - connect_icons
     assert(unknown_icons.empty?, "Все имена иконок входят в набор connect (неизвестные: #{unknown_icons.join(', ')})")
 
-    # 11. Проверка размещения включателя рамки в настройке Картинка чертежа и привязки пропорций к блоку шаблона
-    assert(js_text.include?("chk_tpl_aspect_overlay"), "app.js содержит включатель оверлея chk_tpl_aspect_overlay в блоке Картинка чертежа")
-    assert(js_text.include?("tplAspectOverlayBadge"), "app.js содержит бейдж пропорций tplAspectOverlayBadge в блоке Картинка чертежа")
-    assert(js_text.include?("tplAspectOverlayText"), "app.js содержит текстовую метку пропорций tplAspectOverlayText")
+    # 11. Проверка постраничного меню кадра и привязки пропорций к блоку шаблона
+    assert(js_text.include?("scene-frame-btn"), "app.js содержит кнопку меню кадра scene-frame-btn")
+    assert(js_text.include?("sceneFramePopover"), "app.js содержит поповер меню кадра sceneFramePopover")
+    assert(js_text.include?("closeSceneFramePopover"), "app.js содержит closeSceneFramePopover")
     assert(js_text.include?("syncCurrentTemplateOverlay"), "app.js содержит метод syncCurrentTemplateOverlay")
-    assert(css_text.include?(".tpl-overlay-toggle-label"), "app.css содержит стили для .tpl-overlay-toggle-label")
-    assert(css_text.include?("#tplAspectOverlayBadge"), "app.css содержит стили для #tplAspectOverlayBadge")
-    assert(css_text.include?("#tplAspectOverlayBadge.disabled-overlay"), "app.css содержит стили для неактивного состояния рамки")
+    assert(css_text.include?(".scene-frame-btn"), "app.css содержит стили кнопки меню кадра .scene-frame-btn")
+    assert(css_text.include?(".scene-frame-pop"), "app.css содержит стили поповера меню кадра .scene-frame-pop")
+    assert(css_text.include?(".scene-frame-ratio-opt.active"), "app.css содержит активное состояние пропорций в меню кадра")
 
     export_dialog_text = File.read(File.join(__dir__, "../dialog/export_dialog.rb"), encoding: "utf-8")
     assert(export_dialog_text.include?("syncOverlayState"), "export_dialog.rb синхронизирует состояние оверлея при обновлении настроек")
@@ -2189,34 +2192,29 @@ class TestRunner
       assert(parsed_c1.red == 239 && parsed_c1.green == 68 && parsed_c1.blue == 68 && parsed_c1.alpha == 204, "parse_color возвращает правильный Color RGBA")
     end
 
-    # Тестирование передачи параметров цвета и прозрачности через update_settings
+    # Стиль рамки зафиксирован в OverlayService (настройки контура/затемнения убраны из GUI):
+    # контур всегда красный #FF0000, затемнение вне кадра всегда 10%
     overlay_svc.update_settings({
-      overlay_border_color: "#10B981",
-      overlay_border_opacity: 75,
-      overlay_mask_color: "#1E293B",
-      overlay_mask_opacity: 60
+      overlay_mask_color: "#1E293B"
     }, mock_model_tpl)
 
     info_colors = overlay_svc.calculate_target_info(mock_model_tpl)
-    assert(info_colors[:border_color] == "#10B981", "calculate_target_info возвращает обновленный border_color")
-    assert(info_colors[:border_opacity] == 75, "calculate_target_info возвращает обновленный border_opacity")
-    assert(info_colors[:mask_color] == "#1E293B", "calculate_target_info возвращает обновленный mask_color")
-    assert(info_colors[:mask_opacity] == 60, "calculate_target_info возвращает обновленный mask_opacity")
+    assert(info_colors[:border_color] == "#FF0000", "контур рамки зафиксирован: красный #FF0000")
+    assert(info_colors[:border_opacity] == 100, "прозрачность контура зафиксирована: 100%")
+    assert(info_colors[:mask_color] == "#1E293B", "calculate_target_info возвращает переданный mask_color")
+    assert(info_colors[:mask_opacity] == 10, "затемнение вне кадра зафиксировано: 10%")
 
     ov_check = overlay_svc.find_model_overlay(mock_model_tpl)
-    assert(ov_check && ov_check.border_color_cache == "#10B981", "Кэш цвета рамки в оверлее обновлен")
-    assert(ov_check && ov_check.border_opacity_cache == 75, "Кэш прозрачности рамки в оверлее обновлен")
+    assert(ov_check && ov_check.border_color_cache == "#FF0000", "Кэш цвета рамки в оверлее — красный #FF0000")
     assert(ov_check && ov_check.mask_color_cache == "#1E293B", "Кэш цвета затемнения в оверлее обновлен")
-    assert(ov_check && ov_check.mask_opacity_cache == 60, "Кэш затемнения в оверлее обновлен")
+    assert(ov_check && ov_check.mask_opacity_cache == 10, "Кэш затемнения в оверлее — 10%")
 
-    # Проверка наличия элементов интерфейса в app.js, app.css и index.html
-    assert(js_text.include?("input_overlay_border_color"), "app.js содержит элемент input_overlay_border_color")
-    assert(js_text.include?("input_overlay_border_opacity"), "app.js содержит элемент input_overlay_border_opacity")
-    assert(js_text.include?("input_overlay_mask_color"), "app.js содержит элемент input_overlay_mask_color")
-    assert(js_text.include?("input_overlay_mask_opacity"), "app.js содержит элемент input_overlay_mask_opacity")
-    assert(css_text.include?(".tpl-overlay-styling-row"), "app.css содержит стили .tpl-overlay-styling-row")
-    assert(!html_text.include?("id=\"inputOverlayBorderColor\""), "из общих настроек index.html удален устаревший id=\"inputOverlayBorderColor\"")
-    assert(!html_text.include?("id=\"inputOverlayMaskColor\""), "из общих настроек index.html удален устаревший id=\"inputOverlayMaskColor\"")
+    # Настройки контура/затемнения убраны из интерфейса
+    assert(!js_text.include?("input_overlay_border_color"), "элемент выбора цвета контура удален из app.js")
+    assert(!js_text.include?("btn-mask-opacity"), "кнопки затемнения удалены из app.js")
+    assert(!css_text.include?(".btn-mask-opacity"), "стили кнопок затемнения удалены из app.css")
+    assert(!html_text.include?('id="inputOverlayBorderColor"'), "из общих настроек index.html удален устаревший id=\"inputOverlayBorderColor\"")
+    assert(!html_text.include?('id="inputOverlayMaskColor"'), "из общих настроек index.html удален устаревший id=\"inputOverlayMaskColor\"")
     assert(!html_text.include?("id=\"inputPrimaryColor\""), "из общих настроек index.html удален id=\"inputPrimaryColor\"")
     assert(!html_text.include?("id=\"inputStampColor\""), "из общих настроек index.html удален id=\"inputStampColor\"")
     assert(!html_text.include?("id=\"selectStamp\""), "из общих настроек index.html удален id=\"selectStamp\"")
@@ -2727,10 +2725,15 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(DN1Code::ExportPdf2::Controller::BlankPage < DN1Code::ExportPdf2::Controller::PageBase, "BlankPage наследуется от PageBase")
     assert(DN1Code::ExportPdf2::Controller::ExportController::PAGE_CONTROLLERS[:blank] == DN1Code::ExportPdf2::Controller::BlankPage, "PAGE_CONTROLLERS сопоставляет :blank с BlankPage")
 
-    # 2. Проверка JavaScript и HTML определений шаблона
-    assert(js_content.include?('key: "blank"') && js_content.include?('Без шаблона'), "app.js getAllTemplates содержит шаблон blank")
+    # 2. Проверка JavaScript и HTML определений шаблона.
+    # Готовые шаблоны — обычные (удаляемые) записи: сид в config/layout.yaml,
+    # структурный фолбэк в DEFAULT_LAYOUTS, списка builtins в JS больше нет.
+    assert(!js_content.include?('isDefault: true'), "app.js не содержит списка встроенных шаблонов (builtins убраны)")
     assert(js_content.include?('blank: {') && js_content.include?('Без шаблона (Blank)'), "app.js DEFAULT_LAYOUTS содержит конфигурацию blank")
-    assert(html_content.include?('value="blank"'), "index.html selectNewTemplateBase содержит вариант blank")
+    layout_yaml_content = File.read(File.expand_path(File.join(__dir__, "..", "config", "layout.yaml")), encoding: "UTF-8")
+    assert(layout_yaml_content.include?("blank:") && layout_yaml_content.include?("name:"), "config/layout.yaml содержит готовый шаблон blank с именем")
+    assert(html_content.include?('id="selectNewTemplateBase"') && js_content.include?('"empty"') && js_content.include?("Пустой шаблон"),
+           "Основа нового шаблона: динамический список «Пустой шаблон» + текущие шаблоны")
 
     # 3. Тест генерации PDF чистой страницы через BlankPage
     test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2948,7 +2951,13 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(info_disabled[:visible] == false, "calculate_target_info возвращает visible: false для выключенного видового экрана")
 
     info_blank = overlay_svc.calculate_target_info(nil, { template_key: :blank })
-    assert(info_blank[:visible] == false, "calculate_target_info возвращает visible: false для шаблона :blank")
+    assert(info_blank[:visible] == true, "calculate_target_info: blank — обычный шаблон, видовой экран по умолчанию включен")
+
+    info_blank_disabled = overlay_svc.calculate_target_info(nil, {
+      template_key: :blank,
+      custom_layouts: { blank: { image_4_3: { visible: false, aspect_ratio: "16:9" } } }
+    })
+    assert(info_blank_disabled[:visible] == false, "calculate_target_info: blank с выключенным видовым экраном → visible: false")
 
     # 2. OverlayService.enable(model) не включает рамку, если видовой экран выключен
     mock_model = Sketchup::MockModel.new
@@ -2982,9 +2991,9 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     # 5. Проверка JavaScript логики в app.js
     js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
     js_content = File.read(js_path, encoding: "UTF-8")
-    assert(js_content.include?('const isOverlayOn = isImageVis && Boolean'), "app.js учитывает isImageVis при отображении чекбокса рамки")
-    assert(js_content.include?('${!isImageVis ? \'disabled\' : \'\'}'), "app.js блокирует чекбокс рамки, если видовой экран выключен")
-    assert(js_content.include?('callRuby("toggleAspectOverlay", false)'), "app.js отключает оверлей в SketchUp при снятии галки видового экрана")
+    assert(!js_content.include?("frameBtn.disabled"), "кнопка меню кадра никогда не блокируется — в меню всегда можно зайти")
+    assert(!js_content.include?("Видовой экран</span>"), "переключатель 'Видовой экран' удалён из меню кадра")
+    assert(js_content.include?('callRuby("toggleAspectOverlay", false)'), "app.js отключает оверлей для шаблонов без блока картинки")
 
     # 6. Проверка Ruby коллбэков в export_dialog.rb
     dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
@@ -3010,46 +3019,50 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(scene1.aspect_ratio == "4:3", "SceneItem по умолчанию имеет aspect_ratio == '4:3'")
     assert(scene1.scale_pct == 100, "SceneItem по умолчанию имеет scale_pct == 100")
 
-    # Сериализация в хэш и десериализация
-    scene1.viewport_visible = false
+    # Сериализация в хэш и десериализация (функция отключения видового экрана удалена — всегда true)
     scene1.viewport_background = false
     scene1.aspect_ratio = "16:9"
     scene1.scale_pct = 80
     h = scene1.to_h
-    assert(h[:viewport_visible] == false, "to_h сохраняет :viewport_visible")
+    assert(h[:viewport_visible] == true, "to_h сохраняет :viewport_visible как true (отключение удалено)")
     assert(h[:viewport_background] == false, "to_h сохраняет :viewport_background")
     assert(h[:aspect_ratio] == "16:9", "to_h сохраняет :aspect_ratio")
     assert(h[:scale_pct] == 80, "to_h сохраняет :scale_pct")
 
     scene_restored = DN1Code::ExportPdf2::Model::SceneItem.from_h(h)
-    assert(scene_restored.viewport_visible == false, "from_h восстанавливает viewport_visible")
+    assert(scene_restored.viewport_visible == true, "from_h игнорирует сохранённое viewport_visible — всегда true")
     assert(scene_restored.viewport_background == false, "from_h восстанавливает viewport_background")
     assert(scene_restored.aspect_ratio == "16:9", "from_h восстанавливает aspect_ratio")
     assert(scene_restored.scale_pct == 80, "from_h восстанавливает scale_pct")
 
+    # Старые проекты со значением viewport_visible: false — видовой экран принудительно включён обратно
+    legacy_vp_off = DN1Code::ExportPdf2::Model::SceneItem.from_h({ name: "Legacy", viewport_visible: false })
+    assert(legacy_vp_off.viewport_visible == true, "from_h c viewport_visible: false всё равно возвращает true (функция отключения удалена)")
+
     # Старые проекты без ключа viewport_background получают значение по умолчанию (false — фон выключен)
     legacy_scene = DN1Code::ExportPdf2::Model::SceneItem.from_h({ name: "Legacy" })
     assert(legacy_scene.viewport_background == false, "from_h без viewport_background подставляет false (фон выключен)")
+    assert(legacy_scene.frame_overlay == false, "from_h без frame_overlay подставляет false (рамка выключена)")
 
     # 2. Проверка разметки в index.html
     html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
     html_content = File.read(html_path, encoding: "UTF-8")
     assert(html_content.include?('class="th-aspect"') && html_content.include?('>Кадр</th>'), "index.html содержит заголовок колонки Кадр в таблице сцен")
-    assert(html_content.include?('id="sceneViewportSection"'), "index.html содержит контейнер sceneViewportSection во вкладке страниц")
+    assert(html_content.include?('id="chk_scenes_frame_all"'), "index.html содержит массовый тумблер рамки chk_scenes_frame_all")
+    assert(!html_content.include?('id="sceneViewportSection"'), "нижняя панель видового экрана удалена из index.html")
 
     # 3. Проверка стилей в app.css
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
     css_content = File.read(css_path, encoding: "UTF-8")
-    assert(css_content.include?(".scene-viewport-section"), "app.css содержит стиль .scene-viewport-section")
-    assert(css_content.include?(".scene-viewport-card"), "app.css содержит стиль .scene-viewport-card")
+    assert(css_content.include?(".scene-frame-btn"), "app.css содержит стиль .scene-frame-btn")
+    assert(css_content.include?(".scene-frame-pop"), "app.css содержит стиль .scene-frame-pop")
     assert(css_content.include?(".scene-aspect-cell"), "app.css содержит стиль .scene-aspect-cell")
-    assert(css_content.include?(".badge-aspect"), "app.css содержит стиль .badge-aspect")
 
     # 4. Проверка логики в app.js
     js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
     js_content = File.read(js_path, encoding: "UTF-8")
-    assert(js_content.include?("function renderSceneViewportCard"), "app.js содержит функцию renderSceneViewportCard")
-    assert(js_content.include?("function bindSceneViewportEvents"), "app.js содержит функцию bindSceneViewportEvents")
+    assert(js_content.include?("function updateSceneTableFrameStates"), "app.js содержит функцию updateSceneTableFrameStates")
+    assert(js_content.include?("function closeSceneFramePopover"), "app.js содержит функцию closeSceneFramePopover")
     assert(js_content.include?("function updateSceneTableAspectCell"), "app.js содержит функцию updateSceneTableAspectCell")
     assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
     assert(js_content.include?('getElementById("chk_scenes_background")'), "app.js использует глобальный чекбокс фона chk_scenes_background")
@@ -3061,24 +3074,29 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(!tpl_block.to_s.include?("cardImageHtml"), "renderTemplateSettingsList больше не рендерит cardImageHtml")
 
     # 5. Проверка работы OverlayService с настройками сцены
+    # (функция отключения видового экрана удалена: видовой экран всегда включен)
     mock_model = Sketchup::MockModel.new
     pdata = DN1Code::ExportPdf2::Model::ProjectData.new
-    scene_ov = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Page 1", page_type: :cover, viewport_visible: false, aspect_ratio: "16:9")
+    scene_ov = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Page 1", page_type: :cover, aspect_ratio: "16:9")
     pdata.scenes = [scene_ov]
 
-    info_scene_off = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
+    info_scene = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
       scene_item: scene_ov,
       project_data: pdata
     })
-    assert(info_scene_off[:visible] == false, "OverlayService возвращает visible: false, если у сцены отключен видовой экран")
+    assert(info_scene[:visible] == true, "OverlayService возвращает visible: true — видовой экран всегда включен")
+    assert(info_scene[:aspect_ratio] == "16:9", "OverlayService возвращает индивидуальную пропорцию сцены 16:9")
 
-    scene_ov.viewport_visible = true
-    info_scene_on = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
+    # Постраничная рамка: флаг frame_overlay сцены управляет overlay_on
+    assert(info_scene[:overlay_on] == false, "overlay_on: false, когда у сцены выключен frame_overlay")
+    scene_ov.frame_overlay = true
+    info_frame_on = DN1Code::ExportPdf2::Service::OverlayService.calculate_target_info(nil, {
       scene_item: scene_ov,
       project_data: pdata
     })
-    assert(info_scene_on[:visible] == true, "OverlayService возвращает visible: true, когда видовой экран сцены включен")
-    assert(info_scene_on[:aspect_ratio] == "16:9", "OverlayService возвращает индивидуальную пропорцию сцены 16:9")
+    assert(info_frame_on[:overlay_on] == true, "overlay_on: true, когда у сцены включен frame_overlay")
+    assert(info_frame_on[:border_color] == "#FF0000", "контур рамки зафиксирован: красный #FF0000")
+    assert(info_frame_on[:mask_opacity] == 10, "затемнение вне кадра зафиксировано: 10%")
 
     # 6. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
@@ -3087,7 +3105,7 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
   end
 
   def test_56_scene_viewport_frame_header_and_shading_controls
-    puts "\n--- 56. Тест перемещения рамки в заголовок, переключателя затемнения 20%/80% и толщины линии 1px ---"
+    puts "\n--- 56. Тест постраничного меню кадра, массового тумблера 'Кадр все' и фиксации стиля рамки (красный контур, затемнение 10%) ---"
 
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
@@ -3095,44 +3113,50 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
     js_content = File.read(js_path, encoding: "UTF-8")
 
-    # 1. Проверка перемещения рамки со значком в заголовок рядом с 'Вкл'
-    scene_card = js_content[/function renderSceneViewportCard.*?function bindSceneViewportEvents/m]
-    assert(scene_card != nil, "app.js содержит функцию renderSceneViewportCard")
+    # 1. Меню кадра в строке таблицы: кнопка + поповер (рамка, пропорции)
+    assert(js_content.include?("scene-frame-btn"), "app.js рендерит кнопку меню кадра scene-frame-btn")
+    assert(js_content.include?('id="sceneFramePopover"') == false && js_content.include?("sceneFramePopover"), "app.js открывает поповер меню кадра #sceneFramePopover")
+    assert(js_content.include?("📐 Рамка кадра"), "Меню кадра содержит переключатель '📐 Рамка кадра'")
+    assert(js_content.include?("Пропорции кадра"), "Меню кадра содержит блок 'Пропорции кадра'")
+    assert(js_content.include?("По листу"), "Меню кадра содержит вариант 'По листу'")
+    assert(!js_content.include?("Видовой экран</span>"), "Переключатель 'Видовой экран' удалён из меню кадра")
 
-    header_part = scene_card[/<div class="tpl-card-header">.*?<\/div>\s*<\/div>/m]
-    assert(header_part != nil, "renderSceneViewportCard содержит tpl-card-header")
-    assert(header_part.include?('id="tplAspectOverlayBadge"'), "tpl-card-header содержит значок/переключатель рамки #tplAspectOverlayBadge")
-    assert(header_part.include?('id="chk_image_4_3_visible"'), "tpl-card-header содержит чекбокс 'Вкл' #chk_image_4_3_visible")
-    assert(header_part.include?("📐 Рамка"), "Заголовок содержит иконку и надпись '📐 Рамка'")
+    # 2. Постраничный флаг рамки сохраняется в сцене и синхронизируется с SketchUp
+    assert(js_content.include?("scene.frame_overlay = on"), "app.js сохраняет постраничный флаг frame_overlay")
+    assert(js_content.include?('JSON.stringify({ enabled: on, scene_index: index })'), "app.js передает флаг рамки страницы в toggleAspectOverlay")
+    assert(!js_content.include?("scene.viewport_visible = on"), "app.js больше не управляет отключением видового экрана")
 
-    # 2. Проверка того, что в параметрах рамки остался только контур (input_overlay_border_color)
-    styling_row = scene_card[/<div class="tpl-overlay-styling-row">.*?<p class="tpl-image-note">/m]
-    assert(styling_row != nil, "renderSceneViewportCard содержит блок .tpl-overlay-styling-row")
-    assert(styling_row.include?('id="input_overlay_border_color"'), "Блок стилей рамки содержит выбор цвета контура input_overlay_border_color")
-    assert(styling_row.include?("Контур рамки:"), "Блок содержит подпись 'Контур рамки:'")
+    # 3. Массовый тумблер 'Кадр все' в шапке таблицы
+    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
+    html_content = File.read(html_path, encoding: "UTF-8")
+    assert(html_content.include?('id="chk_scenes_frame_all"'), "index.html содержит массовый тумблер chk_scenes_frame_all")
+    assert(html_content.include?("<span>Кадр все</span>"), "index.html содержит подпись 'Кадр все'")
+    assert(js_content.include?("s.frame_overlay = on"), "app.js применяет 'Кадр все' ко всем страницам")
+    assert(js_content.include?("updateSceneTableFrameStates"), "app.js обновляет индикаторы рамки во всех строках")
+    assert(js_content.include?("chkScenesFrameAll"), "app.js привязывает обработчик к chkScenesFrameAll")
 
-    # 3. Проверка переключателя затемнения 10%, 40%, 70%, 90%
-    assert(styling_row.include?('id="grp_overlay_mask_opacity"'), "Блок стилей содержит группу переключателя затемнения #grp_overlay_mask_opacity")
-    assert(styling_row.include?('data-opacity="10"'), "Переключатель содержит вариант 10%")
-    assert(styling_row.include?('data-opacity="40"'), "Переключатель содержит вариант 40%")
-    assert(styling_row.include?('data-opacity="70"'), "Переключатель содержит вариант 70%")
-    assert(styling_row.include?('data-opacity="90"'), "Переключатель содержит вариант 90%")
-    assert(!styling_row.include?('id="input_overlay_border_opacity"'), "Из карточки видового экрана удален ползунок прозрачности рамки")
-    assert(!styling_row.include?('id="input_overlay_mask_color"'), "Из карточки видового экрана удален выбор цвета затемнения")
-
-    # 4. Проверка обработчиков в bindSceneViewportEvents
-    assert(js_content.include?("grpMaskOpacity.querySelectorAll(\".btn-mask-opacity\")"), "app.js привязывает события клика к кнопкам затемнения")
-    assert(js_content.include?("state.pdf_settings.overlay_mask_opacity = opacity;"), "app.js сохраняет выбранное затемнение в настройки")
+    # 4. Нижняя панель 'Картинка чертежа под текст' полностью удалена
+    assert(!js_content.include?("renderSceneViewportCard"), "app.js больше не содержит renderSceneViewportCard")
+    assert(!js_content.include?("bindSceneViewportEvents"), "app.js больше не содержит bindSceneViewportEvents")
+    assert(!js_content.include?("Контур рамки:"), "Настройки цвета контура убраны из GUI")
+    assert(!js_content.include?("Затемнение:"), "Настройки затемнения убраны из GUI")
+    assert(!html_content.include?('id="sceneViewportSection"'), "index.html больше не содержит контейнер нижней панели")
 
     # 5. Проверка стилей в app.css
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
     css_content = File.read(css_path, encoding: "UTF-8")
-    assert(css_content.include?("#grp_overlay_mask_opacity"), "app.css содержит стили для #grp_overlay_mask_opacity")
-    assert(css_content.include?(".btn-mask-opacity"), "app.css содержит стили для .btn-mask-opacity")
+    assert(css_content.include?(".scene-frame-btn"), "app.css содержит стиль кнопки меню кадра .scene-frame-btn")
+    assert(css_content.include?(".scene-frame-pop"), "app.css содержит стиль поповера .scene-frame-pop")
+    assert(css_content.include?(".scene-frame-dot"), "app.css содержит индикатор рамки .scene-frame-dot")
+    assert(!css_content.include?(".scene-viewport-card"), "Стили нижней панели .scene-viewport-card удалены")
+    assert(!css_content.include?(".btn-mask-opacity"), "Стили кнопок затемнения .btn-mask-opacity удалены")
+    assert(css_content.include?(".tpl-btn-group"), "Стили .tpl-btn-group вкладки шаблонов сохранены")
 
-    # 6. Проверка толщины линии рамки по умолчанию 1px в OverlayService
+    # 6. Стиль рамки зафиксирован в OverlayService: красный контур #FF0000, затемнение 10%
     overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
     info = overlay_svc.calculate_target_info(nil, {})
+    assert(info[:border_color] == "#FF0000", "OverlayService.calculate_target_info фиксирует красный контур #FF0000")
+    assert(info[:mask_opacity] == 10, "OverlayService.calculate_target_info фиксирует затемнение 10%")
     assert(info[:line_width] == 1, "OverlayService.calculate_target_info по умолчанию возвращает line_width: 1")
 
     ov_inst = overlay_svc.overlay_instance
@@ -3143,6 +3167,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     overlay_svc.enable(mock_model)
     ov_model = overlay_svc.find_model_overlay(mock_model)
     assert(ov_model && ov_model.line_width_cache == 1, "SafeFrameOverlay после enable сохраняет толщину линии 1px")
+    assert(ov_model && ov_model.border_color_cache == "#FF0000", "SafeFrameOverlay после enable хранит красный контур #FF0000")
+    assert(ov_model && ov_model.mask_opacity_cache == 10, "SafeFrameOverlay после enable хранит затемнение 10%")
 
     # 7. Проверка информационной строки (внизу по центру, тонкий черный шрифт без темной плашки)
     mock_view = mock_model.active_view
@@ -3501,6 +3527,50 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- 60a. Регрессионный тест: снимок каждой страницы рендерится со своими пропорциями ---
+  # Раньше пропорции снимка брались из OverlayService по выбранной (первой)
+  # странице и кэшировались по ключу шаблона — все страницы шаблона получали
+  # пропорции первой страницы, хотя у них свои значения в настройках «Кадр».
+  def test_60a_per_page_aspect_ratio_snapshot
+    puts "\n--- 60a. Постраничные пропорции: снимок каждой страницы рендерится со своими пропорциями ---"
+
+    doc = Layout::Document.new
+    page = doc.pages.first
+    layer = doc.layers.first
+    temp_imgs = []
+    model = Sketchup::MockModel.new
+
+    ctx = {
+      model: model,
+      settings: { layout_render_mode: "image", image_width: 800, image_aspect_ratio: "page" },
+      rendered_scene_images: {}
+    }
+    content = { left: 0.0, top: 100.0, w: 400.0, h: 300.0 }
+    img_cfg = { aspect_ratio: "4:3", scale_pct: 100, visible: true }
+
+    # Две страницы ОДНОГО шаблона (general) с разными кадрами в настройках
+    scene_169 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Широкий кадр", page_type: :general, aspect_ratio: "16:9")
+    DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :render_image_block, doc, page, layer, scene_169, content, img_cfg, ctx, temp_imgs, :general
+    )
+    assert(temp_imgs.size == 1, "Снимок первой страницы создан")
+    opts_1 = model.active_view.last_write_image_options
+    assert(opts_1 && opts_1[:width].to_i > 0 && opts_1[:height].to_i > 0, "Параметры снимка первой страницы зафиксированы")
+    assert(((opts_1[:width].to_f / opts_1[:height]) - (16.0 / 9.0)).abs < 0.05,
+           "Снимок страницы с кадром 16:9 рендерится в пропорциях 16:9 (#{opts_1[:width]}x#{opts_1[:height]})")
+
+    scene_43 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Традиционный кадр", page_type: :general, aspect_ratio: "4:3")
+    DN1Code::ExportPdf2::Service::LayoutBuilder.send(
+      :render_image_block, doc, page, layer, scene_43, content, img_cfg, ctx, temp_imgs, :general
+    )
+    assert(temp_imgs.size == 2, "Снимок второй страницы создан")
+    opts_2 = model.active_view.last_write_image_options
+    assert(((opts_2[:width].to_f / opts_2[:height]) - (4.0 / 3.0)).abs < 0.05,
+           "Снимок страницы с кадром 4:3 рендерится в пропорциях 4:3, а не 16:9 первой страницы (#{opts_2[:width]}x#{opts_2[:height]})")
+
+    temp_imgs.each { |p| File.delete(p) rescue nil }
   end
 
   # --- 60. Тест работы множителя толщины линий в режимах рендера (Гибридный видовой экран, Растровый GPU) ---

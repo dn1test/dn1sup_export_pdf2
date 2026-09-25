@@ -275,10 +275,9 @@ module DN1Code
           tpl_cfg = pdata_tpl.merge(session_tpl).merge(override_tpl)
           img_cfg = pdata_img.merge(session_img).merge(override_img)
 
-          # Проверка видимости блока видового экрана (из сцены или из шаблона)
-          img_visible = if tpl_key.to_s == "blank" && (matched_sc.nil? || matched_sc.viewport_visible != true)
-                          false
-                        elsif matched_sc && matched_sc.respond_to?(:viewport_visible) && !matched_sc.viewport_visible.nil?
+          # Проверка видимости блока видового экрана (из сцены или из шаблона).
+          # Шаблоны равнозначны (в т.ч. «Без шаблона (Blank)») — особого случая нет.
+          img_visible = if matched_sc && matched_sc.respond_to?(:viewport_visible) && !matched_sc.viewport_visible.nil?
                           matched_sc.viewport_visible != false
                         elsif img_cfg.key?(:visible)
                           v = img_cfg[:visible]
@@ -293,6 +292,15 @@ module DN1Code
             v = override_settings[:visible].nil? ? override_settings["visible"] : override_settings[:visible]
             img_visible = (v != false && v.to_s != "false" && v != 0 && v.to_s != "0")
           end
+
+          # Рамка кадра (Safe Frame Overlay): постраничный флаг сцены приоритетнее
+          # глобального show_aspect_overlay (глобальный остаётся для сцен без флага)
+          overlay_on = if matched_sc && matched_sc.respond_to?(:frame_overlay) && !matched_sc.frame_overlay.nil?
+                         matched_sc.frame_overlay == true || matched_sc.frame_overlay.to_s == "true"
+                       else
+                         v = settings[:show_aspect_overlay] || settings["show_aspect_overlay"]
+                         v == true || v.to_s == "true"
+                       end
 
           valid_modes = %w[page 16:9 4:3 3:2 1:1 custom].freeze
 
@@ -382,21 +390,16 @@ module DN1Code
             end
           end
 
-          border_color_val   = settings[:overlay_border_color] || settings["overlay_border_color"] ||
-                               img_cfg[:overlay_border_color] || img_cfg["overlay_border_color"] ||
-                               (pdata ? pdata.pdf_settings[:overlay_border_color] : nil) || "#0EA5E9"
-
-          border_opacity_val = settings[:overlay_border_opacity] || settings["overlay_border_opacity"] ||
-                               img_cfg[:overlay_border_opacity] || img_cfg["overlay_border_opacity"] ||
-                               (pdata ? pdata.pdf_settings[:overlay_border_opacity] : nil) || 100
+          # Стиль рамки зафиксирован (настроек в GUI больше нет):
+          # контур — красный #FF0000, затемнение вне кадра — 10%
+          border_color_val   = "#FF0000"
+          border_opacity_val = 100
 
           mask_color_val     = settings[:overlay_mask_color] || settings["overlay_mask_color"] ||
                                img_cfg[:overlay_mask_color] || img_cfg["overlay_mask_color"] ||
                                (pdata ? pdata.pdf_settings[:overlay_mask_color] : nil) || "#0F172A"
 
-          mask_opacity_val   = settings[:overlay_mask_opacity] || settings["overlay_mask_opacity"] ||
-                               img_cfg[:overlay_mask_opacity] || img_cfg["overlay_mask_opacity"] ||
-                               (pdata ? pdata.pdf_settings[:overlay_mask_opacity] : nil) || 55
+          mask_opacity_val   = 10
 
           border_color_val = "##{border_color_val}" unless border_color_val.to_s.start_with?("#")
           mask_color_val   = "##{mask_color_val}" unless mask_color_val.to_s.start_with?("#")
@@ -423,7 +426,8 @@ module DN1Code
             mask_opacity:   mask_opacity_val,
             line_width:     line_width_val,
             visible:        img_visible,
-            image_visible:  img_visible
+            image_visible:  img_visible,
+            overlay_on:     overlay_on
           }
         end
 
@@ -495,6 +499,7 @@ module DN1Code
             return false unless ov.enabled?
             info = calculate_target_info(m)
             return false if info[:visible] == false
+            return false if info[:overlay_on] == false
             true
           rescue StandardError
             false
@@ -527,7 +532,7 @@ module DN1Code
           ov.mask_opacity_cache   = info[:mask_opacity]
           ov.line_width_cache     = info[:line_width] || 1
 
-          if info[:visible] == false
+          if info[:visible] == false || info[:overlay_on] == false
             disable(m)
             return false
           end
@@ -577,7 +582,7 @@ module DN1Code
             ov.line_width_cache     = info[:line_width] || 1
           end
 
-          if info[:visible] == false
+          if info[:visible] == false || info[:overlay_on] == false
             disable(m)
           else
             invalidate_view(m)
@@ -640,7 +645,7 @@ module DN1Code
             ov.mask_color_cache     = info[:mask_color]
             ov.mask_opacity_cache   = info[:mask_opacity]
             ov.line_width_cache     = info[:line_width] || 1
-            if info[:visible] == false
+            if info[:visible] == false || info[:overlay_on] == false
               ov.enabled = false if ov.respond_to?(:enabled=)
               invalidate_view(m)
               return
@@ -702,7 +707,7 @@ module DN1Code
           end
 
           is_active = overlay_active?(m)
-          should_show = pdata && pdata.pdf_settings && pdata.pdf_settings[:show_aspect_overlay] && info[:visible] != false
+          should_show = info[:overlay_on] == true && info[:visible] != false
           if should_show
             enable(m)
           elsif is_active || info[:visible] == false
