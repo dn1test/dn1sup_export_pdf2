@@ -98,6 +98,10 @@ module DN1Code
               "Откуда: #{res[:dev_dir]}\n" \
               "Куда: #{res[:plugins_dir]}\n" \
               "Скопировано файлов: #{res[:files_copied]}"
+        if res[:warnings] && !res[:warnings].empty?
+          msg += "\n\n⚠ Пропущены залоченные файлы (обновятся после перезапуска SketchUp):\n" \
+                 "#{res[:warnings].join("\n")}"
+        end
         UI.messagebox(msg, defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
       else
         err = "❌ Ошибка обновления из dev-папки:\n#{res[:error]}"

@@ -66,6 +66,31 @@ module DN1Code
           default_path
         end
 
+        # Копирует файл, переживая блокировки: уже одинаковые файлы пропускаются,
+        # а залоченные (нативные DLL, загруженные в процесс SketchUp, Windows
+        # запрещает перезаписывать до завершения процесса) дают предупреждение
+        # вместо обрыва всего обновления
+        # @param src [String] исходный файл
+        # @param dst [String] целевой файл
+        # @param warnings [Array<String>] накопитель предупреждений
+        # @param rel_label [String] имя файла для сообщений
+        # @return [Symbol] :copied | :identical | :skipped
+        def safe_copy(src, dst, warnings, rel_label)
+          # FileUtils.identical? на части версий Ruby бросает ENOENT для
+          # несуществующей цели — проверяем существование явно
+          return :identical if File.exist?(dst) && FileUtils.identical?(src, dst)
+
+          FileUtils.cp(src, dst)
+          :copied
+        rescue Errno::EACCES, Errno::EBUSY, Errno::EPERM
+          if dst.downcase.end_with?(".dll")
+            warnings << "#{rel_label}: DLL загружена в SketchUp, обновится после перезапуска SketchUp"
+          else
+            warnings << "#{rel_label}: файл занят другим процессом, пропущен"
+          end
+          :skipped
+        end
+
         # Копирует файлы плагина из dev-папки в каталог Plugins
         # @param dev_dir [String, nil]
         # @param plugins_dir [String, nil]
@@ -103,13 +128,14 @@ module DN1Code
           end
 
           files_copied = 0
+          warnings = []
 
           # 1. Копируем главный загрузчик dn1c_export_pdf2.rb
           root_loader = File.join(src_dir, "dn1c_export_pdf2.rb")
           if File.exist?(root_loader)
             target_loader = File.join(dst_plugins, "dn1c_export_pdf2.rb")
-            FileUtils.cp(root_loader, target_loader)
-            files_copied += 1
+            copied = safe_copy(root_loader, target_loader, warnings, "dn1c_export_pdf2.rb")
+            files_copied += 1 if copied == :copied
           end
 
           # 2. Копируем директорию пакета dn1c_export_pdf2/
@@ -127,8 +153,8 @@ module DN1Code
               FileUtils.mkdir_p(dest_entry)
             else
               FileUtils.mkdir_p(File.dirname(dest_entry))
-              FileUtils.cp(entry, dest_entry)
-              files_copied += 1
+              copied = safe_copy(entry, dest_entry, warnings, rel)
+              files_copied += 1 if copied == :copied
             end
           end
 
@@ -138,6 +164,7 @@ module DN1Code
             dev_dir: src_dir,
             plugins_dir: dst_plugins,
             files_copied: files_copied,
+            warnings: warnings,
             version: PLUGIN_VERSION,
             updated_at: Time.now.strftime("%Y-%m-%d %H:%M:%S")
           }

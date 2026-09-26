@@ -5542,6 +5542,13 @@ function updateParamModalPreview() {
         if (statusEl) {
           statusEl.style.color = "var(--bs-success)";
           statusEl.textContent = `✅ ${msg} [${res.updated_at || res.reloaded_at || ""}]`;
+          const warnings = (res.warnings || []).filter(Boolean);
+          if (warnings.length) {
+            const warnEl = document.createElement("div");
+            warnEl.style.color = "var(--bs-warning)";
+            warnEl.textContent = `⚠ Пропущено файлов: ${warnings.length} (загруженные DLL обновятся после перезапуска SketchUp) — ${warnings.join("; ")}`;
+            statusEl.appendChild(warnEl);
+          }
         }
         showNotification(msg, "success");
       } else {
