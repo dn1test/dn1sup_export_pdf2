@@ -28,7 +28,7 @@
   };
 
   // Иконка крестика закрытия/удаления (шрифт Modus Icons, набор connect)
-  const MODUS_CROSS_SVG = '<i class="modus-icons icon-close-cross" style="font-size: 11px;">content-close</i>';
+  const MODUS_CROSS_SVG = '<i class="modus-icons icon-close-cross" style="font-size: 11px;">content_close</i>';
 
   // Ключ шаблона по умолчанию: первый доступный шаблон; legacy-ключ cover —
   // последний фолбэк (готовые шаблоны удаляемы, «cover» может не существовать)
@@ -506,6 +506,7 @@ const DEFAULT_LAYOUTS = {
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
     btnRefreshThumbs: document.getElementById("btnRefreshThumbs"),
     chkScenesBackground: document.getElementById("chk_scenes_background"),
+    chkScenesWatermarks: document.getElementById("chk_scenes_watermarks"),
     chkScenesFrameAll: document.getElementById("chk_scenes_frame_all"),
     scenesPanel: document.getElementById("scenesPanel"),
     scenesSplitResizer: document.getElementById("scenesSplitResizer"),
@@ -3689,12 +3690,12 @@ function updateParamModalPreview() {
   let sceneThumbnailsSig = null;
   let sceneThumbsManualRequest = false;
 
-  // Сигнатура набора сцен: состав/имена/порядок страниц и флаг «Фон».
+  // Сигнатура набора сцен: состав/имена/порядок страниц и флаги «Фон»/«Водяной знак».
   // Эскизы перегенерируются автоматически только когда она меняется —
   // иначе SketchUp зря «перелистывает» все страницы при каждом открытии вкладки
   function sceneThumbnailsSignature() {
     const scenes = state.scenes || [];
-    return JSON.stringify(scenes.map((s) => [s.name || "", s.original_name || "", s.viewport_background === true]));
+    return JSON.stringify(scenes.map((s) => [s.name || "", s.original_name || "", s.viewport_background === true, s.viewport_watermarks === true]));
   }
 
   function requestSceneThumbnails(force) {
@@ -3875,9 +3876,12 @@ function updateParamModalPreview() {
     const scenes = state.scenes || [];
     updateSceneBadge();
 
-    // Синхронизация глобальной галки фона в тулбаре со состоянием сцен
+    // Синхронизация глобальных галок фона и водяных знаков в тулбаре со состоянием сцен
     if (els.chkScenesBackground) {
       els.chkScenesBackground.checked = scenes.some((s) => s.viewport_background === true);
+    }
+    if (els.chkScenesWatermarks) {
+      els.chkScenesWatermarks.checked = scenes.some((s) => s.viewport_watermarks === true);
     }
 
     // «Кадр все» отмечен, когда рамка включена на всех страницах
@@ -5085,6 +5089,17 @@ function updateParamModalPreview() {
         const bgOn = e.target.checked;
         (state.scenes || []).forEach((s) => { s.viewport_background = bgOn; });
         updateBlockSlot("image_4_3", { show_background: bgOn });
+        requestSceneThumbnails(true);
+        notifyChange();
+      });
+    }
+
+    // Водяные знаки сцены: независимая от фона галка, включается/выключается сразу
+    // на всех страницах, эскизы в таблице перегенерируются с учётом нового состояния
+    if (els.chkScenesWatermarks) {
+      els.chkScenesWatermarks.addEventListener("change", (e) => {
+        const wmOn = e.target.checked;
+        (state.scenes || []).forEach((s) => { s.viewport_watermarks = wmOn; });
         requestSceneThumbnails(true);
         notifyChange();
       });

@@ -1186,6 +1186,19 @@ module DN1Code
           @project[:frame_overlay_default_migrated] = true
         end
 
+        # Одноразовый перенос старых проектов: раньше водяные знаки вида гасились
+        # вместе с фоном (RenderingOptions["DisplayWatermarks"] сбрасывался при
+        # viewport_background=false), теперь они управляются отдельным постраничным
+        # флагом (SceneItem#viewport_watermarks). При первой загрузке проекта,
+        # сохраненного старой версией, раздаём сценам текущее значение фона —
+        # внешнее поведение не меняется.
+        def migrate_watermark_default!
+          return if @project[:watermark_default_migrated] == true
+
+          @scenes.each { |sc| sc.viewport_watermarks = sc.viewport_background != false }
+          @project[:watermark_default_migrated] = true
+        end
+
         # Синхронизирует список сцен с активной моделью SketchUp, сохраняя настроенные параметры
         # @param model [Sketchup::Model] модель SketchUp
         # @return [void]
@@ -1689,6 +1702,7 @@ module DN1Code
                 @scenes = root[:scenes].map { |h| SceneItem.from_h(h) }
                 migrate_legacy_background_default!
                 migrate_frame_overlay_default!
+                migrate_watermark_default!
               end
 
               # Проверяем, есть ли рядом файл edit_history.yaml
@@ -1723,6 +1737,7 @@ module DN1Code
               @scenes = docs[1].map { |h| SceneItem.from_h(h) }
               migrate_legacy_background_default!
               migrate_frame_overlay_default!
+              migrate_watermark_default!
             end
             if docs[2].is_a?(Array)
               @history = docs[2].map do |item|
@@ -1762,6 +1777,7 @@ module DN1Code
             articul:      @project[:articul].to_s,
             articul_locked: @project[:articul_locked] == true,
             background_default_migrated: @project[:background_default_migrated] == true,
+            watermark_default_migrated: @project[:watermark_default_migrated] == true,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,

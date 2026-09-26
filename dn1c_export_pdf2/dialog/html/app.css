@@ -1033,7 +1033,8 @@ textarea.form-control {
   text-overflow: ellipsis;
 }
 
-/* Стильный крестик удаления стадии в стиле Trimble Modus */
+/* Стильный крестик удаления стадии в стиле Trimble Modus.
+   Скрыт по умолчанию, появляется при наведении на строку (или фокусе с клавиатуры). */
 .stadia-checkbox-item .stadia-delete,
 .btn-stadia-del {
   flex: 0 0 auto;
@@ -1049,14 +1050,18 @@ textarea.form-control {
   align-items: center;
   justify-content: center;
   cursor: pointer;
-  opacity: 0.7;
+  opacity: 0;
+  pointer-events: none;
   transition: all 0.15s cubic-bezier(0.4, 0, 0.2, 1);
   line-height: 1;
 }
 
 .stadia-checkbox-item:hover .stadia-delete,
-.stadia-checkbox-item:hover .btn-stadia-del {
+.stadia-checkbox-item:focus-within .stadia-delete,
+.stadia-checkbox-item:hover .btn-stadia-del,
+.stadia-checkbox-item:focus-within .btn-stadia-del {
   opacity: 1;
+  pointer-events: auto;
 }
 
 .stadia-checkbox-item .stadia-delete .icon-close-cross,

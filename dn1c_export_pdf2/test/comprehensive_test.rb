@@ -191,6 +191,7 @@ class TestRunner
     test_58_line_scale_multiplier
     test_59_line_thickness_parameters_from_style
     test_viewport_background_toggle
+    test_watermark_toggle
     test_60a_per_page_aspect_ratio_snapshot
     test_60_line_multiplier_consistent_across_all_render_modes
     test_61_page_formats_a4_a3_and_quality_levels
@@ -3023,22 +3024,26 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     scene1 = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Scene 1", page_type: :cover)
     assert(scene1.viewport_visible == true, "SceneItem по умолчанию имеет viewport_visible == true")
     assert(scene1.viewport_background == false, "SceneItem по умолчанию имеет viewport_background == false (фон выключен)")
+    assert(scene1.viewport_watermarks == false, "SceneItem по умолчанию имеет viewport_watermarks == false (водяные знаки выключены)")
     assert(scene1.aspect_ratio == "4:3", "SceneItem по умолчанию имеет aspect_ratio == '4:3'")
     assert(scene1.scale_pct == 100, "SceneItem по умолчанию имеет scale_pct == 100")
 
     # Сериализация в хэш и десериализация (функция отключения видового экрана удалена — всегда true)
     scene1.viewport_background = false
+    scene1.viewport_watermarks = true
     scene1.aspect_ratio = "16:9"
     scene1.scale_pct = 80
     h = scene1.to_h
     assert(h[:viewport_visible] == true, "to_h сохраняет :viewport_visible как true (отключение удалено)")
     assert(h[:viewport_background] == false, "to_h сохраняет :viewport_background")
+    assert(h[:viewport_watermarks] == true, "to_h сохраняет :viewport_watermarks")
     assert(h[:aspect_ratio] == "16:9", "to_h сохраняет :aspect_ratio")
     assert(h[:scale_pct] == 80, "to_h сохраняет :scale_pct")
 
     scene_restored = DN1Code::ExportPdf2::Model::SceneItem.from_h(h)
     assert(scene_restored.viewport_visible == true, "from_h игнорирует сохранённое viewport_visible — всегда true")
     assert(scene_restored.viewport_background == false, "from_h восстанавливает viewport_background")
+    assert(scene_restored.viewport_watermarks == true, "from_h восстанавливает viewport_watermarks")
     assert(scene_restored.aspect_ratio == "16:9", "from_h восстанавливает aspect_ratio")
     assert(scene_restored.scale_pct == 80, "from_h восстанавливает scale_pct")
 
@@ -3050,12 +3055,14 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     legacy_scene = DN1Code::ExportPdf2::Model::SceneItem.from_h({ name: "Legacy" })
     assert(legacy_scene.viewport_background == false, "from_h без viewport_background подставляет false (фон выключен)")
     assert(legacy_scene.frame_overlay == false, "from_h без frame_overlay подставляет false (рамка выключена)")
+    assert(legacy_scene.viewport_watermarks == false, "from_h без viewport_watermarks подставляет false (водяные знаки выключены)")
 
     # 2. Проверка разметки в index.html
     html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
     html_content = File.read(html_path, encoding: "UTF-8")
     assert(html_content.include?('class="th-aspect"') && html_content.include?('>Кадр</th>'), "index.html содержит заголовок колонки Кадр в таблице сцен")
     assert(html_content.include?('id="chk_scenes_frame_all"'), "index.html содержит массовый тумблер рамки chk_scenes_frame_all")
+    assert(html_content.include?('id="chk_scenes_watermarks"'), "index.html содержит независимый тумблер водяных знаков chk_scenes_watermarks")
     assert(!html_content.include?('id="sceneViewportSection"'), "нижняя панель видового экрана удалена из index.html")
 
     # 3. Проверка стилей в app.css
@@ -3074,6 +3081,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
     assert(js_content.include?('getElementById("chk_scenes_background")'), "app.js использует глобальный чекбокс фона chk_scenes_background")
     assert(js_content.include?("s.viewport_background = bgOn"), "app.js сохраняет viewport_background при переключении чекбокса фона")
+    assert(js_content.include?("s.viewport_watermarks = wmOn"), "app.js сохраняет viewport_watermarks при переключении чекбокса водяных знаков")
+    assert(js_content.include?("s.viewport_watermarks === true, s.viewport_background === true") || js_content.include?("s.viewport_background === true, s.viewport_watermarks === true"), "app.js включает флаг водяных знаков в сигнатуру эскизов")
     assert(js_content.include?('updateBlockSlot("image_4_3", { show_background: bgOn })'), "app.js синхронизирует show_background в слоте шаблона")
 
     # Проверка, что из шаблонов карточка удалена
@@ -3531,6 +3540,80 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     end
 
     # 7. Проверка неизменности оригинального файла project.yaml
+    current_content = File.binread(root_project_yaml)
+    current_md5 = Digest::MD5.hexdigest(current_content)
+    assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")
+  end
+
+  # --- Тест независимого переключателя водяных знаков (Водяной знак) ---
+  def test_watermark_toggle
+    puts "\n--- Тест независимого включения/выключения водяных знаков (show_watermarks) ---"
+    root_project_yaml = File.expand_path("../../project.yaml", __dir__)
+    initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
+
+    # 1. apply_watermark_override: false гасит DisplayWatermarks, true включает, nil не трогает
+    model = Sketchup.active_model
+    ro = model.rendering_options
+    ro["DisplayWatermarks"] = true
+    orig_wm = DN1Code::ExportPdf2::Service::RenderService.apply_watermark_override(ro, false)
+    assert(ro["DisplayWatermarks"] == false, "apply_watermark_override(ro, false) гасит DisplayWatermarks")
+    DN1Code::ExportPdf2::Service::RenderService.restore_background(ro, orig_wm)
+    assert(ro["DisplayWatermarks"] == true, "restore_background возвращает исходное DisplayWatermarks")
+
+    orig_wm2 = DN1Code::ExportPdf2::Service::RenderService.apply_watermark_override(ro, true)
+    assert(ro["DisplayWatermarks"] == true, "apply_watermark_override(ro, true) включает DisplayWatermarks")
+    DN1Code::ExportPdf2::Service::RenderService.restore_background(ro, orig_wm2)
+
+    ro["DisplayWatermarks"] = false
+    assert(DN1Code::ExportPdf2::Service::RenderService.apply_watermark_override(ro, nil).empty?, "apply_watermark_override(ro, nil) ничего не изменяет")
+    assert(ro["DisplayWatermarks"] == false, "apply_watermark_override(ro, nil) оставляет значение без изменений")
+    ro["DisplayWatermarks"] = true
+
+    # 2. Фон больше не управляет водяными знаками: рендер с show_background: false не трогает DisplayWatermarks
+    bg_page = Sketchup::MockPage.new("08. Сцена со знаком")
+    tmp = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0,
+      show_background: false
+    })
+    assert(File.exist?(tmp), "Временный файл рендера с отключенным фоном создан")
+    File.delete(tmp) rescue nil
+    assert(model.rendering_options["DisplayWatermarks"] == true, "show_background: false не изменяет DisplayWatermarks (знаки управляются отдельно)")
+
+    # 3. Рендер с show_watermarks: false гасит и восстанавливает DisplayWatermarks
+    tmp2 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0,
+      show_watermarks: false
+    })
+    assert(File.exist?(tmp2), "Временный файл рендера с отключенными водяными знаками создан")
+    File.delete(tmp2) rescue nil
+    assert(model.rendering_options["DisplayWatermarks"] == true, "DisplayWatermarks восстановлен после рендера с show_watermarks: false")
+
+    # 4. Комбинация: фон выключен, знаки включены — флаги независимы
+    tmp3 = DN1Code::ExportPdf2::Service::RenderService.render_scene_temp(model, bg_page, {
+      image_width: 800,
+      scale_factor: 1.0,
+      show_background: false,
+      show_watermarks: true
+    })
+    assert(File.exist?(tmp3), "Временный файл рендера без фона, но со знаками создан")
+    File.delete(tmp3) rescue nil
+    assert(model.rendering_options["DrawGround"] == true && model.rendering_options["DisplayWatermarks"] == true, "Фон и знаки восстановлены после рендера без фона со знаками")
+
+    # 5. SceneItem хранит флаг; миграция раздаёт знакам текущее значение фона
+    scene_wm = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Сцена со знаком", viewport_background: false, viewport_watermarks: true)
+    assert(scene_wm.viewport_watermarks == true && scene_wm.viewport_background == false, "SceneItem хранит viewport_watermarks независимо от viewport_background")
+    pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata.scenes = [
+      DN1Code::ExportPdf2::Model::SceneItem.new(name: "A", viewport_background: true),
+      DN1Code::ExportPdf2::Model::SceneItem.new(name: "B", viewport_background: false)
+    ]
+    pdata.migrate_watermark_default!
+    assert(pdata.scenes[0].viewport_watermarks == true, "migrate_watermark_default! раздаёт знакам значение фона (фон включен)")
+    assert(pdata.scenes[1].viewport_watermarks == false, "migrate_watermark_default! раздаёт знакам значение фона (фон выключен)")
+
+    # 6. Проверка неизменности оригинального файла project.yaml
     current_content = File.binread(root_project_yaml)
     current_md5 = Digest::MD5.hexdigest(current_content)
     assert(current_md5 == initial_md5, "КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым (MD5 совпадает)")

@@ -28,6 +28,9 @@ module DN1Code
         attr_accessor :frame_overlay
         # @return [Boolean] флаг отображения фона сцены (небо/земля) в видовом экране
         attr_accessor :viewport_background
+        # @return [Boolean] флаг отображения водяных знаков из стиля сцены в видовом экране
+        #   (управляется отдельно от фона, гасит RenderingOptions["DisplayWatermarks"])
+        attr_accessor :viewport_watermarks
         # @return [String] пропорции видового экрана ('3:2', '4:3', '5:4', '4:5', '16:9', '1:1', 'page')
         attr_accessor :aspect_ratio
         # @return [Integer] процент масштабирования/размещения на листе (60-100)
@@ -51,11 +54,12 @@ module DN1Code
         # @param viewport_visible [Boolean] устарел и игнорируется: видовой экран всегда включен
         # @param frame_overlay [Boolean] показывать ли рамку кадра в окне SketchUp для этой страницы
         # @param viewport_background [Boolean] отображать ли фон сцены (небо/земля) в видовом экране (по умолчанию выключен)
+        # @param viewport_watermarks [Boolean] отображать ли водяные знаки из стиля сцены в видовом экране (по умолчанию выключены)
         # @param aspect_ratio [String] пропорции кадра (3:2, 4:3, 5:4, 4:5, 16:9, 1:1, page)
         # @param scale_pct [Integer] масштаб/размещение кадра на листе в % (60-100)
         # @param align_h [String] выравнивание эскиза по горизонтали (left, center, right)
         # @param align_v [String] выравнивание эскиза по вертикали (top, center, bottom)
-        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, frame_overlay: false, viewport_background: false, aspect_ratio: "4:3", scale_pct: 100, align_h: "center", align_v: "center")
+        def initialize(name:, original_name: nil, scene_ref: nil, page_type: nil, description: "", order: 0, enabled: true, viewport_visible: true, frame_overlay: false, viewport_background: false, viewport_watermarks: false, aspect_ratio: "4:3", scale_pct: 100, align_h: "center", align_v: "center")
           @name             = name.to_s
           @original_name    = (original_name || name).to_s
           @scene_ref        = scene_ref
@@ -65,6 +69,7 @@ module DN1Code
           @viewport_visible = true
           @frame_overlay    = (frame_overlay == true || frame_overlay.to_s == "true")
           @viewport_background = (viewport_background == true || viewport_background.to_s == "true")
+          @viewport_watermarks = (viewport_watermarks == true || viewport_watermarks.to_s == "true")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
           @scale_pct        = (scale_pct || 100).to_i
           @align_h          = normalize_alignment(align_h, VALID_ALIGN_H)
@@ -115,6 +120,7 @@ module DN1Code
             viewport_visible: @viewport_visible,
             frame_overlay:    @frame_overlay,
             viewport_background: @viewport_background,
+            viewport_watermarks: @viewport_watermarks,
             aspect_ratio:     @aspect_ratio,
             scale_pct:        @scale_pct,
             align_h:          @align_h,
@@ -138,6 +144,7 @@ module DN1Code
             viewport_visible: true,
             frame_overlay:    hash.fetch(:frame_overlay, hash.fetch("frame_overlay", false)),
             viewport_background: hash.fetch(:viewport_background, hash.fetch("viewport_background", false)),
+            viewport_watermarks: hash.fetch(:viewport_watermarks, hash.fetch("viewport_watermarks", false)),
             aspect_ratio:     hash[:aspect_ratio] || hash["aspect_ratio"] || "4:3",
             scale_pct:        hash[:scale_pct] || hash["scale_pct"] || 100,
             align_h:          hash[:align_h] || hash["align_h"] || "center",

@@ -712,12 +712,19 @@ module DN1Code
         # ------------------------------------------------------------------
 
         def render_image_block(doc, page, layer, scene_item, content, img_cfg, ctx, temp_images, pt)
-          # Фон сцены (небо/земля/водяные знаки): посценный флаг с фолбэком на настройку слота шаблона
+          # Фон сцены (небо/земля): посценный флаг с фолбэком на настройку слота шаблона
           show_bg = if scene_item && scene_item.respond_to?(:viewport_background) && !scene_item.viewport_background.nil?
                       scene_item.viewport_background != false
                     else
                       slot_bg = img_cfg[:show_background] || img_cfg["show_background"]
                       !(slot_bg == false || slot_bg.to_s == "false" || slot_bg == 0 || slot_bg.to_s == "0")
+                    end
+          # Водяные знаки (DisplayWatermarks) — отдельный от фона посценный флаг;
+          # для страниц без сцены наследуем значение фона (прежнее поведение)
+          show_wm = if scene_item && scene_item.respond_to?(:viewport_watermarks) && !scene_item.viewport_watermarks.nil?
+                      scene_item.viewport_watermarks != false
+                    else
+                      show_bg
                     end
 
           ratio_str = if scene_item && scene_item.respond_to?(:aspect_ratio) && !scene_item.aspect_ratio.to_s.empty?
@@ -845,7 +852,10 @@ module DN1Code
                   skp_model.reset_style rescue nil
                 end
 
-                # Отключение фона видового экрана (небо/земля) в LayOut при выключенном фоне
+                # Отключение фона видового экрана (небо/земля) в LayOut при выключенном фоне.
+                # Ограничение: в LayOut API нет отдельного управления водяными знаками
+                # (есть только display_background=), поэтому в гибридном режиме
+                # водяные знаки следуют за переключателем фона, как раньше.
                 if !show_bg && skp_model.respond_to?(:display_background=)
                   begin
                     skp_model.display_background = false
@@ -946,6 +956,7 @@ module DN1Code
             page_size:          ctx[:settings][:page_size] || "A4",
             antialias:          ctx[:settings].fetch(:antialias, true),
             show_background:    show_bg,
+            show_watermarks:    show_wm,
             aspect_ratio:       target_ratio,
             image_aspect_ratio: ctx[:settings][:image_aspect_ratio],
             image_format:       ctx[:settings][:image_format] || "png",

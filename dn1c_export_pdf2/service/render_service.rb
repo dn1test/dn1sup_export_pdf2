@@ -18,8 +18,10 @@ module DN1Code
             (value != false && value.to_s != "false" && value != 0 && value.to_s != "0")
         end
 
-        # Временное отключение фона сцены (небо/земля/водяные знаки/туман) на rendering_options модели.
+        # Временное отключение фона сцены (небо/земля/туман) на rendering_options модели.
         # Ключа DisplaySky в RenderingOptions нет, поэтому градиент неба гасится принудительно белыми цветами.
+        # Водяные знаки (DisplayWatermarks) фоном не управляются — у них отдельная галка,
+        # см. apply_watermark_override.
         # @param ro [Sketchup::RenderingOptions, nil] параметры отрисовки модели
         # @param show_bg [Object] флаг «показывать фон»
         # @return [Hash] сохранённые исходные значения — передать в restore_background
@@ -27,7 +29,7 @@ module DN1Code
           orig_bg = {}
           return orig_bg if ro.nil? || background_enabled?(show_bg)
 
-          bg_keys = %w[BackgroundColor SkyColor GroundColor DrawGround DrawUnderground DisplayWatermarks DisplayFog]
+          bg_keys = %w[BackgroundColor SkyColor GroundColor DrawGround DrawUnderground DisplayFog]
           bg_keys.each do |k|
             has_key = ro.respond_to?(:keys) ? ro.keys.include?(k) : !ro[k].nil?
             orig_bg[k] = ro[k] if has_key
@@ -41,6 +43,26 @@ module DN1Code
             end
           end
           orig_bg
+        end
+
+        # Трактовка флага «показывать водяные знаки»: nil означает «не трогать»
+        # (водяные знаки следуют стилю сцены — прежнее поведение для вызовов без флага)
+        def self.watermark_enabled?(value)
+          !(value == false || value.to_s == "false" || value == 0 || value.to_s == "0")
+        end
+
+        # Независимое от фона управление водяными знаками сцены (DisplayWatermarks).
+        # @param ro [Sketchup::RenderingOptions, nil] параметры отрисовки модели
+        # @param show_wm [Object] флаг «показывать водяные знаки»
+        # @return [Hash] сохранённые исходные значения — передать в restore_background
+        def self.apply_watermark_override(ro, show_wm)
+          orig_wm = {}
+          return orig_wm if ro.nil? || show_wm.nil?
+
+          has_key = ro.respond_to?(:keys) ? ro.keys.include?("DisplayWatermarks") : !ro["DisplayWatermarks"].nil?
+          orig_wm["DisplayWatermarks"] = ro["DisplayWatermarks"] if has_key
+          ro["DisplayWatermarks"] = watermark_enabled?(show_wm)
+          orig_wm
         end
 
         # Восстанавливает параметры фона, изменённые apply_background_override
@@ -237,8 +259,10 @@ module DN1Code
               ro["LineExtension"]   = [1, (ext_val * line_mult).round].max if ext_val > 0
             end
 
-            # Временное отключение фона сцены (небо/земля/водяные знаки/туман) при show_background: false.
+            # Временное отключение фона сцены (небо/земля/туман) и водяных знаков при
+            # выключенных show_background / show_watermarks — два независимых флага.
             orig_bg = apply_background_override(ro, options[:show_background])
+            orig_wm = apply_watermark_override(ro, options.key?(:show_watermarks) ? options[:show_watermarks] : options["show_watermarks"])
 
             afs_setting = options[:annotation_font_size] || options["annotation_font_size"]
             hide_annot = options[:hide_annotations] == true || options["hide_annotations"] == true
@@ -250,11 +274,12 @@ module DN1Code
                 rescue StandardError => e
                   warn "[DN1C Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
                 ensure
-                  # Восстановление исходных параметров отрисовки линий и фона
+                  # Восстановление исходных параметров отрисовки линий, фона и водяных знаков
                   if ro && !orig_widths.empty?
                     orig_widths.each { |k, v| ro[k] = v }
                   end
                   restore_background(ro, orig_bg)
+                  restore_background(ro, orig_wm)
                 end
               end
             end

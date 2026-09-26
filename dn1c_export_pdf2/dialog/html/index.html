@@ -6,7 +6,7 @@
   <title>DN1C Export PDF 2 v2.3.0</title>
 <link rel="stylesheet" href="fonts/modus-icons.css">
 <link rel="stylesheet" href="modus-bootstrap.min.css">
-<link rel="stylesheet" href="app.css?v=20260925_design7">
+<link rel="stylesheet" href="app.css?v=20260926_watermark_toggle">
 </head>
 <body>
   <div class="app-container">
@@ -209,9 +209,13 @@
             <div class="scenes-quick-actions">
               <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check_mark</i> Все</button>
               <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content_close</i> Снять</button>
-              <label class="checkbox-label" title="Фон сцены (небо/земля/водяные знаки) включается/выключается сразу на всех страницах и на эскизах">
+              <label class="checkbox-label" title="Фон сцены (небо/земля/туман) включается/выключается сразу на всех страницах и на эскизах; водяные знаки — отдельная галка">
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
+              </label>
+              <label class="checkbox-label" title="Водяные знаки из стиля сцены SketchUp включаются/выключаются сразу на всех страницах и на эскизах — независимо от фона">
+                <input type="checkbox" id="chk_scenes_watermarks">
+                <span>Водяной знак</span>
               </label>
               <label class="checkbox-label" title="Рамка кадра в окне SketchUp: включить/выключить сразу на всех страницах (индивидуально — в меню кадра строки)">
                 <input type="checkbox" id="chk_scenes_frame_all">
@@ -815,6 +819,6 @@
     </footer>
   </div>
 
-  <script src="app.js?v=20260924_noicons"></script>
+  <script src="app.js?v=20260926_watermark_toggle"></script>
 </body>
 </html>

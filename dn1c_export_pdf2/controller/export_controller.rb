@@ -273,12 +273,19 @@ module DN1Code
             optimize_png:       optimize_png
           }
           # Фон видового экрана: тот же посценный флаг, что и в PDF-вьюпортах —
-          # при viewport_background=false небо/земля/водяные знаки гасятся (белый фон).
+          # при viewport_background=false небо/земля гасятся (белый фон).
           # По умолчанию фон выключен.
           opts[:show_background] = if scene_item.respond_to?(:viewport_background) && !scene_item.viewport_background.nil?
                                      scene_item.viewport_background != false
                                    else
                                      false
+                                   end
+          # Водяные знаки — независимый от фона посценный флаг; для страниц без
+          # флага наследуем значение фона (прежнее поведение).
+          opts[:show_watermarks] = if scene_item.respond_to?(:viewport_watermarks) && !scene_item.viewport_watermarks.nil?
+                                     scene_item.viewport_watermarks != false
+                                   else
+                                     opts[:show_background]
                                    end
           # Пропорция конкретной сцены приоритетна; "page"/"4:3"/custom уходят в глобальную логику
           sc_ratio = scene_aspect_ratio(scene_item)

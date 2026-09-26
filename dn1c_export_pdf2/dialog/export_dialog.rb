@@ -416,10 +416,11 @@ module DN1Code
                 orig_guides = ro ? (ro["HideConstructionGeometry"] rescue nil) : nil
                 orig_sec_planes = ro ? (ro["DisplaySectionPlanes"] rescue nil) : nil
 
-                # Карта «имя страницы → показывать ли фон»: эскизы подчиняются той же
-                # глобальной галке «Фон», что и видовые экраны PDF/экспорта.
-                # По умолчанию фон выключен.
+                # Карты «имя страницы → показывать ли фон / водяные знаки»: эскизы
+                # подчиняются тем же глобальным галкам «Фон» и «Водяной знак», что и
+                # видовые экраны PDF/экспорта. По умолчанию фон и знаки выключены.
                 bg_by_name = {}
+                wm_by_name = {}
                 if defined?(Model::SessionStore)
                   pd = Model::SessionStore.data(model) rescue nil
                   scenes = pd ? (pd.scenes || []) : []
@@ -427,6 +428,9 @@ module DN1Code
                     bg = !(sc.respond_to?(:viewport_background) && sc.viewport_background == false)
                     bg_by_name[sc.original_name] = bg if sc.respond_to?(:original_name)
                     bg_by_name[sc.name] = bg if sc.respond_to?(:name)
+                    wm = !(sc.respond_to?(:viewport_watermarks) && sc.viewport_watermarks == false)
+                    wm_by_name[sc.original_name] = wm if sc.respond_to?(:original_name)
+                    wm_by_name[sc.name] = wm if sc.respond_to?(:name)
                   end
                 end
 
@@ -446,13 +450,18 @@ module DN1Code
                       ro["DisplaySectionPlanes"] = false rescue nil
                     end
 
-                    # Гашение фона (небо/земля/водяные знаки) для сцен с выключенной галкой
+                    # Гашение фона (небо/земля) и водяных знаков для сцен с выключенными галками
                     show_bg = bg_by_name.fetch(p_name, false)
                     orig_bg = defined?(Service::RenderService) ? Service::RenderService.apply_background_override(ro, show_bg) : {}
+                    show_wm = wm_by_name.fetch(p_name, false)
+                    orig_wm = defined?(Service::RenderService) ? Service::RenderService.apply_watermark_override(ro, show_wm) : {}
 
                     tmp = File.join(Dir.tmpdir, "dn1c_scene_thumb_#{i}_#{Time.now.to_i}.jpg").tr("\\", "/")
                     model.active_view.write_image(filename: tmp, width: 360, height: 240, antialias: false) rescue nil
-                    Service::RenderService.restore_background(ro, orig_bg) if defined?(Service::RenderService)
+                    if defined?(Service::RenderService)
+                      Service::RenderService.restore_background(ro, orig_bg)
+                      Service::RenderService.restore_background(ro, orig_wm)
+                    end
                     if File.exist?(tmp)
                       b64 = Base64.strict_encode64(File.binread(tmp)) rescue nil
                       thumbs[p_name] = "data:image/jpeg;base64,#{b64}" if b64
