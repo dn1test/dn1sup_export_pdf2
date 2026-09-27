@@ -70,12 +70,12 @@
             </div>
             <div class="form-grid">
               <div class="form-group full-width">
-                <label for="inputFurnitureName">Изделие / Теги мебели (product_tags) *</label>
+                <label for="inputFurnitureName">Изделие / Название мебели</label>
                 <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба, Зеркало">
               </div>
 
               <div class="form-group">
-                <label for="inputRoomName">Комната / Помещение / Место установки *</label>
+                <label for="inputRoomName">Комната / Помещение / Место</label>
                 <input type="text" id="inputRoomName" class="form-control" placeholder="например: Прихожая, Кухня-гостиная">
               </div>
 
@@ -86,7 +86,7 @@
 
               <div class="form-group full-width">
                 <label for="inputProjectDescription">Описание проекта / задания</label>
-                <textarea id="inputProjectDescription" class="form-control" rows="2" placeholder="Краткое описание задания и назначения изделия..."></textarea>
+                <textarea id="inputProjectDescription" class="form-control" rows="7" placeholder="Краткое описание задания и назначения изделия..."></textarea>
               </div>
 
             </div>
@@ -140,41 +140,48 @@
             <!-- Левая колонка: параметры жизненного цикла -->
             <div class="workflow-left-col">
               <div class="form-grid workflow-grid">
-                <div class="form-group">
+                <div class="form-group span-2">
                   <label for="inputAuthor">Автор / Ответственный конструктор</label>
                   <input type="text" id="inputAuthor" class="form-control" placeholder="например: Иванов И.И.">
                 </div>
 
-                <div class="form-group">
+                <div class="form-group span-2">
                   <label for="inputPrice">Стоимость проекта (руб. / валюта)</label>
                   <input type="text" id="inputPrice" class="form-control" placeholder="например: 125 000">
                 </div>
 
-                <div class="form-group full-width">
-                  <label for="inputStartDate">Дата начала — дата сдачи (Дедлайн)</label>
-                  <div class="joined-fields">
-                    <input type="date" id="inputStartDate" class="form-control">
-                    <span class="joined-fields-sep">&mdash;</span>
-                    <input type="date" id="inputEndDate" class="form-control">
-                  </div>
+                <div class="form-group span-1">
+                  <label for="inputStartDate">Дата начала</label>
+                  <input type="date" id="inputStartDate" class="form-control">
                 </div>
 
-                <div class="form-group">
-                  <label for="inputTotalDuration">Общая длительность / Трудозатраты</label>
+                <div class="form-group span-1">
+                  <label for="inputEndDate">Дата сдачи</label>
+                  <input type="date" id="inputEndDate" class="form-control">
+                </div>
+
+                <div class="form-group span-2">
+                  <label for="inputTotalDuration">Общая длительность проекта</label>
                   <input type="text" id="inputTotalDuration" class="form-control" placeholder="например: 9 дней / 45 часов">
                 </div>
 
-                <div class="form-group">
-                  <label for="inputVersion">Вариант проекта / Ревизия (version.revision)</label>
-                  <div class="joined-fields">
-                    <input type="number" id="inputVersion" class="form-control joined-fields-num" min="1" value="1">
-                    <span class="joined-fields-sep">.</span>
-                    <input type="number" id="inputRevision" class="form-control joined-fields-num" min="1" value="1">
-                  </div>
+                <div class="form-group span-1">
+                  <label for="inputVersion">Вариант</label>
+                  <input type="number" id="inputVersion" class="form-control" min="1" value="1">
+                </div>
+
+                <div class="form-group span-1">
+                  <label for="inputRevision">Ревизия</label>
+                  <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+                </div>
+
+                <div class="form-group span-2">
+                  <label for="inputRate">Ставка руб./час</label>
+                  <input type="text" id="inputRate" class="form-control">
                 </div>
 
                 <div class="form-group full-width">
-                  <label for="inputLastEdit">Комментарий к очередной правке проекта (last_edit)</label>
+                  <label for="inputLastEdit">Комментарий к последней правке</label>
                   <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
                 </div>
               </div>

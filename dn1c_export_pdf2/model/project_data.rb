@@ -144,6 +144,9 @@ module DN1Code
             when :total_duration
               @owner.workflow[:total_duration] = val.to_s
               super(:total_duration, val.to_s)
+            when :rate
+              @owner.workflow[:rate] = val.to_s
+              super(:rate, val.to_s)
             when :status
               @owner.workflow[:status] = val.to_s
               super(:status, val.to_s)
@@ -194,7 +197,7 @@ module DN1Code
         attr_accessor :project
         # @return [Hash] карточка заказчика (id, name, phone, email, company)
         attr_accessor :customer
-        # @return [Hash] ход работы и жизненный цикл (author, price, start_date, end_date, total_duration, status, version, revision, history_edit)
+        # @return [Hash] ход работы и жизненный цикл (author, price, start_date, end_date, total_duration, rate, status, version, revision, history_edit)
         attr_accessor :workflow
         # @return [Hash] метаданные и реквизиты проекта для обратной совместимости
         attr_accessor :project_info
@@ -437,6 +440,7 @@ module DN1Code
             start_date:     "",
             end_date:       "",
             total_duration: "",
+            rate:           "",
             status:         "Правки",
             version:        "01",
             revision:       "001",
@@ -727,6 +731,10 @@ module DN1Code
           w_dur = self.class.pick_str(@workflow[:total_duration], @project_info[:total_duration])
           @workflow[:total_duration]     = w_dur
           @project_info[:total_duration] = w_dur
+
+          w_rate = self.class.pick_str(@workflow[:rate], @project_info[:rate])
+          @workflow[:rate]     = w_rate
+          @project_info[:rate] = w_rate
 
           # Стадии проекта (Stadia)
           st_raw = @workflow[:stadia] || @project_info[:stadia]

@@ -9,6 +9,8 @@ module DN1Code
       # следующей; прежние отдельные "dir.<индекс>.title" и
       # "dir.<индекс>.description" тоже поддерживаются),
       # "scene.name", "page.number_total".
+      # Условный "customer.name_or_company" зависит от типа проекта:
+      # коммерческий — название компании, бытовой — заказчик.
       # Возвращает «сырое» значение БЕЗ заголовка-префикса: заголовок задаётся
       # настройкой самого параметра (label/show_label в конфиге шаблона).
       # Пустое значение — nil: параметр не выводится на лист (без заглушек).
@@ -48,6 +50,7 @@ module DN1Code
             "project.description"     => "Описание проекта",
             "customer.id"             => "ID заказчика",
             "customer.name"           => "Заказчик (контактное лицо)",
+            "customer.name_or_company" => "Заказчик / Компания (по типу проекта)",
             "customer.phone"          => "Телефон",
             "customer.email"          => "Email",
             "workflow.author"         => "Автор / Конструктор",
@@ -55,6 +58,7 @@ module DN1Code
             "workflow.start_date"     => "Дата начала",
             "workflow.end_date"       => "Дата сдачи",
             "workflow.duration"       => "Длительность / Трудозатраты",
+            "workflow.rate"           => "Ставка руб./час",
             "workflow.version"        => "Версия",
             "workflow.revision"       => "Ревизия",
             "workflow.date"           => "Дата",
@@ -88,6 +92,11 @@ module DN1Code
           when "project.description"    then non_blank(info[:project_description] || info[:description])
           when "customer.id"            then non_blank(info[:customer_id] || info[:id])
           when "customer.name"          then non_blank(info[:name_customer] || info[:customer])
+          when "customer.name_or_company"
+            # Условный источник: коммерческий проект — компания, бытовой — заказчик
+            info[:trade].to_s == "1" ?
+              non_blank(info[:company] || info[:name_company]) :
+              non_blank(info[:name_customer] || info[:customer])
           when "customer.phone"         then non_blank(info[:phone])
           when "customer.email"         then non_blank(info[:email])
           when "workflow.author"        then non_blank(workflow[:author] || info[:author])
@@ -99,6 +108,7 @@ module DN1Code
           when "workflow.duration"
             v = non_blank(info[:total_duration])
             v && (v.match?(/дн|день|час/i) ? v : "#{v} дн.")
+          when "workflow.rate"          then non_blank(workflow[:rate] || info[:rate])
           when "workflow.version"       then "v#{non_blank(workflow[:version] || info[:version]) || '01'}"
           when "workflow.revision"      then "#r#{non_blank(workflow[:revision] || info[:revision]) || '001'}"
           when "workflow.date"          then non_blank(workflow[:date_order] || info[:date]) || Time.now.strftime("%d.%m.%Y")

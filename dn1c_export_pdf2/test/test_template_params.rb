@@ -58,6 +58,7 @@ module DN1Code
           )
           pd.workflow[:version]         = "02"
           pd.workflow[:revision]        = "003"
+          pd.workflow[:rate]            = "1 250"
           pd.workflow[:last_edit_date]  = "22.09.2026"
           # Канонический порядок истории: новые записи сверху (как в Ruby-памяти)
           pd.workflow[:history_edit]    = [
@@ -251,6 +252,12 @@ module DN1Code
           assert(res.resolve_param(rctx, "customer.name") == "Иванов И.И.", "customer.name → заказчик")
           assert(res.resolve_param(rctx, "workflow.price") == "150 000 руб.", "workflow.price → с «руб.»")
           assert(res.resolve_param(rctx, "workflow.duration") == "45 дн.", "workflow.duration → с «дн.»")
+          assert(res.resolve_param(rctx, "workflow.rate") == "1 250", "workflow.rate → ставка руб./час")
+          pd_nr = tp_make_project
+          pd_nr.workflow.delete(:rate)
+          pd_nr.project_info.delete(:rate)
+          rctx_nr = LB.send(:resolver_context, LB.send(:build_context, pd_nr, nil, "Sofia Sans Condensed"), nil, 2, 3)
+          assert(res.resolve_param(rctx_nr, "workflow.rate").nil?, "Пустая ставка → nil")
           assert(res.resolve_param(rctx, "workflow.version") == "v02", "workflow.version → v02")
           assert(res.resolve_param(rctx, "workflow.revision") == "#r003", "workflow.revision → #r003")
           assert(res.resolve_param(rctx, "workflow.author").nil?, "Пустой автор → nil")
@@ -837,6 +844,71 @@ module DN1Code
           assert(lens.all? { |l| l.positive? && l < page_w_pt * 0.25 },
                  "Разделитель небольшой — шириной с текст строки (#{lens.map { |l| l.round(1) }.inspect} pt при странице #{page_w_pt.round} pt)")
         end
+
+        # ------------------------------------------------------------------
+        # 87. Условный источник «Заказчик / Компания»: значение и подпись
+        #     зависят от типа проекта (коммерческий — компания, бытовой — заказчик)
+        # ------------------------------------------------------------------
+        def test_87_template_params_conditional_customer_or_company
+          puts "\n--- 87. Условный источник customer.name_or_company (по типу проекта) ---"
+
+          res = ::DN1Code::ExportPdf2::Service::InfoLineResolver
+          assert(res.param_source_labels.key?("customer.name_or_company"),
+                 "Каталог источников: условный источник задокументирован")
+
+          # 1. Коммерческий проект (CF#) → название компании, подпись «Компания»
+          pd = tp_make_project
+          pd.project_info[:trade] = "1"
+          ctx  = LB.send(:build_context, pd, nil, "Sofia Sans Condensed")
+          rctx = LB.send(:resolver_context, ctx, nil, 2, 3)
+          assert(res.resolve_param(rctx, "customer.name_or_company") == "ООО «МебельПроект»",
+                 "Коммерческий проект → значение «Компания»")
+          assert(LB.send(:effective_param_label, "customer.name_or_company", "", rctx) == "Компания",
+                 "Коммерческий проект → авто-подпись «Компания»")
+
+          # 2. Бытовой проект (HF#) → имя заказчика, подпись «Заказчик»
+          pd_house = tp_make_project
+          pd_house.project_info[:articul] = "HF#260922_100000"
+          hctx  = LB.send(:build_context, pd_house, nil, "Sofia Sans Condensed")
+          hrctx = LB.send(:resolver_context, hctx, nil, 2, 3)
+          assert(res.resolve_param(hrctx, "customer.name_or_company") == "Иванов И.И.",
+                 "Бытовой проект → значение «Заказчик»")
+          assert(LB.send(:effective_param_label, "customer.name_or_company", "", hrctx) == "Заказчик",
+                 "Бытовой проект → авто-подпись «Заказчик»")
+
+          # 3. Незаполненное значение → nil (параметр не выводится, без заглушек)
+          pd_no_co = tp_make_project
+          pd_no_co.project_info[:trade] = "1"
+          pd_no_co.project_info[:company] = ""
+          nctx = LB.send(:resolver_context, LB.send(:build_context, pd_no_co, nil, "Sofia Sans Condensed"), nil, 2, 3)
+          assert(res.resolve_param(nctx, "customer.name_or_company").nil?,
+                 "Коммерческий без компании → nil")
+          pd_no_cu = tp_make_project
+          pd_no_cu.project_info[:articul] = "HF#260922_100000"
+          pd_no_cu.project_info[:name_customer] = ""
+          nhrctx = LB.send(:resolver_context, LB.send(:build_context, pd_no_cu, nil, "Sofia Sans Condensed"), nil, 2, 3)
+          assert(res.resolve_param(nhrctx, "customer.name_or_company").nil?,
+                 "Бытовой без заказчика → nil")
+
+          # 4. Рендер на лист: заголовок и значение меняются вместе с типом
+          tp_add_param(pd, :cover, "customer.name_or_company")
+          comm = tp_find_text(tp_render(pd), "ООО «МебельПроект»")
+          assert(comm && comm.plain_text.split("\n", -1) == ["Компания", "ООО «МебельПроект»"],
+                 "Коммерческий лист: «Компания» на своей строке, значение — на следующей (#{comm&.plain_text.inspect})")
+          tp_params(pd_house, :cover) << {
+            id: "p_house", source: "customer.name_or_company", label: "", show_label: true,
+            align: "left", valign: "top", font_family: "", font_size: 10.0,
+            color: "#0F172A", visible: true
+          }
+          house = tp_find_text(tp_render(pd_house), "Иванов И.И.")
+          assert(house && house.plain_text.split("\n", -1) == ["Заказчик", "Иванов И.И."],
+                 "Бытовой лист: «Заказчик» на своей строке, значение — на следующей (#{house&.plain_text.inspect})")
+
+          # 5. Guard: диалог знает условный источник (список/подпись/превью)
+          js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+          assert(js.include?("customer.name_or_company"),
+                 "app.js: условный источник «Заказчик / Компания» в списке добавления параметров")
+        end
       end
     end
   end
@@ -880,6 +952,7 @@ if __FILE__ == $PROGRAM_NAME
         test_84_template_params_group_block
         test_85_template_params_height_label_and_overflow_clamp
         test_86_template_params_line_gap_and_separator
+        test_87_template_params_conditional_customer_or_company
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"

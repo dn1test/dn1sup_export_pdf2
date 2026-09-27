@@ -685,29 +685,6 @@ body {
   grid-column: span 2;
 }
 
-.joined-fields {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.joined-fields .form-control {
-  flex: 1;
-  min-width: 0;
-}
-
-.joined-fields .joined-fields-num {
-  flex: none;
-  width: 76px;
-  text-align: center;
-}
-
-.joined-fields-sep {
-  flex: none;
-  color: var(--text-secondary);
-  font-weight: 600;
-}
-
 label {
   font-size: 12px;
   font-weight: 600;
@@ -954,6 +931,7 @@ textarea.form-control {
   margin-top: 2px;
 }
 
+/* Сплит карточки Workflow: параметры слева, чекбоксы стадий справа */
 .workflow-split-layout {
   display: flex;
   gap: 20px;
@@ -969,6 +947,39 @@ textarea.form-control {
   flex-direction: column;
   border-left: 1px solid var(--border-light);
   padding-left: 20px;
+}
+
+/* 4-колоночная сетка параметров Workflow в левой колонке
+   (span-1 — четверть, span-2 — половина, full-width — весь ряд) */
+.workflow-grid {
+  grid-template-columns: repeat(4, 1fr);
+}
+
+.workflow-grid .form-group.span-1 {
+  grid-column: span 1;
+}
+
+.workflow-grid .form-group.span-2 {
+  grid-column: span 2;
+}
+
+.workflow-grid .form-group.full-width {
+  grid-column: span 4;
+}
+
+@media (max-width: 760px) {
+  .workflow-grid {
+    grid-template-columns: 1fr 1fr;
+  }
+
+  .workflow-grid .form-group.span-1,
+  .workflow-grid .form-group.span-2 {
+    grid-column: span 1;
+  }
+
+  .workflow-grid .form-group.full-width {
+    grid-column: span 2;
+  }
 }
 
 .workflow-stadia-panel {

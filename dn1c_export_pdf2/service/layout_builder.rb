@@ -1076,6 +1076,7 @@ module DN1Code
           "workflow.start_date"  => "Дата начала",
           "workflow.end_date"    => "Дата сдачи",
           "workflow.duration"    => "Длительность",
+          "workflow.rate"        => "Ставка руб./час",
           "workflow.version"     => "Версия",
           "workflow.revision"    => "Ревизия",
           "workflow.date"        => "Дата",
@@ -1111,6 +1112,12 @@ module DN1Code
           return label unless label.empty?
 
           src = source.to_s.strip
+          # Условный источник «Заказчик / Компания»: подпись тоже условная —
+          # коммерческий проект печатает «Компания», бытовой — «Заказчик»
+          if src == "customer.name_or_company"
+            info = (rctx && rctx[:info]) || {}
+            return info[:trade].to_s == "1" ? "Компания" : "Заказчик"
+          end
           return AUTO_PARAM_LABELS[src] if AUTO_PARAM_LABELS.key?(src)
 
           m = src.match(/\Adir\.(\d+)\.(title|description|line)\z/)

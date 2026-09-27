@@ -98,6 +98,7 @@
         { value: "customer.id",    label: "🆔 ID заказчика" },
         { value: "customer.name",  label: "👤 Заказчик (контактное лицо)" },
         { value: "project.company", label: "🏢 Название компании" },
+        { value: "customer.name_or_company", label: "🔄 Заказчик / Компания (по типу проекта)" },
         { value: "customer.phone", label: "📞 Телефон" },
         { value: "customer.email", label: "✉️ Email" }
       ] },
@@ -107,6 +108,7 @@
         { value: "workflow.start_date", label: "📅 Дата начала" },
         { value: "workflow.end_date",   label: "📅 Дата сдачи" },
         { value: "workflow.duration",   label: "⏱️ Длительность / Трудозатраты" },
+        { value: "workflow.rate",       label: "🧮 Ставка руб./час" },
         { value: "workflow.version",    label: "🔢 Версия" },
         { value: "workflow.revision",   label: "🏷️ Ревизия" },
         { value: "workflow.date",       label: "🗓️ Дата" },
@@ -177,6 +179,7 @@
     "workflow.start_date":  "Дата начала",
     "workflow.end_date":    "Дата сдачи",
     "workflow.duration":    "Длительность",
+    "workflow.rate":        "Ставка руб./час",
     "workflow.version":     "Версия",
     "workflow.revision":    "Ревизия",
     "workflow.date":        "Дата",
@@ -198,6 +201,11 @@
     const l = tval(label).replace(/:+\s*$/, "").trim();
     if (l) return l;
     const s = tval(source);
+    // Условный источник «Заказчик / Компания»: подпись тоже условная —
+    // коммерческий проект печатает «Компания», бытовой — «Заказчик»
+    if (s === "customer.name_or_company") {
+      return getTradeValue() === "1" ? "Компания" : "Заказчик";
+    }
     if (AUTO_PARAM_LABELS[s]) return AUTO_PARAM_LABELS[s];
     const m = s.match(/^dir\.(\d+)\.(title|description|line)$/);
     if (m) {
@@ -225,6 +233,11 @@
       case "project.description":    return tval(info.project_description || info.description);
       case "customer.id":            return tval(info.customer_id || info.id);
       case "customer.name":          return tval(info.name_customer || info.customer);
+      case "customer.name_or_company":
+        // Условный источник: коммерческий проект — компания, бытовой — заказчик
+        return getTradeValue() === "1"
+          ? tval(info.company || info.name_company)
+          : tval(info.name_customer || info.customer);
       case "customer.phone":         return tval(info.phone);
       case "customer.email":         return tval(info.email);
       case "workflow.author":        return tval(wf.author || info.author);
@@ -238,6 +251,7 @@
         const d = tval(info.total_duration);
         return d ? (/дн|день|час/i.test(d) ? d : `${d} дн.`) : "";
       }
+      case "workflow.rate":          return tval(wf.rate || info.rate);
       case "workflow.version":       return `v${tval(wf.version || info.version) || "01"}`;
       case "workflow.revision":      return `#r${tval(wf.revision || info.revision) || "001"}`;
       case "workflow.date":          return previewDate(wf.date_order || info.date);
@@ -485,6 +499,7 @@ const DEFAULT_LAYOUTS = {
     inputTotalDuration: document.getElementById("inputTotalDuration"),
     inputVersion: document.getElementById("inputVersion"),
     inputRevision: document.getElementById("inputRevision"),
+    inputRate: document.getElementById("inputRate"),
     inputStatus: document.getElementById("inputStatus"),
     stadiaCheckboxesContainer: document.getElementById("stadiaCheckboxesContainer"),
     inputNewStadia: document.getElementById("inputNewStadia"),
@@ -2812,6 +2827,7 @@ function updateParamModalPreview() {
     if (els.inputStatus) els.inputStatus.value = wf.status || info.status || "Предварительный";
     if (els.inputVersion) els.inputVersion.value = wf.version || info.version || 1;
     if (els.inputRevision) els.inputRevision.value = wf.revision || info.revision || 1;
+    if (els.inputRate) els.inputRate.value = wf.rate || info.rate || "";
     if (els.inputLastEdit) els.inputLastEdit.value = info.last_edit || info.edit || "";
 
     // Task Brief (для вкладок ТЗ)
@@ -4633,6 +4649,7 @@ function updateParamModalPreview() {
     const startDateVal = (els.inputStartDate ? els.inputStartDate.value : "").trim();
     const endDateVal = (els.inputEndDate ? els.inputEndDate.value : "").trim();
     const totalDurationVal = (els.inputTotalDuration ? els.inputTotalDuration.value : "").trim();
+    const rateVal = (els.inputRate ? els.inputRate.value : "").trim();
 
     // Статус определяется по последней активной стадии
     const activeStadia = (state.workflow?.stadia || []).filter(s => s.status);
@@ -4681,6 +4698,7 @@ function updateParamModalPreview() {
       start_date: startDateVal,
       end_date: endDateVal,
       total_duration: totalDurationVal,
+      rate: rateVal,
       status: statusVal,
       version: String(verVal),
       revision: String(revVal),
@@ -4723,6 +4741,7 @@ function updateParamModalPreview() {
       email:            emailVal,
       author:           authorVal,
       price:            priceVal,
+      rate:             rateVal,
       task_description: (els.inputTaskDescription ? els.inputTaskDescription.value : "").trim() || descVal,
       task_dimensions:  (els.inputTaskDimensions ? els.inputTaskDimensions.value : "").trim(),
       task_wishes:      (els.inputTaskWishes ? els.inputTaskWishes.value : "").trim(),
@@ -5473,7 +5492,7 @@ function updateParamModalPreview() {
       "inputCompany", "inputArticul", "inputTags",
       "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
-      "inputTotalDuration", "inputStatus", "inputRevision", "inputVersion",
+      "inputTotalDuration", "inputRate", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
       "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",

@@ -225,6 +225,7 @@ class TestRunner
     test_83_template_params_render_reads_new_config_only
     test_84_template_params_group_block
     test_85_template_params_auto_labels
+    test_87_template_params_conditional_customer_or_company
     test_86_overlay_follows_native_page_switch
     test_87_refresh_thumbnails_button_and_sig_guard
 
