@@ -508,6 +508,7 @@ const DEFAULT_LAYOUTS = {
 
     // Tab Directories
     directoriesCardsContainer: document.getElementById("directoriesCardsContainer"),
+    btnRefreshDirectories: document.getElementById("btnRefreshDirectories"),
     btnAddDirectory: document.getElementById("btnAddDirectory"),
 
     // Tab Settings
@@ -3003,6 +3004,28 @@ function updateParamModalPreview() {
     }, 4500);
   }
 
+  // Пересканирует файлы одной папки: сбрасывает кеш и бейджи, запрашивает
+  // список файлов у Ruby. Используется общей кнопкой «Обновить» в заголовке секции.
+  // @return [Boolean] false, если у папки не указан путь
+  function refreshDirectoryFiles(index) {
+    const d = state.directories[index];
+    if (!d || !d.path) return false;
+    const badge = document.getElementById(`dirFileBadge_${index}`);
+    const grid = document.getElementById(`dirPreviewGrid_${index}`);
+    if (badge) {
+      badge.textContent = "Сканирование...";
+      badge.className = "badge badge-tag badge-grid";
+    }
+    if (grid) {
+      grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
+    }
+    if (state.folderFiles) delete state.folderFiles[index];
+    if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
+    scheduleScanTimeout(index, d.path);
+    callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
+    return true;
+  }
+
   // Синхронизирует спецификации проекта, связывая их с описаниями (description) в каталогах directories
   function syncDirectoriesSpecifications() {
     if (!Array.isArray(state.directories)) return;
@@ -3186,10 +3209,11 @@ function updateParamModalPreview() {
         notifyChange();
       });
 
-      // Путь — мелкий текст справа от заголовка; клик открывает проводник для выбора
+      // Путь — кнопка рядом с названием раздела; клик открывает проводник для выбора
       // папки, заголовок при выборе берется из имени конечного каталога (onDirectorySelected)
-      const pathText = document.createElement("span");
-      pathText.className = "dir-path-text" + (d.path ? "" : " empty");
+      const pathText = document.createElement("button");
+      pathText.type = "button";
+      pathText.className = "dir-path-text btn btn-xs btn-secondary" + (d.path ? "" : " empty");
       pathText.textContent = d.path || "выбрать папку…";
       pathText.title = d.path
         ? `${d.path}\nНажмите, чтобы выбрать другую папку`
@@ -3198,32 +3222,7 @@ function updateParamModalPreview() {
         callRuby("selectDirectory", index.toString());
       });
 
-      const btnRefresh = document.createElement("button");
-      btnRefresh.type = "button";
-      btnRefresh.className = "btn btn-xs btn-secondary";
-      btnRefresh.innerHTML = '<i class="modus-icons" style="font-size: 13px; vertical-align: -2px; margin-right: 4px;">refresh</i> Обновить';
-      btnRefresh.title = "Пересканировать файлы в папке";
-      btnRefresh.addEventListener("click", () => {
-        if (d.path) {
-          const badge = document.getElementById(`dirFileBadge_${index}`);
-          const grid = document.getElementById(`dirPreviewGrid_${index}`);
-          if (badge) {
-            badge.textContent = "Сканирование...";
-            badge.className = "badge badge-tag badge-grid";
-          }
-          if (grid) {
-            grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
-          }
-          if (state.folderFiles) delete state.folderFiles[index];
-          if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
-          scheduleScanTimeout(index, d.path);
-          callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
-        } else {
-          showNotification("Укажите путь к папке", "warning");
-        }
-      });
-
-      // Действия шапки справа: «Обновить» и чекбокс отправки на сервер
+      // Действия шапки справа: чекбокс отправки на сервер
       const headerActions = document.createElement("div");
       headerActions.className = "dir-header-actions";
 
@@ -3244,7 +3243,6 @@ function updateParamModalPreview() {
       sendServerText.textContent = "Отправлять на сервер";
       sendServerLabel.appendChild(sendServerText);
 
-      headerActions.appendChild(btnRefresh);
       headerActions.appendChild(sendServerLabel);
 
       headerLeft.appendChild(titleInput);
@@ -4934,6 +4932,26 @@ function updateParamModalPreview() {
         // Сразу открываем проводник для выбора папки у новой карточки:
         // после выбора путь и заголовок из имени папки придут в onDirectorySelected
         callRuby("selectDirectory", newIndex.toString());
+      });
+    }
+
+    // Общая кнопка «Обновить»: пересканирует файлы во всех папках с указанным путём
+    if (els.btnRefreshDirectories) {
+      els.btnRefreshDirectories.addEventListener("click", () => {
+        const dirs = Array.isArray(state.directories) ? state.directories : [];
+        if (dirs.length === 0) {
+          showNotification("Нет папок для обновления", "warning");
+          return;
+        }
+        let refreshed = 0;
+        dirs.forEach((d, index) => {
+          if (refreshDirectoryFiles(index)) refreshed++;
+        });
+        if (refreshed === 0) {
+          showNotification("Укажите путь к папке", "warning");
+        } else {
+          showNotification(`Обновление файлов: папок ${refreshed}`, "info");
+        }
       });
     }
 

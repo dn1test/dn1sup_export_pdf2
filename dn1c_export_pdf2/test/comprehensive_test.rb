@@ -2574,6 +2574,25 @@ class TestRunner
            "app.css прижимает блок «Обновить» + чекбокс отправки к правому краю")
     assert(css_text.include?("dir-send-server-label"), "app.css содержит стиль чекбокса отправки")
 
+    # 5. Общая кнопка «Обновить» в заголовке секции (рядом с «Добавить папку»),
+    #    пересканирует все папки; кнопка «Обновить» из карточек папок удалена
+    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    assert(html_text.include?('id="btnRefreshDirectories"'), "index.html содержит общую кнопку обновления папок #btnRefreshDirectories")
+    btn_pos = html_text.index('id="btnRefreshDirectories"')
+    add_pos = html_text.index('id="btnAddDirectory"')
+    assert(btn_pos && add_pos && btn_pos < add_pos, "Кнопка «Обновить» расположена рядом с «Добавить папку» в заголовке секции")
+    assert(js_text.include?('btnRefreshDirectories: document.getElementById("btnRefreshDirectories")'), "app.js регистрирует btnRefreshDirectories в els")
+    assert(js_text.include?("function refreshDirectoryFiles(index)"), "app.js содержит общую функцию пересканирования папки")
+    assert(js_text.include?("els.btnRefreshDirectories.addEventListener"), "app.js обрабатывает нажатие общей кнопки «Обновить»")
+    assert(!js_text.include?("Пересканировать файлы в папке"), "Кнопка «Обновить» удалена из карточек папок")
+    assert(css_text.include?(".card-header-buttons"), "app.css содержит стиль группы кнопок заголовка секции")
+
+    # 6. Название папки рядом с названием раздела оформлено кнопкой (клик — выбор папки)
+    assert(js_text.include?('dir-path-text btn btn-xs btn-secondary'), "app.js оформляет название папки кнопкой в шапке карточки")
+    assert(css_text.include?("button.dir-path-text"), "app.css содержит стили кнопки пути в шапке карточки")
+    assert(css_text.include?("justify-content: flex-start") || css_text.include?("text-align: left"),
+           "app.css выравнивает текст кнопки пути влево с обрезкой длинных путей")
+
     FileUtils.rm_rf(test_dir)
   end
 

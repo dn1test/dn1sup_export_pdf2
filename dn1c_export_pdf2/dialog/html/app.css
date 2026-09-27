@@ -624,6 +624,15 @@ body {
   background: transparent;
 }
 
+/* Группа кнопок в заголовке секции (Обновить + Добавить папку) */
+.card-header-buttons {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
 .card-header-title-wrap {
   display: flex;
   align-items: center;
@@ -2388,7 +2397,8 @@ tr:hover td {
   background: #ffffff;
 }
 
-/* Путь — кликабельный текст рядом с названием (открывает выбор папки) */
+/* Путь — кнопка рядом с названием раздела (клик — выбор папки);
+   растягивается под текст, длинные пути обрезаются многоточием */
 .dir-path-text {
   font-size: 12px;
   color: var(--text-secondary);
@@ -2400,16 +2410,17 @@ tr:hover td {
   max-width: 340px;
   min-width: 90px;
   flex: 0 1 auto;
+  justify-content: flex-start;
+  text-align: left;
 }
 
-.dir-path-text:hover {
-  color: var(--bs-primary);
-  text-decoration: underline;
+.dir-header-left button.dir-path-text {
+  flex: 0 1 auto;
 }
 
 .dir-path-text.empty {
   color: var(--text-muted);
-  font-style: italic;
+  font-style: normal;
 }
 
 .dir-header-left .btn {
