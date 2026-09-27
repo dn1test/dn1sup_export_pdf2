@@ -51,6 +51,9 @@
       <button class="tab-btn tab-btn-settings" data-tab="tab-settings">
         <span class="tab-icon"><i class="modus-icons">settings</i></span> Настройки
       </button>
+      <button class="tab-btn" data-tab="tab-send">
+        <span class="tab-icon"><i class="modus-icons">file_upload</i></span> Отправка
+      </button>
     </nav>
 
     <!-- Toast Notification -->
@@ -397,26 +400,6 @@
 
       <!-- TAB 6: SETTINGS -->
       <section id="tab-settings" class="tab-pane">
-        <!-- General Settings Card -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon"><i class="modus-icons">settings</i></span>
-            <span class="card-header-title">Общие настройки</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group" id="webpQualityGroup">
-              <label for="selectWebpQuality">Качество WebP</label>
-              <select id="selectWebpQuality" class="form-control">
-                <option value="75">75 — компактнее</option>
-                <option value="85" selected>85 — рекомендуемое</option>
-                <option value="95">95 — выше качество</option>
-                <option value="lossless">Lossless — без потерь</option>
-              </select>
-              <span class="field-hint" id="hintWebpFormat"></span>
-            </div>
-          </div>
-        </div>
-
         <!-- LayOut Parameters Card -->
         <div class="settings-card">
           <div class="card-header">
@@ -539,21 +522,6 @@
           </div>
         </div>
 
-        <!-- Section: Адресаты API -->
-        <div class="settings-card">
-          <div class="card-header">
-            <div class="card-header-title-wrap">
-              <span class="card-header-icon"><i class="modus-icons">browser</i></span>
-              <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
-            </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add_circle</i> + Добавить URL</button>
-          </div>
-          <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
-          <div id="apiTargetsList" class="api-targets-container">
-            <!-- Dynamically populated via JS -->
-          </div>
-        </div>
-
         <!-- Section: Dev Tools & Обновление из папки разработки -->
         <div class="settings-card" id="cardDevUpdater">
           <div class="card-header">
@@ -573,6 +541,44 @@
             </div>
           </div>
           <div id="devUpdateStatus" class="field-hint" style="font-size: 11px; margin-top: 4px; min-height: 16px;"></div>
+        </div>
+      </section>
+
+      <!-- TAB 7: SEND -->
+      <section id="tab-send" class="tab-pane">
+        <!-- Snapshots WebP Card -->
+        <div class="settings-card">
+          <div class="card-header">
+            <span class="card-header-icon"><i class="modus-icons">insert_photo</i></span>
+            <span class="card-header-title">Снимки страниц (WebP)</span>
+          </div>
+          <div class="form-grid">
+            <div class="form-group" id="webpQualityGroup">
+              <label for="selectWebpQuality">Качество WebP</label>
+              <select id="selectWebpQuality" class="form-control">
+                <option value="75">75 — компактнее</option>
+                <option value="85" selected>85 — рекомендуемое</option>
+                <option value="95">95 — выше качество</option>
+                <option value="lossless">Lossless — без потерь</option>
+              </select>
+              <span class="field-hint" id="hintWebpFormat"></span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Section: Адресаты API -->
+        <div class="settings-card">
+          <div class="card-header">
+            <div class="card-header-title-wrap">
+              <span class="card-header-icon"><i class="modus-icons">browser</i></span>
+              <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
+            </div>
+            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add_circle</i> + Добавить URL</button>
+          </div>
+          <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
+          <div id="apiTargetsList" class="api-targets-container">
+            <!-- Dynamically populated via JS -->
+          </div>
         </div>
       </section>
     </main>

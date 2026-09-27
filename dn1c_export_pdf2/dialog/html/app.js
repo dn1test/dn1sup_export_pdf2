@@ -873,7 +873,7 @@ const DEFAULT_LAYOUTS = {
             updateLayoutUsageBadge();
           } else if (tab.dataset.tab === "tab-directories") {
             renderDirectories();
-          } else if (tab.dataset.tab === "tab-settings") {
+          } else if (tab.dataset.tab === "tab-send") {
             renderApiTargets();
           }
         }
@@ -916,7 +916,7 @@ const DEFAULT_LAYOUTS = {
       updateLayoutUsageBadge();
     } else if (tabId === "tab-directories") {
       renderDirectories();
-    } else if (tabId === "tab-settings") {
+    } else if (tabId === "tab-send") {
       renderApiTargets();
     }
   }

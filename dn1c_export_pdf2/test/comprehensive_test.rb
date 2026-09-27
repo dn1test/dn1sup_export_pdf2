@@ -1827,6 +1827,13 @@ class TestRunner
     assert(html_content.include?('+ Добавить URL'), "index.html содержит надпись '+ Добавить URL'")
     assert(html_content.include?('id="apiTargetsList"'), "index.html содержит контейнер #apiTargetsList")
 
+    # 1a. Проверка вкладки "Отправка" (tab-send): WebP и адресаты перенесены из "Настроек"
+    assert(html_content.include?('data-tab="tab-send"'), "index.html содержит кнопку вкладки Отправка (tab-send)")
+    assert(html_content.include?('id="tab-send"'), "index.html содержит панель #tab-send")
+    send_pane_pos = html_content.index('id="tab-send"')
+    assert(send_pane_pos && send_pane_pos < html_content.index('id="webpQualityGroup"'), "Карточка WebP перенесена на вкладку Отправка")
+    assert(send_pane_pos && send_pane_pos < html_content.index('id="btnAddApiTarget"'), "Карточка адресатов перенесена на вкладку Отправка")
+
     # 2. Проверка CSS стилей
     css_path = File.expand_path("../dialog/html/app.css", __dir__)
     css_content = File.read(css_path, encoding: "utf-8")
