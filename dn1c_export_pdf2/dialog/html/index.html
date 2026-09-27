@@ -69,11 +69,6 @@
               <span class="card-header-title">Паспорт объекта (Project)</span>
             </div>
             <div class="form-grid">
-              <div class="form-group" id="companyFieldGroup">
-                <label for="inputCompany">Название компании (для коммерческих)</label>
-                <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
-              </div>
-
               <div class="form-group full-width">
                 <label for="inputFurnitureName">Изделие / Теги мебели (product_tags) *</label>
                 <input type="text" id="inputFurnitureName" class="form-control" placeholder="например: Шкаф купе, Тумба, Зеркало">
@@ -84,7 +79,7 @@
                 <input type="text" id="inputRoomName" class="form-control" placeholder="например: Прихожая, Кухня-гостиная">
               </div>
 
-              <div class="form-group full-width">
+              <div class="form-group">
                 <label for="inputAddress">Адрес установки объекта</label>
                 <input type="text" id="inputAddress" class="form-control" placeholder="например: г. Москва, ул. Никитская, д. 12, кв. 45">
               </div>
@@ -115,6 +110,11 @@
               <div class="form-group full-width">
                 <label for="inputCustomer">ФИО / Контактное лицо *</label>
                 <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
+              </div>
+
+              <div class="form-group full-width" id="companyFieldGroup">
+                <label for="inputCompany">Название компании (для коммерческих)</label>
+                <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
               </div>
 
               <div class="form-group full-width">
@@ -150,14 +150,13 @@
                   <input type="text" id="inputPrice" class="form-control" placeholder="например: 125 000">
                 </div>
 
-                <div class="form-group">
-                  <label for="inputStartDate">Дата начала проектирования</label>
-                  <input type="date" id="inputStartDate" class="form-control">
-                </div>
-
-                <div class="form-group">
-                  <label for="inputEndDate">Планируемая дата сдачи (Дедлайн)</label>
-                  <input type="date" id="inputEndDate" class="form-control">
+                <div class="form-group full-width">
+                  <label for="inputStartDate">Дата начала — дата сдачи (Дедлайн)</label>
+                  <div class="joined-fields">
+                    <input type="date" id="inputStartDate" class="form-control">
+                    <span class="joined-fields-sep">&mdash;</span>
+                    <input type="date" id="inputEndDate" class="form-control">
+                  </div>
                 </div>
 
                 <div class="form-group">
@@ -166,13 +165,12 @@
                 </div>
 
                 <div class="form-group">
-                  <label for="inputVersion">Вариант проекта (version)</label>
-                  <input type="number" id="inputVersion" class="form-control" min="1" value="1">
-                </div>
-
-                <div class="form-group">
-                  <label for="inputRevision">Количество изменений (revision)</label>
-                  <input type="number" id="inputRevision" class="form-control" min="1" value="1">
+                  <label for="inputVersion">Вариант проекта / Ревизия (version.revision)</label>
+                  <div class="joined-fields">
+                    <input type="number" id="inputVersion" class="form-control joined-fields-num" min="1" value="1">
+                    <span class="joined-fields-sep">.</span>
+                    <input type="number" id="inputRevision" class="form-control joined-fields-num" min="1" value="1">
+                  </div>
                 </div>
 
                 <div class="form-group full-width">

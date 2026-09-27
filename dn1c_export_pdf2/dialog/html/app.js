@@ -92,12 +92,12 @@
         { value: "project.furniture_name", label: "🪑 Изделие" },
         { value: "project.room_name",      label: "🚪 Помещение / Место установки" },
         { value: "project.address",        label: "📍 Адрес установки" },
-        { value: "project.company",        label: "🏢 Название компании" },
         { value: "project.description",    label: "📋 Описание проекта" }
       ] },
       { title: "Данные проекта — Заказчик", options: [
         { value: "customer.id",    label: "🆔 ID заказчика" },
         { value: "customer.name",  label: "👤 Заказчик (контактное лицо)" },
+        { value: "project.company", label: "🏢 Название компании" },
         { value: "customer.phone", label: "📞 Телефон" },
         { value: "customer.email", label: "✉️ Email" }
       ] },
@@ -2780,7 +2780,6 @@ function updateParamModalPreview() {
 
     if (els.inputArticul) els.inputArticul.value = prj.articul || info.articul || "";
     updateTradeBadge();
-    if (els.inputCompany) els.inputCompany.value = prj.name_company || info.company || "";
     if (els.inputFurnitureName) {
       const pTags = prj.product_tags || info.product_tags;
       if (Array.isArray(pTags) && pTags.length) {
@@ -2800,6 +2799,7 @@ function updateParamModalPreview() {
     // 2. Карточка заказчика (Customer)
     if (els.inputCustomerId) els.inputCustomerId.value = cust.id || cust.customer_id || "";
     if (els.inputCustomer) els.inputCustomer.value = cust.name || info.customer || info.name_customer || "";
+    if (els.inputCompany) els.inputCompany.value = cust.company || prj.name_company || info.company || "";
     if (els.inputPhone) els.inputPhone.value = cust.phone || info.phone || "";
     if (els.inputEmail) els.inputEmail.value = cust.email || info.email || "";
 
@@ -4669,6 +4669,7 @@ function updateParamModalPreview() {
     state.customer = {
       id: custIdVal,
       name: custVal,
+      company: compVal,
       phone: phoneVal,
       email: emailVal
     };

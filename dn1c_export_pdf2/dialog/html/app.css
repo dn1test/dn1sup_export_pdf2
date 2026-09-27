@@ -685,6 +685,29 @@ body {
   grid-column: span 2;
 }
 
+.joined-fields {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.joined-fields .form-control {
+  flex: 1;
+  min-width: 0;
+}
+
+.joined-fields .joined-fields-num {
+  flex: none;
+  width: 76px;
+  text-align: center;
+}
+
+.joined-fields-sep {
+  flex: none;
+  color: var(--text-secondary);
+  font-weight: 600;
+}
+
 label {
   font-size: 12px;
   font-weight: 600;
