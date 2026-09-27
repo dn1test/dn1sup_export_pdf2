@@ -520,6 +520,7 @@ const DEFAULT_LAYOUTS = {
     scenesTableBody: document.getElementById("scenesTableBody"),
     btnSelectAllScenes: document.getElementById("btnSelectAllScenes"),
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
+    btnApplyTemplateAll: document.getElementById("btnApplyTemplateAll"),
     btnRefreshThumbs: document.getElementById("btnRefreshThumbs"),
     chkScenesBackground: document.getElementById("chk_scenes_background"),
     chkScenesWatermarks: document.getElementById("chk_scenes_watermarks"),
@@ -5117,6 +5118,17 @@ function updateParamModalPreview() {
       renderScenesTable();
       notifyChange();
     });
+
+    // «Шаблон всем»: назначить шаблон из первой строки всем сценам сразу
+    if (els.btnApplyTemplateAll) {
+      els.btnApplyTemplateAll.addEventListener("click", () => {
+        const tpl = (state.scenes || [])[0] && state.scenes[0].page_type;
+        if (!tpl) return;
+        state.scenes.forEach((s) => { s.page_type = tpl; });
+        renderScenesTable();
+        notifyChange();
+      });
+    }
 
     // Обновить эскизы сцен вручную: SketchUp перелистывает страницы и снимает свежие мини-превью
     if (els.btnRefreshThumbs) {

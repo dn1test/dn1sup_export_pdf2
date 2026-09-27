@@ -217,6 +217,12 @@
             <div class="scenes-quick-actions">
               <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check_mark</i> Все</button>
               <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content_close</i> Снять</button>
+              <button class="btn btn-xs btn-secondary" id="btnRefreshThumbs" title="Перерисовать мини-превью заново: SketchUp по очереди переключится на каждую страницу, снимет свежий эскиз и вернётся на текущую страницу">
+                <i class="modus-icons">refresh</i> Обновить эскизы
+              </button>
+            </div>
+            <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
+            <div class="scenes-quick-actions">
               <label class="checkbox-label" title="Фон сцены (небо/земля/туман) включается/выключается сразу на всех страницах и на эскизах; водяные знаки — отдельная галка">
                 <input type="checkbox" id="chk_scenes_background">
                 <span>Фон</span>
@@ -229,11 +235,10 @@
                 <input type="checkbox" id="chk_scenes_frame_all">
                 <span>Кадр все</span>
               </label>
-              <button class="btn btn-xs btn-secondary" id="btnRefreshThumbs" title="Перерисовать мини-превью заново: SketchUp по очереди переключится на каждую страницу, снимет свежий эскиз и вернётся на текущую страницу">
-                <i class="modus-icons">refresh</i> Обновить эскизы
+              <button class="btn btn-xs btn-secondary" id="btnApplyTemplateAll" title="Назначить шаблон из первой строки всем сценам сразу">
+                <i class="modus-icons">layers</i> Шаблон всем
               </button>
             </div>
-            <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
           </div>
 
           <div class="table-container">
@@ -246,8 +251,8 @@
                   <th>Сцена / Описание</th>
                   <th width="92" class="th-aspect" title="Пропорции кадра, рамка и видовой экран — индивидуально для каждой страницы (меню открывается кликом)">Кадр</th>
                   <th width="74" class="th-scale" title="Размещение картинки на странице, % от листа — индивидуально для каждой страницы">Масштаб</th>
-                  <th width="88" class="th-align" title="Выравнивание эскиза на странице — индивидуально для каждой страницы">Выравнивание</th>
-                  <th width="210">Шаблон страницы</th>
+                  <th width="64" class="th-align" title="Выравнивание эскиза на странице — индивидуально для каждой страницы">Выравн.</th>
+                  <th width="120" title="Шаблон страницы, назначаемый этой сцене">Шаблон</th>
                 </tr>
               </thead>
               <tbody id="scenesTableBody">

@@ -1195,6 +1195,12 @@ textarea.form-control {
   color: var(--text-secondary);
 }
 
+/* Заголовок сразу после левой группы, правый блок настроек — у правого края */
+.scenes-toolbar .info-text {
+  margin-right: auto;
+  padding-left: 4px;
+}
+
 .table-container {
   background: #ffffff;
   border: 1px solid var(--border-light);
@@ -1207,6 +1213,13 @@ table {
   width: 100%;
   border-collapse: collapse;
   text-align: left;
+}
+
+/* Строгая раскладка: ширины th соблюдаются точно, колонка «Сцена / Описание»
+   забирает всё оставшееся место (иначе авто-раскладка не даёт колонке
+   «Шаблон страницы» сузиться ниже самого длинного пункта списка) */
+.scenes-table {
+  table-layout: fixed;
 }
 
 thead th {
@@ -1245,7 +1258,13 @@ tr:hover td {
 .th-preview { width: 108px; text-align: center; }
 .th-aspect { width: 92px; text-align: center; }
 .th-scale { width: 74px; text-align: center; }
-.th-align { width: 88px; text-align: center; }
+.th-align { width: 64px; text-align: center; }
+
+/* Плотная упаковка управляющих колонок: меньше расстояние между Кадр / Масштаб / Выравнивание / Шаблон */
+.scenes-table .scene-aspect-cell,
+.scenes-table .scene-scale-cell,
+.scenes-table .scene-align-cell,
+.scenes-table .scene-type-cell { padding-left: 5px; padding-right: 5px; }
 
 .scene-check-cell { text-align: center; }
 .scene-num-cell { text-align: center; font-weight: 700; color: var(--text-muted); font-size: 11px; }
@@ -1289,13 +1308,23 @@ tr:hover td {
 .scenes-table .scene-info-cell,
 .scene-info-cell { min-width: 220px; }
 .scene-info-wrap { display: flex; flex-direction: column; gap: 3px; }
-.scene-desc-input {
+
+/* Имя сцены и описание — одинаковый размер, оба поля видны всегда */
+.scenes-table .scene-name-input,
+.scenes-table .scene-desc-input {
   width: 100%;
+  height: 26px;
+  min-height: 26px;
+  padding: 3px 8px;
+  font-size: 12px;
+  line-height: 1.3;
+  box-sizing: border-box;
+}
+
+.scene-desc-input {
   background: var(--bg-app);
   border: 1px solid transparent;
   border-radius: var(--radius-sm);
-  padding: 4px 6px;
-  font-size: 12px;
   color: var(--text-muted);
   transition: all 0.15s ease;
 }
@@ -1326,13 +1355,6 @@ tr:hover td {
   color: var(--text-main);
   box-shadow: var(--shadow-focus);
 }
-
-/* Описание страницы скрыто до наведения мыши на строку (или до фокуса на поле).
-   visibility, а не display: место резервируется и строка таблицы не «прыгает». */
-.scenes-table tr .scene-desc-input { visibility: hidden; }
-.scenes-table tr:hover .scene-desc-input,
-.scenes-table tr:focus-within .scene-desc-input,
-.scene-desc-input:focus { visibility: visible; }
 
 .scene-aspect-cell,
 .scene-scale-cell,
@@ -1443,6 +1465,14 @@ tr:hover td {
   display: flex;
   align-items: center;
   gap: 6px;
+}
+
+/* Селект шаблона сжимается вместе с колонкой, а не по самому длинному пункту списка */
+.scene-template-cell-wrap .table-select {
+  flex: 1 1 auto;
+  min-width: 0;
+  width: auto;
+  max-width: 100%;
 }
 
 .btn-goto-template {
