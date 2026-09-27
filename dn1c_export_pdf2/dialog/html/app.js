@@ -3807,6 +3807,8 @@ function updateParamModalPreview() {
       if (!scene) return;
       const btn = row.querySelector(".scene-frame-btn");
       if (btn) btn.classList.toggle("frame-on", scene.frame_overlay === true);
+      const chk = row.querySelector(".scene-frame-check");
+      if (chk) chk.checked = scene.frame_overlay === true;
     });
   }
 
@@ -4059,12 +4061,34 @@ function updateParamModalPreview() {
         `<span class="scene-frame-ratio">${ratioLabel(sceneRatio)}</span>` +
         `<span class="scene-frame-dot"></span>` +
         `<i class="modus-icons scene-frame-caret">expand_more</i>`;
-      frameBtn.title = "Пропорции кадра и рамка для этой страницы";
+      frameBtn.title = "Пропорции кадра для этой страницы";
       frameBtn.addEventListener("focus", () => {
         layoutState.selectedSceneIndex = index;
         highlightActiveSceneRow(index);
         switchToSketchupScene(scene, index);
       });
+
+      // Рамка кадра — постраничный флаг отображения Safe Frame Overlay в окне SketchUp
+      const frameChk = document.createElement("input");
+      frameChk.type = "checkbox";
+      frameChk.className = "scene-frame-check";
+      frameChk.checked = scene.frame_overlay === true;
+      frameChk.title = "Рамка кадра для этой страницы (вкл/выкл)";
+      frameChk.addEventListener("click", (e) => e.stopPropagation());
+      frameChk.addEventListener("change", (ev) => {
+        const on = ev.target.checked;
+        layoutState.selectedSceneIndex = index;
+        highlightActiveSceneRow(index);
+        switchToSketchupScene(scene, index);
+        scene.frame_overlay = on;
+        frameBtn.classList.toggle("frame-on", on);
+        callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, scene_index: index }));
+        if (on && layoutState.selectedSceneIndex === index) {
+          syncCurrentSceneOverlay(scene, null, true);
+        }
+        notifyChange();
+      });
+
       frameBtn.addEventListener("click", (e) => {
         e.stopPropagation();
         layoutState.selectedSceneIndex = index;
@@ -4080,27 +4104,6 @@ function updateParamModalPreview() {
         pop.id = "sceneFramePopover";
         pop.className = "scene-frame-pop";
         pop.addEventListener("click", (ev) => ev.stopPropagation());
-
-        // Рамка кадра — постраничный флаг отображения Safe Frame Overlay в окне SketchUp
-        const frameRow = document.createElement("label");
-        frameRow.className = "scene-frame-check-row";
-        frameRow.title = "Показывать рамку кадра в окне SketchUp для этой страницы";
-        frameRow.innerHTML = `<span>📐 Рамка кадра</span>`;
-        const frameChk = document.createElement("input");
-        frameChk.type = "checkbox";
-        frameChk.checked = scene.frame_overlay === true;
-        frameChk.addEventListener("change", (ev) => {
-          const on = ev.target.checked;
-          scene.frame_overlay = on;
-          frameBtn.classList.toggle("frame-on", on);
-          callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, scene_index: index }));
-          if (on && layoutState.selectedSceneIndex === index) {
-            syncCurrentSceneOverlay(scene, null, true);
-          }
-          notifyChange();
-        });
-        frameRow.appendChild(frameChk);
-        pop.appendChild(frameRow);
 
         // Пропорции кадра
         const ratioTitle = document.createElement("div");
@@ -4152,7 +4155,11 @@ function updateParamModalPreview() {
           document.addEventListener("keydown", closeSceneFramePopover, { once: true });
         }, 0);
       });
-      tdAspect.appendChild(frameBtn);
+      const frameCtrl = document.createElement("div");
+      frameCtrl.className = "scene-frame-ctrl";
+      frameCtrl.appendChild(frameBtn);
+      frameCtrl.appendChild(frameChk);
+      tdAspect.appendChild(frameCtrl);
 
       // 5. Scale Cell (Масштаб) — постраничное размещение на листе
       const tdScale = document.createElement("td");

@@ -1474,11 +1474,19 @@ tr:hover td {
 /* ==========================================================================
    Frame menu (Tab 2, column "Кадр"): button in the row + popover
    ========================================================================== */
+.scene-frame-ctrl {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  width: 100%;
+}
+
 .scene-frame-btn {
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  width: 100%;
+  flex: 1;
+  min-width: 0;
   padding: 4px 7px;
   font-size: 11.5px;
   font-weight: 600;
@@ -1538,26 +1546,13 @@ tr:hover td {
   z-index: 3000;
 }
 
-.scene-frame-check-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 10px;
-  font-size: 11.5px;
-  font-weight: 600;
-  color: var(--text-main);
-  cursor: pointer;
-  padding: 3px 4px;
-  border-radius: 4px;
-}
-
-.scene-frame-check-row:hover {
-  background: var(--bg-app);
-}
-
-.scene-frame-check-row input[type="checkbox"] {
+.scene-frame-check {
+  width: 15px;
+  height: 15px;
   margin: 0;
+  flex-shrink: 0;
   cursor: pointer;
+  accent-color: var(--bs-primary);
 }
 
 .scene-frame-pop-title {
@@ -1567,7 +1562,6 @@ tr:hover td {
   letter-spacing: 0.4px;
   color: var(--text-muted);
   padding: 3px 4px 0;
-  border-top: 1px solid var(--border-light);
 }
 
 .scene-frame-ratio-grid {
