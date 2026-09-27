@@ -2467,6 +2467,21 @@ tr:hover td {
   cursor: not-allowed;
 }
 
+/* Действия шапки («Обновить» + отправка на сервер) — прижаты к правому краю */
+.dir-header-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+
+.dir-send-server-label {
+  font-size: 12px;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
 /* Описание раздела — поле на всю ширину */
 .dir-section-desc {
   display: flex;

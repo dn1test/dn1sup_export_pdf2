@@ -977,6 +977,8 @@ module DN1Code
               }
               item[:display] = (v[:display] || v["display"]).to_s if v[:display] || v["display"]
               item[:thumb_size] = (v[:thumb_size] || v["thumb_size"]).to_s if v[:thumb_size] || v["thumb_size"]
+              ss_val = v.key?(:send_to_server) ? v[:send_to_server] : v["send_to_server"]
+              item[:send_to_server] = !(ss_val == false || ss_val == "false")
               item
             end.compact
           elsif dirs.is_a?(Array)
@@ -992,6 +994,8 @@ module DN1Code
               }
               item[:display] = (d[:display] || d["display"]).to_s if d[:display] || d["display"]
               item[:thumb_size] = (d[:thumb_size] || d["thumb_size"]).to_s if d[:thumb_size] || d["thumb_size"]
+              ss_val = d.key?(:send_to_server) ? d[:send_to_server] : d["send_to_server"]
+              item[:send_to_server] = !(ss_val == false || ss_val == "false")
               item
             end.compact
           else
@@ -1852,6 +1856,7 @@ module DN1Code
             }
             entry["display"] = d[:display].to_s if d[:display]
             entry["thumb_size"] = d[:thumb_size].to_s if d[:thumb_size]
+            entry["send_to_server"] = d[:send_to_server] != false
             entry
           end
 

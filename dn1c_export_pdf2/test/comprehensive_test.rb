@@ -228,6 +228,7 @@ class TestRunner
     test_87_template_params_conditional_customer_or_company
     test_86_overlay_follows_native_page_switch
     test_87_refresh_thumbnails_button_and_sig_guard
+    test_88_directory_send_to_server_flag
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -2519,6 +2520,59 @@ class TestRunner
     assert(css_text.include?("thumb-small") && css_text.include?("thumb-medium") && css_text.include?("thumb-large"),
            "app.css содержит три варианта размеров эскизов (small/medium/large)")
     assert(css_text.include?("dir-path-text"), "app.css содержит стиль текстового пути")
+
+    FileUtils.rm_rf(test_dir)
+  end
+
+  # ============================================================================
+  # 88. ТЕСТ: флаг «Отправлять на сервер» в настройках каждой папки (send_to_server)
+  # ============================================================================
+  def test_88_directory_send_to_server_flag
+    puts "\n--- 88. Тест флага отправки папки на сервер (SEND_TO_SERVER) ---"
+
+    test_dir = File.expand_path("test_dirs_send_server_dir", __dir__)
+    FileUtils.mkdir_p(test_dir)
+
+    # 1. Нормализация: отсутствие ключа и строковое "false"
+    data = DN1Code::ExportPdf2::Model::ProjectData.new
+    data.directories = [
+      { path: "C:/Тест/Материалы", title: "Материалы", description: "" },
+      { path: "C:/Тест/Фурнитура", title: "Фурнитура", description: "", send_to_server: false },
+      { path: "C:/Тест/Техника", title: "Техника", description: "", "send_to_server" => "false" }
+    ]
+    data.normalize_directories!
+    assert(data.directories[0][:send_to_server] == true,
+           "Папка без ключа send_to_server нормализуется как «отправлять» (true)")
+    assert(data.directories[1][:send_to_server] == false,
+           "Папка с send_to_server: false сохраняет значение false")
+    assert(data.directories[2][:send_to_server] == false,
+           "Строковое значение send_to_server 'false' приводится к boolean false")
+
+    # 2. Сохранение в YAML: явный boolean у каждой папки
+    data.sync_project_fields!
+    send_yaml = File.join(test_dir, "SendServerProject.yaml")
+    assert(data.save_to_yaml(send_yaml), "Проект с send_to_server сохранен в YAML")
+    yaml_text = File.read(send_yaml, encoding: "utf-8")
+    assert(yaml_text.include?("send_to_server: false"), "YAML содержит send_to_server: false для отключенной папки")
+    assert(yaml_text.include?("send_to_server: true"), "YAML содержит send_to_server: true для папки по умолчанию")
+
+    # 3. Чтение обратно (round-trip)
+    reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    assert(reloaded.load_from_yaml(send_yaml), "YAML с send_to_server загружен обратно")
+    assert(reloaded.directories[0][:send_to_server] == true, "После перезагрузки send_to_server: true сохранен")
+    assert(reloaded.directories[1][:send_to_server] == false, "После перезагрузки send_to_server: false сохранен")
+
+    # 4. Интерфейс: чекбокс в шапке карточки рядом с «Обновить», справа
+    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    assert(js_text.include?("dir-header-actions"), "app.js группирует «Обновить» и чекбокс отправки в правом блоке шапки папки")
+    assert(js_text.include?("dir-send-server-label"), "app.js содержит чекбокс отправки в шапке карточки папки")
+    assert(js_text.include?("d.send_to_server !== false"), "app.js по умолчанию включает отправку для старых данных")
+    assert(js_text.include?("d.send_to_server = e.target.checked"), "app.js сохраняет состояние чекбокса в directories")
+    assert(js_text.include?("Отправлять на сервер"), "app.js содержит подпись чекбокса «Отправлять на сервер»")
+    css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
+    assert(css_text.include?(".dir-header-actions") && css_text.include?("margin-left: auto"),
+           "app.css прижимает блок «Обновить» + чекбокс отправки к правому краю")
+    assert(css_text.include?("dir-send-server-label"), "app.css содержит стиль чекбокса отправки")
 
     FileUtils.rm_rf(test_dir)
   end

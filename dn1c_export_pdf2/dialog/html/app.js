@@ -3223,9 +3223,33 @@ function updateParamModalPreview() {
         }
       });
 
+      // Действия шапки справа: «Обновить» и чекбокс отправки на сервер
+      const headerActions = document.createElement("div");
+      headerActions.className = "dir-header-actions";
+
+      // Отправлять папку на сервер (directories[].send_to_server,
+      // по умолчанию включено — отсутствие ключа в старых данных трактуется как true)
+      const sendServerLabel = document.createElement("label");
+      sendServerLabel.className = "checkbox-label dir-send-server-label";
+      const sendServerChk = document.createElement("input");
+      sendServerChk.type = "checkbox";
+      sendServerChk.checked = d.send_to_server !== false;
+      sendServerChk.title = "Отправлять эту папку на сервер при отправке проекта";
+      sendServerChk.addEventListener("change", (e) => {
+        d.send_to_server = e.target.checked;
+        notifyChange();
+      });
+      sendServerLabel.appendChild(sendServerChk);
+      const sendServerText = document.createElement("span");
+      sendServerText.textContent = "Отправлять на сервер";
+      sendServerLabel.appendChild(sendServerText);
+
+      headerActions.appendChild(btnRefresh);
+      headerActions.appendChild(sendServerLabel);
+
       headerLeft.appendChild(titleInput);
       headerLeft.appendChild(pathText);
-      headerLeft.appendChild(btnRefresh);
+      headerLeft.appendChild(headerActions);
 
       const headerRight = document.createElement("div");
       headerRight.className = "dir-header-right";
