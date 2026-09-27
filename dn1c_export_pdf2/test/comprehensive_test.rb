@@ -3989,6 +3989,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
            "app.js безопасно проверяет наличие els.selectAnnotationFontSize")
     assert(app_js_text.include?("annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value :"),
            "app.js безопасно извлекает annotation_font_size с фоллбэком")
+    assert(app_js_text.include?("PARAM_FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72]"),
+           "PARAM_FONT_SIZES в app.js содержит кегли до 72 pt")
 
     # 4. Проверка ProjectData и YAML файлов настроек
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
