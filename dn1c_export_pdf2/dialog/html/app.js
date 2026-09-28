@@ -1456,6 +1456,16 @@ const DEFAULT_LAYOUTS = {
       textDiv.appendChild(subSpan);
       item.appendChild(textDiv);
 
+      const btnRefresh = document.createElement("button");
+      btnRefresh.type = "button";
+      btnRefresh.className = "tpl-item-action-btn refresh";
+      btnRefresh.title = "Обновить набор: перезаписать его текущим списком шаблонов";
+      btnRefresh.innerHTML = '<i class="modus-icons" style="font-size: 14px;">refresh</i>';
+      btnRefresh.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openConfirmTemplateSetModal({ type: "refresh", name: set.name });
+      });
+
       const btnDel = document.createElement("button");
       btnDel.type = "button";
       btnDel.className = "tpl-item-action-btn delete";
@@ -1465,7 +1475,12 @@ const DEFAULT_LAYOUTS = {
         e.stopPropagation();
         openConfirmTemplateSetModal({ type: "delete", name: set.name });
       });
-      item.appendChild(btnDel);
+
+      const actionsDiv = document.createElement("div");
+      actionsDiv.className = "tpl-item-actions";
+      actionsDiv.appendChild(btnRefresh);
+      actionsDiv.appendChild(btnDel);
+      item.appendChild(actionsDiv);
 
       item.addEventListener("click", () => {
         openConfirmTemplateSetModal({ type: "load", name: set.name });
@@ -1480,21 +1495,25 @@ const DEFAULT_LAYOUTS = {
     const name = action ? action.name : "";
     const isDelete = !!action && action.type === "delete";
     const isOverwrite = !!action && action.type === "overwrite";
+    const isRefresh = !!action && action.type === "refresh";
 
     if (els.confirmTemplateSetTitle) {
       els.confirmTemplateSetTitle.textContent = isDelete
         ? "Удаление набора шаблонов"
-        : (isOverwrite ? "Перезапись набора шаблонов" : "Загрузка набора шаблонов");
+        : (isOverwrite ? "Перезапись набора шаблонов"
+            : (isRefresh ? "Обновление набора шаблонов" : "Загрузка набора шаблонов"));
     }
     if (els.confirmTemplateSetMsg) {
       els.confirmTemplateSetMsg.textContent = isDelete
         ? `Вы действительно хотите удалить набор «${name}»?`
         : (isOverwrite
             ? `Набор «${name}» уже существует. Перезаписать его текущим списком шаблонов?`
-            : `Вы действительно хотите загрузить набор «${name}»?`);
+            : (isRefresh
+                ? `Обновить набор «${name}» текущим списком шаблонов? Содержимое набора будет перезаписано.`
+                : `Вы действительно хотите загрузить набор «${name}»?`));
     }
     if (els.confirmTemplateSetWarning) {
-      els.confirmTemplateSetWarning.style.display = (isDelete || isOverwrite) ? "none" : "";
+      els.confirmTemplateSetWarning.style.display = (isDelete || isOverwrite || isRefresh) ? "none" : "";
     }
     if (els.btnConfirmTemplateSet) {
       els.btnConfirmTemplateSet.classList.toggle("btn-danger", isDelete);
@@ -1524,7 +1543,9 @@ const DEFAULT_LAYOUTS = {
     } else if (action.type === "load") {
       flushAutoSave();
       callRuby("loadTemplateSet", JSON.stringify(action.name));
-    } else if (action.type === "overwrite") {
+    } else if (action.type === "overwrite" || action.type === "refresh") {
+      // Обновление набора — та же перезапись: текущие шаблоны сохраняются
+      // под именем существующего набора (saved_at в файле обновляется)
       doSaveTemplateSet(action.name);
     }
   }
