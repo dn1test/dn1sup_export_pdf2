@@ -13,6 +13,7 @@
     pdf_settings: {},
     scenes: [],
     history: [],
+    template_sets: [],
     lastExportedPdf: ""
   };
 
@@ -550,6 +551,18 @@ const DEFAULT_LAYOUTS = {
     inputRenameTemplateDescription: document.getElementById("inputRenameTemplateDescription"),
     btnCancelRenameTemplate: document.getElementById("btnCancelRenameTemplate"),
     btnConfirmRenameTemplate: document.getElementById("btnConfirmRenameTemplate"),
+    templateSetsList: document.getElementById("templateSetsList"),
+    btnSaveTemplateSet: document.getElementById("btnSaveTemplateSet"),
+    saveTemplateSetModal: document.getElementById("saveTemplateSetModal"),
+    inputTemplateSetName: document.getElementById("inputTemplateSetName"),
+    btnCancelSaveTemplateSet: document.getElementById("btnCancelSaveTemplateSet"),
+    btnConfirmSaveTemplateSet: document.getElementById("btnConfirmSaveTemplateSet"),
+    confirmTemplateSetModal: document.getElementById("confirmTemplateSetModal"),
+    confirmTemplateSetTitle: document.getElementById("confirmTemplateSetTitle"),
+    confirmTemplateSetMsg: document.getElementById("confirmTemplateSetMsg"),
+    confirmTemplateSetWarning: document.getElementById("confirmTemplateSetWarning"),
+    btnCancelConfirmTemplateSet: document.getElementById("btnCancelConfirmTemplateSet"),
+    btnConfirmTemplateSet: document.getElementById("btnConfirmTemplateSet"),
     templateSettingsPanel: document.getElementById("templateSettingsPanel"),
     templateSettingsContainer: document.getElementById("templateSettingsContainer"),
     selectLayoutTemplate: document.getElementById("selectLayoutTemplate"),
@@ -1384,6 +1397,187 @@ const DEFAULT_LAYOUTS = {
 
   function deleteCustomTemplate(tplKey) {
     openDeleteTemplateModal(tplKey);
+  }
+
+  // -----------------------------------------------------------------------------
+  // Template Sets: сохранение/загрузка всего списка шаблонов под разные проекты.
+  // Набор — снимок custom_layouts в config/layout_sets/*.yaml; загрузка заменяет
+  // все шаблоны, сцены отсутствующих шаблонов уходят на первый доступный.
+  // -----------------------------------------------------------------------------
+  let templateSetPendingAction = null; // { type: "load" | "overwrite" | "delete", name }
+
+  function templateSetsCountWord(n) {
+    if (n === 1) return "шаблон";
+    return n > 1 && n < 5 ? "шаблона" : "шаблонов";
+  }
+
+  function formatTemplateSetDate(raw) {
+    const s = String(raw || "").trim();
+    if (!s) return "";
+    const d = new Date(s);
+    if (isNaN(d.getTime())) return s;
+    const pad = (n) => String(n).padStart(2, "0");
+    return `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`;
+  }
+
+  function renderTemplateSetsList() {
+    const listEl = els.templateSetsList || document.getElementById("templateSetsList");
+    if (!listEl) return;
+    listEl.innerHTML = "";
+
+    const sets = state.template_sets || [];
+    if (!sets.length) {
+      const empty = document.createElement("div");
+      empty.className = "template-set-empty";
+      empty.textContent = "Нет сохраненных наборов";
+      listEl.appendChild(empty);
+      return;
+    }
+
+    sets.forEach((set) => {
+      const item = document.createElement("div");
+      item.className = "template-set-item";
+      item.title = `Загрузить набор «${set.name}» (текущие шаблоны будут заменены)`;
+
+      const textDiv = document.createElement("div");
+      textDiv.className = "tpl-item-text";
+
+      const nameSpan = document.createElement("span");
+      nameSpan.className = "tpl-item-name";
+      nameSpan.textContent = set.name;
+
+      const subSpan = document.createElement("span");
+      subSpan.className = "tpl-item-sub";
+      const count = set.templates_count || 0;
+      const dateStr = formatTemplateSetDate(set.saved_at);
+      subSpan.textContent = `${count} ${templateSetsCountWord(count)}${dateStr ? ` · ${dateStr}` : ""}`;
+
+      textDiv.appendChild(nameSpan);
+      textDiv.appendChild(subSpan);
+      item.appendChild(textDiv);
+
+      const btnDel = document.createElement("button");
+      btnDel.type = "button";
+      btnDel.className = "tpl-item-action-btn delete";
+      btnDel.title = "Удалить набор";
+      btnDel.innerHTML = '<i class="modus-icons" style="font-size: 14px;">delete</i>';
+      btnDel.addEventListener("click", (e) => {
+        e.stopPropagation();
+        openConfirmTemplateSetModal({ type: "delete", name: set.name });
+      });
+      item.appendChild(btnDel);
+
+      item.addEventListener("click", () => {
+        openConfirmTemplateSetModal({ type: "load", name: set.name });
+      });
+
+      listEl.appendChild(item);
+    });
+  }
+
+  function openConfirmTemplateSetModal(action) {
+    templateSetPendingAction = action;
+    const name = action ? action.name : "";
+    const isDelete = !!action && action.type === "delete";
+    const isOverwrite = !!action && action.type === "overwrite";
+
+    if (els.confirmTemplateSetTitle) {
+      els.confirmTemplateSetTitle.textContent = isDelete
+        ? "Удаление набора шаблонов"
+        : (isOverwrite ? "Перезапись набора шаблонов" : "Загрузка набора шаблонов");
+    }
+    if (els.confirmTemplateSetMsg) {
+      els.confirmTemplateSetMsg.textContent = isDelete
+        ? `Вы действительно хотите удалить набор «${name}»?`
+        : (isOverwrite
+            ? `Набор «${name}» уже существует. Перезаписать его текущим списком шаблонов?`
+            : `Вы действительно хотите загрузить набор «${name}»?`);
+    }
+    if (els.confirmTemplateSetWarning) {
+      els.confirmTemplateSetWarning.style.display = (isDelete || isOverwrite) ? "none" : "";
+    }
+    if (els.btnConfirmTemplateSet) {
+      els.btnConfirmTemplateSet.classList.toggle("btn-danger", isDelete);
+      els.btnConfirmTemplateSet.classList.toggle("btn-primary", !isDelete);
+      const icon = els.btnConfirmTemplateSet.querySelector(".modus-icons");
+      if (icon) icon.textContent = isDelete ? "delete" : "check_mark";
+    }
+    if (els.confirmTemplateSetModal) {
+      els.confirmTemplateSetModal.classList.remove("hidden");
+    }
+  }
+
+  function closeConfirmTemplateSetModal() {
+    templateSetPendingAction = null;
+    if (els.confirmTemplateSetModal) {
+      els.confirmTemplateSetModal.classList.add("hidden");
+    }
+  }
+
+  function confirmTemplateSetAction() {
+    const action = templateSetPendingAction;
+    closeConfirmTemplateSetModal();
+    if (!action) return;
+
+    if (action.type === "delete") {
+      callRuby("deleteTemplateSet", JSON.stringify(action.name));
+    } else if (action.type === "load") {
+      flushAutoSave();
+      callRuby("loadTemplateSet", JSON.stringify(action.name));
+    } else if (action.type === "overwrite") {
+      doSaveTemplateSet(action.name);
+    }
+  }
+
+  function doSaveTemplateSet(name) {
+    const layouts = state.pdf_settings?.custom_layouts || {};
+    if (!Object.keys(layouts).length) {
+      showNotification("Нет шаблонов для сохранения", "error");
+      return;
+    }
+    flushAutoSave();
+    callRuby("saveTemplateSet", JSON.stringify({ name: name, custom_layouts: deepClone(layouts) }));
+  }
+
+  function openSaveTemplateSetModal() {
+    const layouts = state.pdf_settings?.custom_layouts || {};
+    if (!Object.keys(layouts).length) {
+      showNotification("Нет шаблонов для сохранения", "error");
+      return;
+    }
+    if (els.inputTemplateSetName) {
+      els.inputTemplateSetName.value = "";
+    }
+    if (els.saveTemplateSetModal) {
+      els.saveTemplateSetModal.classList.remove("hidden");
+      if (els.inputTemplateSetName) {
+        setTimeout(() => els.inputTemplateSetName.focus(), 50);
+      }
+    }
+  }
+
+  function closeSaveTemplateSetModal() {
+    if (els.saveTemplateSetModal) {
+      els.saveTemplateSetModal.classList.add("hidden");
+    }
+  }
+
+  function confirmSaveTemplateSet() {
+    const name = (els.inputTemplateSetName ? els.inputTemplateSetName.value : "").trim();
+    if (!name) {
+      showNotification("Укажите название набора", "warning");
+      if (els.inputTemplateSetName) els.inputTemplateSetName.focus();
+      return;
+    }
+    closeSaveTemplateSetModal();
+
+    // Набор с таким именем уже есть — подтверждаем перезапись
+    const exists = (state.template_sets || []).some((s) => (s.name || "").toLowerCase() === name.toLowerCase());
+    if (exists) {
+      openConfirmTemplateSetModal({ type: "overwrite", name: name });
+    } else {
+      doSaveTemplateSet(name);
+    }
   }
 
   function openRenameTemplateModal(tplKey) {
@@ -2488,6 +2682,48 @@ function updateParamModalPreview() {
         } else if (e.key === "Escape") {
           closeRenameTemplateModal();
         }
+      });
+    }
+
+    // Template Sets Handlers (наборы шаблонов)
+    if (els.btnSaveTemplateSet) {
+      els.btnSaveTemplateSet.addEventListener("click", () => {
+        openSaveTemplateSetModal();
+      });
+    }
+
+    if (els.btnCancelSaveTemplateSet) {
+      els.btnCancelSaveTemplateSet.addEventListener("click", () => {
+        closeSaveTemplateSetModal();
+      });
+    }
+
+    if (els.btnConfirmSaveTemplateSet) {
+      els.btnConfirmSaveTemplateSet.addEventListener("click", () => {
+        confirmSaveTemplateSet();
+      });
+    }
+
+    if (els.inputTemplateSetName) {
+      els.inputTemplateSetName.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault();
+          confirmSaveTemplateSet();
+        } else if (e.key === "Escape") {
+          closeSaveTemplateSetModal();
+        }
+      });
+    }
+
+    if (els.btnCancelConfirmTemplateSet) {
+      els.btnCancelConfirmTemplateSet.addEventListener("click", () => {
+        closeConfirmTemplateSetModal();
+      });
+    }
+
+    if (els.btnConfirmTemplateSet) {
+      els.btnConfirmTemplateSet.addEventListener("click", () => {
+        confirmTemplateSetAction();
       });
     }
 
@@ -5595,6 +5831,8 @@ function updateParamModalPreview() {
         if (inputDev && !inputDev.value) inputDev.value = data.dev_dir;
       }
       ensureCustomLayouts();
+      // Список наборов шаблонов приходит в payload getData (state.template_sets)
+      renderTemplateSetsList();
       // Если выбранный шаблон удалён (или список пуст) — выбираем первый доступный
       const tplKeys = Object.keys(state.pdf_settings?.custom_layouts || {});
       if (!tplKeys.includes(layoutState.currentTemplate)) {
@@ -5610,6 +5848,49 @@ function updateParamModalPreview() {
       }
       // При открытии панели предлагаем создать артикул (если проект еще без артикула)
       setTimeout(maybeOfferArticulCreation, 300);
+    },
+
+    // Ruby прислал обновлённый список наборов шаблонов (после сохранения/удаления)
+    onTemplateSetsUpdated: function (payload) {
+      state.template_sets = (payload && payload.sets) || [];
+      renderTemplateSetsList();
+    },
+
+    // Ruby загрузил набор шаблонов: custom_layouts заменен целиком — применяем
+    // к состоянию, переключаем сцены отсутствующих шаблонов и перерисовываем UI
+    onTemplateSetLoaded: function (payload) {
+      const layouts = payload && payload.custom_layouts;
+      if (!layouts || typeof layouts !== "object") return;
+
+      if (!state.pdf_settings) state.pdf_settings = {};
+      state.pdf_settings.custom_layouts = layouts;
+
+      // Сцены шаблонов, отсутствующих в наборе, → первый доступный шаблон
+      const keys = Object.keys(layouts);
+      const fallbackKey = keys[0] || "";
+      if (fallbackKey) {
+        (state.scenes || []).forEach((s) => {
+          if (!keys.includes(s.page_type)) {
+            s.page_type = fallbackKey;
+          }
+        });
+      }
+
+      if (!keys.includes(layoutState.currentTemplate)) {
+        layoutState.currentTemplate = fallbackKey;
+      }
+
+      syncTemplateDropdowns();
+      renderScenesTable();
+      if (fallbackKey) {
+        selectTemplate(fallbackKey);
+      } else {
+        layoutState.currentTemplate = "";
+        renderTemplateSettingsList(true);
+        renderTemplatesList();
+        updateLayoutUsageBadge();
+      }
+      notifyChange();
     },
 
     onDevUpdateResult: function (res) {

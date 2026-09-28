@@ -111,6 +111,7 @@ module DN1Code
             payload[:dev_dir] = Service::DevUpdater.resolve_dev_dir if defined?(Service::DevUpdater)
             payload[:plugins_dir] = Service::DevUpdater.resolve_plugins_dir if defined?(Service::DevUpdater)
             payload[:vips_available] = Service::VipsService.available? if defined?(Service::VipsService)
+            payload[:template_sets] = project_data.list_template_sets
             json_str = JSON.generate(payload)
             dialog.execute_script("window.app && window.app.loadData(#{json_str});")
           end
@@ -755,6 +756,83 @@ module DN1Code
               else
                 dialog.execute_script("window.app && window.app.showNotification('Не удалось прочитать YAML файл: #{File.basename(yaml_file.to_s)}', 'error');")
               end
+            end
+          end
+
+          # --- Наборы шаблонов (config/layout_sets/*.yaml) -------------------------
+
+          # Список сохранённых наборов шаблонов
+          dialog.add_action_callback("getTemplateSets") do |_action_context|
+            model = Sketchup.active_model
+            project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
+            sets = project_data ? project_data.list_template_sets : []
+            json_str = JSON.generate({ sets: sets })
+            dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
+          end
+
+          # Сохранить текущие шаблоны как набор: { name, custom_layouts }
+          dialog.add_action_callback("saveTemplateSet") do |_action_context, data_json|
+            begin
+              payload = JSON.parse(data_json, symbolize_names: true)
+              name = payload[:name].to_s
+              layouts = payload[:custom_layouts]
+              if name.strip.empty? || !layouts.is_a?(Hash) || layouts.empty?
+                dialog.execute_script("window.app && window.app.showNotification('Набор не сохранен: укажите имя набора', 'error');")
+                next
+              end
+
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
+              ok = project_data && project_data.save_template_set(name, layouts)
+              if ok
+                dialog.execute_script("window.app && window.app.showNotification('Набор шаблонов «#{name.gsub('"', "'")}\" сохранен', 'success');")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Не удалось сохранить набор шаблонов', 'error');")
+              end
+              sets = project_data ? project_data.list_template_sets : []
+              json_str = JSON.generate({ sets: sets })
+              dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка сохранения набора: #{e.message}', 'error');")
+            end
+          end
+
+          # Загрузить набор по имени: заменяет все шаблоны содержимым набора
+          dialog.add_action_callback("loadTemplateSet") do |_action_context, name_json|
+            begin
+              name = JSON.parse(name_json.to_s).to_s
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
+              layouts = project_data && project_data.load_template_set(name)
+              if layouts
+                json_str = JSON.generate({ custom_layouts: layouts })
+                dialog.execute_script("window.app && window.app.onTemplateSetLoaded(#{json_str});")
+                dialog.execute_script("window.app && window.app.showNotification('Набор шаблонов «#{name.gsub('"', "'")}\" загружен', 'success');")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Набор шаблонов не найден: #{name.gsub('"', "'")}', 'error');")
+              end
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка загрузки набора: #{e.message}', 'error');")
+            end
+          end
+
+          # Удалить набор по имени
+          dialog.add_action_callback("deleteTemplateSet") do |_action_context, name_json|
+            begin
+              name = JSON.parse(name_json.to_s).to_s
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
+              ok = project_data && project_data.delete_template_set(name)
+              if ok
+                dialog.execute_script("window.app && window.app.showNotification('Набор шаблонов «#{name.gsub('"', "'")}\" удален', 'success');")
+              else
+                dialog.execute_script("window.app && window.app.showNotification('Не удалось удалить набор шаблонов', 'error');")
+              end
+              sets = project_data ? project_data.list_template_sets : []
+              json_str = JSON.generate({ sets: sets })
+              dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка удаления набора: #{e.message}', 'error');")
             end
           end
 

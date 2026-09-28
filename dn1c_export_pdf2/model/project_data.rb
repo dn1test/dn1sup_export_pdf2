@@ -1600,6 +1600,134 @@ module DN1Code
           true
         end
 
+        # --- Наборы шаблонов (config/layout_sets/*.yaml) -------------------------
+        # Набор — снимок полного списка шаблонов страниц (custom_layouts) под
+        # конкретный проект. Схема файла повторяет layout.yaml (корневой ключ
+        # layout) плюс метаданные name/saved_at, поэтому набор читается штатным
+        # load_from_layout_yaml со всей его нормализацией.
+
+        # Папка хранения наборов шаблонов
+        def template_sets_dir
+          File.join(PLUGIN_CONFIG_DIR, "layout_sets")
+        end
+
+        # Очищает имя набора от символов, недопустимых в имени файла
+        def sanitize_template_set_name(name)
+          name.to_s.gsub(/[\\\/:*?"<>|\x00-\x1F]/, " ").squeeze(" ").strip[0, 80].to_s.strip
+        end
+
+        def template_set_filename(name)
+          base = sanitize_template_set_name(name)
+          base = "set" if base.empty?
+          "#{base}.yaml"
+        end
+
+        def template_set_path_for(name)
+          File.join(template_sets_dir, template_set_filename(name))
+        end
+
+        # Читает YAML файла набора; возвращает {name, saved_at, layouts} или nil
+        def read_template_set_file(path)
+          return nil unless path.is_a?(String) && File.exist?(path)
+
+          raw = begin
+                  content = File.read(path, encoding: "utf-8")
+                  parsed = YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
+                  parsed.is_a?(Hash) ? self.class.deep_symbolize_keys(parsed) : nil
+                rescue StandardError, ArgumentError
+                  nil
+                end
+          return nil unless raw.is_a?(Hash)
+
+          layouts = raw[:layout] || raw[:custom_layouts] || raw[:layouts]
+          return nil unless layouts.is_a?(Hash) && !layouts.empty?
+
+          {
+            name: (raw[:name] || File.basename(path, ".*")).to_s,
+            saved_at: raw[:saved_at].to_s,
+            layouts: layouts
+          }
+        end
+
+        # Список сохранённых наборов: {name, saved_at, templates_count}, по алфавиту
+        def list_template_sets
+          dir = template_sets_dir
+          return [] unless Dir.exist?(dir)
+
+          Dir.glob(File.join(dir, "*.yaml")).map do |path|
+            info = read_template_set_file(path)
+            next unless info
+
+            {
+              name: info[:name],
+              saved_at: info[:saved_at],
+              templates_count: info[:layouts].size
+            }
+          end.compact.sort_by { |s| s[:name].downcase }
+        end
+
+        def find_template_set_file(name)
+          dir = template_sets_dir
+          return nil unless Dir.exist?(dir)
+
+          wanted = name.to_s.strip.downcase
+          return nil if wanted.empty?
+
+          Dir.glob(File.join(dir, "*.yaml")).each do |path|
+            info = read_template_set_file(path)
+            return path if info && info[:name].downcase == wanted
+          end
+
+          # Fallback: файл с очищенным именем, но изменённым name внутри
+          fallback = template_set_path_for(name)
+          File.exist?(fallback) ? fallback : nil
+        end
+
+        # Сохраняет список шаблонов как набор с заданным именем
+        # @return [Boolean] true в случае успешной записи
+        def save_template_set(name, layouts)
+          clean = sanitize_template_set_name(name)
+          return false if clean.empty?
+          return false unless layouts.is_a?(Hash) && !layouts.empty?
+
+          dir = template_sets_dir
+          FileUtils.mkdir_p(dir)
+          data = {
+            "name" => clean,
+            "saved_at" => Time.now.strftime("%Y-%m-%d %H:%M"),
+            "layout" => self.class.deep_stringify_keys(layouts)
+          }
+          File.open(File.join(dir, template_set_filename(clean)), "w:utf-8") do |f|
+            f.write data.to_yaml
+          end
+          true
+        end
+
+        # Загружает набор по имени: целиком заменяет текущие шаблоны содержимым
+        # набора и сразу записывает их в layout.yaml (смена набора персистентна).
+        # @return [Hash, nil] новый список шаблонов или nil, если набор не найден
+        def load_template_set(name)
+          path = find_template_set_file(name)
+          return nil unless path
+
+          # load_from_layout_yaml читает корневой ключ layout, нормализует блоки
+          # и заменяет @pdf_settings[:custom_layouts]
+          return nil unless load_from_layout_yaml(path)
+
+          save_to_layout_yaml(PROGRAM_LAYOUT_FILE)
+          @pdf_settings[:custom_layouts]
+        end
+
+        # Удаляет файл набора по имени
+        # @return [Boolean] true, если набор удалён
+        def delete_template_set(name)
+          path = find_template_set_file(name)
+          return false unless path
+
+          File.delete(path)
+          true
+        end
+
         # Загружает данные проекта из файла YAML (поддерживает структуру project_config.yaml,
         # одиночные хэши и потоковый формат)
         # @param file_path [String] путь к YAML файлу

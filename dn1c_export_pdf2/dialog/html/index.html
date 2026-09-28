@@ -281,6 +281,22 @@
           <div class="templates-list" id="templatesList">
             <!-- Dynamically populated via renderTemplatesList() in app.js -->
           </div>
+
+          <!-- Template Sets: сохранение/загрузка всего списка шаблонов под разные проекты -->
+          <div class="templates-sets-section" id="templateSetsSection">
+            <div class="templates-sets-header">
+              <div class="sidebar-title-group">
+                <span class="sidebar-title-icon"><i class="modus-icons">layers</i></span>
+                <span class="templates-sets-title">Наборы шаблонов</span>
+              </div>
+              <button type="button" class="btn btn-xs btn-secondary btn-icon-only" id="btnSaveTemplateSet" title="Сохранить текущий список шаблонов как набор для быстрого переключения между проектами" aria-label="Сохранить набор">
+                <i class="modus-icons">save</i>
+              </button>
+            </div>
+            <div class="templates-sets-list" id="templateSetsList">
+              <!-- Dynamically populated via renderTemplateSetsList() in app.js -->
+            </div>
+          </div>
         </aside>
 
         <!-- Template & List Settings Panel (Right) -->
@@ -817,6 +833,47 @@
       </div>
     </div>
 
+    <!-- Save Template Set Modal -->
+    <div id="saveTemplateSetModal" class="modal-overlay hidden">
+      <div class="modal-card modal-form-card">
+        <div class="modal-header-row">
+          <span class="modal-card-icon"><i class="modus-icons">layers</i></span>
+          <h3>Сохранение набора шаблонов</h3>
+        </div>
+        <p class="field-hint">Набор сохраняет текущий список всех шаблонов страниц. Загрузив набор позже, вы мгновенно переключите оформление PDF под другой проект:</p>
+
+        <div class="form-group">
+          <label for="inputTemplateSetName">Название набора *</label>
+          <input type="text" id="inputTemplateSetName" class="form-control" placeholder="Например: Кухни, Шкафы-купе, Проект Иванов">
+        </div>
+
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelSaveTemplateSet"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmSaveTemplateSet"><i class="modus-icons">check_mark</i> Сохранить набор</button>
+        </div>
+      </div>
+    </div>
+
+    <!-- Confirm Template Set Action Modal (загрузка / перезапись / удаление) -->
+    <div id="confirmTemplateSetModal" class="modal-overlay hidden">
+      <div class="modal-card modal-form-card">
+        <div class="modal-header-row">
+          <span class="modal-card-icon"><i class="modus-icons">layers</i></span>
+          <h3 id="confirmTemplateSetTitle">Загрузка набора шаблонов</h3>
+        </div>
+        <p id="confirmTemplateSetMsg" class="modal-msg">
+          Вы действительно хотите загрузить этот набор?
+        </p>
+        <div id="confirmTemplateSetWarning" class="field-hint modal-alert-danger">
+          ⚠️ Текущие шаблоны будут полностью заменены. Сцены, использующие отсутствующие в наборе шаблоны, будут переключены на первый доступный шаблон.
+        </div>
+        <div class="modal-actions">
+          <button type="button" class="btn btn-secondary" id="btnCancelConfirmTemplateSet"><i class="modus-icons">content_close</i> Отмена</button>
+          <button type="button" class="btn btn-primary" id="btnConfirmTemplateSet"><i class="modus-icons">check_mark</i> Подтвердить</button>
+        </div>
+      </div>
+    </div>
+
     <!-- Footer Action Bar -->
     <footer class="app-footer">
       <div class="footer-left">
@@ -838,6 +895,6 @@
     </footer>
   </div>
 
-  <script src="app.js?v=20260926_watermark_toggle"></script>
+  <script src="app.js?v=20260928_template_sets"></script>
 </body>
 </html>
