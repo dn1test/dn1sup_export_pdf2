@@ -24,6 +24,8 @@ export const ui = reactive({
   // Вкладка «История»: ui.history = [{ uid, item }], где item — тот же объект,
   // что и в state.history (прокси Vue пишет данные насквозь в legacy-state).
   history: [],
+  // Вкладка «Отправка»: список адресатов API (строки-URL)
+  apiTargets: [],
 })
 
 let dirUidSeq = 1

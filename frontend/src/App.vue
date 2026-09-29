@@ -383,41 +383,9 @@
       </section>
 
       <!-- TAB 7: SEND -->
+      <!-- TAB 7: SEND — рендерится Vue-компонентом -->
       <section id="tab-send" class="tab-pane">
-        <!-- Snapshots WebP Card -->
-        <div class="settings-card">
-          <div class="card-header">
-            <span class="card-header-icon"><i class="modus-icons">insert_photo</i></span>
-            <span class="card-header-title">Снимки страниц (WebP)</span>
-          </div>
-          <div class="form-grid">
-            <div class="form-group" id="webpQualityGroup">
-              <label for="selectWebpQuality">Качество WebP</label>
-              <select id="selectWebpQuality" class="form-control">
-                <option value="75">75 — компактнее</option>
-                <option value="85" selected>85 — рекомендуемое</option>
-                <option value="95">95 — выше качество</option>
-                <option value="lossless">Lossless — без потерь</option>
-              </select>
-              <span class="field-hint" id="hintWebpFormat"></span>
-            </div>
-          </div>
-        </div>
-
-        <!-- Section: Адресаты API -->
-        <div class="settings-card">
-          <div class="card-header">
-            <div class="card-header-title-wrap">
-              <span class="card-header-icon"><i class="modus-icons">browser</i></span>
-              <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
-            </div>
-            <button type="button" class="btn btn-xs btn-primary" id="btnAddApiTarget"><i class="modus-icons">add_circle</i> + Добавить URL</button>
-          </div>
-          <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
-          <div id="apiTargetsList" class="api-targets-container">
-            <!-- Dynamically populated via JS -->
-          </div>
-        </div>
+        <SendTab />
       </section>
     </main>
 
@@ -695,4 +663,5 @@ import ParamModal from './components/ParamModal.vue'
 import DirectoriesTab from './components/DirectoriesTab.vue'
 import SettingsTab from './components/SettingsTab.vue'
 import HistoryTab from './components/HistoryTab.vue'
+import SendTab from './components/SendTab.vue'
 </script>

@@ -515,8 +515,7 @@ const DEFAULT_LAYOUTS = {
     // Вкладка «Папки» рендерится Vue-компонентом DirectoriesTab.vue
 
     // Tab Settings
-    apiTargetsList: document.getElementById("apiTargetsList"),
-    btnAddApiTarget: document.getElementById("btnAddApiTarget"),
+    // Вкладка «Отправка»: список адресатов рендерит Vue-компонент SendTab.vue
 
     // Tab 2 Elements: Scenes & Layout Split View
     layoutTplUsageBadge: document.getElementById("layoutTplUsageBadge"),
@@ -3380,66 +3379,27 @@ function updateParamModalPreview() {
     entry.preview = { state: files.length > 0 ? "ready" : "empty", files: files, count: files.length };
   }
 
-  // Render API Targets (api_targets from project_config.yaml / settings)
+  // Render API Targets (api_targets from project_config.yaml / settings):
+  // рендер — SendTab.vue, здесь только синхронизация store
   function renderApiTargets() {
-    if (!els.apiTargetsList) return;
-    els.apiTargetsList.innerHTML = "";
     if (!Array.isArray(state.api_targets)) {
       state.api_targets = [];
     }
-    const targets = state.api_targets;
-    if (targets.length === 0) {
-      els.apiTargetsList.innerHTML = `
-        <div class="empty-targets-placeholder">
-          Адресаты API не заданы. Нажмите «+ Добавить URL», чтобы добавить адрес веб-интеграции.
-        </div>`;
-      return;
-    }
-    targets.forEach((targetUrl, index) => {
-      const card = document.createElement("div");
-      card.className = "api-target-card";
-      card.dataset.index = index;
+    ui.apiTargets = state.api_targets.slice();
+  }
 
-      const icon = document.createElement("span");
-      icon.className = "api-target-icon";
-      icon.innerHTML = '<i class="modus-icons">web_link</i>';
+  // Кнопка «+ Добавить URL» (SendTab.vue)
+  function addApiTarget() {
+    if (!Array.isArray(state.api_targets)) state.api_targets = [];
+    state.api_targets.push("");
+    renderApiTargets();
+    notifyChange();
+  }
 
-      const badge = document.createElement("span");
-      badge.className = "api-target-badge";
-      badge.textContent = `#${index + 1}`;
-
-      const input = document.createElement("input");
-      input.type = "text";
-      input.className = "form-control api-target-input";
-      input.value = targetUrl || "";
-      input.placeholder = "https://domain.com/api/projects?token=...";
-      input.title = "URL адресата веб-интеграции";
-      input.addEventListener("input", (e) => {
-        state.api_targets[index] = e.target.value;
-      });
-      input.addEventListener("change", (e) => {
-        state.api_targets[index] = e.target.value.trim();
-        notifyChange();
-      });
-
-      const btnDelete = document.createElement("button");
-      btnDelete.type = "button";
-      btnDelete.className = "btn-icon btn-delete";
-      btnDelete.innerHTML = MODUS_CROSS_SVG;
-      btnDelete.title = "Удалить этот адрес API";
-      btnDelete.addEventListener("click", () => {
-        state.api_targets.splice(index, 1);
-        renderApiTargets();
-        notifyChange();
-      });
-
-      card.appendChild(icon);
-      card.appendChild(badge);
-      card.appendChild(input);
-      card.appendChild(btnDelete);
-
-      els.apiTargetsList.appendChild(card);
-    });
+  // Commit изменённого списка из SendTab.vue (ввод, удаление)
+  function commitApiTargets(list) {
+    state.api_targets = list;
+    notifyChange();
   }
 
   // Update Aspect Ratio UI & SketchUp Overlay state
@@ -4645,11 +4605,8 @@ function updateParamModalPreview() {
       custom_layouts: state.pdf_settings.custom_layouts
     };
 
-    // Синхронизация адресатов API из элементов ввода интерфейса
-    if (els.apiTargetsList) {
-      const inputs = els.apiTargetsList.querySelectorAll(".api-target-input");
-      state.api_targets = Array.from(inputs).map((inp) => inp.value.trim()).filter(Boolean);
-    } else if (Array.isArray(state.api_targets)) {
+    // Синхронизация адресатов API: актуальные значения пишет SendTab.vue в state
+    if (Array.isArray(state.api_targets)) {
       state.api_targets = state.api_targets.map((t) => String(t).trim()).filter(Boolean);
     }
 
@@ -4720,20 +4677,7 @@ function updateParamModalPreview() {
     // (addDirectory / refreshDirectories).
 
     // API Targets Add button
-    if (els.btnAddApiTarget) {
-      els.btnAddApiTarget.addEventListener("click", () => {
-        if (!Array.isArray(state.api_targets)) state.api_targets = [];
-        state.api_targets.push("");
-        renderApiTargets();
-        notifyChange();
-        if (els.apiTargetsList) {
-          const inputs = els.apiTargetsList.querySelectorAll(".api-target-input");
-          if (inputs.length > 0) {
-            inputs[inputs.length - 1].focus();
-          }
-        }
-      });
-    }
+    // Кнопка «+ Добавить URL» перенесена в SendTab.vue → window.legacy.addApiTarget
 
     // Specifications dynamic preview update
     if (els.inputMaterials) els.inputMaterials.addEventListener("input", updateHeaderTitles);
@@ -5587,6 +5531,8 @@ function updateParamModalPreview() {
     addHistoryEntry,
     removeHistoryEntry,
     syncHistoryEdit,
+    addApiTarget,
+    commitApiTargets,
     notifyChange,
     callRuby
   };
