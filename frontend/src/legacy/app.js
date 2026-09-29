@@ -506,9 +506,9 @@ const DEFAULT_LAYOUTS = {
     inputRevision: document.getElementById("inputRevision"),
     inputRate: document.getElementById("inputRate"),
     inputStatus: document.getElementById("inputStatus"),
-    stadiaCheckboxesContainer: document.getElementById("stadiaCheckboxesContainer"),
-    inputNewStadia: document.getElementById("inputNewStadia"),
-    btnAddStadia: document.getElementById("btnAddStadia"),
+    stadiaCheckboxesContainer: null, // рендер стадий — ProjectTab.vue
+    inputNewStadia: null,
+    btnAddStadia: null,
     inputLastEdit: document.getElementById("inputLastEdit"),
 
     // Tab Directories
@@ -4227,9 +4227,6 @@ function updateParamModalPreview() {
     }
   }
 
-  // Render Stadia Checkboxes
-  let draggedStadiaIndex = null;
-
   // Пересчитывает статус проекта по последней отмеченной стадии (порядок стадий значим)
   function updateStadiaStatus() {
     const stadia = state.workflow && Array.isArray(state.workflow.stadia) ? state.workflow.stadia : [];
@@ -4246,10 +4243,9 @@ function updateParamModalPreview() {
     }
   }
 
+  // Render Stadia: ui.stadia хранит { uid, item } (write-through в
+  // state.workflow.stadia), рендер — ProjectTab.vue
   function renderStadia() {
-    if (!els.stadiaCheckboxesContainer) return;
-    els.stadiaCheckboxesContainer.innerHTML = "";
-
     const defaultStadia = [
       { name: "Предварительный проект", status: true },
       { name: "Правки проекта (история правок)", status: false },
@@ -4268,98 +4264,42 @@ function updateParamModalPreview() {
       state.workflow.stadia = stadia;
     }
 
-    stadia.forEach((st, idx) => {
-      const label = document.createElement("label");
-      label.className = `stadia-checkbox-item ${st.status ? "checked" : ""}`;
+    ui.stadia = stadia.map((item, idx) => ({ uid: "st" + idx + "-" + (item.name || ""), item }));
+  }
 
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.checked = !!st.status;
+  // Мосты для ProjectTab.vue: мутации стадий из Vue-списка
+  function stadiaChanged() {
+    updateStadiaStatus();
+    notifyChange();
+  }
 
-      chk.addEventListener("change", (e) => {
-        st.status = e.target.checked;
-        label.classList.toggle("checked", st.status);
-        updateStadiaStatus();
-        notifyChange();
-      });
+  function removeStadia(index) {
+    if (!state.workflow || !Array.isArray(state.workflow.stadia)) return;
+    if (state.workflow.stadia.length <= 1) return;
+    state.workflow.stadia.splice(index, 1);
+    renderStadia();
+    updateStadiaStatus();
+    notifyChange();
+  }
 
-      const span = document.createElement("span");
-      span.className = "stadia-name";
-      span.textContent = st.name || `Стадия ${idx + 1}`;
+  function commitStadia(from, to) {
+    if (!state.workflow || !Array.isArray(state.workflow.stadia)) return;
+    const item = state.workflow.stadia.splice(from, 1)[0];
+    state.workflow.stadia.splice(to, 0, item);
+    updateStadiaStatus();
+    notifyChange();
+  }
 
-      // Кнопка удаления стадии (последнюю оставшуюся не удаляем)
-      const btnDel = document.createElement("button");
-      btnDel.type = "button";
-      btnDel.className = "stadia-delete";
-      btnDel.innerHTML = MODUS_CROSS_SVG;
-      btnDel.title = "Удалить стадию";
-      if (stadia.length <= 1) btnDel.style.display = "none";
-      btnDel.addEventListener("click", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        if (state.workflow.stadia.length <= 1) return;
-        state.workflow.stadia.splice(idx, 1);
-        renderStadia();
-        updateStadiaStatus();
-        notifyChange();
-      });
-
-      // Drag and Drop переупорядочивание строк (как у таблицы сцен)
-      label.addEventListener("mousedown", (e) => {
-        label.setAttribute("draggable", e.target.closest("input, button") ? "false" : "true");
-      });
-      label.addEventListener("mouseup", () => {
-        label.setAttribute("draggable", "true");
-      });
-      label.addEventListener("dragstart", (e) => {
-        draggedStadiaIndex = idx;
-        label.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", String(idx));
-      });
-      label.addEventListener("dragend", () => {
-        draggedStadiaIndex = null;
-        label.classList.remove("dragging");
-        els.stadiaCheckboxesContainer.querySelectorAll(".stadia-checkbox-item").forEach((row) => {
-          row.classList.remove("drag-over-top", "drag-over-bottom");
-        });
-      });
-      label.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (draggedStadiaIndex === null || draggedStadiaIndex === idx) return;
-        const rect = label.getBoundingClientRect();
-        const isTop = e.clientY - rect.top < rect.height / 2;
-        label.classList.toggle("drag-over-top", isTop);
-        label.classList.toggle("drag-over-bottom", !isTop);
-      });
-      label.addEventListener("dragleave", () => {
-        label.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-      label.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        label.classList.remove("drag-over-top", "drag-over-bottom");
-        if (draggedStadiaIndex === null || draggedStadiaIndex === idx) return;
-
-        const rect = label.getBoundingClientRect();
-        let dropIndex = e.clientY - rect.top < rect.height / 2 ? idx : idx + 1;
-        if (draggedStadiaIndex < dropIndex) dropIndex -= 1;
-
-        if (dropIndex !== draggedStadiaIndex) {
-          const item = state.workflow.stadia.splice(draggedStadiaIndex, 1)[0];
-          state.workflow.stadia.splice(dropIndex, 0, item);
-          renderStadia();
-          updateStadiaStatus();
-          notifyChange();
-        }
-      });
-
-      label.appendChild(chk);
-      label.appendChild(span);
-      label.appendChild(btnDel);
-      els.stadiaCheckboxesContainer.appendChild(label);
-    });
+  function addStadia(name) {
+    name = String(name || "").trim();
+    if (!name) return;
+    state.workflow = state.workflow || {};
+    if (!Array.isArray(state.workflow.stadia) || state.workflow.stadia.length === 0) {
+      state.workflow.stadia = [];
+    }
+    state.workflow.stadia.push({ name, status: false });
+    renderStadia();
+    notifyChange();
   }
 
   // Render History Table
@@ -4840,28 +4780,7 @@ function updateParamModalPreview() {
     }
 
     // Добавление пользовательской стадии в конец списка (кнопка или Enter)
-    const addStadiaFromInput = () => {
-      if (!els.inputNewStadia) return;
-      const name = els.inputNewStadia.value.trim();
-      if (!name) return;
-      state.workflow = state.workflow || {};
-      if (!Array.isArray(state.workflow.stadia) || state.workflow.stadia.length === 0) {
-        state.workflow.stadia = [];
-      }
-      state.workflow.stadia.push({ name, status: false });
-      els.inputNewStadia.value = "";
-      renderStadia();
-      notifyChange();
-    };
-    if (els.btnAddStadia) els.btnAddStadia.addEventListener("click", addStadiaFromInput);
-    if (els.inputNewStadia) {
-      els.inputNewStadia.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          addStadiaFromInput();
-        }
-      });
-    }
+    // Добавление стадий перенесено в ProjectTab.vue → window.legacy.addStadia
 
     // Глобальный фон: включается/выключается сразу на всех страницах,
     // эскизы в таблице перегенерируются с учётом нового состояния
@@ -5533,6 +5452,10 @@ function updateParamModalPreview() {
     syncHistoryEdit,
     addApiTarget,
     commitApiTargets,
+    stadiaChanged,
+    removeStadia,
+    commitStadia,
+    addStadia,
     notifyChange,
     callRuby
   };

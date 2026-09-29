@@ -26,6 +26,8 @@ export const ui = reactive({
   history: [],
   // Вкладка «Отправка»: список адресатов API (строки-URL)
   apiTargets: [],
+  // Вкладка «Проект»: стадии { uid, item } (write-through в state.workflow.stadia)
+  stadia: [],
 })
 
 let dirUidSeq = 1
