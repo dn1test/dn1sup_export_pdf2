@@ -117,17 +117,32 @@ frontend/                                      # Исходники веб-ин�
 ├── index.html                                 # Vite-шаблон входа
 ├── public/                                    # Копируются в сборку как есть (css, шрифты)
 └── src/
-    ├── main.js                                # createApp + монтирование
-    ├── App.vue                                # Корневой компонент интерфейса
-    └── legacy/                                # Vanilla JS в процессе миграции на Vue (по вкладкам)
-        └── app.js
+    ├── main.js                                # createApp + монтирование, динамический import legacy
+    ├── store.js                               # Реактивный UI-store (мост legacy ↔ Vue)
+    ├── format.js                              # Общие утилиты (размеры файлов, иконки, плюрализация)
+    ├── App.vue                                # Корневой компонент: каркас + статичные формы
+    ├── legacy/                                # Бизнес-логика (мост callRuby/window.app, состояние, экспорт)
+    │   └── app.js
+    └── components/                            # По компоненту на вкладку + общие
+        ├── BaseModal.vue                      # Единая оболочка модалок (ESC, фокус-трап, aria)
+        ├── AppToast.vue                       # Уведомления
+        ├── ParamModal.vue                     # Модал создания/правки параметра
+        ├── ProjectTab.vue                     # Вкладка «Проект» + стадии
+        ├── ScenesTab.vue                      # Вкладка «Страницы»: таблица, попапы кадра/выравнивания
+        ├── TemplatesSidebar.vue               # Список шаблонов и наборов
+        ├── TemplateModals.vue                 # 5 модалок шаблонов/наборов
+        ├── TemplateSettingsEditor.vue         # WYSIWYG-редактор параметров с DnD
+        ├── DirectoriesTab.vue                 # Вкладка «Папки»: карточки, DnD, предпросмотр
+        ├── HistoryTab.vue                     # Вкладка «История»
+        ├── SettingsTab.vue                    # Вкладка «Настройки»
+        └── SendTab.vue                        # Вкладка «Отправка» + API-адресаты
 ```
 
 ---
 
 ## 🎨 Разработка GUI (Vue 3 + Vite)
 
-Веб-интерфейс диалога переносится с vanilla JS на Vue 3 по вкладкам. Источники — в `frontend/`, готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
+Веб-интерфейс диалога работает на Vue 3: разметка и рендер — в SFC-компонентах (`frontend/src/components/`), бизнес-логика и мост к SketchUp — в `frontend/src/legacy/app.js`. Связь через реактивный store (`ui.*`) и `window.legacy` — контракты Ruby↔JS (`callRuby`, `window.app.*`) не изменились. Готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
 
 ```bash
 cd frontend

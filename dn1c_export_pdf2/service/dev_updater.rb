@@ -158,12 +158,34 @@ module DN1Code
             end
           end
 
+          # 3. Сборка Vite пишет ассеты с хешами в имени (assets/*.js) и удаляет
+          #    устаревшие из dev-папки (emptyOutDir) — в Plugins они накапливались.
+          #    Зеркалим dialog/html: удаляем файлы, которых больше нет в dev.
+          pruned = 0
+          src_html = File.join(src_pkg, "dialog", "html")
+          dst_html = File.join(dst_pkg, "dialog", "html")
+          if Dir.exist?(src_html) && Dir.exist?(dst_html)
+            src_files = Dir.glob(File.join(src_html, "**", "*")).select { |f| File.file?(f) }
+                       .map { |f| f.sub("#{src_html}/", "").tr("\\", "/") }
+            Dir.glob(File.join(dst_html, "**", "*")).select { |f| File.file?(f) }.each do |f|
+              rel_html = f.sub("#{dst_html}/", "").tr("\\", "/")
+              next if src_files.include?(rel_html)
+              begin
+                File.delete(f)
+                pruned += 1
+              rescue StandardError
+                warnings << "dialog/html/#{rel_html}: не удалось удалить устаревший файл"
+              end
+            end
+          end
+
           {
             success: true,
             same_dir: false,
             dev_dir: src_dir,
             plugins_dir: dst_plugins,
             files_copied: files_copied,
+            files_pruned: pruned,
             warnings: warnings,
             version: PLUGIN_VERSION,
             updated_at: Time.now.strftime("%Y-%m-%d %H:%M:%S")

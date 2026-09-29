@@ -56,6 +56,7 @@ if res[:success]
     puts "  ℹ️  Каталоги совпадают: расширение работает напрямую из dev-папки."
   else
     puts "  ✅ Скопировано файлов: #{res[:files_copied]}"
+    puts "  🧹 Удалено устаревших: #{res[:files_pruned] || 0}" if res[:files_pruned].to_i.positive?
     puts "  ✅ Дата обновления:    #{res[:updated_at]}"
   end
 else
