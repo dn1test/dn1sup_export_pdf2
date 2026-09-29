@@ -792,6 +792,7 @@ const DEFAULT_LAYOUTS = {
             window.app.onWorkStats({
               articul: state.project?.articul || "HF#260924_104500",
               product: state.project?.furniture_name || "",
+              saved_at: (() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; })(),
               report: {
                 total_seconds: 2160000,
                 today_seconds: 7200,
@@ -801,6 +802,21 @@ const DEFAULT_LAYOUTS = {
                 last_tracked: now.toISOString().slice(0, 10),
                 "empty?": false,
                 series: { hourly, daily, weekly, monthly, yearly }
+              }
+            });
+          }
+        }, 50);
+      }
+      if (action === "resetWorkStats") {
+        setTimeout(() => {
+          if (window.app && window.app.onWorkStats) {
+            window.app.onWorkStats({
+              articul: state.project?.articul || "HF#260924_104500",
+              product: "",
+              report: {
+                total_seconds: 0, today_seconds: 0, week7_seconds: 0, month30_seconds: 0,
+                first_tracked: null, last_tracked: null, "empty?": true,
+                series: { hourly: [], daily: [], weekly: [], monthly: [], yearly: [] }
               }
             });
           }
@@ -896,6 +912,24 @@ const DEFAULT_LAYOUTS = {
     callRuby("getWorkStats");
   }
 
+  // Живое обновление статистики: пока вкладка «Статистика» активна, раз в минуту
+  // перезапрашиваем отчет (время тикает, карточки и график не устаревают)
+  const STATS_AUTO_REFRESH_MS = 60000;
+  let statsAutoTimer = null;
+  function startStatsAutoRefresh() {
+    stopStatsAutoRefresh();
+    statsAutoTimer = setInterval(() => {
+      const pane = document.getElementById("tab-stats");
+      if (pane && pane.classList.contains("active")) refreshWorkStats();
+    }, STATS_AUTO_REFRESH_MS);
+  }
+  function stopStatsAutoRefresh() {
+    if (statsAutoTimer) {
+      clearInterval(statsAutoTimer);
+      statsAutoTimer = null;
+    }
+  }
+
   // Пульс активности в диалоге: мышь/клавиатура/колесо → Ruby-колбэк activityPing.
   // Троттлинг 30 сек — пульс нужен лишь для отметки «пользователь активен».
   function bindActivityHeartbeat() {
@@ -921,6 +955,7 @@ const DEFAULT_LAYOUTS = {
       error: payload.error || "",
       articul: payload.articul || "",
       product: payload.product || "",
+      savedAt: payload.saved_at || "",
       report: payload.report || null,
       seq: (ui.stats ? ui.stats.seq : 0) + 1
     };
@@ -957,6 +992,9 @@ const DEFAULT_LAYOUTS = {
             renderApiTargets();
           } else if (tab.dataset.tab === "tab-stats") {
             refreshWorkStats();
+            startStatsAutoRefresh();
+          } else {
+            stopStatsAutoRefresh();
           }
         }
       });
@@ -1000,6 +1038,11 @@ const DEFAULT_LAYOUTS = {
       renderDirectories();
     } else if (tabId === "tab-send") {
       renderApiTargets();
+    } else if (tabId === "tab-stats") {
+      refreshWorkStats();
+      startStatsAutoRefresh();
+    } else {
+      stopStatsAutoRefresh();
     }
   }
 

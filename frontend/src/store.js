@@ -53,7 +53,7 @@ export const ui = reactive({
   },
   // Вкладка «Статистика»: отчёт Ruby (getWorkStats → onWorkStats) — сводки и
   // серии графиков работы над проектом; seq — триггер перерисовки диаграммы
-  stats: { loaded: false, error: '', articul: '', product: '', report: null, seq: 0 },
+  stats: { loaded: false, error: '', articul: '', product: '', savedAt: '', report: null, seq: 0 },
 })
 
 let dirUidSeq = 1

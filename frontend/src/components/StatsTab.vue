@@ -68,6 +68,7 @@
     <div class="stats-footer" v-if="report && !report.empty">
       <span>Первая активность: <b>{{ report.first_tracked || '—' }}</b></span>
       <span>Последняя активность: <b>{{ report.last_tracked || '—' }}</b></span>
+      <span v-if="savedAt">Обновлено: <b>{{ savedAt }}</b></span>
     </div>
   </div>
 </template>
@@ -95,6 +96,7 @@ const report = computed(() => ui.stats?.report || null)
 const statsError = computed(() => ui.stats?.error || '')
 const articul = computed(() => ui.stats?.articul || '')
 const product = computed(() => ui.stats?.product || '')
+const savedAt = computed(() => ui.stats?.savedAt || '')
 const isEmpty = computed(() => !report.value || report.value.empty)
 
 function legacy(fn, ...args) {
