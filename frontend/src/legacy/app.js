@@ -565,7 +565,7 @@ const DEFAULT_LAYOUTS = {
     btnCancelConfirmTemplateSet: document.getElementById("btnCancelConfirmTemplateSet"),
     btnConfirmTemplateSet: document.getElementById("btnConfirmTemplateSet"),
     templateSettingsPanel: document.getElementById("templateSettingsPanel"),
-    templateSettingsContainer: document.getElementById("templateSettingsContainer"),
+    // Редактор параметров шаблона рендерится TemplateSettingsEditor.vue
     selectLayoutTemplate: document.getElementById("selectLayoutTemplate"),
     layoutPageInfoBadge: document.getElementById("layoutPageInfoBadge"),
     inputLayoutMargin: document.getElementById("inputLayoutMargin"),
@@ -1679,14 +1679,11 @@ function setTemplateLineSettings(tplKey, updates) {
 }
 
   function renderTemplateSettingsList(isUserAction = false) {
-  if (!els.templateSettingsContainer) return;
   ensureCustomLayouts();
   syncDirectoriesSpecifications();
 
   const tplKey = layoutState.currentTemplate || (getAllTemplates()[0] ? getAllTemplates()[0].key : "");
   const tplDefObj = getTemplateDef(tplKey);
-  const params = getTemplateParams(tplKey);
-  const tplLine = getTemplateLineSettings(tplKey);
 
   if (els.currentTemplateTitle && tplKey) {
     els.currentTemplateTitle.textContent = tplDefObj.name;
@@ -1714,468 +1711,62 @@ function setTemplateLineSettings(tplKey, updates) {
 
   updateLayoutUsageBadge();
 
-    const sizeOptionsHtml = (current) => {
-      const sizes = PARAM_FONT_SIZES.includes(current) ? PARAM_FONT_SIZES : PARAM_FONT_SIZES.concat([current]).sort((a, b) => a - b);
-      return sizes.map((s) => `<option value="${s}" ${s === current ? "selected" : ""}>${s} pt</option>`).join("");
-    };
+  // Рендер списка — Vue-компонент TemplateSettingsEditor.vue: снимок параметров
+  // с вычисленными подписями; мутации идут через tplEditor*-мосты ниже
+  const tplLine = getTemplateLineSettings(tplKey);
+  const decorateChild = (c) => {
+    const cPrev = paramPreviewValue(c.source);
+    const cLabel = c.show_label ? effectiveParamLabel(c.source, c.label) : "";
+    return Object.assign({}, c, {
+      _label: paramSourceLabel(c.source),
+      _shownLabel: cLabel,
+      _preview: cPrev.replace(/\n+/g, " ⏎ ")
+    });
+  };
+  const decorate = (p) => {
+    const preview = paramPreviewValue(p.source);
+    const shownLabel = p.show_label ? effectiveParamLabel(p.source, p.label) : "";
+    return Object.assign({}, p, {
+      _label: paramSourceLabel(p.source),
+      _shownLabel: shownLabel,
+      _preview: preview.replace(/\n+/g, " ⏎ "),
+      _zone: paramZoneLabel(p),
+      _children: Array.isArray(p.params) ? p.params.map(decorateChild) : []
+    });
+  };
 
-    const gapOptionsHtml = (current) => {
-      const gaps = PARAM_LINE_GAPS.includes(current) ? PARAM_LINE_GAPS : PARAM_LINE_GAPS.concat([current]).sort((a, b) => a - b);
-      return gaps.map((g) => `<option value="${g}" ${g === current ? "selected" : ""}>${g} мм</option>`).join("");
-    };
+  ui.tplEditor = {
+    tplKey: tplKey,
+    lineGap: tplLine.line_gap,
+    lineEnabled: tplLine.line_enabled,
+    params: getTemplateParams(tplKey).map(decorate)
+  };
 
-    const fontOptionsHtml = (current) => PARAM_FONT_FAMILIES
-      .map((f) => `<option value="${f.value}" ${f.value === current ? "selected" : ""}>${f.label}</option>`).join("");
-
-    const renderParamRowHtml = (p) => {
-      const preview = paramPreviewValue(p.source);
-      const previewShort = preview.replace(/\n+/g, " ⏎ ");
-      // Подпись, которая реально печатается на листе: label или авто-подпись
-      const shownLabel = p.show_label ? effectiveParamLabel(p.source, p.label) : "";
-      return `
-        <div class="tpl-param-row ${p.visible ? "" : "disabled-block"}" data-id="${p.id}">
-          <div class="tpl-param-head">
-            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
-            <label class="tpl-param-vis" title="Выводить параметр на страницах шаблона">
-              <input type="checkbox" class="tpl-param-visible" data-id="${p.id}" ${p.visible ? "checked" : ""}>
-              <span>Вкл</span>
-            </label>
-            <div class="tpl-param-main">
-              <span class="tpl-param-label">${paramSourceLabel(p.source)}</span>
-              ${shownLabel ? `<span class="tpl-param-caption">«${shownLabel}»</span>` : ""}
-              ${previewShort ? `<span class="tpl-line-preview">(${previewShort})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
-            </div>
-            <div class="tpl-param-actions">
-              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${p.id}" title="Выше в списке">▲</button>
-              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${p.id}" title="Ниже в списке">▼</button>
-              <button type="button" class="tpl-param-btn tpl-param-edit" data-id="${p.id}" title="Изменить источник и заголовок"><i class="modus-icons" style="font-size: 13px;">edit</i></button>
-              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${p.id}" title="Удалить параметр"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
-            </div>
-          </div>
-          <div class="tpl-param-controls">
-            <input type="color" class="tpl-param-color" data-id="${p.id}" value="${p.color}" title="Цвет текста параметра">
-            <div class="tpl-param-box" title="Шрифт параметра («По умолчанию» — шрифт страницы)">
-              <select class="tpl-param-select tpl-param-font" data-id="${p.id}">${fontOptionsHtml(p.font_family || "")}</select>
-            </div>
-            <div class="tpl-param-box" title="Размер шрифта (пт)">
-              <select class="tpl-param-select tpl-param-size" data-id="${p.id}">${sizeOptionsHtml(p.font_size)}</select>
-            </div>
-            <div class="tpl-btn-group" title="Вертикальная привязка: группа у верхнего / нижнего края листа">
-              <button type="button" class="tpl-param-btn tpl-param-valign ${p.valign !== "bottom" ? "active" : ""}" data-id="${p.id}" data-valign="top" title="По верху">⬆</button>
-              <button type="button" class="tpl-param-btn tpl-param-valign ${p.valign === "bottom" ? "active" : ""}" data-id="${p.id}" data-valign="bottom" title="По низу">⬇</button>
-            </div>
-            <div class="tpl-btn-group" title="Колонка: слева / по центру / справа">
-              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "left" ? "active" : ""}" data-id="${p.id}" data-align="left" title="Слева">⇤</button>
-              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "center" ? "active" : ""}" data-id="${p.id}" data-align="center" title="По центру">↔</button>
-              <button type="button" class="tpl-param-btn tpl-param-align ${p.align === "right" ? "active" : ""}" data-id="${p.id}" data-align="right" title="Справа">⇥</button>
-            </div>
-            <label class="tpl-param-vis" title="Выводить заголовок на отдельной строке над значением на листе">
-              <input type="checkbox" class="tpl-param-show-label" data-id="${p.id}" ${p.show_label ? "checked" : ""}>
-              <span>Заголовок</span>
-            </label>
-            <span class="tpl-param-zone" data-id="${p.id}" title="Зона размещения параметра на странице">${paramZoneLabel(p)}</span>
-          </div>
-        </div>
-      `;
-    };
-
-    // Блок объединения параметров: вложенные параметры выводятся одной строкой
-    // через « | » со стилем блока; внутри блока порядок меняется мышкой.
-    const renderGroupHtml = (g) => {
-      const children = Array.isArray(g.params) ? g.params : [];
-      const childRows = children.map((c) => {
-        const cPrev = paramPreviewValue(c.source).replace(/\n+/g, " ⏎ ");
-        const cLabel = c.show_label ? effectiveParamLabel(c.source, c.label) : "";
-        return `
-          <div class="tpl-param-child" data-id="${c.id}">
-            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
-            <span class="tpl-param-child-label">${paramSourceLabel(c.source)}</span>
-            ${cLabel ? `<span class="tpl-param-caption">«${cLabel}»</span>` : ""}
-            ${cPrev ? `<span class="tpl-line-preview">(${cPrev})</span>` : `<span class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>`}
-            <label class="tpl-param-vis tpl-param-child-vis" title="Выводить заголовок перед значением внутри блока">
-              <input type="checkbox" class="tpl-param-child-show-label" data-id="${c.id}" ${c.show_label ? "checked" : ""}>
-              <span>Заголовок</span>
-            </label>
-            <button type="button" class="tpl-param-child-out" data-id="${c.id}" data-group="${g.id}" title="Вывести из блока">${MODUS_CROSS_SVG}</button>
-          </div>`;
-      }).join("");
-
-      return `
-        <div class="tpl-param-row tpl-param-group ${g.visible ? "" : "disabled-block"}" data-id="${g.id}" data-group="true">
-          <div class="tpl-param-head">
-            <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
-            <label class="tpl-param-vis" title="Выводить блок на страницах шаблона">
-              <input type="checkbox" class="tpl-param-visible" data-id="${g.id}" ${g.visible ? "checked" : ""}>
-              <span>Вкл</span>
-            </label>
-            <div class="tpl-param-main">
-              <span class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">layers</i> Блок</span>
-              <input type="text" class="form-control tpl-param-group-label" data-id="${g.id}" placeholder="Название блока (необязательно)" value="${g.label || ""}">
-              <span class="tpl-param-count">${paramCountText(children.length)}</span>
-            </div>
-            <div class="tpl-param-actions">
-              <button type="button" class="tpl-param-btn tpl-param-up" data-id="${g.id}" title="Выше в списке">▲</button>
-              <button type="button" class="tpl-param-btn tpl-param-down" data-id="${g.id}" title="Ниже в списке">▼</button>
-              <button type="button" class="tpl-param-btn tpl-param-del" data-id="${g.id}" title="Удалить блок вместе с его параметрами"><i class="modus-icons" style="font-size: 13px;">delete</i></button>
-            </div>
-          </div>
-          <div class="tpl-param-controls">
-            <input type="color" class="tpl-param-color" data-id="${g.id}" value="${g.color}" title="Цвет текста блока">
-            <div class="tpl-param-box" title="Шрифт блока («По умолчанию» — шрифт страницы)">
-              <select class="tpl-param-select tpl-param-font" data-id="${g.id}">${fontOptionsHtml(g.font_family || "")}</select>
-            </div>
-            <div class="tpl-param-box" title="Размер шрифта (пт)">
-              <select class="tpl-param-select tpl-param-size" data-id="${g.id}">${sizeOptionsHtml(g.font_size)}</select>
-            </div>
-            <div class="tpl-btn-group" title="Вертикальная привязка: группа у верхнего / нижнего края листа">
-              <button type="button" class="tpl-param-btn tpl-param-valign ${g.valign !== "bottom" ? "active" : ""}" data-id="${g.id}" data-valign="top" title="По верху">⬆</button>
-              <button type="button" class="tpl-param-btn tpl-param-valign ${g.valign === "bottom" ? "active" : ""}" data-id="${g.id}" data-valign="bottom" title="По низу">⬇</button>
-            </div>
-            <div class="tpl-btn-group" title="Колонка: слева / по центру / справа">
-              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "left" ? "active" : ""}" data-id="${g.id}" data-align="left" title="Слева">⇤</button>
-              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "center" ? "active" : ""}" data-id="${g.id}" data-align="center" title="По центру">↔</button>
-              <button type="button" class="tpl-param-btn tpl-param-align ${g.align === "right" ? "active" : ""}" data-id="${g.id}" data-align="right" title="Справа">⇥</button>
-            </div>
-            <label class="tpl-param-vis" title="Выводить название блока перед строкой на листе">
-              <input type="checkbox" class="tpl-param-show-label" data-id="${g.id}" ${g.show_label ? "checked" : ""}>
-              <span>Заголовок</span>
-            </label>
-            <span class="tpl-param-zone" data-id="${g.id}" title="Зона размещения блока на странице">${paramZoneLabel(g)}</span>
-          </div>
-          <div class="tpl-param-group-list" data-group-id="${g.id}">
-            ${childRows || `<div class="tpl-param-drop-empty">Перетащите сюда параметры — они выстроятся в одну строку через « | »</div>`}
-          </div>
-        </div>
-      `;
-    };
-
-    const rowsHtml = params.map((p) => (p.group ? renderGroupHtml(p) : renderParamRowHtml(p))).join("");
-
-  const html = `
-    <div class="tpl-single-column-layout">
-      <div class="tpl-card" id="card_params">
-        <div class="tpl-card-header">
-          <div class="tpl-card-title-group">
-            <span class="tpl-card-icon"><i class="modus-icons">tune</i></span>
-            <span class="tpl-card-title">Параметры страницы</span>
-          </div>
-          <div class="tpl-card-header-actions">
-            <label class="tpl-header-ctl" title="Размер между строками (мм) — общий отступ между параметрами и блоками на листе, один для всего шаблона">
-              <span>Между строками</span>
-              <select class="tpl-param-select tpl-header-linegap">${gapOptionsHtml(tplLine.line_gap)}</select>
-            </label>
-            <label class="tpl-header-ctl" title="Небольшая линия-разделитель между соседними строками параметров на листе, шириной с текст строки">
-              <input type="checkbox" class="tpl-header-line" ${tplLine.line_enabled ? "checked" : ""}>
-              <span>Линия</span>
-            </label>
-            <button type="button" class="btn btn-xs btn-secondary" id="btnCreateParamGroup" title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »"><i class="modus-icons">layers</i> Блок</button>
-            <button type="button" class="btn btn-xs btn-primary" id="btnCreateParam" title="Создать параметр шаблона"><i class="modus-icons">add_circle</i> Создать параметр</button>
-          </div>
-        </div>
-        <div class="tpl-card-body">
-            <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. Дополнительные настройки задаются в строке параметра: шрифт, размер, привязка по вертикали (⬆/⬇), выравнивание (⇤/↔/⇥), цвет и заголовок. «Размер между строками» и линия-разделитель «Линия» — общие для всех параметров и блоков, задаются в шапке карточки. Место на странице определяется выравниваниями: колонка слева/по центру/справа и привязка группы к верхнему или нижнему краю листа. 📦 Блок объединяет параметры в одну строку через « | ».</p>
-          <div class="tpl-params-list">
-            ${rowsHtml || `<div class="tpl-params-empty">Параметров пока нет — нажмите «+ Создать параметр».</div>`}
-          </div>
-        </div>
-      </div>
-    </div>
-  `;
-
-  els.templateSettingsContainer.innerHTML = html;
-  bindTemplateSettingsEvents(tplKey);
   syncCurrentTemplateOverlay(null, isUserAction);
 }
 
-  // Drag-and-drop параметров: сортировка за ручку ⠿, перенос параметров в блок
-  // и обратно, реордер внутри блока. Порядок в списке = порядок в зоне на листе;
-  // порядок внутри блока = порядок в строке « | ».
-  function setupParamDragAndDrop(container, tplKey) {
-    const list = container.querySelector(".tpl-params-list");
-    if (!list) return;
-    const drag = { id: null, fromGroup: null }; // fromGroup: id блока либо null
-
-    const clearMarkers = () => {
-      list.querySelectorAll(".drag-over-top, .drag-over-bottom, .drag-over-group")
-        .forEach((el) => el.classList.remove("drag-over-top", "drag-over-bottom", "drag-over-group"));
-    };
-
-    const findGroup = (params, gid) => params.find((p) => p.id === gid && p.group);
-
-    // Реордер на верхнем уровне списка
-    const reorderTopLevel = (dragId, targetId, before) => {
-      const params = getTemplateParams(tplKey);
-      const fromIdx = params.findIndex((p) => p.id === dragId);
-      if (fromIdx < 0) return;
-      const [moved] = params.splice(fromIdx, 1);
-      const toIdx = params.findIndex((p) => p.id === targetId);
-      if (toIdx < 0) {
-        params.push(moved);
-      } else {
-        params.splice(before ? toIdx : toIdx + 1, 0, moved);
-      }
-      setTemplateParams(params, tplKey);
-    };
-
-    // Перенос параметра/дитя внутрь блока (в конец строки блока)
-    const moveIntoGroup = (groupId, dragId, fromGroup) => {
-      const params = getTemplateParams(tplKey);
-      let moved = null;
-      if (fromGroup === null) {
-        const idx = params.findIndex((p) => p.id === dragId);
-        if (idx < 0) return;
-        [moved] = params.splice(idx, 1);
-      } else {
-        const src = findGroup(params, fromGroup);
-        const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
-        if (cIdx < 0) return;
-        [moved] = src.params.splice(cIdx, 1);
-      }
-      const dst = findGroup(params, groupId);
-      if (!dst) {
-        params.push(moved);
-      } else {
-        (dst.params = Array.isArray(dst.params) ? dst.params : []).push(moved);
-      }
-      setTemplateParams(params, tplKey);
-    };
-
-    // Вывод дитя из блока на верхний уровень (перед/после целевой строки)
-    const moveChildToTopLevel = (fromGroup, dragId, targetId, before) => {
-      const params = getTemplateParams(tplKey);
-      const src = findGroup(params, fromGroup);
-      const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
-      if (cIdx < 0) return;
-      const [moved] = src.params.splice(cIdx, 1);
-      const toIdx = params.findIndex((p) => p.id === targetId);
-      if (toIdx < 0) {
-        params.push(moved);
-      } else {
-        params.splice(before ? toIdx : toIdx + 1, 0, moved);
-      }
-      setTemplateParams(params, tplKey);
-    };
-
-    // Перенос к конкретному дитю: реордер внутри блока либо между блоками
-    const moveChildToChild = (fromGroup, dragId, toGroup, targetChildId, before) => {
-      const params = getTemplateParams(tplKey);
-      let moved = null;
-
-      if (fromGroup === toGroup) {
-        const grp = findGroup(params, toGroup);
-        const arr = grp.params = Array.isArray(grp.params) ? grp.params : [];
-        const fromIdx = arr.findIndex((c) => c.id === dragId);
-        if (fromIdx < 0) return;
-        [moved] = arr.splice(fromIdx, 1);
-        const toIdx = arr.findIndex((c) => c.id === targetChildId);
-        if (toIdx < 0) arr.push(moved);
-        else arr.splice(before ? toIdx : toIdx + 1, 0, moved);
-        setTemplateParams(params, tplKey);
-        return;
-      }
-
-      if (fromGroup === null) {
-        const idx = params.findIndex((p) => p.id === dragId);
-        if (idx < 0) return;
-        [moved] = params.splice(idx, 1);
-      } else {
-        const src = findGroup(params, fromGroup);
-        const cIdx = (src?.params || []).findIndex((c) => c.id === dragId);
-        if (cIdx < 0) return;
-        [moved] = src.params.splice(cIdx, 1);
-      }
-
-      const dst = findGroup(params, toGroup);
-      if (!dst) {
-        params.push(moved);
-      } else {
-        const arr = dst.params = Array.isArray(dst.params) ? dst.params : [];
-        const toIdx = arr.findIndex((c) => c.id === targetChildId);
-        if (toIdx < 0) arr.push(moved);
-        else arr.splice(before ? toIdx : toIdx + 1, 0, moved);
-      }
-      setTemplateParams(params, tplKey);
-    };
-
-    // Общая обвязка событий перетаскивания для строки любого уровня.
-    // Дети вложены в строку-блок, поэтому событие должно обрабатывать
-    // только самая внутренняя строка, содержащая цель события.
-    const wireRow = (row, groupId) => {
-      const isOwnEvent = (e) => e.target.closest(".tpl-param-row, .tpl-param-child") === row;
-
-      row.addEventListener("mousedown", (e) => {
-        if (!isOwnEvent(e)) return;
-        const interactive = e.target.closest("input, select, button, label, .tpl-btn-group");
-        row.setAttribute("draggable", interactive ? "false" : "true");
-      });
-      row.addEventListener("mouseup", (e) => {
-        if (!isOwnEvent(e)) return;
-        row.setAttribute("draggable", "true");
-      });
-
-      row.addEventListener("dragstart", (e) => {
-        if (!isOwnEvent(e)) return;
-        drag.id = row.dataset.id;
-        drag.fromGroup = groupId;
-        row.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", row.dataset.id || "");
-      });
-
-      row.addEventListener("dragend", (e) => {
-        if (!isOwnEvent(e)) return;
-        drag.id = null;
-        drag.fromGroup = null;
-        row.classList.remove("dragging");
-        clearMarkers();
-      });
-    };
-
-    // 1. Верхнеуровневые строки (параметры и блоки)
-    list.querySelectorAll(":scope > .tpl-param-row").forEach((row) => {
-      wireRow(row, null);
-
-      row.addEventListener("dragover", (e) => {
-        if (!drag.id) return;
-        if (e.target.closest(".tpl-param-group-list")) return; // подсветку дает список детей
-        if (e.target.closest(".tpl-param-row") !== row) return; // событие из вложенной строки
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (drag.fromGroup === null && drag.id === row.dataset.id) return;
-        const rect = row.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
-        row.classList.toggle("drag-over-top", before);
-        row.classList.toggle("drag-over-bottom", !before);
-      });
-
-      row.addEventListener("dragleave", (e) => {
-        if (e.target.closest(".tpl-param-row") !== row) return;
-        row.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-
-      row.addEventListener("drop", (e) => {
-        if (e.target.closest(".tpl-param-row") !== row) return; // событие из вложенной строки
-        if (!drag.id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        const targetId = row.dataset.id;
-        const rect = row.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
-        row.classList.remove("drag-over-top", "drag-over-bottom");
-
-        if (drag.fromGroup === null) {
-          if (drag.id !== targetId) reorderTopLevel(drag.id, targetId, before);
-        } else {
-          moveChildToTopLevel(drag.fromGroup, drag.id, targetId, before);
-        }
-        drag.id = null;
-        drag.fromGroup = null;
-        renderTemplateSettingsList();
-        notifyChange();
-      });
-    });
-
-    // 2. Контейнер детей блока: бросок сюда переносит параметр в блок (в конец)
-    list.querySelectorAll(":scope > .tpl-param-row[data-group='true'] > .tpl-param-group-list").forEach((glist) => {
-      const groupId = glist.closest(".tpl-param-row").dataset.id;
-
-      glist.addEventListener("dragover", (e) => {
-        if (!drag.id) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        glist.classList.add("drag-over-group");
-      });
-      glist.addEventListener("dragleave", () => glist.classList.remove("drag-over-group"));
-      glist.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        glist.classList.remove("drag-over-group");
-        if (!drag.id) return;
-        const from = drag.fromGroup;
-        const id = drag.id;
-        drag.id = null;
-        drag.fromGroup = null;
-        if (!(from === groupId)) moveIntoGroup(groupId, id, from);
-        renderTemplateSettingsList();
-        notifyChange();
-      });
-    });
-
-    // 3. Дети внутри блока: реордер, прием из других блоков/верхнего уровня
-    list.querySelectorAll(".tpl-param-child").forEach((child) => {
-      const parentGroup = child.closest(".tpl-param-row[data-group='true']")?.dataset.id || null;
-      wireRow(child, parentGroup);
-
-      child.addEventListener("dragover", (e) => {
-        if (!drag.id) return;
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (drag.fromGroup === parentGroup && drag.id === child.dataset.id) return;
-        const rect = child.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
-        child.classList.toggle("drag-over-top", before);
-        child.classList.toggle("drag-over-bottom", !before);
-      });
-
-      child.addEventListener("dragleave", () => child.classList.remove("drag-over-top", "drag-over-bottom"));
-
-      child.addEventListener("drop", (e) => {
-        if (!drag.id) return;
-        e.preventDefault();
-        e.stopPropagation();
-        child.classList.remove("drag-over-top", "drag-over-bottom");
-        const rect = child.getBoundingClientRect();
-        const before = e.clientY < rect.top + rect.height / 2;
-        const from = drag.fromGroup;
-        const id = drag.id;
-        drag.id = null;
-        drag.fromGroup = null;
-        moveChildToChild(from, id, parentGroup, child.dataset.id, before);
-        renderTemplateSettingsList();
-        notifyChange();
-      });
-    });
+  // -------------------------------------------------------------
+  // Мутаторы редактора параметров (TemplateSettingsEditor.vue → legacy):
+  // изменение уходит в state.template_params, затем список ре-синхронизируется
+  // -------------------------------------------------------------
+  function tplEditorSetVisible(id, checked) {
+    const tplKey = ui.tplEditor.tplKey;
+    setTemplateParams(getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, { visible: checked }) : p)), tplKey);
+    // Класс disabled-block в строке реактивно зависит от ui-копии — обновляем её
+    const entry = ui.tplEditor.params.find((p) => p.id === id);
+    if (entry) entry.visible = checked;
+    notifyChange();
   }
 
-  function bindTemplateSettingsEvents(tplKey) {
-  if (!els.templateSettingsContainer) return;
-  const container = els.templateSettingsContainer;
+  function tplEditorDeleteRow(id) {
+    const tplKey = ui.tplEditor.tplKey;
+    setTemplateParams(getTemplateParams(tplKey).filter((p) => p.id !== id), tplKey);
+    renderTemplateSettingsList();
+    notifyChange();
+  }
 
-    const btnCreate = document.getElementById("btnCreateParam");
-    if (btnCreate) {
-      btnCreate.addEventListener("click", () => openParamModal("create", null, tplKey));
-    }
-
-    const btnCreateGroup = document.getElementById("btnCreateParamGroup");
-    if (btnCreateGroup) {
-      btnCreateGroup.addEventListener("click", () => createParamGroup(tplKey));
-    }
-
-  container.querySelectorAll(".tpl-param-visible").forEach((chk) => {
-    chk.addEventListener("change", () => {
-      const id = chk.dataset.id;
-      const params = getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, { visible: chk.checked }) : p));
-      setTemplateParams(params, tplKey);
-      const row = container.querySelector(`.tpl-param-row[data-id="${id}"]`);
-      if (row) row.classList.toggle("disabled-block", !chk.checked);
-      notifyChange();
-    });
-  });
-
-  container.querySelectorAll(".tpl-param-edit").forEach((btn) => {
-    btn.addEventListener("click", () => openParamModal("edit", btn.dataset.id, tplKey));
-  });
-
-  container.querySelectorAll(".tpl-param-del").forEach((btn) => {
-    btn.addEventListener("click", () => {
-      const id = btn.dataset.id;
-      setTemplateParams(getTemplateParams(tplKey).filter((p) => p.id !== id), tplKey);
-      renderTemplateSettingsList();
-      notifyChange();
-    });
-  });
-
-  const moveParam = (id, delta) => {
+  function tplEditorMove(id, delta) {
+    const tplKey = ui.tplEditor.tplKey;
     const params = getTemplateParams(tplKey);
     const idx = params.findIndex((p) => p.id === id);
     const target = idx + delta;
@@ -2185,128 +1776,122 @@ function setTemplateLineSettings(tplKey, updates) {
     setTemplateParams(swapped, tplKey);
     renderTemplateSettingsList();
     notifyChange();
-  };
-    container.querySelectorAll(".tpl-param-up").forEach((btn) => {
-      btn.addEventListener("click", () => moveParam(btn.dataset.id, -1));
-    });
-    container.querySelectorAll(".tpl-param-down").forEach((btn) => {
-      btn.addEventListener("click", () => moveParam(btn.dataset.id, 1));
-    });
+  }
 
-    // Перетаскивание параметров за ручку ⠿ меняет их порядок в списке
-    setupParamDragAndDrop(container, tplKey);
+  // updates применяются к строке; rerender нужен, когда меняются вычисляемые
+  // подписи (show_label) — цвет/шрифт/размер обновляются без перерисовки
+  function tplEditorUpdate(id, updates, rerender) {
+    const tplKey = ui.tplEditor.tplKey;
+    setTemplateParams(getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, updates) : p)), tplKey);
+    if (rerender) renderTemplateSettingsList();
+    notifyChange();
+  }
 
-    // Дополнительные настройки параметра задаются прямо в строке:
-    // шрифт, размер, привязка по вертикали, выравнивание, цвет, заголовок.
-    // «Размер между строками» и «Линия» — общие, в шапке карточки.
-    const updateParam = (id, updates) => {
-      const params = getTemplateParams(tplKey).map((p) => (p.id === id ? Object.assign({}, p, updates) : p));
-      setTemplateParams(params, tplKey);
-      notifyChange();
-      return params.find((p) => p.id === id);
-    };
+  function tplEditorSetLineEnabled(checked) {
+    setTemplateLineSettings(ui.tplEditor.tplKey, { line_enabled: checked });
+  }
 
-    const refreshZoneLabel = (param) => {
-      if (!param) return;
-      const zone = container.querySelector(`.tpl-param-zone[data-id="${param.id}"]`);
-      if (zone) zone.textContent = paramZoneLabel(param);
-    };
+  function tplEditorSetLineGap(rawGap) {
+    const g = parseFloat(rawGap);
+    if (!isNaN(g) && g >= 0) setTemplateLineSettings(ui.tplEditor.tplKey, { line_gap: g });
+  }
 
-    container.querySelectorAll(".tpl-param-font").forEach((sel) => {
-      sel.addEventListener("change", () => updateParam(sel.dataset.id, { font_family: sel.value }));
-    });
+  function tplEditorCreateGroup() {
+    createParamGroup(ui.tplEditor.tplKey);
+  }
 
-    container.querySelectorAll(".tpl-param-size").forEach((sel) => {
-      sel.addEventListener("change", () => {
-        const sz = parseFloat(sel.value);
-        if (!isNaN(sz) && sz > 0) updateParam(sel.dataset.id, { font_size: sz });
-      });
-    });
+  function tplEditorChildOut(groupId, childId) {
+    const tplKey = ui.tplEditor.tplKey;
+    const params = getTemplateParams(tplKey);
+    const group = params.find((p) => p.id === groupId && p.group);
+    if (!group || !Array.isArray(group.params)) return;
+    const cIdx = group.params.findIndex((c) => c.id === childId);
+    if (cIdx < 0) return;
+    const [child] = group.params.splice(cIdx, 1);
+    params.push(child);
+    setTemplateParams(params, tplKey);
+    renderTemplateSettingsList();
+    notifyChange();
+  }
 
-    // Общие настройки стека параметров (шапка карточки): линия-разделитель
-    // и размер между строками — одни на все параметры и блоки шаблона
-    const headerLineChk = container.querySelector(".tpl-header-line");
-    if (headerLineChk) {
-      headerLineChk.addEventListener("change", () => {
-        setTemplateLineSettings(tplKey, { line_enabled: headerLineChk.checked });
-      });
-    }
+  function tplEditorChildShowLabel(groupId, childId, checked) {
+    const tplKey = ui.tplEditor.tplKey;
+    const params = getTemplateParams(tplKey);
+    const group = params.find((p) => p.group && Array.isArray(p.params) && p.params.some((c) => c.id === childId));
+    if (!group) return;
+    group.params = group.params.map((c) => (c.id === childId ? Object.assign({}, c, { show_label: checked }) : c));
+    setTemplateParams(params, tplKey);
+    renderTemplateSettingsList();
+    notifyChange();
+  }
 
-    const headerGapSel = container.querySelector(".tpl-header-linegap");
-    if (headerGapSel) {
-      headerGapSel.addEventListener("change", () => {
-        const g = parseFloat(headerGapSel.value);
-        if (!isNaN(g) && g >= 0) setTemplateLineSettings(tplKey, { line_gap: g });
-      });
-    }
+  // Drop в редакторе: op = { dragId, fromGroup, kind: 'row'|'group'|'child',
+  // targetId, before, toGroup }. Порядок в списке = порядок зон на листе.
+  function tplEditorDrop(op) {
+    const tplKey = ui.tplEditor.tplKey;
+    const findGroup = (params, gid) => params.find((p) => p.id === gid && p.group);
+    const params = getTemplateParams(tplKey);
+    const dragId = op.dragId;
+    const fromGroup = op.fromGroup;
 
-    container.querySelectorAll(".tpl-param-valign").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const group = btn.closest(".tpl-btn-group");
-        if (group) group.querySelectorAll(".tpl-param-valign").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        refreshZoneLabel(updateParam(btn.dataset.id, { valign: btn.dataset.valign }));
-      });
-    });
-
-    container.querySelectorAll(".tpl-param-align").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const group = btn.closest(".tpl-btn-group");
-        if (group) group.querySelectorAll(".tpl-param-align").forEach((b) => b.classList.remove("active"));
-        btn.classList.add("active");
-        refreshZoneLabel(updateParam(btn.dataset.id, { align: btn.dataset.align }));
-      });
-    });
-
-    container.querySelectorAll(".tpl-param-color").forEach((inp) => {
-      const onColorChange = () => updateParam(inp.dataset.id, { color: inp.value });
-      inp.addEventListener("input", onColorChange);
-      inp.addEventListener("change", onColorChange);
-    });
-
-    container.querySelectorAll(".tpl-param-show-label").forEach((chk) => {
-      chk.addEventListener("change", () => {
-        updateParam(chk.dataset.id, { show_label: chk.checked });
-        // Заголовок отображается в шапке строки («Название» источника) — перерисуем
-        renderTemplateSettingsList();
-      });
-    });
-
-    // Название блока: сохраняем на лету, без перерисовки (иначе собьется ввод)
-    container.querySelectorAll(".tpl-param-group-label").forEach((inp) => {
-      inp.addEventListener("input", () => updateParam(inp.dataset.id, { label: inp.value }));
-    });
-
-    // ✕ у параметра внутри блока — вывести его из блока обратно в общий список
-    container.querySelectorAll(".tpl-param-child-out").forEach((btn) => {
-      btn.addEventListener("click", () => {
-        const params = getTemplateParams(tplKey);
-        const group = params.find((p) => p.id === btn.dataset.group && p.group);
-        if (!group || !Array.isArray(group.params)) return;
-        const cIdx = group.params.findIndex((c) => c.id === btn.dataset.id);
+    if (op.kind === "row") {
+      if (fromGroup === null) {
+        const fromIdx = params.findIndex((p) => p.id === dragId);
+        if (fromIdx < 0) return;
+        const [moved] = params.splice(fromIdx, 1);
+        const toIdx = params.findIndex((p) => p.id === op.targetId);
+        if (toIdx < 0) params.push(moved);
+        else params.splice(op.before ? toIdx : toIdx + 1, 0, moved);
+      } else {
+        const src = findGroup(params, fromGroup);
+        const cIdx = (src && src.params ? src.params : []).findIndex((c) => c.id === dragId);
         if (cIdx < 0) return;
-        const [child] = group.params.splice(cIdx, 1);
-        params.push(child);
-        setTemplateParams(params, tplKey);
-        renderTemplateSettingsList();
-        notifyChange();
-      });
-    });
+        const [moved] = src.params.splice(cIdx, 1);
+        const toIdx = params.findIndex((p) => p.id === op.targetId);
+        if (toIdx < 0) params.push(moved);
+        else params.splice(op.before ? toIdx : toIdx + 1, 0, moved);
+      }
+    } else if (op.kind === "group") {
+      // бросок на список детей блока — параметр встаёт в конец строки блока
+      let moved = null;
+      if (fromGroup === null) {
+        const idx = params.findIndex((p) => p.id === dragId);
+        if (idx < 0) return;
+        [moved] = params.splice(idx, 1);
+      } else {
+        const src = findGroup(params, fromGroup);
+        const cIdx = (src && src.params ? src.params : []).findIndex((c) => c.id === dragId);
+        if (cIdx < 0) return;
+        [moved] = src.params.splice(cIdx, 1);
+      }
+      const dst = findGroup(params, op.targetId);
+      if (!dst) {
+        params.push(moved);
+      } else {
+        (dst.params = Array.isArray(dst.params) ? dst.params : []).push(moved);
+      }
+    } else if (op.kind === "child") {
+      // бросок к конкретному ребенку: реордер внутри блока либо перенос между блоками
+      const src = findGroup(params, fromGroup);
+      const cIdx = (src && src.params ? src.params : []).findIndex((c) => c.id === dragId);
+      if (cIdx < 0) return;
+      const [moved] = src.params.splice(cIdx, 1);
+      const dst = findGroup(params, op.toGroup);
+      if (!dst) {
+        const toIdx = params.findIndex((p) => p.id === op.targetId);
+        if (toIdx < 0) params.push(moved);
+        else params.splice(op.before ? toIdx : toIdx + 1, 0, moved);
+      } else {
+        const children = dst.params;
+        const toIdx = children.findIndex((c) => c.id === op.targetId);
+        if (toIdx < 0) children.push(moved);
+        else children.splice(op.before ? toIdx : toIdx + 1, 0, moved);
+      }
+    }
 
-    // «Заголовок» у параметра внутри блока: подпись ребёнка печатается перед
-    // его значением внутри строки блока («Помещение: Гостиная | Адрес: …»)
-    container.querySelectorAll(".tpl-param-child-show-label").forEach((chk) => {
-      chk.addEventListener("change", () => {
-        const params = getTemplateParams(tplKey);
-        const group = params.find((p) => p.group && Array.isArray(p.params) && p.params.some((c) => c.id === chk.dataset.id));
-        if (!group) return;
-        group.params = group.params.map((c) => (c.id === chk.dataset.id ? Object.assign({}, c, { show_label: chk.checked }) : c));
-        setTemplateParams(params, tplKey);
-        notifyChange();
-        // Подпись в строке ребёнка могла появиться или исчезнуть — перерисуем
-        renderTemplateSettingsList();
-      });
-    });
+    setTemplateParams(params, tplKey);
+    renderTemplateSettingsList();
+    notifyChange();
   }
 
 // -------------------------------------------------------------
@@ -4664,6 +4249,16 @@ function updateParamModalPreview() {
     addStadia,
     focusScene,
     selectTemplate,
+    tplEditorSetVisible,
+    tplEditorDeleteRow,
+    tplEditorMove,
+    tplEditorUpdate,
+    tplEditorSetLineEnabled,
+    tplEditorSetLineGap,
+    tplEditorCreateGroup,
+    tplEditorChildOut,
+    tplEditorChildShowLabel,
+    tplEditorDrop,
     openNewTemplateModal,
     confirmNewTemplate,
     openRenameTemplateModal,

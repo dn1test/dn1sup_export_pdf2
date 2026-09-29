@@ -138,10 +138,8 @@
             </div>
           </div>
 
-          <!-- Settings Cards List Container -->
-          <div class="template-settings-scroll" id="templateSettingsContainer">
-            <!-- Dynamically populated via renderTemplateSettingsList() in app.js -->
-          </div>
+          <!-- Settings Cards List — рендерится Vue-компонентом -->
+          <TemplateSettingsEditor />
         </div>
       </section>
 
@@ -333,4 +331,5 @@ import ProjectTab from './components/ProjectTab.vue'
 import ScenesTab from './components/ScenesTab.vue'
 import TemplatesSidebar from './components/TemplatesSidebar.vue'
 import TemplateModals from './components/TemplateModals.vue'
+import TemplateSettingsEditor from './components/TemplateSettingsEditor.vue'
 </script>

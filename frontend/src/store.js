@@ -40,6 +40,10 @@ export const ui = reactive({
   // { name, sub } и состояние пяти модалок. Бизнес-логика — в legacy.
   templates: [],
   templateSets: [],
+  // Редактор параметров шаблона (TemplateSettingsEditor.vue): снимок данных
+  // с вычисленными подписями (_label/_shownLabel/_preview/_zone); каждая мутация
+  // идёт через legacy-мутатор состояния и завершается ре-синком
+  tplEditor: { tplKey: '', lineGap: 2.5, lineEnabled: false, params: [] },
   tplModals: {
     newTemplate: null,   // { name, description, base, bases: [{key, name}] } | null
     renameTemplate: null, // { key, name, description } | null

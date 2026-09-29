@@ -14,13 +14,23 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params:
-    - id: g_mueltqbw_ll48m
+    - id: p_mufh4eux_6yjdn
       label: ''
-      show_label: true
+      show_label: false
       align: center
       valign: top
       font_family: ''
-      font_size: 8.0
+      font_size: 48.0
+      color: "#5b7fd2"
+      visible: true
+      source: project.furniture_name
+    - id: g_mueltqbw_ll48m
+      label: ''
+      show_label: false
+      align: center
+      valign: top
+      font_family: ''
+      font_size: 32.0
       color: "#9e9e9e"
       visible: true
       group: true
@@ -28,112 +38,63 @@ layout:
       - id: p_mufh3k0o_w6snt
         source: project.room_name
         label: ''
-        show_label: true
+        show_label: false
       - id: p_muelx881_5m0bk
         source: project.address
         label: ''
-        show_label: true
-      - id: p_mufh2xi8_z1byg
-        source: customer.name
-        label: ''
-        show_label: true
-      - id: p_mufh4eux_6yjdn
-        source: project.furniture_name
-        label: ''
-        show_label: true
-    - id: g_mufh6cio_dtcyj
+        show_label: false
+    - id: p_mufh2xi8_z1byg
       label: ''
-      show_label: true
+      show_label: false
       align: center
       valign: top
       font_family: ''
-      font_size: 12.0
-      color: "#4366b6"
+      font_size: 28.0
+      color: "#8a8a8a"
       visible: true
-      group: true
-      params:
-      - id: p_mufh6onl_b7ise
-        source: scene.name
-        label: ''
-        show_label: true
-      - id: p_mufh6zkv_hzia5
-        source: scene.description
-        label: ''
-        show_label: true
+      source: customer.name_or_company
     - id: p_muelnqn5_e6y4l
       label: ''
-      show_label: true
-      align: center
-      valign: bottom
+      show_label: false
+      align: right
+      valign: top
       font_family: ''
       font_size: 8.0
-      color: "#9e9e9e"
+      color: "#828282"
       visible: true
       source: project.articul
     - id: p_mufhkzd7_lq6d6
       label: ''
-      show_label: true
+      show_label: false
       align: right
       valign: bottom
       font_family: ''
-      font_size: 10.0
-      color: "#0F172A"
+      font_size: 8.0
+      color: "#8c8c8c"
       visible: true
       source: page.number_total
-    - id: p_mufhm0t9_zb0q0
+    - id: p_mukx6ba9_57hyj
       label: ''
-      show_label: false
+      show_label: true
       align: left
       valign: top
       font_family: ''
       font_size: 10.0
-      color: "#0F172A"
+      color: "#919191"
       visible: true
-      source: workflow.last_edit
+      source: page.toc
     - id: p_mufhmdd2_rhqwg
       label: ''
-      show_label: false
+      show_label: true
       align: left
-      valign: top
+      valign: bottom
       font_family: ''
       font_size: 10.0
-      color: "#0F172A"
-      visible: true
+      color: "#8c8c8c"
+      visible: false
       source: workflow.history
-    line_gap: 2.5
-    line_enabled: false
-  description:
-    name: Описание и спецификации (Description)
-    description: Описание изделия и спецификации
-    image_4_3:
-      x: 25
-      "y": 12
-      w: 50
-      h: 82
-      visible: true
-      content: render_viewport
-      show_background: false
-      aspect_ratio: '4:3'
-      scale_pct: 100
-    params: []
-    line_gap: 2.5
-    line_enabled: false
-  explain:
-    name: Содержание и ведомость (Explain)
-    description: Содержание и ведомость материалов
-    image_4_3:
-      x: 25
-      "y": 12
-      w: 50
-      h: 82
-      visible: true
-      content: render_viewport
-      show_background: false
-      aspect_ratio: '4:3'
-      scale_pct: 100
-    params: []
-    line_gap: 2.5
-    line_enabled: false
+    line_gap: 0.0
+    line_enabled: true
   general:
     name: Общий вид (General)
     description: Общий вид изделия с основными параметрами
@@ -148,34 +109,84 @@ layout:
       aspect_ratio: '4:3'
       scale_pct: 100
     params:
-    - id: p_mufe1eri_jbh8l
-      label: ''
+    - id: g_mukxp5ba_aji3i
+      label: Строчка с параметрами
       show_label: false
-      align: left
+      align: center
       valign: top
       font_family: ''
       font_size: 10.0
-      color: "#0F172A"
+      color: "#8c8c8c"
+      visible: true
+      group: true
+      params:
+      - id: p_mukxpsum_s2lwr
+        source: project.room_name
+        label: ''
+        show_label: false
+      - id: p_mukxpwq8_0epo7
+        source: project.address
+        label: ''
+        show_label: false
+      - id: p_mukxpzmj_jtgvj
+        source: customer.name_or_company
+        label: ''
+        show_label: false
+      - id: p_mukxq2qu_1uzs8
+        source: project.furniture_name
+        label: ''
+        show_label: false
+    - id: g_mukxqnal_qzt2y
+      label: Сцена, Описание
+      show_label: false
+      align: center
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#5076ce"
+      visible: true
+      group: true
+      params:
+      - id: p_mukxr5hh_3svg0
+        source: scene.name
+        label: ''
+        show_label: false
+      - id: p_mukxrc3b_m2hyl
+        source: scene.description
+        label: ''
+        show_label: false
+    - id: p_mufe1eri_jbh8l
+      label: ''
+      show_label: false
+      align: right
+      valign: top
+      font_family: ''
+      font_size: 8.0
+      color: "#8f8f8f"
       visible: true
       source: project.articul
-    line_gap: 2.5
-    line_enabled: false
-  visual:
-    name: Визуализация (Visual)
-    description: Крупная визуализация вида модели
-    image_4_3:
-      x: 25
-      "y": 12
-      w: 50
-      h: 82
+    - id: p_mukxryk8_lqrmt
+      label: ''
+      show_label: false
+      align: right
+      valign: bottom
+      font_family: ''
+      font_size: 8.0
+      color: "#8f8f8f"
       visible: true
-      content: render_viewport
-      show_background: false
-      aspect_ratio: '4:3'
-      scale_pct: 100
-    params: []
-    line_gap: 2.5
-    line_enabled: false
+      source: page.number_total
+    - id: p_muky4zva_lfeui
+      label: ''
+      show_label: false
+      align: left
+      valign: bottom
+      font_family: ''
+      font_size: 8.0
+      color: "#7d7d7d"
+      visible: true
+      source: workflow.last_edit
+    line_gap: 0.0
+    line_enabled: true
   blank:
     name: Без шаблона (Blank)
     description: 'Пустая страница: только видовой экран'
@@ -190,5 +201,110 @@ layout:
       aspect_ratio: '16:9'
       scale_pct: 100
     params: []
-    line_gap: 2.5
-    line_enabled: false
+    line_gap: 0.0
+    line_enabled: true
+  custom_mumt84yx:
+    name: Материалы
+    description: Общий вид изделия с основными параметрами
+    image_4_3:
+      x: 25
+      "y": 12
+      w: 50
+      h: 82
+      visible: true
+      content: render_viewport
+      show_background: false
+      aspect_ratio: '4:3'
+      scale_pct: 100
+    params:
+    - id: g_mukxp5ba_aji3i
+      label: Строчка с параметрами
+      show_label: false
+      align: center
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#8c8c8c"
+      visible: true
+      group: true
+      params:
+      - id: p_mukxpsum_s2lwr
+        source: project.room_name
+        label: ''
+        show_label: false
+      - id: p_mukxpwq8_0epo7
+        source: project.address
+        label: ''
+        show_label: false
+      - id: p_mukxpzmj_jtgvj
+        source: customer.name_or_company
+        label: ''
+        show_label: false
+      - id: p_mukxq2qu_1uzs8
+        source: project.furniture_name
+        label: ''
+        show_label: false
+    - id: g_mukxqnal_qzt2y
+      label: Сцена, Описание
+      show_label: false
+      align: center
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#5076ce"
+      visible: true
+      group: true
+      params:
+      - id: p_mukxr5hh_3svg0
+        source: scene.name
+        label: ''
+        show_label: false
+      - id: p_mukxrc3b_m2hyl
+        source: scene.description
+        label: ''
+        show_label: false
+    - id: p_mufe1eri_jbh8l
+      label: ''
+      show_label: false
+      align: right
+      valign: top
+      font_family: ''
+      font_size: 8.0
+      color: "#8f8f8f"
+      visible: true
+      source: project.articul
+    - id: p_mukxryk8_lqrmt
+      label: ''
+      show_label: false
+      align: right
+      valign: bottom
+      font_family: ''
+      font_size: 8.0
+      color: "#8f8f8f"
+      visible: true
+      source: page.number_total
+    - id: p_muky4zva_lfeui
+      label: ''
+      show_label: false
+      align: left
+      valign: bottom
+      font_family: ''
+      font_size: 8.0
+      color: "#7d7d7d"
+      visible: true
+      source: workflow.last_edit
+    - id: p_mumsyf0j_3wac7
+      label: ''
+      show_label: false
+      align: left
+      valign: top
+      font_family: ''
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: project.description
+    line_gap: 0.0
+    line_enabled: true
+    _name: Материалы
+    _base_type: general
+    _icon: "\U0001F4C4"
