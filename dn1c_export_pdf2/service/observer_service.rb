@@ -20,6 +20,7 @@ module DN1Code
 
         class AppObserverHandler < (defined?(Sketchup::AppObserver) ? Sketchup::AppObserver : Object)
           def onNewModel(model)
+            Service::StatsTracker.on_model_activated(model) if defined?(Service::StatsTracker)
             attach_pages_observer(model)
             if defined?(OverlayService)
               OverlayService.on_model_opened(model)
@@ -28,6 +29,8 @@ module DN1Code
           end
 
           def onOpenModel(model)
+            Service::StatsTracker.on_model_activated(model) if defined?(Service::StatsTracker)
+
             # Сбрасываем кэш сессии для только что открытой модели, чтобы повторная обработка не блокировалась
             if model && model.respond_to?(:path) && !model.path.to_s.empty?
               clean_p = model.path.to_s.tr("\\", "/").downcase
@@ -50,6 +53,11 @@ module DN1Code
           # Закрытие SketchUp: принудительная запись всех измененных сессий в YAML
           def onQuit
             ObserverService.handle_quit
+          end
+
+          # Активация уже открытой модели (актуально на Mac, вызовы защищены)
+          def onActivateModel(model)
+            Service::StatsTracker.on_model_activated(model) if defined?(Service::StatsTracker)
           end
         end
 

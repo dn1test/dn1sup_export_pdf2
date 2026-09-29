@@ -849,6 +849,60 @@ module DN1Code
             json_res = JSON.generate(res)
             dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
           end
+
+          # Пульс активности из диалога (мышь/клавиатура/колесо в панели) —
+          # отмечает активную работу для трекера статистики
+          dialog.add_action_callback("activityPing") do |_action_context|
+            Service::StatsTracker.heartbeat if defined?(Service::StatsTracker)
+          end
+
+          # Данные статистики работы над проектом для вкладки «Статистика»
+          dialog.add_action_callback("getWorkStats") do |_action_context|
+            begin
+              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+              project_data = model ? Model::SessionStore.data(model) : nil
+              payload = build_work_stats_payload(project_data)
+              json_res = JSON.generate(payload)
+              dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{json_res});")
+            rescue StandardError => e
+              warn "[DN1C Export PDF] Ошибка получения статистики: #{e.message}"
+              dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{JSON.generate({ error: e.message.to_s })});")
+            end
+          end
+
+          # Полный сброс статистики работы над проектом (по кнопке с подтверждением)
+          dialog.add_action_callback("resetWorkStats") do |_action_context|
+            begin
+              model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
+              if model
+                project_data = Model::SessionStore.data(model)
+                project_data.reset_work_stats!
+                Model::SessionStore.mark_dirty!(model)
+                Model::SessionStore.flush(model)
+              end
+              payload = build_work_stats_payload(model ? Model::SessionStore.data(model) : nil)
+              json_res = JSON.generate(payload)
+              dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{json_res});")
+              dialog.execute_script("window.app && window.app.showNotification('Статистика работы сброшена', 'success');")
+            rescue StandardError => e
+              dialog.execute_script("window.app && window.app.showNotification('Ошибка сброса статистики: #{e.message}', 'error');")
+            end
+          end
+        end
+
+        # Собирает данные статистики для вкладки «Статистика»: отчёт трекера
+        # (сводки и серии графиков) + подпись проекта
+        # @param project_data [Model::ProjectData, nil]
+        # @return [Hash]
+        def self.build_work_stats_payload(project_data)
+          now = Time.now
+          report = project_data ? project_data.work_stats_report(now) : Model::WorkStats.report(Model::WorkStats.blank_data, now)
+          {
+            articul: project_data ? project_data.project_info[:articul].to_s : "",
+            product: project_data ? project_data.project[:product].to_s : "",
+            report:  report,
+            saved_at: now.strftime("%Y-%m-%d %H:%M")
+          }
         end
       end
     end

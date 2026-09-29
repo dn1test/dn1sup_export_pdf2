@@ -835,6 +835,45 @@ const DEFAULT_LAYOUTS = {
     return state.pdf_settings?.scale_factor ? (parseFloat(state.pdf_settings.scale_factor) || 2.0) : 2.0;
   }
 
+  // ------------------------------------------------------------------
+  // Статистика работы над проектом (вкладка «Статистика»)
+  // ------------------------------------------------------------------
+
+  // Запрашивает у Ruby отчёт статистики активной модели (project.yaml → work_stats)
+  function refreshWorkStats() {
+    callRuby("getWorkStats");
+  }
+
+  // Пульс активности в диалоге: мышь/клавиатура/колесо → Ruby-колбэк activityPing.
+  // Троттлинг 30 сек — пульс нужен лишь для отметки «пользователь активен».
+  function bindActivityHeartbeat() {
+    if (window.__activityHeartbeatBound) return;
+    window.__activityHeartbeatBound = true;
+    let lastPing = 0;
+    const ping = () => {
+      const now = Date.now();
+      if (now - lastPing < 30000) return;
+      lastPing = now;
+      callRuby("activityPing");
+    };
+    ["pointermove", "pointerdown", "keydown", "wheel"].forEach((evt) => {
+      document.addEventListener(evt, ping, { passive: true });
+    });
+  }
+
+  // Ruby прислал отчёт статистики (getWorkStats / resetWorkStats)
+  function handleWorkStats(payload) {
+    if (!payload) return;
+    ui.stats = {
+      loaded: true,
+      error: payload.error || "",
+      articul: payload.articul || "",
+      product: payload.product || "",
+      report: payload.report || null,
+      seq: (ui.stats ? ui.stats.seq : 0) + 1
+    };
+  }
+
   // Navigation Tabs Switching
   function setupTabs() {
     const appContent = document.querySelector(".app-content");
@@ -864,6 +903,8 @@ const DEFAULT_LAYOUTS = {
             renderDirectories();
           } else if (tab.dataset.tab === "tab-send") {
             renderApiTargets();
+          } else if (tab.dataset.tab === "tab-stats") {
+            refreshWorkStats();
           }
         }
       });
@@ -3845,6 +3886,11 @@ function updateParamModalPreview() {
       renderTemplateSetsList();
     },
 
+    // Ruby прислал отчёт статистики работы над проектом
+    onWorkStats: function (payload) {
+      handleWorkStats(payload);
+    },
+
     // Ruby загрузил набор шаблонов: custom_layouts заменен целиком — применяем
     // к состоянию, переключаем сцены отсутствующих шаблонов и перерисовываем UI
     onTemplateSetLoaded: function (payload) {
@@ -4241,6 +4287,10 @@ function updateParamModalPreview() {
     scenePageTypeChanged,
     gotoTemplateEditor,
     commitScenesReorder,
+    refreshStats: refreshWorkStats,
+    resetStats: function () {
+      callRuby("resetWorkStats");
+    },
     notifyChange,
     callRuby
   };
@@ -4253,6 +4303,7 @@ function updateParamModalPreview() {
     setupLayoutEditor();
     setupSplitResizer();
     setupScrollWheelHandlers();
+    bindActivityHeartbeat();
 
     // Request initial data from SketchUp
     callRuby("getData");

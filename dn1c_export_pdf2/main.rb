@@ -18,6 +18,7 @@ require_relative "service/observer_service"
 require_relative "service/overlay_service"
 require_relative "service/vips_service"
 require_relative "service/snapshot_worker"
+require_relative "service/stats_tracker"
 require_relative "service/dev_updater"
 
 # Загрузка моделей данных
@@ -126,6 +127,9 @@ module DN1Code
     unless file_loaded?(__FILE__)
       # Регистрация наблюдателя сохранения и открытия моделей SketchUp
       Service::ObserverService.register!
+
+      # Запуск трекера активной работы (статистика на вкладке «Статистика»)
+      Service::StatsTracker.register!
 
       # Создание пункта меню в Plugins с версией в заголовке
       menu = UI.menu("Plugins")

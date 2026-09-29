@@ -131,7 +131,7 @@
               <span class="card-header-icon"><i class="modus-icons">tune</i></span>
               <span class="card-header-title">Папка разработки и обновление (Dev Tools)</span>
             </div>
-            <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.4.0</span>
+            <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.5.0</span>
           </div>
           <p class="field-hint">Быстрое обновление плагина из рабочей dev-папки в каталог Plugins SketchUp без ручного копирования файлов:</p>
           <div class="form-group" style="margin-bottom: 8px;">

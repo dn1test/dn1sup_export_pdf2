@@ -6,6 +6,7 @@ require "time"
 require "date"
 require "fileutils"
 require_relative "scene_item"
+require_relative "work_stats"
 require_relative "../service/font_service"
 
 module DN1Code
@@ -211,6 +212,8 @@ module DN1Code
         attr_accessor :api_targets
         # @return [Array<Hash>, Hash] каталоги проекта и настройки их отображения
         attr_accessor :directories
+        # @return [Hash] статистика активной работы над проектом (Model::WorkStats)
+        attr_accessor :work_stats
 
         # @return [Hash] конфигурация макетов страниц (прокси к @pdf_settings[:custom_layouts])
         def custom_layouts
@@ -230,11 +233,34 @@ module DN1Code
           @directories  = []
           @scenes       = []
           @history      = []
+          @work_stats   = WorkStats.blank_data
 
           sync_project_fields!
 
           # Загружаем глобальные настройки программы из плагина
           load_program_settings
+        end
+
+        # Начисляет секунды активной работы в статистику проекта (в памяти)
+        # @param seconds [Integer] секунды активной работы (> 0)
+        # @param now [Time] момент начисления
+        # @return [void]
+        def accrue_work_stats(seconds, now = Time.now)
+          WorkStats.accrue!(@work_stats, seconds, now)
+          WorkStats.prune!(@work_stats, now)
+        end
+
+        # Данные статистики для вкладки «Статистика» (сводки + серии графиков)
+        # @param now [Time]
+        # @return [Hash]
+        def work_stats_report(now = Time.now)
+          WorkStats.report(@work_stats, now)
+        end
+
+        # Полный сброс статистики работы над проектом
+        # @return [void]
+        def reset_work_stats!
+          @work_stats = WorkStats.blank_data
         end
 
         # Загружает глобальные настройки программы из файлов конфигурации плагина:
@@ -1733,7 +1759,7 @@ module DN1Code
         # @param file_path [String] путь к YAML файлу
         # @param include_settings [Boolean] читать ли секцию pdf_settings (глобальные настройки PDF)
         # @return [Boolean] true в случае успешной загрузки
-        def load_from_yaml(file_path, include_settings: true)
+        def load_from_yaml(file_path, include_settings: true, include_work_stats: true)
           return false unless File.exist?(file_path)
 
           begin
@@ -1843,6 +1869,13 @@ module DN1Code
                 migrate_legacy_background_default!
                 migrate_frame_overlay_default!
                 migrate_watermark_default!
+              end
+
+              # Статистика работы — машинно-локальные данные проекта: читается
+              # при открытии своего project.yaml, но не переносится импортом
+              # YAML с чужой машины
+              if include_work_stats && root[:work_stats].is_a?(Hash)
+                @work_stats = WorkStats.normalize(root[:work_stats])
               end
 
               # Проверяем, есть ли рядом файл edit_history.yaml
@@ -2002,6 +2035,10 @@ module DN1Code
           end
           if include_settings && @pdf_settings && !@pdf_settings.empty?
             data[:pdf_settings] = @pdf_settings
+          end
+          unless WorkStats.blank?(@work_stats)
+            WorkStats.prune!(@work_stats)
+            data[:work_stats] = @work_stats
           end
 
           File.open(file_path, "w:utf-8") do |f|

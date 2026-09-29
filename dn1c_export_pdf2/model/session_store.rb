@@ -114,7 +114,8 @@ module DN1Code
             return nil unless file_path && File.exist?(file_path)
 
             pd = ProjectData.new
-            return nil unless pd.load_from_yaml(file_path, include_settings: false)
+            # Статистика работы машинно-локальная — из импортируемого YAML не переносится
+            return nil unless pd.load_from_yaml(file_path, include_settings: false, include_work_stats: false)
 
             pd.sync_with_model_scenes(model) if model
             # Артикул импортированного проекта дублируется в атрибуты модели (.skp)
@@ -137,6 +138,15 @@ module DN1Code
           def dirty?(model)
             entry = @sessions[key_for(model)]
             entry ? entry[:dirty] : false
+          end
+
+          # Помечает сессию модели измененной (например, при начислении статистики
+          # работы), чтобы она попала в flush_all при закрытии SketchUp
+          # @param model [Sketchup::Model, nil]
+          # @return [void]
+          def mark_dirty!(model)
+            entry = @sessions[key_for(model)]
+            entry[:dirty] = true if entry
           end
 
           private

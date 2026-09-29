@@ -51,6 +51,9 @@ export const ui = reactive({
     saveSet: null,        // { name } | null
     confirmSet: null,     // { type: 'load'|'overwrite'|'delete'|'refresh', name, title, msg, danger } | null
   },
+  // Вкладка «Статистика»: отчёт Ruby (getWorkStats → onWorkStats) — сводки и
+  // серии графиков работы над проектом; seq — триггер перерисовки диаграммы
+  stats: { loaded: false, error: '', articul: '', product: '', report: null, seq: 0 },
 })
 
 let dirUidSeq = 1

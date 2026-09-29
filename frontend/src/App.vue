@@ -4,7 +4,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="logo-badge" title="Версия плагина: v2.4.0"><i class="modus-icons">file_template</i> export PDF</div>
+        <div class="logo-badge" title="Версия плагина: v2.5.0"><i class="modus-icons">file_template</i> export PDF</div>
         <div class="header-titles">
           <h1 id="headerProjectTitle">Новый проект</h1>
           <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>
@@ -44,6 +44,9 @@
       </button>
       <button class="tab-btn" data-tab="tab-send">
         <span class="tab-icon"><i class="modus-icons">file_upload</i></span> Отправка
+      </button>
+      <button class="tab-btn" data-tab="tab-stats">
+        <span class="tab-icon"><i class="modus-icons">insert_chart</i></span> Статистика
       </button>
     </nav>
 
@@ -164,6 +167,11 @@
       <!-- TAB 7: SEND — рендерится Vue-компонентом -->
       <section id="tab-send" class="tab-pane">
         <SendTab />
+      </section>
+
+      <!-- TAB 8: WORK-TIME STATISTICS — рендерится Vue-компонентом -->
+      <section id="tab-stats" class="tab-pane">
+        <StatsTab />
       </section>
     </main>
 
@@ -327,6 +335,7 @@ import DirectoriesTab from './components/DirectoriesTab.vue'
 import SettingsTab from './components/SettingsTab.vue'
 import HistoryTab from './components/HistoryTab.vue'
 import SendTab from './components/SendTab.vue'
+import StatsTab from './components/StatsTab.vue'
 import ProjectTab from './components/ProjectTab.vue'
 import ScenesTab from './components/ScenesTab.vue'
 import TemplatesSidebar from './components/TemplatesSidebar.vue'
