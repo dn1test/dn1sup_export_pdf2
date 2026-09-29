@@ -414,15 +414,6 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     return `${h} ${v}`;
   }
 
-  // «N параметров» с согласованием окончаний
-  function paramCountText(n) {
-    const mod10 = n % 10;
-    const mod100 = n % 100;
-    const word = (mod10 === 1 && mod100 !== 11) ? "параметр"
-      : (mod10 >= 2 && mod10 <= 4 && (mod100 < 12 || mod100 > 14)) ? "параметра"
-        : "параметров";
-    return `${n} ${word}`;
-  }
 
   // Deep clone utility to guarantee complete independence of template slot settings
   function deepClone(obj) {
@@ -532,38 +523,15 @@ const DEFAULT_LAYOUTS = {
 
     // Template & List Settings Elements
     templatesSidebar: document.getElementById("templatesSidebar"),
-    templatesList: document.getElementById("templatesList"),
-    btnCreateTemplate: document.getElementById("btnCreateTemplate"),
     currentTemplateTitle: document.getElementById("currentTemplateTitle"),
     btnRenameCurrentTemplate: document.getElementById("btnRenameCurrentTemplate"),
     btnDeleteCurrentTemplate: document.getElementById("btnDeleteCurrentTemplate"),
-    newTemplateModal: document.getElementById("newTemplateModal"),
     inputNewTemplateName: document.getElementById("inputNewTemplateName"),
     inputNewTemplateDescription: document.getElementById("inputNewTemplateDescription"),
     selectNewTemplateBase: document.getElementById("selectNewTemplateBase"),
-    btnConfirmNewTemplate: document.getElementById("btnConfirmNewTemplate"),
-    btnCancelNewTemplate: document.getElementById("btnCancelNewTemplate"),
-    deleteTemplateModal: document.getElementById("deleteTemplateModal"),
-    deleteTemplateMsg: document.getElementById("deleteTemplateMsg"),
-    btnCancelDeleteTemplate: document.getElementById("btnCancelDeleteTemplate"),
-    btnConfirmDeleteTemplate: document.getElementById("btnConfirmDeleteTemplate"),
-    renameTemplateModal: document.getElementById("renameTemplateModal"),
     inputRenameTemplateName: document.getElementById("inputRenameTemplateName"),
     inputRenameTemplateDescription: document.getElementById("inputRenameTemplateDescription"),
-    btnCancelRenameTemplate: document.getElementById("btnCancelRenameTemplate"),
-    btnConfirmRenameTemplate: document.getElementById("btnConfirmRenameTemplate"),
-    templateSetsList: document.getElementById("templateSetsList"),
-    btnSaveTemplateSet: document.getElementById("btnSaveTemplateSet"),
-    saveTemplateSetModal: document.getElementById("saveTemplateSetModal"),
     inputTemplateSetName: document.getElementById("inputTemplateSetName"),
-    btnCancelSaveTemplateSet: document.getElementById("btnCancelSaveTemplateSet"),
-    btnConfirmSaveTemplateSet: document.getElementById("btnConfirmSaveTemplateSet"),
-    confirmTemplateSetModal: document.getElementById("confirmTemplateSetModal"),
-    confirmTemplateSetTitle: document.getElementById("confirmTemplateSetTitle"),
-    confirmTemplateSetMsg: document.getElementById("confirmTemplateSetMsg"),
-    confirmTemplateSetWarning: document.getElementById("confirmTemplateSetWarning"),
-    btnCancelConfirmTemplateSet: document.getElementById("btnCancelConfirmTemplateSet"),
-    btnConfirmTemplateSet: document.getElementById("btnConfirmTemplateSet"),
     templateSettingsPanel: document.getElementById("templateSettingsPanel"),
     // Редактор параметров шаблона рендерится TemplateSettingsEditor.vue
     selectLayoutTemplate: document.getElementById("selectLayoutTemplate"),
@@ -1326,10 +1294,6 @@ const DEFAULT_LAYOUTS = {
     showNotification(`Шаблон «${tplDef.name}» удален${reassignedCount > 0 ? ` (сцен переключено: ${reassignedCount})` : ""}`, "info");
   }
 
-  function deleteCustomTemplate(tplKey) {
-    openDeleteTemplateModal(tplKey);
-  }
-
   // -----------------------------------------------------------------------------
   // Template Sets: сохранение/загрузка всего списка шаблонов под разные проекты.
   // Набор — снимок custom_layouts в config/layout_sets/*.yaml; загрузка заменяет
@@ -1493,10 +1457,6 @@ const DEFAULT_LAYOUTS = {
     selectTemplate(tplKey);
     notifyChange();
     showNotification(`Шаблон переименован в «${newName}»`, "success");
-  }
-
-  function promptRenameTemplate(tplKey) {
-    openRenameTemplateModal(tplKey);
   }
 
   // Модалка создания шаблона (TemplatesSidebar.vue / NewTemplateModal.vue)

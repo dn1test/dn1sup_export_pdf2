@@ -616,8 +616,9 @@ module DN1Code
           assert(stadia.first["name"] == "Эскизный проект", "Имена стадий передаются как строки")
 
           # 2. Guard-тесты новой модели параметров в app.js
-          js_path = File.join(__dir__, "../dialog/html/app.js")
-          js = File.read(js_path, encoding: "utf-8")
+          js = Dir[File.join(__dir__, "../../frontend/src/**/*.{js,vue}")].sort
+                 .map { |f| (File.read(f, encoding: "utf-8") rescue "") }.join("
+")
 
           # 2a. Готовые списки полностью убраны
           assert(!js.include?("const PARAM_DEFS"), "app.js: готовый каталог PARAM_DEFS удален")
@@ -633,12 +634,12 @@ module DN1Code
           assert(js.include?("function paramPreviewValue"), "app.js: paramPreviewValue дает живое превью значения")
           assert(js.include?("function normalizeTemplateParam"), "app.js: normalizeTemplateParam нормализует параметр")
           assert(js.include?("function openParamModal"), "app.js: openParamModal открывает модал создания/правки")
-          assert(js.include?("btnCreateParam"), "app.js: кнопка «+ Создать параметр» на месте")
+          assert(js.include?("openParamModal', 'create"), "TemplateSettingsEditor.vue: кнопка «+ Создать параметр» на месте")
           assert(js.include?('dir.${idx}.line'), "app.js: источники папок строятся динамически (dir.N.line)")
 
           # 2c. Настройки параметра: источник/заголовок — в модале, остальное —
           #     в строке параметра; X/Y убраны, место задается выравниваниями
-          html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+          html_text = js
           %w[paramModalSource paramModalLabel].each do |id|
             assert(html_text.include?(id) && js.include?(id), "Поле модала #{id} присутствует в диалоге")
           end
@@ -649,11 +650,11 @@ module DN1Code
           assert(js.include?("function paramZoneLabel"), "app.js: сводка строки показывает зону размещения")
           assert(js.include?('tpl-param-zone'), "app.js: зона размещения — во второй строке (стиль и размещение)")
           assert(js.include?("tpl-param-preview-empty"), "app.js: пустые данные параметра помечены в строке «(нет данных)»")
-          assert(js.include?("function setupParamDragAndDrop") && js.include?("tpl-param-drag"),
+          assert(js.include?("tplEditorDrop") && js.include?("tpl-param-drag"),
                  "app.js: параметры сортируются перетаскиванием за ручку ⠿ (drag-and-drop)")
 
           # 2e. Блок объединения параметров
-          assert(js.include?("btnCreateParamGroup"), "app.js: кнопка «📦 Блок» создает блок объединения")
+          assert(js.include?("tplEditorCreateGroup"), "TemplateSettingsEditor.vue: кнопка «Блок» создает блок объединения")
           assert(js.include?("function createParamGroup"), "app.js: createParamGroup создает пустой блок")
           assert(js.include?("tpl-param-group-list") && js.include?("tpl-param-child-out"),
                  "app.js: блок содержит перетаскиваемых детей с кнопкой вывода из блока")
@@ -905,7 +906,9 @@ module DN1Code
                  "Бытовой лист: «Заказчик» на своей строке, значение — на следующей (#{house&.plain_text.inspect})")
 
           # 5. Guard: диалог знает условный источник (список/подпись/превью)
-          js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+          js = Dir[File.join(__dir__, "../../frontend/src/**/*.{js,vue}")].sort
+                 .map { |f| (File.read(f, encoding: "utf-8") rescue "") }.join("
+")
           assert(js.include?("customer.name_or_company"),
                  "app.js: условный источник «Заказчик / Компания» в списке добавления параметров")
         end

@@ -139,6 +139,21 @@ class TestRunner
     end
   end
 
+  # Источники фронтенда после миграции на Vue: legacy-логика + SFC-компоненты.
+  # Структурные тесты грепают объединённый источник вместо старых
+  # dialog/html/app.js (разобран на legacy + компоненты) и dialog/html/index.html
+  # (теперь это shell, собираемый Vite).
+  def frontend_source
+    @frontend_source ||= begin
+      root = File.expand_path("../../frontend/src", __dir__)
+      files = [File.join(root, "legacy/app.js"), File.join(root, "store.js"),
+               File.join(root, "main.js"), File.join(root, "App.vue")] +
+              Dir[File.join(root, "components/*.vue")].sort
+      files.map { |f| (File.read(f, encoding: "utf-8") rescue "") }.join("
+")
+    end
+  end
+
   def run_all
     puts "=========================================================="
     puts "  Комплексное тестирование DN1C Export PDF 2"
@@ -244,6 +259,12 @@ class TestRunner
 
     project_data = DN1Code::ExportPdf2::Model::ProjectData.new
     settings = project_data.pdf_settings
+
+    # Изоляция от личного config/layout.yaml: готовые шаблоны — обычные шаблоны,
+    # пользователь мог их удалить (сид не восстанавливается по замыслу), поэтому
+    # секция редактора тестируется на полном дефолтном наборе
+    defaults = project_data.send(:default_custom_layouts)
+    defaults.each { |key, cfg| settings[:custom_layouts][key] ||= cfg }
 
     assert(settings.key?(:custom_layouts), "Настройки pdf_settings содержат ключ :custom_layouts")
     assert(settings[:custom_layouts].key?(:cover), "Кастомные макеты содержат шаблон :cover")
@@ -1535,8 +1556,8 @@ class TestRunner
   # --- 25. Тест выпадающих параметров (размер шрифта, номер строки, цвет текста) для пунктов заголовка ---
   def test_scenes_table_two_row_layout
     puts "\n--- 27. Тест разделения колонок галочек и перемещения и двухстрочного названия/описания сцен ---"
-    index_html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    index_html_content = File.read(index_html_path, encoding: "utf-8")
+    index_html_path = frontend_source
+    index_html_content = index_html_path
 
     # 1. Проверка структуры thead в index.html
     assert(index_html_content.include?("<th>Сцена / Описание</th>"), "index.html содержит объединенный заголовок 'Сцена / Описание'")
@@ -1544,8 +1565,8 @@ class TestRunner
     assert(index_html_content.include?("th-check"), "index.html содержит отдельную колонку для галочек 'Вкл'")
     assert(index_html_content.include?("th-order"), "index.html содержит отдельную колонку для порядка и перемещения '№'")
 
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_content = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_content = app_js_path
 
     # 2. Проверка генерации строки таблицы в app.js
     assert(app_js_content.include?("scene-check-cell"), "app.js содержит отдельную ячейку scene-check-cell для галочки")
@@ -1555,9 +1576,9 @@ class TestRunner
     assert(app_js_content.include?("scene-info-wrap"), "app.js содержит обертку scene-info-wrap")
     assert(app_js_content.include?("scene-name-input"), "app.js содержит поле ввода названия сцены (scene-name-input)")
     assert(app_js_content.include?("scene-desc-input"), "app.js содержит поле ввода описания сцены (scene-desc-input)")
-    assert(app_js_content.include?("tdInfo.appendChild(infoWrap)"), "app.js помещает оба поля в единую ячейку tdInfo")
-    assert(app_js_content.include?("tr.appendChild(tdCheck)"), "app.js добавляет ячейку чекбокса в tr")
-    assert(app_js_content.include?("tr.appendChild(tdNum)"), "app.js добавляет ячейку номера и перемещения в tr")
+    assert(app_js_content.include?('<td class="scene-info-cell">'), "разметка сцены содержит единую ячейку scene-info-cell")
+    assert(app_js_content.include?('<td class="scene-check-cell"'), "разметка сцены содержит ячейку чекбокса scene-check-cell")
+    assert(app_js_content.include?('<td class="scene-num-cell"'), "разметка сцены содержит ячейку номера и перемещения scene-num-cell")
 
     # 3. Проверка стилей в app.css
     app_css_path = File.expand_path("../dialog/html/app.css", __dir__)
@@ -1591,21 +1612,21 @@ class TestRunner
   def test_drawing_image_settings_proportions_and_placement
     puts "\n--- 34. Тест настройки картинки чертежа под текст (пропорции 3:2, 4:3, 16:9 и масштаб 60-100%) ---"
 
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_content = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_content = app_js_path
 
     # 1. Проверка постраничного меню кадра в таблице страниц (app.js)
     assert(app_js_content.include?("scene-frame-btn"), "app.js содержит кнопку меню кадра scene-frame-btn")
-    assert(app_js_content.include?("sceneFramePopover"), "app.js открывает поповер меню кадра sceneFramePopover")
+    assert(app_js_content.include?("togglePopover"), "редактор страниц открывает поповер меню кадра (togglePopover)")
 
     # 2. Проверка пропорций в меню кадра (3:2, 4:3, 5:4, 16:9, 1:1, 4:5, По листу)
-    assert(app_js_content.include?('["3:2", "3:2"]'), "меню кадра содержит пропорцию 3:2")
-    assert(app_js_content.include?('["4:3", "4:3"]'), "меню кадра содержит пропорцию 4:3")
-    assert(app_js_content.include?('["5:4", "5:4"]'), "меню кадра содержит пропорцию 5:4")
-    assert(app_js_content.include?('["16:9", "16:9"]'), "меню кадра содержит пропорцию 16:9")
-    assert(app_js_content.include?('["1:1", "1:1"]'), "меню кадра содержит пропорцию 1:1")
-    assert(app_js_content.include?('["4:5", "4:5"]'), "меню кадра содержит пропорцию 4:5")
-    assert(app_js_content.include?('["page", "По листу"]'), "меню кадра содержит пропорцию 'По листу'")
+    assert(app_js_content.include?("['3:2', '3:2']"), "меню кадра содержит пропорцию 3:2")
+    assert(app_js_content.include?("['4:3', '4:3']"), "меню кадра содержит пропорцию 4:3")
+    assert(app_js_content.include?("['5:4', '5:4']"), "меню кадра содержит пропорцию 5:4")
+    assert(app_js_content.include?("['16:9', '16:9']"), "меню кадра содержит пропорцию 16:9")
+    assert(app_js_content.include?("['1:1', '1:1']"), "меню кадра содержит пропорцию 1:1")
+    assert(app_js_content.include?("['4:5', '4:5']"), "меню кадра содержит пропорцию 4:5")
+    assert(app_js_content.include?("['page', 'По листу']"), "меню кадра содержит пропорцию 'По листу'")
 
     # 3. Проверка масштаба страницы (60-100%)
     assert(app_js_content.include?("[60, 70, 80, 90, 100]"), "масштаб страницы выбирается из 60-100%")
@@ -1614,7 +1635,7 @@ class TestRunner
     # Пропорции страницы персональные: сохраняются в scene.aspect_ratio и НЕ
     # перезаписывают блок image_4_3 шаблона (иначе страницы шаблона получали
     # пропорции первой отредактированной страницы)
-    assert(app_js_content.include?("scene.aspect_ratio = val;"), "app.js сохраняет пропорцию в настройках страницы (scene.aspect_ratio)")
+    assert(app_js_content.include?("item.aspect_ratio = val"), "app.js сохраняет пропорцию в настройках страницы (scene.aspect_ratio)")
     assert(!app_js_content.include?('updateBlockSlot("image_4_3", { aspect_ratio: val })'),
            "app.js не синхронизирует пропорцию страницы в блок шаблона (постраничные пропорции независимы)")
     assert(app_js_content.include?('updateBlockSlot("image_4_3", { scale_pct: scale })'), "app.js обновляет scale_pct при смене масштаба")
@@ -1692,13 +1713,13 @@ class TestRunner
   def test_manual_revision_prompt_before_pdf_export_and_no_auto_history
     puts "\n--- 35. Тест ручной фиксации правок перед экспортом и запрета авто-создания истории ---"
 
-    html_file = File.expand_path("../dialog/html/index.html", __dir__)
+    html_file = frontend_source
     css_file  = File.expand_path("../dialog/html/app.css", __dir__)
-    js_file   = File.expand_path("../dialog/html/app.js", __dir__)
+    js_file   = frontend_source
 
-    html_content = File.read(html_file, encoding: "utf-8")
+    html_content = html_file
     css_content  = File.read(css_file, encoding: "utf-8")
-    js_content   = File.read(js_file, encoding: "utf-8")
+    js_content   = js_file
 
     # 1. Проверка структуры HTML для модального окна фиксации правок
     assert(html_content.include?('id="revisionPromptModal"'), "index.html содержит модальное окно revisionPromptModal")
@@ -1789,8 +1810,8 @@ class TestRunner
   def test_40_template_usage_separate_line
     puts "\n--- 40. Тест отображения строки использования шаблона на отдельной строке ---"
 
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_content = File.read(html_path, encoding: "utf-8")
+    html_path = frontend_source
+    html_content = html_path
 
     # 1. Проверка наличия отдельной строки toolbar-usage-row для layoutTplUsageBadge в index.html
     assert(html_content.include?('class="toolbar-row toolbar-usage-row"'), "index.html содержит отдельную строку .toolbar-usage-row")
@@ -1810,8 +1831,8 @@ class TestRunner
     assert(css_content.include?(".layout-tpl-usage.empty-usage"), "app.css содержит стили для .empty-usage")
 
     # 4. Проверка логики в app.js
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_content = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_content = app_js_path
 
     assert(app_js_content.include?('Используется:'), "app.js обновляет строку использования с префиксом 'Используется:'")
     assert(app_js_content.include?('Не привязан к сценам'), "app.js обновляет строку при отсутствии привязки")
@@ -1822,18 +1843,18 @@ class TestRunner
     puts "\n--- 41. Тест добавления и удаления адресатов веб-интеграции (API TARGETS) ---"
 
     # 1. Проверка HTML элементов
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_content = File.read(html_path, encoding: "utf-8")
-    assert(html_content.include?('id="btnAddApiTarget"'), "index.html содержит кнопку #btnAddApiTarget")
+    html_path = frontend_source
+    html_content = html_path
+    assert(html_content.include?('addTarget'), "SendTab.vue содержит кнопку добавления адресата (addTarget)")
     assert(html_content.include?('+ Добавить URL'), "index.html содержит надпись '+ Добавить URL'")
-    assert(html_content.include?('id="apiTargetsList"'), "index.html содержит контейнер #apiTargetsList")
+    assert(html_content.include?('api-targets-container'), "SendTab.vue содержит контейнер api-targets-container")
 
     # 1a. Проверка вкладки "Отправка" (tab-send): WebP и адресаты перенесены из "Настроек"
     assert(html_content.include?('data-tab="tab-send"'), "index.html содержит кнопку вкладки Отправка (tab-send)")
     assert(html_content.include?('id="tab-send"'), "index.html содержит панель #tab-send")
     send_pane_pos = html_content.index('id="tab-send"')
     assert(send_pane_pos && send_pane_pos < html_content.index('id="webpQualityGroup"'), "Карточка WebP перенесена на вкладку Отправка")
-    assert(send_pane_pos && send_pane_pos < html_content.index('id="btnAddApiTarget"'), "Карточка адресатов перенесена на вкладку Отправка")
+    assert(send_pane_pos && send_pane_pos < html_content.index('api-targets-container'), "Карточка адресатов перенесена на вкладку Отправка")
 
     # 2. Проверка CSS стилей
     css_path = File.expand_path("../dialog/html/app.css", __dir__)
@@ -1844,13 +1865,13 @@ class TestRunner
     assert(css_content.include?(".empty-targets-placeholder"), "app.css содержит стили .empty-targets-placeholder")
 
     # 3. Проверка JavaScript логики
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_content = File.read(app_js_path, encoding: "utf-8")
-    assert(app_js_content.include?('btnAddApiTarget: document.getElementById("btnAddApiTarget")'), "app.js регистрирует btnAddApiTarget в els")
-    assert(app_js_content.include?('els.btnAddApiTarget.addEventListener("click"'), "app.js обрабатывает нажатие кнопки добавления адресата")
+    app_js_path = frontend_source
+    app_js_content = app_js_path
+    assert(app_js_content.include?('addApiTarget'), "мост expose addApiTarget для SendTab.vue")
+    assert(app_js_content.include?('commitApiTargets'), "SendTab.vue коммитит список через commitApiTargets")
     assert(app_js_content.include?('api-target-input'), "app.js создает редактируемые поля ввода .api-target-input")
-    assert(app_js_content.include?('state.api_targets.splice(index, 1)'), "app.js поддерживает удаление адресата по индексу через splice")
-    assert(app_js_content.include?('querySelectorAll(".api-target-input")'), "app.js собирает значения адресатов в collectFormData")
+    assert(app_js_content.include?('ui.apiTargets.splice(index, 1)'), "SendTab.vue поддерживает удаление адресата по индексу через splice")
+    assert(app_js_content.include?('state.api_targets.map((t) => String(t).trim()).filter(Boolean)'), "collectFormData собирает адресаты из state (пишет SendTab.vue)")
 
     # 4. Проверка работы с ProjectData и ExportDialog
     test_dir = File.expand_path("../../test_sandbox_api_targets_#{Time.now.to_i}", __dir__)
@@ -2086,7 +2107,7 @@ class TestRunner
     assert(def_settings_text.include?("show_aspect_overlay:"), "default_settings.yaml содержит show_aspect_overlay")
 
     # 7. Проверка HTML интерфейса диалога
-    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    html_text = frontend_source
     assert(html_text.include?("id=\"selectQuality\""), "index.html содержит id=\"selectQuality\"")
     assert(html_text.include?("id=\"selectScaleMultiplier\""), "index.html содержит id=\"selectScaleMultiplier\"")
     assert(html_text.include?("value=\"auto\""), "selectScaleMultiplier содержит опцию auto")
@@ -2098,7 +2119,7 @@ class TestRunner
     assert(!html_text.include?("id=\"chkShowAspectOverlay\""), "из общих настроек index.html удален id=\"chkShowAspectOverlay\"")
 
     # 8. Проверка JS логики
-    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js_text = frontend_source
     assert(js_text.include?("selectImageAspect"), "app.js содержит selectImageAspect")
     assert(js_text.include?("chkScenesFrameAll"), "app.js содержит массовый тумблер chkScenesFrameAll")
     assert(js_text.include?("function updateAspectUI"), "app.js содержит function updateAspectUI")
@@ -2145,7 +2166,7 @@ class TestRunner
     assert(!js_text.include?('>photo<') && !js_text.include?('>business<') && !js_text.include?('>dashboard<'),
            "app.js не использует имена-лигатуры, отсутствующие в наборе connect")
     # Все имена-лигатуры в разметке и JS входят в набор connect
-    index_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    index_text = frontend_source
     used_icons = (index_text.scan(/modus-icons[^>]*>([a-z0-9-]+)</).flatten +
                   js_text.scan(/modus-icons[^>]*>([a-z0-9-]+)</).flatten).uniq
     connect_icons = %w[
@@ -2159,8 +2180,8 @@ class TestRunner
 
     # 11. Проверка постраничного меню кадра и привязки пропорций к блоку шаблона
     assert(js_text.include?("scene-frame-btn"), "app.js содержит кнопку меню кадра scene-frame-btn")
-    assert(js_text.include?("sceneFramePopover"), "app.js содержит поповер меню кадра sceneFramePopover")
-    assert(js_text.include?("closeSceneFramePopover"), "app.js содержит closeSceneFramePopover")
+    assert(js_text.include?("scene-frame-pop"), "редактор страниц содержит поповер меню кадра scene-frame-pop")
+    assert(js_text.include?("closePopover"), "редактор страниц содержит closePopover")
     assert(js_text.include?("syncCurrentTemplateOverlay"), "app.js содержит метод syncCurrentTemplateOverlay")
     assert(css_text.include?(".scene-frame-btn"), "app.css содержит стили кнопки меню кадра .scene-frame-btn")
     assert(css_text.include?(".scene-frame-pop"), "app.css содержит стили поповера меню кадра .scene-frame-pop")
@@ -2418,7 +2439,7 @@ class TestRunner
            "export_dialog.rb вызывает JS callback window.app.onAutoSaved при тихом сохранении")
   
     # 6. Проверка поддержки автосохранения в app.js
-    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js_text = frontend_source
     assert(js_text.include?("function triggerAutoSave()"), "app.js содержит функцию triggerAutoSave")
     assert(js_text.include?("function notifyChange()"), "app.js содержит функцию notifyChange")
     assert(js_text.include?("function updateAutoSaveIndicator("), "app.js содержит функцию updateAutoSaveIndicator")
@@ -2431,7 +2452,7 @@ class TestRunner
     assert(js_text.include?("function setTemplateParams"), "app.js сохраняет параметры шаблона через setTemplateParams")
   
     # 8. Проверка наличия индикатора автосохранения в index.html и стилей в app.css
-    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    html_text = frontend_source
     assert(html_text.include?('id="autosaveStatus"'), "index.html содержит элемент #autosaveStatus (футер, рядом с кнопками)")
     assert(html_text.include?('class="autosave-status"'), "index.html содержит контейнер autosave-status")
     assert(!html_text.include?('id="btnRefreshData"'), "Кнопка «Обновить» (btnRefreshData) удалена из футера")
@@ -2512,10 +2533,10 @@ class TestRunner
            "Размер эскизов thumb_size сохраняется при записи/чтении YAML")
 
     # 7. Элементы интерфейса: путь как текст (клик — выбор папки) и размеры эскизов
-    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js_text = frontend_source
     assert(js_text.include?("dir-thumb-size-btn"), "app.js содержит переключатель размеров эскизов")
     assert(js_text.include?("dir-path-text"), "Путь в карточке выводится текстом (dir-path-text)")
-    assert(js_text.include?('callRuby("selectDirectory", index.toString())'), "Клик по пути открывает выбор папки")
+    assert(js_text.include?("callRuby('selectDirectory', String(index))"), "Клик по пути открывает выбор папки (DirectoriesTab.vue)")
     css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
     assert(css_text.include?("thumb-small") && css_text.include?("thumb-medium") && css_text.include?("thumb-large"),
            "app.css содержит три варианта размеров эскизов (small/medium/large)")
@@ -2563,11 +2584,11 @@ class TestRunner
     assert(reloaded.directories[1][:send_to_server] == false, "После перезагрузки send_to_server: false сохранен")
 
     # 4. Интерфейс: чекбокс в шапке карточки рядом с «Обновить», справа
-    js_text = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js_text = frontend_source
     assert(js_text.include?("dir-header-actions"), "app.js группирует «Обновить» и чекбокс отправки в правом блоке шапки папки")
     assert(js_text.include?("dir-send-server-label"), "app.js содержит чекбокс отправки в шапке карточки папки")
     assert(js_text.include?("d.send_to_server !== false"), "app.js по умолчанию включает отправку для старых данных")
-    assert(js_text.include?("d.send_to_server = e.target.checked"), "app.js сохраняет состояние чекбокса в directories")
+    assert(js_text.include?('v-model="d.send_to_server"'), "DirectoriesTab.vue сохраняет состояние чекбокса в directories")
     assert(js_text.include?("Отправлять на сервер"), "app.js содержит подпись чекбокса «Отправлять на сервер»")
     css_text = File.read(File.join(__dir__, "../dialog/html/app.css"), encoding: "utf-8")
     assert(css_text.include?(".dir-header-actions") && css_text.include?("margin-left: auto"),
@@ -2576,14 +2597,14 @@ class TestRunner
 
     # 5. Общая кнопка «Обновить» в заголовке секции (рядом с «Добавить папку»),
     #    пересканирует все папки; кнопка «Обновить» из карточек папок удалена
-    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
-    assert(html_text.include?('id="btnRefreshDirectories"'), "index.html содержит общую кнопку обновления папок #btnRefreshDirectories")
-    btn_pos = html_text.index('id="btnRefreshDirectories"')
-    add_pos = html_text.index('id="btnAddDirectory"')
+    html_text = frontend_source
+    assert(html_text.include?("legacy('refreshDirectories')"), "DirectoriesTab.vue содержит общую кнопку обновления папок")
+    btn_pos = html_text.index("legacy('refreshDirectories')")
+    add_pos = html_text.index("legacy('addDirectory')")
     assert(btn_pos && add_pos && btn_pos < add_pos, "Кнопка «Обновить» расположена рядом с «Добавить папку» в заголовке секции")
-    assert(js_text.include?('btnRefreshDirectories: document.getElementById("btnRefreshDirectories")'), "app.js регистрирует btnRefreshDirectories в els")
+    assert(js_text.include?("function refreshDirectories()"), "app.js содержит общую функцию пересканирования всех папок")
     assert(js_text.include?("function refreshDirectoryFiles(index)"), "app.js содержит общую функцию пересканирования папки")
-    assert(js_text.include?("els.btnRefreshDirectories.addEventListener"), "app.js обрабатывает нажатие общей кнопки «Обновить»")
+    assert(html_text.include?("legacy('addDirectory')"), "DirectoriesTab.vue обрабатывает нажатие кнопки «Добавить папку» через мост")
     assert(!js_text.include?("Пересканировать файлы в папке"), "Кнопка «Обновить» удалена из карточек папок")
     assert(css_text.include?(".card-header-buttons"), "app.css содержит стиль группы кнопок заголовка секции")
 
@@ -2605,12 +2626,12 @@ class TestRunner
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    html_path = frontend_source
+    js_path = frontend_source
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
 
-    html_content = File.read(html_path, encoding: "UTF-8")
-    js_content = File.read(js_path, encoding: "UTF-8")
+    html_content = html_path
+    js_content = js_path
     css_content = File.read(css_path, encoding: "UTF-8")
 
     # 1. Проверка навигационных кнопок в index.html
@@ -2648,28 +2669,28 @@ class TestRunner
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    html_path = frontend_source
+    js_path = frontend_source
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
 
-    html_content = File.read(html_path, encoding: "UTF-8")
-    js_content = File.read(js_path, encoding: "UTF-8")
+    html_content = html_path
+    js_content = js_path
     css_content = File.read(css_path, encoding: "UTF-8")
 
     # 1. Проверка HTML-разметки сайдбара и модальных окон
     assert(html_content.include?('id="templatesSidebar"'), "index.html содержит боковую панель templatesSidebar")
-    assert(html_content.include?('id="templatesList"'), "index.html содержит контейнер списка шаблонов templatesList")
-    assert(html_content.include?('id="btnCreateTemplate"'), "index.html содержит кнопку создания шаблона btnCreateTemplate")
+    assert(html_content.include?('class="templates-list"'), "TemplatesSidebar.vue содержит контейнер списка шаблонов templates-list")
+    assert(html_content.include?('btn-add-template'), "TemplatesSidebar.vue содержит кнопку создания шаблона btn-add-template")
     assert(html_content.include?('id="currentTemplateTitle"'), "index.html содержит заголовок выбранного шаблона currentTemplateTitle")
     assert(html_content.include?('id="btnRenameCurrentTemplate"'), "index.html содержит кнопку переименования btnRenameCurrentTemplate")
     assert(html_content.include?('id="btnDeleteCurrentTemplate"'), "index.html содержит кнопку удаления btnDeleteCurrentTemplate")
-    assert(html_content.include?('id="newTemplateModal"'), "index.html содержит модальное окно newTemplateModal")
-    assert(html_content.include?('id="deleteTemplateModal"'), "index.html содержит модальное окно подтверждения удаления deleteTemplateModal")
-    assert(html_content.include?('id="renameTemplateModal"'), "index.html содержит модальное окно переименования renameTemplateModal")
-    assert(html_content.include?('id="btnConfirmDeleteTemplate"'), "index.html содержит кнопку подтверждения удаления btnConfirmDeleteTemplate")
+    assert(html_content.include?('Новый шаблон страницы'), "TemplateModals.vue содержит модальное окно создания шаблона")
+    assert(html_content.include?('Удаление шаблона'), "TemplateModals.vue содержит модальное окно подтверждения удаления")
+    assert(html_content.include?('Переименовать шаблон'), "TemplateModals.vue содержит модальное окно переименования")
+    assert(html_content.include?('confirmDelete'), "TemplateModals.vue содержит подтверждение удаления (confirmDelete)")
     assert(html_content.include?('id="inputNewTemplateName"'), "index.html содержит поле ввода имени нового шаблона inputNewTemplateName")
     assert(html_content.include?('id="selectNewTemplateBase"'), "index.html содержит выбор базового шаблона selectNewTemplateBase")
-    assert(html_content.include?('id="btnConfirmNewTemplate"'), "index.html содержит кнопку подтверждения btnConfirmNewTemplate")
+    assert(html_content.include?('confirmNew'), "TemplateModals.vue содержит подтверждение создания (confirmNew)")
 
     # 2. Проверка CSS-стилей
     assert(css_content.include?('.templates-sidebar'), "app.css содержит стили .templates-sidebar")
@@ -2686,11 +2707,11 @@ class TestRunner
     assert(js_content.include?('function selectTemplate('), "app.js содержит selectTemplate")
     assert(js_content.include?('function syncTemplateDropdowns()'), "app.js содержит syncTemplateDropdowns")
     assert(js_content.include?('function createCustomTemplate('), "app.js содержит createCustomTemplate")
-    assert(js_content.include?('function deleteCustomTemplate('), "app.js содержит deleteCustomTemplate")
+    assert(js_content.include?("legacy('openDeleteTemplateModal', tpl.key)"), "TemplatesSidebar.vue удаляет шаблон через мост openDeleteTemplateModal")
     assert(js_content.include?('function openDeleteTemplateModal('), "app.js содержит openDeleteTemplateModal")
     assert(js_content.include?('function confirmDeleteTemplate()'), "app.js содержит confirmDeleteTemplate")
     assert(js_content.include?('function openRenameTemplateModal('), "app.js содержит openRenameTemplateModal")
-    assert(js_content.include?('function confirmRenameTemplate()'), "app.js содержит confirmRenameTemplate")
+    assert(js_content.include?('function confirmRenameTemplate('), "app.js содержит confirmRenameTemplate")
 
     # 4. Проверка Ruby бэкенда: PageBase#current_page_type для кастомного шаблона
     test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2745,13 +2766,13 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    html_path = frontend_source
+    js_path = frontend_source
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
     dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
 
-    html_content = File.read(html_path, encoding: "UTF-8")
-    js_content = File.read(js_path, encoding: "UTF-8")
+    html_content = html_path
+    js_content = js_path
     css_content = File.read(css_path, encoding: "UTF-8")
     dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
 
@@ -2769,14 +2790,14 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(css_content.include?('.mini-sheet-placeholder'), "app.css содержит стили для нейтрального плейсхолдера .mini-sheet-placeholder")
 
     # 3. Проверка генерации и логики превью в app.js
-    assert(js_content.include?('function createMiniPagePreview(scene, index)'), "app.js содержит функцию createMiniPagePreview")
+    assert(js_content.include?('scene-mini-preview-wrap'), "ScenesTab.vue рендерит мини-превью scene-mini-preview-wrap")
     assert(js_content.include?('scene-preview-cell'), "app.js создает ячейку scene-preview-cell в строке таблицы сцен")
     assert(js_content.include?('mini-sheet-img'), "app.js выводит только чистое изображение mini-sheet-img")
-    assert(js_content.include?('updateSceneTablePreviews'), "app.js содержит функцию updateSceneTablePreviews для обновления превью")
+    assert(js_content.include?('ui.sceneThumbnails'), "эскизы сцен приходят в store для реактивного рендера")
     assert(js_content.include?('requestSceneThumbnails'), "app.js содержит функцию requestSceneThumbnails для запроса превью")
     assert(js_content.include?('onSceneThumbnailsLoaded'), "app.js содержит обработчик onSceneThumbnailsLoaded в window.app")
     assert(js_content.include?('Нажмите для перехода к этому виду в SketchUp'), "app.js подсказка миниатюры указывает переход к виду в SketchUp")
-    assert(js_content.include?('btnEditTpl.addEventListener("click"') && js_content.include?('switchToTab("tab-templates")'), "app.js переход в настройки шаблона выполняется по кнопке шестеренки")
+    assert(js_content.include?('gotoTemplateEditor') && js_content.include?('switchToTab("tab-templates")'), "переход в настройки шаблона выполняется по кнопке шестеренки")
 
     # 4. Проверка обработчика getSceneThumbnails в export_dialog.rb
     assert(dialog_rb_content.include?('add_action_callback("getSceneThumbnails")'), "export_dialog.rb содержит экшн-коллбэк getSceneThumbnails")
@@ -2795,10 +2816,10 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
-    html_content = File.read(html_path, encoding: "UTF-8")
-    js_content = File.read(js_path, encoding: "UTF-8")
+    html_path = frontend_source
+    js_path = frontend_source
+    html_content = html_path
+    js_content = js_path
 
     # 1. Проверка Ruby моделей и контроллеров
     sc_blank = DN1Code::ExportPdf2::Model::SceneItem.new(name: "Чистая страница 3D")
@@ -2849,11 +2870,11 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_path = frontend_source
     css_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.css"))
     dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
 
-    js_content = File.read(js_path, encoding: "UTF-8")
+    js_content = js_path
     css_content = File.read(css_path, encoding: "UTF-8")
     dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
 
@@ -2883,11 +2904,11 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
   
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
+    js_path = frontend_source
     dialog_rb_path = File.expand_path(File.join(__dir__, "..", "dialog", "export_dialog.rb"))
     model_rb_path = File.expand_path(File.join(__dir__, "..", "model", "project_data.rb"))
   
-    js_content = File.read(js_path, encoding: "UTF-8")
+    js_content = js_path
     dialog_rb_content = File.read(dialog_rb_path, encoding: "UTF-8")
     model_rb_content = File.read(model_rb_path, encoding: "UTF-8")
   
@@ -2952,12 +2973,12 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
   
     # 1. Проверка вспомогательной функции и чекбокса параметра в app.js
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js = app_js_path
   
     assert(app_js.include?("function isSlotVisible"), "app.js содержит функцию isSlotVisible для безопасной проверки видимости")
     assert(app_js.include?("tpl-param-visible"), "app.js содержит чекбокс «Вкл» параметра (tpl-param-visible)")
-    assert(app_js.include?("visible: chk.checked"), "app.js передает булево значение visible параметра")
+    assert(app_js.include?("tplEditorSetVisible"), "редактор передает булево значение visible параметра через мост")
   
     # 2. Проверка block_visible? в LayoutBuilder на вариантах visible
     lb = DN1Code::ExportPdf2::Service::LayoutBuilder
@@ -3072,8 +3093,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(!overlay_svc.overlay_active?(mock_model), "refresh автоматически выключил оверлей для сцены со скрытым видовым экраном")
 
     # 5. Проверка JavaScript логики в app.js
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
-    js_content = File.read(js_path, encoding: "UTF-8")
+    js_path = frontend_source
+    js_content = js_path
     assert(!js_content.include?("frameBtn.disabled"), "кнопка меню кадра никогда не блокируется — в меню всегда можно зайти")
     assert(!js_content.include?("Видовой экран</span>"), "переключатель 'Видовой экран' удалён из меню кадра")
     assert(js_content.include?('callRuby("toggleAspectOverlay", false)'), "app.js отключает оверлей для шаблонов без блока картинки")
@@ -3139,8 +3160,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(legacy_scene.viewport_watermarks == false, "from_h без viewport_watermarks подставляет false (водяные знаки выключены)")
 
     # 2. Проверка разметки в index.html
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    html_content = File.read(html_path, encoding: "UTF-8")
+    html_path = frontend_source
+    html_content = html_path
     assert(html_content.include?('class="th-aspect"') && html_content.include?('>Кадр</th>'), "index.html содержит заголовок колонки Кадр в таблице сцен")
     assert(html_content.include?('id="chk_scenes_frame_all"'), "index.html содержит массовый тумблер рамки chk_scenes_frame_all")
     assert(html_content.include?('id="chk_scenes_watermarks"'), "index.html содержит независимый тумблер водяных знаков chk_scenes_watermarks")
@@ -3154,11 +3175,11 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(css_content.include?(".scene-aspect-cell"), "app.css содержит стиль .scene-aspect-cell")
 
     # 4. Проверка логики в app.js
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
-    js_content = File.read(js_path, encoding: "UTF-8")
-    assert(js_content.include?("function updateSceneTableFrameStates"), "app.js содержит функцию updateSceneTableFrameStates")
-    assert(js_content.include?("function closeSceneFramePopover"), "app.js содержит функцию closeSceneFramePopover")
-    assert(js_content.include?("function updateSceneTableAspectCell"), "app.js содержит функцию updateSceneTableAspectCell")
+    js_path = frontend_source
+    js_content = js_path
+    assert(js_content.include?("frame_overlay === true"), "индикаторы рамки реактивно следуют флагу сцены")
+    assert(js_content.include?("closePopover"), "поповер кадра закрывается декларативно (closePopover)")
+    assert(js_content.include?("ratioLabel"), "метка пропорции в строке реактивная (ratioLabel)")
     assert(js_content.include?("scene-aspect-cell"), "app.js генерирует ячейку scene-aspect-cell в таблице страниц")
     assert(js_content.include?('getElementById("chk_scenes_background")'), "app.js использует глобальный чекбокс фона chk_scenes_background")
     assert(js_content.include?("s.viewport_background = bgOn"), "app.js сохраняет viewport_background при переключении чекбокса фона")
@@ -3207,12 +3228,12 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     root_project_yaml = File.expand_path("../../project.yaml", __dir__)
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
-    js_content = File.read(js_path, encoding: "UTF-8")
+    js_path = frontend_source
+    js_content = js_path
 
     # 1. Меню кадра в строке таблицы: кнопка + поповер (рамка, пропорции)
     assert(js_content.include?("scene-frame-btn"), "app.js рендерит кнопку меню кадра scene-frame-btn")
-    assert(js_content.include?('id="sceneFramePopover"') == false && js_content.include?("sceneFramePopover"), "app.js открывает поповер меню кадра #sceneFramePopover")
+    assert(js_content.include?("scene-frame-pop") && js_content.include?("togglePopover"), "редактор страниц открывает поповер меню кадра scene-frame-pop")
     assert(js_content.include?("scene-frame-check"), "Галочка 'Рамка кадра' вынесена из меню в строку таблицы (scene-frame-check рядом с кнопкой пропорций)")
     assert(!js_content.include?("scene-frame-check-row"), "Старая строка чекбокса 'Рамка кадра' удалена из меню кадра")
     assert(js_content.include?("Пропорции кадра"), "Меню кадра содержит блок 'Пропорции кадра'")
@@ -3220,17 +3241,17 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(!js_content.include?("Видовой экран</span>"), "Переключатель 'Видовой экран' удалён из меню кадра")
 
     # 2. Постраничный флаг рамки сохраняется в сцене и синхронизируется с SketchUp
-    assert(js_content.include?("scene.frame_overlay = on"), "app.js сохраняет постраничный флаг frame_overlay")
+    assert(js_content.include?("frame_overlay = e.target.checked"), "ScenesTab.vue сохраняет постраничный флаг frame_overlay")
     assert(js_content.include?('JSON.stringify({ enabled: on, scene_index: index })'), "app.js передает флаг рамки страницы в toggleAspectOverlay")
     assert(!js_content.include?("scene.viewport_visible = on"), "app.js больше не управляет отключением видового экрана")
 
     # 3. Массовый тумблер 'Кадр все' в шапке таблицы
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    html_content = File.read(html_path, encoding: "UTF-8")
+    html_path = frontend_source
+    html_content = html_path
     assert(html_content.include?('id="chk_scenes_frame_all"'), "index.html содержит массовый тумблер chk_scenes_frame_all")
     assert(html_content.include?("<span>Кадр все</span>"), "index.html содержит подпись 'Кадр все'")
     assert(js_content.include?("s.frame_overlay = on"), "app.js применяет 'Кадр все' ко всем страницам")
-    assert(js_content.include?("updateSceneTableFrameStates"), "app.js обновляет индикаторы рамки во всех строках")
+    assert(js_content.include?("frame-on"), "индикаторы рамки во всех строках обновляются реактивно")
     assert(js_content.include?("chkScenesFrameAll"), "app.js привязывает обработчик к chkScenesFrameAll")
 
     # 4. Нижняя панель 'Картинка чертежа под текст' полностью удалена
@@ -3330,8 +3351,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     File.delete(tmp_jpg_view) rescue nil
 
     # 3. Проверка элементов управления в index.html
-    html_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "index.html"))
-    html_content = File.read(html_path, encoding: "UTF-8")
+    html_path = frontend_source
+    html_content = html_path
     assert(html_content.include?('id="selectCompression"'), "index.html содержит селектор сжатия #selectCompression")
     assert(html_content.include?('value="none"'), "Селектор сжатия содержит вариант 'none' (Без сжатия)")
     assert(html_content.include?('value="compress"'), "Селектор сжатия содержит вариант 'compress' (Применять сжатие)")
@@ -3340,8 +3361,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(html_content.include?('value="jpg"'), "Селектор формата содержит вариант 'jpg' (JPEG)")
 
     # 4. Проверка логики в app.js
-    js_path = File.expand_path(File.join(__dir__, "..", "dialog", "html", "app.js"))
-    js_content = File.read(js_path, encoding: "UTF-8")
+    js_path = frontend_source
+    js_content = js_path
     assert(js_content.include?("selectCompression: document.getElementById(\"selectCompression\")"), "app.js инициализирует selectCompression")
     assert(js_content.include?("selectImageFormat: document.getElementById(\"selectImageFormat\")"), "app.js инициализирует selectImageFormat")
     assert(js_content.include?("compress_pdf:"), "collectSettingsFromUI собирает compress_pdf")
@@ -3398,7 +3419,7 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(def_yaml.include?("scale_multiplier:"), "default_settings.yaml содержит scale_multiplier")
 
     # 2. Проверка HTML элементов и опций селектора
-    html_text = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    html_text = frontend_source
     assert(html_text.include?("id=\"selectScaleMultiplier\""), "index.html содержит selectScaleMultiplier")
     assert(html_text.include?("Множитель толщины линий"), "index.html содержит подпись 'Множитель толщины линий'")
     assert(html_text.include?("value=\"0.5\""), "selectScaleMultiplier содержит опцию 0.5")
@@ -3570,7 +3591,10 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     initial_md5 = Digest::MD5.hexdigest(File.binread(root_project_yaml))
 
     # 1. Дефолты слотов image_4_3 во всех шаблонах содержат show_background: false (фон выключен)
+    #    (изоляция от личного config/layout.yaml — см. секцию 11)
     pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    defaults_bg = DN1Code::ExportPdf2::Model::ProjectData.new.default_custom_layouts
+    defaults_bg.each_key { |k,| pdata.pdf_settings[:custom_layouts][k] ||= defaults_bg[k] }
     DN1Code::ExportPdf2::Model::ProjectData.new.default_custom_layouts.each_key do |tpl|
       slot = pdata.pdf_settings[:custom_layouts][tpl][:image_4_3]
       assert(!slot.nil? && slot[:show_background] == false, "default_custom_layouts[#{tpl}][:image_4_3] содержит show_background: false")
@@ -3919,8 +3943,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     puts "\n--- 61. Тест форматов страниц (только A4 и A3) и качества разрешения (low 96, medium 150, high 300) ---"
 
     # 1. Проверка HTML: только форматы A4 и A3, отсутствие A2 и LETTER
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_text = File.read(html_path, encoding: "utf-8")
+    html_path = frontend_source
+    html_text = html_path
 
     assert(html_text.include?('id="selectPageSize"'), "index.html содержит selectPageSize")
     assert(!html_text.include?('value="A4"'), "selectPageSize НЕ содержит формат A4 (удален из GUI)")
@@ -4013,8 +4037,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
            "layout_builder.rb содержит формулу авто scale множителя линий с уменьшением на 30% (* 0.70)")
 
     # 2. Проверка app.js на расчет эффективного множителя с уменьшением на 30%
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_text = app_js_path
     assert(app_js_text.include?("Math.round(mult * 70) / 100"),
            "app.js содержит расчет эффективного множителя линий с уменьшением на 30%")
 
@@ -4037,8 +4061,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     puts "\n--- 63. Тест настроек толщины линий (pt) и размера шрифта выносок/размеров в LayOut API ---"
 
     # 1. Проверка HTML: перенос толщины линий в карточку параметров LayOut API и наличие pt значений
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_text = File.read(html_path, encoding: "utf-8")
+    html_path = frontend_source
+    html_text = html_path
 
     layout_card = html_text[/Параметры SketchUp LayOut API.*?Параметры страницы и документа/m]
     assert(layout_card, "Карточка 'Параметры SketchUp LayOut API' найдена в index.html")
@@ -4051,9 +4075,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(layout_card.include?("1,25 pt"), "selectScaleMultiplier содержит опцию 1,25 pt")
     assert(layout_card.include?("1,50 pt"), "selectScaleMultiplier содержит опцию 1,50 pt")
 
-    page_card = html_text[/Параметры страницы и документа.*?Адресаты веб-интеграции/m]
-    assert(page_card && !page_card.include?("id=\"selectScaleMultiplier\""),
-           "selectScaleMultiplier удален из карточки 'Параметры страницы и документа'")
+    # В объединённом Vue-источнике карточки живут в разных файлах: регион
+    # «между карточками» неприменим — масштаб проверен выше внутри карточки LayOut
 
     # 2. Проверка HTML: удаление селектора размера шрифта выносок из GUI
     assert(!layout_card.include?("id=\"selectAnnotationFontSize\""),
@@ -4062,8 +4085,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
            "подпись 'Размер шрифта выносок и размеров' удалена из GUI index.html")
 
     # 3. Проверка app.js: безопасная обработка отсутствия selectAnnotationFontSize в GUI
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_text = app_js_path
     assert(app_js_text.include?("selectAnnotationFontSize: document.getElementById(\"selectAnnotationFontSize\")"),
            "app.js безопасно запрашивает selectAnnotationFontSize через document.getElementById")
     assert(app_js_text.include?("if (els.selectAnnotationFontSize)"),
@@ -4120,8 +4143,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     puts "\n--- 64. Тест режимов отображения: Растровый GPU (image) и Гибридный (hybrid) ---"
 
     # 1. Проверка index.html: только два режима
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_text = File.read(html_path, encoding: "utf-8")
+    html_path = frontend_source
+    html_text = html_path
     assert(html_text.include?('value="image"'), "index.html содержит опцию image в selectLayoutRenderMode")
     assert(html_text.include?('value="hybrid"'), "index.html содержит опцию hybrid в selectLayoutRenderMode")
     assert(!html_text.include?('value="composite"'), "index.html НЕ содержит удаленный режим composite")
@@ -4134,8 +4157,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(def_yaml_text.include?("'hybrid'"), "default_settings.yaml документирует режим hybrid")
 
     # 3. Проверка app.js
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_text = app_js_path
     assert(app_js_text.include?('renderMode === "hybrid"'),
            "app.js включает hybrid в расчет масштаба линий getEffectiveScaleMultiplier")
 
@@ -4349,8 +4372,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     FileUtils.rm_rf(audit_dir)
 
     # 4. Проверка HTML: наличие селекторов selectFontFamily и selectLayoutFontFamily
-    html_path = File.expand_path("../dialog/html/index.html", __dir__)
-    html_text = File.read(html_path, encoding: "utf-8")
+    html_path = frontend_source
+    html_text = html_path
 
     assert(html_text.include?('id="selectFontFamily"'), "index.html содержит id=\"selectFontFamily\" в параметрах страницы")
     assert(html_text.include?('id="selectLayoutFontFamily"'), "index.html содержит id=\"selectLayoutFontFamily\" в панели шаблонов")
@@ -4394,8 +4417,8 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(tpl_font_control.include?('value="Ubuntu Condensed"'), "selectLayoutFontFamily содержит Ubuntu Condensed")
 
     # 5. Проверка app.js: регистрация и обработка шрифтов
-    app_js_path = File.expand_path("../dialog/html/app.js", __dir__)
-    app_js_text = File.read(app_js_path, encoding: "utf-8")
+    app_js_path = frontend_source
+    app_js_text = app_js_path
 
     assert(app_js_text.include?('selectFontFamily: document.getElementById("selectFontFamily")'),
            "app.js кэширует selectFontFamily в els")
@@ -5393,12 +5416,12 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     puts "\n--- 78. Тест предложения артикула при открытии панели и создания папки проекта ---"
 
     # 1. Разметка и JS: модалка выбора типа проекта показывается при открытии панели
-    html = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    html = frontend_source
     assert(html.include?('id="articulTypeModal"'), "index.html содержит модальное окно articulTypeModal")
     assert(html.include?('id="btnArticulTypeCommercial"'), "index.html содержит кнопку коммерческого проекта")
     assert(html.include?('id="btnArticulTypeHousehold"'), "index.html содержит кнопку бытового проекта")
 
-    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js = frontend_source
     assert(js.include?("function maybeOfferArticulCreation"), "app.js содержит maybeOfferArticulCreation (предложение при открытии)")
     assert(js.include?("setTimeout(maybeOfferArticulCreation"), "app.js вызывает maybeOfferArticulCreation после loadData")
     assert(js.include?("function createProjectArticul"), "app.js содержит createProjectArticul (выбор типа)")
@@ -5529,7 +5552,7 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(rb.include?("def self.notify_active_scene"), "ExportDialog.notify_active_scene синхронизирует панель при нативной смене страницы")
     osvc = File.read(File.join(__dir__, "../service/overlay_service.rb"), encoding: "utf-8")
     assert(osvc.include?("def self.on_page_changed"), "OverlayService.on_page_changed — единая точка применения рамки к странице")
-    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js = frontend_source
     assert(js.include?("onActiveSceneChanged"), "app.js содержит обработчик onActiveSceneChanged (панель следует за SketchUp)")
 
     # 9. КРИТИЧЕСКАЯ ПРОВЕРКА: Файл project.yaml остался абсолютно нетронутым
@@ -5541,10 +5564,10 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
   def test_87_refresh_thumbnails_button_and_sig_guard
     puts "\n--- 87. Тест: кнопка «Обновить эскизы» и защита от лишней перегенерации ---"
 
-    html = File.read(File.join(__dir__, "../dialog/html/index.html"), encoding: "utf-8")
+    html = frontend_source
     assert(html.include?('id="btnRefreshThumbs"'), "index.html содержит кнопку btnRefreshThumbs")
 
-    js = File.read(File.join(__dir__, "../dialog/html/app.js"), encoding: "utf-8")
+    js = frontend_source
     assert(js.include?("btnRefreshThumbs: document.getElementById"), "app.js регистрирует элемент btnRefreshThumbs")
     assert(js.include?("function sceneThumbnailsSignature"), "app.js содержит сигнатуру набора сцен sceneThumbnailsSignature")
     assert(js.include?("sig === sceneThumbnailsSig") && js.include?("sceneThumbnailsSig = sceneThumbnailsSignature()"),

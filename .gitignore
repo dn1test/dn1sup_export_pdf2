@@ -30,3 +30,8 @@ dist/
 dn1c_export_pdf2/test/test_snapshot_worker/
 # Frontend build deps
 node_modules/
+
+# Тестовые артефакты comprehensive_test
+_dn1c_export_pdf2_test/
+test_history_save_dir/
+test_separate_layout_dir/
