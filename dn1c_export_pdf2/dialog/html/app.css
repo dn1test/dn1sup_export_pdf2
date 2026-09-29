@@ -188,13 +188,13 @@
   user-select: none;
 }
 
-body, button, input, select, textarea, .btn, .tab-btn, .form-control, .form-select, table, th, td, label {
+body, button, input, select, textarea, .btn, .tab-btn, .form-control, table, th, td, label {
   font-family: var(--font-family-modus) !important;
   font-stretch: normal !important;
   letter-spacing: normal !important;
 }
 
-code, kbd, samp, pre, .font-mono, .badge-code, .log-content, input.font-mono {
+code, kbd, samp, pre, .font-mono, input.font-mono {
   font-family: "Consolas", "Source Code Pro", ui-monospace, SFMono-Regular, monospace !important;
   font-stretch: normal !important;
   letter-spacing: normal !important;
@@ -268,28 +268,12 @@ body {
   vertical-align: -1px;
 }
 
-.logo-badge .logo-version {
-  font-size: 11px;
-  font-weight: 600;
-  opacity: 0.9;
-  letter-spacing: 0.2px;
-}
-
 .header-articul-label .modus-icons {
   font-size: 12px;
   margin-right: 3px;
   vertical-align: -1px;
 }
 
-.tpl-item-icon .modus-icons {
-  font-size: 16px;
-  color: var(--bs-primary);
-  vertical-align: middle;
-}
-
-.template-list-item.active .tpl-item-icon .modus-icons {
-  color: var(--bs-primary);
-}
 
 .drag-handle .modus-icons,
 .dir-drag-handle .modus-icons,
@@ -749,16 +733,16 @@ label {
 
 /* modus-bootstrap задаёт рамку покоя цепочкой :not() (.form-control → 0,6,0 и
    input.form-control → 0,7,1), поэтому селекторы приходится зеркалить, а не просто усиливать */
-.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]) {
+.form-control:not(:focus):not(:disabled):not([readonly]) {
   border-color: var(--border-input);
 }
 
-input.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]) {
+input.form-control:not(:focus):not(:disabled):not([readonly]) {
   border-color: var(--border-input);
 }
 
-.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]):hover,
-input.form-control:not(.is-invalid):not(.is-valid):not(:focus):not(:disabled):not([readonly]):hover {
+.form-control:not(:focus):not(:disabled):not([readonly]):hover,
+input.form-control:not(:focus):not(:disabled):not([readonly]):hover {
   border-color: var(--border-light);
 }
 
@@ -879,12 +863,6 @@ textarea.form-control {
   white-space: nowrap;
 }
 
-.btn-sm {
-  padding: 3px 10px;
-  font-size: 12px;
-  height: 30px;
-  border-radius: var(--radius-sm);
-}
 
 .btn-xs {
   padding: 2px 8px;
@@ -954,15 +932,13 @@ textarea.form-control {
   border-color: #b51b24;
 }
 
-.btn-danger-outline,
-.btn-outline-danger {
+.btn-danger-outline {
   background-color: transparent;
   border-color: var(--bs-danger);
   color: var(--bs-danger);
 }
 
-.btn-danger-outline:hover,
-.btn-outline-danger:hover {
+.btn-danger-outline:hover {
   background-color: var(--bs-danger);
   color: #ffffff;
 }
@@ -1112,8 +1088,7 @@ textarea.form-control {
 
 /* Стильный крестик удаления стадии в стиле Trimble Modus.
    Скрыт по умолчанию, появляется при наведении на строку (или фокусе с клавиатуры). */
-.stadia-checkbox-item .stadia-delete,
-.btn-stadia-del {
+.stadia-checkbox-item .stadia-delete {
   flex: 0 0 auto;
   width: 22px;
   height: 22px;
@@ -1134,21 +1109,17 @@ textarea.form-control {
 }
 
 .stadia-checkbox-item:hover .stadia-delete,
-.stadia-checkbox-item:focus-within .stadia-delete,
-.stadia-checkbox-item:hover .btn-stadia-del,
-.stadia-checkbox-item:focus-within .btn-stadia-del {
+.stadia-checkbox-item:focus-within .stadia-delete {
   opacity: 1;
   pointer-events: auto;
 }
 
-.stadia-checkbox-item .stadia-delete .icon-close-cross,
-.btn-stadia-del .icon-close-cross {
+.stadia-checkbox-item .stadia-delete .icon-close-cross {
   stroke: currentColor;
   transition: stroke 0.15s ease, transform 0.15s ease;
 }
 
-.stadia-checkbox-item .stadia-delete:hover,
-.btn-stadia-del:hover {
+.stadia-checkbox-item .stadia-delete:hover {
   background: #fee8e6;
   border-color: #fca5a5;
   color: #da291c;
@@ -1156,8 +1127,7 @@ textarea.form-control {
   box-shadow: 0 1px 3px rgba(218, 41, 28, 0.12);
 }
 
-.stadia-checkbox-item .stadia-delete:active,
-.btn-stadia-del:active {
+.stadia-checkbox-item .stadia-delete:active {
   background: #fca5a5;
   color: #991b1b;
   transform: scale(0.92);
@@ -1177,10 +1147,6 @@ textarea.form-control {
   box-shadow: inset 0 -2px 0 var(--bs-primary);
 }
 
-.stadia-item-actions {
-  display: flex;
-  gap: 4px;
-}
 
 .stadia-add-row {
   display: flex;
@@ -1395,7 +1361,6 @@ tr:hover td {
 .scene-align-cell { text-align: center; }
 
 /* Постраничные настройки эскиза: пропорции / масштаб */
-.scene-aspect-select,
 .scene-scale-select {
   width: 100%;
   max-width: 84px;
@@ -1411,14 +1376,12 @@ tr:hover td {
 
 .scene-scale-select { max-width: 68px; }
 
-.scene-aspect-select:hover:not(:disabled),
 .scene-scale-select:hover:not(:disabled) {
   background: #ffffff;
   border-color: var(--border-light);
   color: var(--text-main);
 }
 
-.scene-aspect-select:focus:not(:disabled),
 .scene-scale-select:focus:not(:disabled) {
   background: #ffffff;
   border-color: var(--bs-primary);
@@ -1427,10 +1390,6 @@ tr:hover td {
   outline: none;
 }
 
-.scene-ctrl-disabled {
-  opacity: 0.45;
-  cursor: not-allowed;
-}
 
 /* Постраничное выравнивание эскиза: кнопка + поповер с сеткой 3×3 */
 .scene-align-btn {
@@ -1748,9 +1707,6 @@ tr:hover td {
   min-width: 0;
 }
 
-.tpl-item-icon {
-  display: none !important;
-}
 
 .tpl-item-text {
   display: flex;
@@ -2916,24 +2872,6 @@ tr:hover td {
   outline: none;
 }
 
-.history-desc-input {
-  width: 100%;
-  border: 1px solid transparent;
-  background: transparent;
-  padding: 3px 6px;
-  border-radius: var(--radius-sm);
-  font-size: 12.5px;
-}
-
-.history-desc-input:hover {
-  border-color: var(--border-light);
-  background: #ffffff;
-}
-
-.history-desc-input:focus {
-  border-color: var(--bs-primary);
-  background: #ffffff;
-}
 
 /* ==========================================================================
    Tab 6: Settings & API Targets

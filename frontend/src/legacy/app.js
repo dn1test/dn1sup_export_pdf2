@@ -3809,8 +3809,6 @@ function updateParamModalPreview() {
       Object.assign(state, data);
       if (data.plugin_version) {
         state.plugin_version = data.plugin_version;
-        const vEl = document.getElementById("logoVersion");
-        if (vEl) vEl.textContent = `v${data.plugin_version}`;
         const devBadge = document.getElementById("badgeDevVersion");
         if (devBadge) devBadge.textContent = `v${data.plugin_version}`;
         document.title = `DN1C Export PDF 2 v${data.plugin_version}`;
