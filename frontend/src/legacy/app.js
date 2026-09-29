@@ -750,7 +750,13 @@ const DEFAULT_LAYOUTS = {
                 scale_multiplier: "2.0",
                 save_layout_file: true,
                 save_backup: true,
-                antialias: true
+                antialias: true,
+                custom_layouts: {
+                  cover: { name: "Титульный лист (Cover)", description: "Обложка проекта" },
+                  explain: { name: "Содержание и материалы (Explain)", description: "Пояснительная записка" },
+                  visual: { name: "Перспективный вид (Visual)", description: "Визуализация" },
+                  general: { name: "План расстановки (General)", description: "Техническая схема" }
+                }
               },
               directories: [
                 { path: "U:/dn1code/projects/specifications", title: "Рабочие спецификации", description: "Чертежи раскроя, список кромки и фурнитуры Blum" },
@@ -1157,80 +1163,18 @@ const DEFAULT_LAYOUTS = {
   }
 
   function renderTemplatesList() {
-    const listEl = els.templatesList || document.getElementById("templatesList");
-    if (!listEl) return;
-    listEl.innerHTML = "";
-
     const templates = getAllTemplates();
     const currentKey = layoutState.currentTemplate || (templates[0] ? templates[0].key : "");
     const scenes = state.scenes || [];
 
-    templates.forEach((tpl) => {
-      const item = document.createElement("div");
-      item.className = `template-list-item${tpl.key === currentKey ? " active" : ""}`;
-      item.dataset.tpl = tpl.key;
-
+    ui.templates = templates.map((tpl) => {
       const matchingScenes = scenes.filter((s) => s.page_type === tpl.key);
       const usageText = matchingScenes.length > 0
         ? `${matchingScenes.length} ${matchingScenes.length === 1 ? "сцена" : (matchingScenes.length < 5 ? "сцены" : "сцен")}`
         : "не используется";
-
       // Второй строкой — описание шаблона (мелче); без описания — использование
       const subText = tpl.description || usageText;
-      item.title = subText;
-
-      const mainDiv = document.createElement("div");
-      mainDiv.className = "tpl-item-main";
-
-      const textDiv = document.createElement("div");
-      textDiv.className = "tpl-item-text";
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "tpl-item-name";
-      nameSpan.textContent = tpl.name;
-
-      const subSpan = document.createElement("span");
-      subSpan.className = "tpl-item-sub";
-      subSpan.textContent = subText;
-
-      textDiv.appendChild(nameSpan);
-      textDiv.appendChild(subSpan);
-      mainDiv.appendChild(textDiv);
-      item.appendChild(mainDiv);
-
-      // Actions (rename / delete — доступны для любого шаблона)
-      const actionsDiv = document.createElement("div");
-      actionsDiv.className = "tpl-item-actions";
-
-        const btnRename = document.createElement("button");
-        btnRename.type = "button";
-        btnRename.className = "tpl-item-action-btn";
-        btnRename.title = "Переименовать шаблон";
-        btnRename.innerHTML = '<i class="modus-icons" style="font-size: 14px;">edit</i>';
-        btnRename.addEventListener("click", (e) => {
-          e.stopPropagation();
-          promptRenameTemplate(tpl.key);
-        });
-
-        const btnDel = document.createElement("button");
-        btnDel.type = "button";
-        btnDel.className = "tpl-item-action-btn delete";
-        btnDel.title = "Удалить шаблон";
-        btnDel.innerHTML = '<i class="modus-icons" style="font-size: 14px;">delete</i>';
-        btnDel.addEventListener("click", (e) => {
-          e.stopPropagation();
-          deleteCustomTemplate(tpl.key);
-        });
-
-      actionsDiv.appendChild(btnRename);
-      actionsDiv.appendChild(btnDel);
-      item.appendChild(actionsDiv);
-
-      item.addEventListener("click", () => {
-        selectTemplate(tpl.key);
-      });
-
-      listEl.appendChild(item);
+      return { key: tpl.key, name: tpl.name, description: tpl.description || "", sub: subText, active: tpl.key === currentKey };
     });
   }
 
@@ -1327,19 +1271,12 @@ const DEFAULT_LAYOUTS = {
     }
     templatePendingDelete = tplKey;
     const tplDef = getTemplateDef(tplKey);
-    if (els.deleteTemplateMsg) {
-      els.deleteTemplateMsg.textContent = `Вы действительно хотите удалить шаблон «${tplDef.name}»?`;
-    }
-    if (els.deleteTemplateModal) {
-      els.deleteTemplateModal.classList.remove("hidden");
-    }
+    ui.tplModals.deleteTemplate = { key: tplKey, name: tplDef.name };
   }
 
   function closeDeleteTemplateModal() {
     templatePendingDelete = null;
-    if (els.deleteTemplateModal) {
-      els.deleteTemplateModal.classList.add("hidden");
-    }
+    ui.tplModals.deleteTemplate = null;
   }
 
   function confirmDeleteTemplate() {
@@ -1415,72 +1352,14 @@ const DEFAULT_LAYOUTS = {
   }
 
   function renderTemplateSetsList() {
-    const listEl = els.templateSetsList || document.getElementById("templateSetsList");
-    if (!listEl) return;
-    listEl.innerHTML = "";
-
     const sets = state.template_sets || [];
-    if (!sets.length) {
-      const empty = document.createElement("div");
-      empty.className = "template-set-empty";
-      empty.textContent = "Нет сохраненных наборов";
-      listEl.appendChild(empty);
-      return;
-    }
-
-    sets.forEach((set) => {
-      const item = document.createElement("div");
-      item.className = "template-set-item";
-      item.title = `Загрузить набор «${set.name}» (текущие шаблоны будут заменены)`;
-
-      const textDiv = document.createElement("div");
-      textDiv.className = "tpl-item-text";
-
-      const nameSpan = document.createElement("span");
-      nameSpan.className = "tpl-item-name";
-      nameSpan.textContent = set.name;
-
-      const subSpan = document.createElement("span");
-      subSpan.className = "tpl-item-sub";
+    ui.templateSets = sets.map((set) => {
       const count = set.templates_count || 0;
       const dateStr = formatTemplateSetDate(set.saved_at);
-      subSpan.textContent = `${count} ${templateSetsCountWord(count)}${dateStr ? ` · ${dateStr}` : ""}`;
-
-      textDiv.appendChild(nameSpan);
-      textDiv.appendChild(subSpan);
-      item.appendChild(textDiv);
-
-      const btnRefresh = document.createElement("button");
-      btnRefresh.type = "button";
-      btnRefresh.className = "tpl-item-action-btn refresh";
-      btnRefresh.title = "Обновить набор: перезаписать его текущим списком шаблонов";
-      btnRefresh.innerHTML = '<i class="modus-icons" style="font-size: 14px;">refresh</i>';
-      btnRefresh.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openConfirmTemplateSetModal({ type: "refresh", name: set.name });
-      });
-
-      const btnDel = document.createElement("button");
-      btnDel.type = "button";
-      btnDel.className = "tpl-item-action-btn delete";
-      btnDel.title = "Удалить набор";
-      btnDel.innerHTML = '<i class="modus-icons" style="font-size: 14px;">delete</i>';
-      btnDel.addEventListener("click", (e) => {
-        e.stopPropagation();
-        openConfirmTemplateSetModal({ type: "delete", name: set.name });
-      });
-
-      const actionsDiv = document.createElement("div");
-      actionsDiv.className = "tpl-item-actions";
-      actionsDiv.appendChild(btnRefresh);
-      actionsDiv.appendChild(btnDel);
-      item.appendChild(actionsDiv);
-
-      item.addEventListener("click", () => {
-        openConfirmTemplateSetModal({ type: "load", name: set.name });
-      });
-
-      listEl.appendChild(item);
+      return {
+        name: set.name,
+        sub: `${count} ${templateSetsCountWord(count)}${dateStr ? ` · ${dateStr}` : ""}`,
+      };
     });
   }
 
@@ -1490,41 +1369,27 @@ const DEFAULT_LAYOUTS = {
     const isDelete = !!action && action.type === "delete";
     const isOverwrite = !!action && action.type === "overwrite";
     const isRefresh = !!action && action.type === "refresh";
-
-    if (els.confirmTemplateSetTitle) {
-      els.confirmTemplateSetTitle.textContent = isDelete
+    ui.tplModals.confirmSet = {
+      type: action ? action.type : "load",
+      name: name,
+      title: isDelete
         ? "Удаление набора шаблонов"
         : (isOverwrite ? "Перезапись набора шаблонов"
-            : (isRefresh ? "Обновление набора шаблонов" : "Загрузка набора шаблонов"));
-    }
-    if (els.confirmTemplateSetMsg) {
-      els.confirmTemplateSetMsg.textContent = isDelete
+            : (isRefresh ? "Обновление набора шаблонов" : "Загрузка набора шаблонов")),
+      msg: isDelete
         ? `Вы действительно хотите удалить набор «${name}»?`
         : (isOverwrite
             ? `Набор «${name}» уже существует. Перезаписать его текущим списком шаблонов?`
             : (isRefresh
                 ? `Обновить набор «${name}» текущим списком шаблонов? Содержимое набора будет перезаписано.`
-                : `Вы действительно хотите загрузить набор «${name}»?`));
-    }
-    if (els.confirmTemplateSetWarning) {
-      els.confirmTemplateSetWarning.style.display = (isDelete || isOverwrite || isRefresh) ? "none" : "";
-    }
-    if (els.btnConfirmTemplateSet) {
-      els.btnConfirmTemplateSet.classList.toggle("btn-danger", isDelete);
-      els.btnConfirmTemplateSet.classList.toggle("btn-primary", !isDelete);
-      const icon = els.btnConfirmTemplateSet.querySelector(".modus-icons");
-      if (icon) icon.textContent = isDelete ? "delete" : "check_mark";
-    }
-    if (els.confirmTemplateSetModal) {
-      els.confirmTemplateSetModal.classList.remove("hidden");
-    }
+                : `Вы действительно хотите загрузить набор «${name}»?`)),
+      danger: isDelete,
+    };
   }
 
   function closeConfirmTemplateSetModal() {
     templateSetPendingAction = null;
-    if (els.confirmTemplateSetModal) {
-      els.confirmTemplateSetModal.classList.add("hidden");
-    }
+    ui.tplModals.confirmSet = null;
   }
 
   function confirmTemplateSetAction() {
@@ -1560,28 +1425,17 @@ const DEFAULT_LAYOUTS = {
       showNotification("Нет шаблонов для сохранения", "error");
       return;
     }
-    if (els.inputTemplateSetName) {
-      els.inputTemplateSetName.value = "";
-    }
-    if (els.saveTemplateSetModal) {
-      els.saveTemplateSetModal.classList.remove("hidden");
-      if (els.inputTemplateSetName) {
-        setTimeout(() => els.inputTemplateSetName.focus(), 50);
-      }
-    }
+    ui.tplModals.saveSet = { name: "" };
   }
 
   function closeSaveTemplateSetModal() {
-    if (els.saveTemplateSetModal) {
-      els.saveTemplateSetModal.classList.add("hidden");
-    }
+    ui.tplModals.saveSet = null;
   }
 
-  function confirmSaveTemplateSet() {
-    const name = (els.inputTemplateSetName ? els.inputTemplateSetName.value : "").trim();
+  function confirmSaveTemplateSet(rawName) {
+    const name = String(rawName || "").trim();
     if (!name) {
       showNotification("Укажите название набора", "warning");
-      if (els.inputTemplateSetName) els.inputTemplateSetName.focus();
       return;
     }
     closeSaveTemplateSetModal();
@@ -1601,40 +1455,26 @@ const DEFAULT_LAYOUTS = {
     }
     templatePendingRename = tplKey;
     const tplDef = getTemplateDef(tplKey);
-    if (els.inputRenameTemplateName) {
-      els.inputRenameTemplateName.value = tplDef.name;
-    }
-    if (els.inputRenameTemplateDescription) {
-      els.inputRenameTemplateDescription.value = tplDef.description || "";
-    }
-    if (els.renameTemplateModal) {
-      els.renameTemplateModal.classList.remove("hidden");
-      if (els.inputRenameTemplateName) {
-        setTimeout(() => els.inputRenameTemplateName.focus(), 50);
-      }
-    }
+    ui.tplModals.renameTemplate = { key: tplKey, name: tplDef.name, description: tplDef.description || "" };
   }
 
   function closeRenameTemplateModal() {
     templatePendingRename = null;
-    if (els.renameTemplateModal) {
-      els.renameTemplateModal.classList.add("hidden");
-    }
+    ui.tplModals.renameTemplate = null;
   }
 
-  function confirmRenameTemplate() {
+  function confirmRenameTemplate(rawName, rawDesc) {
     const tplKey = templatePendingRename;
     if (!tplKey) {
       closeRenameTemplateModal();
       return;
     }
-    const newName = els.inputRenameTemplateName ? els.inputRenameTemplateName.value.trim() : "";
+    const newName = String(rawName || "").trim();
     if (!newName) {
       showNotification("Название шаблона не может быть пустым", "warning");
-      if (els.inputRenameTemplateName) els.inputRenameTemplateName.focus();
       return;
     }
-    const newDesc = els.inputRenameTemplateDescription ? els.inputRenameTemplateDescription.value.trim() : "";
+    const newDesc = String(rawDesc || "").trim();
 
     if (!state.pdf_settings) state.pdf_settings = {};
     if (!state.pdf_settings.custom_layouts) state.pdf_settings.custom_layouts = {};
@@ -1657,6 +1497,29 @@ const DEFAULT_LAYOUTS = {
 
   function promptRenameTemplate(tplKey) {
     openRenameTemplateModal(tplKey);
+  }
+
+  // Модалка создания шаблона (TemplatesSidebar.vue / NewTemplateModal.vue)
+  function openNewTemplateModal() {
+    ensureCustomLayouts();
+    ui.tplModals.newTemplate = {
+      name: "",
+      description: "",
+      base: "empty",
+      bases: [{ key: "empty", name: "Пустой шаблон — базовый видовой экран" }]
+        .concat(getAllTemplates().map((t) => ({ key: t.key, name: t.name }))),
+    };
+  }
+
+  function confirmNewTemplate(rawName, baseType, rawDescription) {
+    const name = String(rawName || "").trim();
+    const description = String(rawDescription || "").trim();
+    if (!name) {
+      showNotification("Введите название шаблона", "warning");
+      return;
+    }
+    createCustomTemplate(name, baseType || "empty", description);
+    ui.tplModals.newTemplate = null;
   }
 
 // Слияние обновлений в конфиг блока шаблона (видовое окно и др.) с вкладки «Страницы»
@@ -2539,184 +2402,18 @@ function updateParamModalPreview() {
       });
     }
 
-    // Динамический список основ нового шаблона: текущие шаблоны + «Пустой шаблон»
-    function syncNewTemplateBaseSelect() {
-      if (!els.selectNewTemplateBase) return;
-      const prevVal = els.selectNewTemplateBase.value;
-      els.selectNewTemplateBase.innerHTML = "";
-      const emptyOpt = document.createElement("option");
-      emptyOpt.value = "empty";
-      emptyOpt.textContent = "Пустой шаблон — базовый видовой экран";
-      els.selectNewTemplateBase.appendChild(emptyOpt);
-      getAllTemplates().forEach((t) => {
-        const opt = document.createElement("option");
-        opt.value = t.key;
-        opt.textContent = t.name;
-        els.selectNewTemplateBase.appendChild(opt);
-      });
-      const hasPrev = Array.from(els.selectNewTemplateBase.options).some((o) => o.value === prevVal);
-      els.selectNewTemplateBase.value = hasPrev ? prevVal : "empty";
-    }
-
-    // Modal and Template Management Buttons
-    if (els.btnCreateTemplate) {
-      els.btnCreateTemplate.addEventListener("click", () => {
-        if (els.newTemplateModal) {
-          if (els.inputNewTemplateName) els.inputNewTemplateName.value = "";
-          if (els.inputNewTemplateDescription) els.inputNewTemplateDescription.value = "";
-          syncNewTemplateBaseSelect();
-          els.newTemplateModal.classList.remove("hidden");
-          if (els.inputNewTemplateName) {
-            setTimeout(() => els.inputNewTemplateName.focus(), 50);
-          }
-        }
-      });
-    }
-
-    if (els.btnCancelNewTemplate) {
-      els.btnCancelNewTemplate.addEventListener("click", () => {
-        if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
-      });
-    }
-
-    if (els.btnConfirmNewTemplate) {
-      els.btnConfirmNewTemplate.addEventListener("click", () => {
-        const name = els.inputNewTemplateName ? els.inputNewTemplateName.value.trim() : "";
-        const baseType = els.selectNewTemplateBase ? els.selectNewTemplateBase.value : "empty";
-        const description = els.inputNewTemplateDescription ? els.inputNewTemplateDescription.value.trim() : "";
-        if (!name) {
-          showNotification("Введите название шаблона", "warning");
-          if (els.inputNewTemplateName) els.inputNewTemplateName.focus();
-          return;
-        }
-        createCustomTemplate(name, baseType, description);
-        if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
-      });
-    }
-
-    if (els.inputNewTemplateName) {
-      els.inputNewTemplateName.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (els.btnConfirmNewTemplate) els.btnConfirmNewTemplate.click();
-        } else if (e.key === "Escape") {
-          if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
-        }
-      });
-    }
-
-    if (els.inputNewTemplateDescription) {
-      els.inputNewTemplateDescription.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (els.btnConfirmNewTemplate) els.btnConfirmNewTemplate.click();
-        } else if (e.key === "Escape") {
-          if (els.newTemplateModal) els.newTemplateModal.classList.add("hidden");
-        }
-      });
-    }
-
-    // Delete Template Modal Handlers
+    // Модалки шаблонов (создание/удаление/переименование/наборы) перенесены в
+    // Vue-компоненты; действия приходят через window.legacy. Кнопки «Удалить»/
+    // «Переименовать» в шапке панели открывают те же модалки через store.
     if (els.btnDeleteCurrentTemplate) {
       els.btnDeleteCurrentTemplate.addEventListener("click", () => {
-        const tplKey = layoutState.currentTemplate;
-        openDeleteTemplateModal(tplKey);
+        openDeleteTemplateModal(layoutState.currentTemplate);
       });
     }
 
-    if (els.btnCancelDeleteTemplate) {
-      els.btnCancelDeleteTemplate.addEventListener("click", () => {
-        closeDeleteTemplateModal();
-      });
-    }
-
-    if (els.btnConfirmDeleteTemplate) {
-      els.btnConfirmDeleteTemplate.addEventListener("click", () => {
-        confirmDeleteTemplate();
-      });
-    }
-
-    // Rename Template Modal Handlers
     if (els.btnRenameCurrentTemplate) {
       els.btnRenameCurrentTemplate.addEventListener("click", () => {
-        const tplKey = layoutState.currentTemplate;
-        openRenameTemplateModal(tplKey);
-      });
-    }
-
-    if (els.btnCancelRenameTemplate) {
-      els.btnCancelRenameTemplate.addEventListener("click", () => {
-        closeRenameTemplateModal();
-      });
-    }
-
-    if (els.btnConfirmRenameTemplate) {
-      els.btnConfirmRenameTemplate.addEventListener("click", () => {
-        confirmRenameTemplate();
-      });
-    }
-
-    if (els.inputRenameTemplateName) {
-      els.inputRenameTemplateName.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          confirmRenameTemplate();
-        } else if (e.key === "Escape") {
-          closeRenameTemplateModal();
-        }
-      });
-    }
-
-    if (els.inputRenameTemplateDescription) {
-      els.inputRenameTemplateDescription.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          confirmRenameTemplate();
-        } else if (e.key === "Escape") {
-          closeRenameTemplateModal();
-        }
-      });
-    }
-
-    // Template Sets Handlers (наборы шаблонов)
-    if (els.btnSaveTemplateSet) {
-      els.btnSaveTemplateSet.addEventListener("click", () => {
-        openSaveTemplateSetModal();
-      });
-    }
-
-    if (els.btnCancelSaveTemplateSet) {
-      els.btnCancelSaveTemplateSet.addEventListener("click", () => {
-        closeSaveTemplateSetModal();
-      });
-    }
-
-    if (els.btnConfirmSaveTemplateSet) {
-      els.btnConfirmSaveTemplateSet.addEventListener("click", () => {
-        confirmSaveTemplateSet();
-      });
-    }
-
-    if (els.inputTemplateSetName) {
-      els.inputTemplateSetName.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          confirmSaveTemplateSet();
-        } else if (e.key === "Escape") {
-          closeSaveTemplateSetModal();
-        }
-      });
-    }
-
-    if (els.btnCancelConfirmTemplateSet) {
-      els.btnCancelConfirmTemplateSet.addEventListener("click", () => {
-        closeConfirmTemplateSetModal();
-      });
-    }
-
-    if (els.btnConfirmTemplateSet) {
-      els.btnConfirmTemplateSet.addEventListener("click", () => {
-        confirmTemplateSetAction();
+        openRenameTemplateModal(layoutState.currentTemplate);
       });
     }
 
@@ -4966,6 +4663,21 @@ function updateParamModalPreview() {
     commitStadia,
     addStadia,
     focusScene,
+    selectTemplate,
+    openNewTemplateModal,
+    confirmNewTemplate,
+    openRenameTemplateModal,
+    closeRenameTemplateModal,
+    confirmRenameTemplate,
+    openDeleteTemplateModal,
+    closeDeleteTemplateModal,
+    confirmDeleteTemplate,
+    openSaveTemplateSetModal,
+    closeSaveTemplateSetModal,
+    confirmSaveTemplateSet,
+    openConfirmTemplateSetModal,
+    closeConfirmTemplateSetModal,
+    confirmTemplateSetAction,
     sceneEnabledChanged,
     sceneTextChanged,
     sceneNameCommitted,

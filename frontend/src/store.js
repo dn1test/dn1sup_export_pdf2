@@ -36,6 +36,17 @@ export const ui = reactive({
   selectedSceneIndex: -1,
   currentTemplate: '',
   templateOptions: [],
+  // Вкладка «Шаблоны»: список шаблонов { key, name, sub }, наборы
+  // { name, sub } и состояние пяти модалок. Бизнес-логика — в legacy.
+  templates: [],
+  templateSets: [],
+  tplModals: {
+    newTemplate: null,   // { name, description, base, bases: [{key, name}] } | null
+    renameTemplate: null, // { key, name, description } | null
+    deleteTemplate: null, // { key, name, msg } | null
+    saveSet: null,        // { name } | null
+    confirmSet: null,     // { type: 'load'|'overwrite'|'delete'|'refresh', name, title, msg, danger } | null
+  },
 })
 
 let dirUidSeq = 1

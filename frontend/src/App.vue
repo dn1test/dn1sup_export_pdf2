@@ -64,39 +64,10 @@
 
       <!-- TAB 3: TEMPLATE SETTINGS -->
       <section id="tab-templates" class="tab-pane">
-        <!-- Templates Sidebar (Left) -->
-        <aside class="templates-sidebar" id="templatesSidebar">
-          <div class="templates-sidebar-header">
-            <div class="sidebar-title-group">
-              <span class="sidebar-title-icon"><i class="modus-icons">dashboard_customize</i></span>
-              <span class="sidebar-title-text">Название шаблона</span>
-            </div>
-            <div class="sidebar-header-actions">
-              <button type="button" class="btn btn-xs btn-primary btn-add-template" id="btnCreateTemplate" title="Создать новый пользовательский шаблон страницы">
-                <i class="modus-icons">add_circle</i> Новый
-              </button>
-            </div>
-          </div>
-          <div class="templates-list" id="templatesList">
-            <!-- Dynamically populated via renderTemplatesList() in app.js -->
-          </div>
-
-          <!-- Template Sets: сохранение/загрузка всего списка шаблонов под разные проекты -->
-          <div class="templates-sets-section" id="templateSetsSection">
-            <div class="templates-sets-header">
-              <div class="sidebar-title-group">
-                <span class="sidebar-title-icon"><i class="modus-icons">layers</i></span>
-                <span class="templates-sets-title">Наборы шаблонов</span>
-              </div>
-              <button type="button" class="btn btn-xs btn-secondary btn-icon-only" id="btnSaveTemplateSet" title="Сохранить текущий список шаблонов как набор для быстрого переключения между проектами" aria-label="Сохранить набор">
-                <i class="modus-icons">save</i>
-              </button>
-            </div>
-            <div class="templates-sets-list" id="templateSetsList">
-              <!-- Dynamically populated via renderTemplateSetsList() in app.js -->
-            </div>
-          </div>
-        </aside>
+        <!-- Templates Sidebar (Left) — Vue-компонент -->
+        <TemplatesSidebar />
+        <!-- Модалки шаблонов и наборов — Vue-компонент -->
+        <TemplateModals />
 
         <!-- Template & List Settings Panel (Right) -->
         <div class="template-settings-panel" id="templateSettingsPanel">
@@ -318,127 +289,12 @@
       </div>
     </div>
 
-    <!-- New Template Creation Modal -->
-    <div id="newTemplateModal" class="modal-overlay hidden">
-      <div class="modal-card modal-form-card">
-        <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">add_circle</i></span>
-          <h3>Создание нового шаблона страницы</h3>
-        </div>
-        <p class="field-hint">Укажите название и описание, выберите основу. Настройки блоков можно будет детально изменить в редакторе:</p>
 
-        <div class="form-group">
-          <label for="inputNewTemplateName">Название шаблона *</label>
-          <input type="text" id="inputNewTemplateName" class="form-control" placeholder="Например: План расстановки мебели">
-        </div>
 
-        <div class="form-group">
-          <label for="inputNewTemplateDescription">Описание шаблона</label>
-          <input type="text" id="inputNewTemplateDescription" class="form-control" placeholder="Например: План расстановки с размерами (вид сверху)">
-        </div>
-
-        <div class="form-group">
-          <label for="selectNewTemplateBase">Базовая структура / основа *</label>
-          <select id="selectNewTemplateBase" class="form-control">
-            <option value="empty" selected>Пустой шаблон — базовый видовой экран</option>
-          </select>
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelNewTemplate"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmNewTemplate"><i class="modus-icons">check_mark</i> Создать шаблон</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Delete Template Confirmation Modal -->
-    <div id="deleteTemplateModal" class="modal-overlay hidden">
-      <div class="modal-card modal-form-card">
-        <div class="modal-header-row modal-header-danger">
-          <span class="modal-card-icon"><i class="modus-icons">delete</i></span>
-          <h3>Удаление шаблона страницы</h3>
-        </div>
-        <p id="deleteTemplateMsg" class="modal-msg">
-          Вы действительно хотите удалить выбранный шаблон?
-        </p>
-        <div class="field-hint modal-alert-danger">
-          ⚠️ Сцены проекта, использующие этот шаблон, будут автоматически переключены на другой доступный шаблон.
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelDeleteTemplate"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-danger" id="btnConfirmDeleteTemplate"><i class="modus-icons">delete</i> Удалить шаблон</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Rename Template Modal -->
-    <div id="renameTemplateModal" class="modal-overlay hidden">
-      <div class="modal-card modal-form-card">
-        <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">edit</i></span>
-          <h3>Переименование шаблона страницы</h3>
-        </div>
-        <p class="field-hint">Укажите новое название и описание для этого шаблона страницы:</p>
-
-        <div class="form-group">
-          <label for="inputRenameTemplateName">Название шаблона *</label>
-          <input type="text" id="inputRenameTemplateName" class="form-control">
-        </div>
-
-        <div class="form-group">
-          <label for="inputRenameTemplateDescription">Описание шаблона</label>
-          <input type="text" id="inputRenameTemplateDescription" class="form-control" placeholder="Отображается в подсказке при наведении на шаблон">
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelRenameTemplate"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmRenameTemplate"><i class="modus-icons">check_mark</i> Сохранить</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Template Parameter Create/Edit Modal: перенесён в Vue-компонент ParamModal.vue -->
 
-    <!-- Save Template Set Modal -->
-    <div id="saveTemplateSetModal" class="modal-overlay hidden">
-      <div class="modal-card modal-form-card">
-        <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">layers</i></span>
-          <h3>Сохранение набора шаблонов</h3>
-        </div>
-        <p class="field-hint">Набор сохраняет текущий список всех шаблонов страниц. Загрузив набор позже, вы мгновенно переключите оформление PDF под другой проект:</p>
 
-        <div class="form-group">
-          <label for="inputTemplateSetName">Название набора *</label>
-          <input type="text" id="inputTemplateSetName" class="form-control" placeholder="Например: Кухни, Шкафы-купе, Проект Иванов">
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelSaveTemplateSet"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmSaveTemplateSet"><i class="modus-icons">check_mark</i> Сохранить набор</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- Confirm Template Set Action Modal (загрузка / перезапись / удаление) -->
-    <div id="confirmTemplateSetModal" class="modal-overlay hidden">
-      <div class="modal-card modal-form-card">
-        <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">layers</i></span>
-          <h3 id="confirmTemplateSetTitle">Загрузка набора шаблонов</h3>
-        </div>
-        <p id="confirmTemplateSetMsg" class="modal-msg">
-          Вы действительно хотите загрузить этот набор?
-        </p>
-        <div id="confirmTemplateSetWarning" class="field-hint modal-alert-danger">
-          ⚠️ Текущие шаблоны будут полностью заменены. Сцены, использующие отсутствующие в наборе шаблоны, будут переключены на первый доступный шаблон.
-        </div>
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelConfirmTemplateSet"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmTemplateSet"><i class="modus-icons">check_mark</i> Подтвердить</button>
-        </div>
-      </div>
-    </div>
 
     <!-- Footer Action Bar -->
     <footer class="app-footer">
@@ -475,4 +331,6 @@ import HistoryTab from './components/HistoryTab.vue'
 import SendTab from './components/SendTab.vue'
 import ProjectTab from './components/ProjectTab.vue'
 import ScenesTab from './components/ScenesTab.vue'
+import TemplatesSidebar from './components/TemplatesSidebar.vue'
+import TemplateModals from './components/TemplateModals.vue'
 </script>
