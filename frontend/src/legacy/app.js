@@ -565,13 +565,8 @@ const DEFAULT_LAYOUTS = {
     selectQuality: document.getElementById("selectQuality"),
     selectScaleMultiplier: document.getElementById("selectScaleMultiplier"),
     selectAnnotationFontSize: document.getElementById("selectAnnotationFontSize"),
-    selectStamp: document.getElementById("selectStamp"),
-    customStampGroup: document.getElementById("customStampGroup"),
-    inputCustomStamp: document.getElementById("inputCustomStamp"),
     inputPrimaryColor: document.getElementById("inputPrimaryColor"),
     primaryColorHex: document.getElementById("primaryColorHex"),
-    inputStampColor: document.getElementById("inputStampColor"),
-    stampColorHex: document.getElementById("stampColorHex"),
     chkAutoOpen: document.getElementById("chkAutoOpen"),
     chkSaveBackup: document.getElementById("chkSaveBackup"),
     chkAntialias: document.getElementById("chkAntialias"),
@@ -2503,17 +2498,10 @@ function updateParamModalPreview() {
     if (els.selectAnnotationFontSize) {
       els.selectAnnotationFontSize.value = settings.annotation_font_size || "auto";
     }
-    if (els.selectStamp) els.selectStamp.value = settings.stamp_type || "draft";
-    if (els.inputCustomStamp) els.inputCustomStamp.value = settings.stamp_custom || "НЕ УТВЕРЖДЕН";
-    if (els.customStampGroup) els.customStampGroup.style.display = settings.stamp_type === "custom" ? "flex" : "none";
 
     const pColor = settings.primary_color ? `#${settings.primary_color}` : "#005EB0";
     if (els.inputPrimaryColor) els.inputPrimaryColor.value = pColor;
     if (els.primaryColorHex) els.primaryColorHex.textContent = pColor;
-
-    const sColor = settings.stamp_color ? `#${settings.stamp_color}` : "#D32F2F";
-    if (els.inputStampColor) els.inputStampColor.value = sColor;
-    if (els.stampColorHex) els.stampColorHex.textContent = sColor;
 
     if (els.chkAutoOpen) els.chkAutoOpen.checked = settings.auto_open_pdf !== false;
     if (els.chkSaveBackup) els.chkSaveBackup.checked = settings.save_skp_backup !== false;
@@ -3296,8 +3284,6 @@ function updateParamModalPreview() {
       scale_multiplier: els.selectScaleMultiplier ? els.selectScaleMultiplier.value : (state.pdf_settings?.scale_multiplier || "2.0"),
       scale_factor: getEffectiveScaleMultiplier(),
       annotation_font_size: els.selectAnnotationFontSize ? els.selectAnnotationFontSize.value : (state.pdf_settings?.annotation_font_size || "auto"),
-      stamp_type: els.selectStamp ? els.selectStamp.value : (state.pdf_settings?.stamp_type || "none"),
-      stamp_custom: els.inputCustomStamp ? els.inputCustomStamp.value.trim() : (state.pdf_settings?.stamp_custom || ""),
       font_family: (els.selectFontFamily && els.selectFontFamily.value)
         ? els.selectFontFamily.value
         : (els.selectLayoutFontFamily && els.selectLayoutFontFamily.value
@@ -3310,7 +3296,6 @@ function updateParamModalPreview() {
         ? els.selectFontWidth.value
         : (state.pdf_settings?.font_width || "condensed"),
       primary_color: els.inputPrimaryColor ? els.inputPrimaryColor.value.replace("#", "") : (state.pdf_settings?.primary_color || "005EB0"),
-      stamp_color: els.inputStampColor ? els.inputStampColor.value.replace("#", "") : (state.pdf_settings?.stamp_color || "D32F2F"),
       auto_open_pdf: els.chkAutoOpen.checked,
       save_skp_backup: els.chkSaveBackup.checked,
       antialias: els.chkAntialias.checked,
@@ -3499,22 +3484,10 @@ function updateParamModalPreview() {
       els.selectFontWidth.addEventListener("change", (e) => handleFontWidthChange(e.target.value));
     }
 
-    // Stamp select change
-    if (els.selectStamp) {
-      els.selectStamp.addEventListener("change", (e) => {
-        if (els.customStampGroup) els.customStampGroup.style.display = e.target.value === "custom" ? "flex" : "none";
-      });
-    }
-
     // Color pickers hex display
     if (els.inputPrimaryColor) {
       els.inputPrimaryColor.addEventListener("input", (e) => {
         if (els.primaryColorHex) els.primaryColorHex.textContent = e.target.value;
-      });
-    }
-    if (els.inputStampColor) {
-      els.inputStampColor.addEventListener("input", (e) => {
-        if (els.stampColorHex) els.stampColorHex.textContent = e.target.value;
       });
     }
 
@@ -3926,8 +3899,8 @@ function updateParamModalPreview() {
       "selectWebpQuality",
       "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily", "selectFontWeight", "selectFontWidth",
       "selectImageAspect", "inputAspectCustomW", "inputAspectCustomH",
-      "selectQuality", "selectScaleMultiplier", "selectStamp", "inputCustomStamp",
-      "inputPrimaryColor", "inputStampColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias"
+      "selectQuality", "selectScaleMultiplier",
+      "inputPrimaryColor", "chkAutoOpen", "chkSaveBackup", "chkAntialias"
     ];
     autoSaveInputIds.forEach((id) => {
       const el = (els && els[id]) || document.getElementById(id);

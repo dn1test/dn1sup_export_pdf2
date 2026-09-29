@@ -318,40 +318,16 @@ module DN1Code
       end
 
       def test_stamp
-        puts "\n--- A9. stamp_type / stamp_custom: штамп ---"
+        puts "\n--- A9. stamp_type / stamp_custom: функция штампа удалена ---"
+        # Штамп («НЕ УТВЕРЖДЕН» / «В ПРОИЗВОДСТВО») полностью удалён из плагина:
+        # ни ключей настроек, ни отрисовки. Проверяем, что экспорт не содержит
+        # текстов штампа при любых остаточных значениях в старых settings.yaml.
         pd = fresh_pd
-
-        pd.pdf_settings[:stamp_type] = "draft"
-        doc = render_page(pd)
-        assert(doc_has_text?(doc, "НЕ УТВЕРЖДЕН"), "stamp_type=draft -> текст «НЕ УТВЕРЖДЕН»")
-        assert(doc_has_text?(doc, "Проект не является финальным чертежом"), "штамп содержит подстрок «Проект не является…»")
-
         pd.pdf_settings[:stamp_type] = "approved"
         doc = render_page(pd)
-        assert(doc_has_text?(doc, "В ПРОИЗВОДСТВО"), "stamp_type=approved -> текст «В ПРОИЗВОДСТВО»")
-        assert(!doc_has_text?(doc, "НЕ УТВЕРЖДЕН"), "stamp_type=approved -> черновой текст отсутствует")
-
-        pd.pdf_settings[:stamp_type] = "custom"
-        pd.pdf_settings[:stamp_custom] = "предварительно"
-        doc = render_page(pd)
-        assert(doc_has_text?(doc, "ПРЕДВАРИТЕЛЬНО"), "stamp_type=custom -> свой текст в верхнем регистре")
-
-        pd.pdf_settings[:stamp_type] = "none"
-        doc = render_page(pd)
-        assert(!doc_has_text?(doc, "НЕ УТВЕРЖДЕН") && !doc_has_text?(doc, "В ПРОИЗВОДСТВО"),
-               "stamp_type=none -> штампа нет")
-
-        pd.pdf_settings[:stamp_type] = nil
-        doc = render_page(pd)
-        assert(!doc_has_text?(doc, "НЕ УТВЕРЖДЕН"), "stamp_type=nil -> штампа нет")
-
-        # Некорректный цвет штампа не валит рендер (stamp_custom возвращаем к умолчанию:
-        # черновик использует кастомный текст, если он задан)
-        pd.pdf_settings[:stamp_type] = "draft"
-        pd.pdf_settings[:stamp_custom] = "НЕ УТВЕРЖДЕН"
-        pd.pdf_settings[:stamp_color] = "XYZ!"
-        doc = render_page(pd)
-        assert(doc_has_text?(doc, "НЕ УТВЕРЖДЕН"), "stamp_color=мусор -> рендер не падает, штамп есть")
+        assert(!doc_has_text?(doc, "В ПРОИЗВОДСТВО"), "устаревший stamp_type=approved -> текста «В ПРОИЗВОДСТВО» нет")
+        assert(!doc_has_text?(doc, "НЕ УТВЕРЖДЕН"), "устаревший stamp_type=approved -> текста «НЕ УТВЕРЖДЕН» нет")
+        assert(!doc_has_text?(doc, "Проект не является финальным чертежом"), "подстрока старого штампа отсутствует")
       end
 
       def test_colors
@@ -361,9 +337,6 @@ module DN1Code
         assert(LB.send(:hex_to_rgb, "GGG") == [51, 65, 85], "hex_to_rgb('GGG') -> fallback [51,65,85]")
         assert(LB.send(:hex_to_rgb, nil) == [51, 65, 85], "hex_to_rgb(nil) -> fallback")
         assert(LB.send(:hex_to_rgb, "12345") == [51, 65, 85], "hex_to_rgb('12345') (короткий) -> fallback")
-
-        tint = LB.send(:tinted_rgb, "FF0000", 0.5)
-        assert(tint == [255, 128, 128], "tinted_rgb('FF0000', 0.5) -> разбавление белым [255,128,128]")
       end
 
       def test_font_service
@@ -642,7 +615,7 @@ module DN1Code
         pd = fresh_pd
         pd.apply_payload!({
           pdf_settings: { margin_mm: 12, page_layout: "portrait", render_quality: "high",
-                          stamp_type: "approved", webp_quality: "lossless" },
+                          webp_quality: "lossless" },
           scenes: [{ name: "01. Вид", page_type: "visual", aspect_ratio: "16:9", scale_pct: 80, enabled: true }],
           directories: [{ path: "U:/x", title: "Папка", description: "desc", display: "grid", thumb_size: 120, send_to_server: false }]
         })
@@ -652,7 +625,7 @@ module DN1Code
         assert(loaded.pdf_settings[:margin_mm] == 12, "margin_mm=12 переживаю запись/чтение")
         assert(loaded.pdf_settings[:page_layout] == "portrait", "page_layout=portrait переживаю запись/чтение")
         assert(loaded.pdf_settings[:render_quality] == "high", "render_quality=high переживаю запись/чтение")
-        assert(loaded.pdf_settings[:stamp_type] == "approved", "stamp_type=approved переживаю запись/чтение")
+        assert(!loaded.pdf_settings.key?(:stamp_type), "stamp_type удалён из whitelist и не возвращается из файла")
         assert(loaded.pdf_settings[:webp_quality] == "lossless", "webp_quality=lossless переживаю запись/чтение")
         assert(!loaded.pdf_settings.key?(:export_engine), "орфанные ключи не попадают в settings.yaml")
       end

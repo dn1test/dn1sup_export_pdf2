@@ -169,7 +169,6 @@ class TestRunner
     test_articul_persisted_in_skp_attributes
     test_pdf_export_a4_landscape
     test_pdf_export_a3_portrait
-    test_pdf_export_with_custom_stamp
     test_pdf_export_page_filtering
     test_default_pdf_path_next_to_skp
     test_pdf_export_description_page
@@ -669,7 +668,6 @@ class TestRunner
 
     project_data.pdf_settings[:page_size] = "A4"
     project_data.pdf_settings[:page_layout] = "landscape"
-    project_data.pdf_settings[:stamp_type] = "draft"
     project_data.pdf_settings[:auto_open_pdf] = false
 
     project_data.sync_with_model_scenes(model)
@@ -700,7 +698,6 @@ class TestRunner
     project_data.project_info[:name_project] = "Флагманский бутик одежды"
     project_data.pdf_settings[:page_size] = "A3"
     project_data.pdf_settings[:page_layout] = "portrait"
-    project_data.pdf_settings[:stamp_type] = "approved"
     project_data.pdf_settings[:auto_open_pdf] = false
 
     project_data.sync_with_model_scenes(model)
@@ -712,29 +709,6 @@ class TestRunner
 
     assert(File.exist?(result_path), "Файл PDF test_a3_portrait.pdf создан")
     assert(File.size(result_path) > 12_000, "Размер A3 PDF файла: #{File.size(result_path)} байт")
-
-    File.delete(pdf_out) if File.exist?(pdf_out)
-  end
-
-  def test_pdf_export_with_custom_stamp
-    puts "\n--- 5. Тест водяного знака / пользовательского штампа ---"
-
-    model = Sketchup::MockModel.new("U:/Projects/Hotel/hotel.skp")
-    model.pages = Sketchup::MockPages.new([Sketchup::MockPage.new("Обложка"), Sketchup::MockPage.new("Лобби")])
-
-    project_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    project_data.project_info[:name_project] = "Отель Grand Palace"
-    project_data.pdf_settings[:stamp_type] = "custom"
-    project_data.pdf_settings[:stamp_custom] = "КОНФИДЕНЦИАЛЬНО"
-    project_data.pdf_settings[:auto_open_pdf] = false
-
-    project_data.sync_with_model_scenes(model)
-
-    pdf_out = File.expand_path("test_custom_stamp.pdf", __dir__)
-    controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
-
-    result_path = controller.export(pdf_out)
-    assert(File.exist?(result_path), "PDF с пользовательским штампом 'КОНФИДЕНЦИАЛЬНО' сгенерирован")
 
     File.delete(pdf_out) if File.exist?(pdf_out)
   end
@@ -888,7 +862,6 @@ class TestRunner
     project_data.pdf_settings[:save_layout_file] = true
     project_data.pdf_settings[:page_size] = "A3"
     project_data.pdf_settings[:page_layout] = "landscape"
-    project_data.pdf_settings[:stamp_type] = "approved"
     project_data.pdf_settings[:auto_open_pdf] = false
 
     project_data.sync_with_model_scenes(model)
@@ -2841,7 +2814,6 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     # 3. Тест генерации PDF чистой страницы через BlankPage
     test_project_data = DN1Code::ExportPdf2::Model::ProjectData.new
-    test_project_data.pdf_settings[:stamp_type] = "draft"
     blank_scene = DN1Code::ExportPdf2::Model::SceneItem.new(name: "05. Чистый эскиз", page_type: :blank)
     test_project_data.scenes = [blank_scene]
 

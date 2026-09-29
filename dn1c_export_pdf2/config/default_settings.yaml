@@ -71,7 +71,6 @@ pdf_settings:
   scale_multiplier: "2.0"  # Множитель толщины линий (Line Scale Multiplier)
   annotation_font_size: "auto"  # Размер шрифта выносок и размеров ('auto', '8', '10', '12', '14', '16', '18', '20')
   antialias: true          # Сглаживание линий SketchUp
-  stamp_type: "draft"      # 'draft' (НЕ УТВЕРЖДЕН), 'approved' (В ПРОИЗВОДСТВО), 'none'
   font_family: "Sofia Sans Condensed" # Доступные шрифты: 'Sofia Sans Condensed', 'Sofia Sans Extra Condensed', 'Oswald', 'Roboto Condensed', 'Ubuntu Condensed'
   font_weight: "normal"    # Начертание: 'normal' (Обычное) или 'bold' (Жирное) — для всего текста PDF
   font_width: "condensed"  # Ширина: 'condensed' (Узкая) или 'extra_condensed' (Сверхузкая) — переключает пару Sofia Sans Condensed/Extra Condensed
@@ -79,4 +78,3 @@ pdf_settings:
   save_skp_backup: true    # Сохранять копию .skp с номером ревизии
   primary_color: "005EB0"  # Цвет заголовков и акцентов
   secondary_color: "64748B"# Цвет подзаголовков
-  stamp_color: "D32F2F"    # Цвет штампа

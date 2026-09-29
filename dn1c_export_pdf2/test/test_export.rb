@@ -55,13 +55,10 @@ project_data.pdf_settings = {
   margin:          15,
   scale_factor:    2.0,
   antialias:       true,
-  stamp_type:      "draft",
-  stamp_custom:    "НЕ УТВЕРЖДЕН",
   auto_open_pdf:   false,
   save_skp_backup: false,
   primary_color:   "005EB0",
-  secondary_color: "64748B",
-  stamp_color:     "D32F2F"
+  secondary_color: "64748B"
 }
 
 project_data.history = [

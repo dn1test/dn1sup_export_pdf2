@@ -15,10 +15,9 @@ module DN1Code
       # Страницы строятся по шаблону (из layout.yaml):
       #   image_4_3 — видовой экран модели (Layout::SketchUpModel) или растровый оверрайд (Layout::Image),
       #   params    — пользовательские параметры шаблона со свободным размещением
-      #               на странице (X/Y в % рабочей области, выравнивание, кегль, цвет),
-      #   stamp     — повернутый полупрозрачный водяной знак/штамп.
+      #               на странице (X/Y в % рабочей области, выравнивание, кегль, цвет)
       #
-        # Документ формируется в многослойной структуре (Viewports, Graphics, Content, Annotations)
+        # Документ формируется в многослойной структуре (Viewports, Graphics, Content)
         # с возможностью выбора режима рендера видовых экранов (Растровый GPU или Гибридный)
         # и сохранения редактируемого файла .layout.
         module LayoutBuilder
@@ -135,11 +134,10 @@ module DN1Code
               layers[:viewport]   = doc.layers.add("DN1C_Viewports", false) rescue first_layer
               layers[:graphics]   = doc.layers.add("DN1C_Graphics", false) rescue (layers[:viewport] || first_layer)
               layers[:content]    = doc.layers.add("DN1C_Content", false) rescue (layers[:graphics] || first_layer)
-              layers[:annotation] = doc.layers.add("DN1C_Annotations", false) rescue (layers[:content] || first_layer)
               layers[:default]    = layers[:content] || first_layer
             else
               first_layer = (doc.respond_to?(:layers) && doc.layers) ? (doc.layers.first rescue nil) : nil
-              layers = { default: first_layer, viewport: first_layer, graphics: first_layer, content: first_layer, annotation: first_layer }
+              layers = { default: first_layer, viewport: first_layer, graphics: first_layer, content: first_layer }
             end
 
             # Отключение фоновой сетки для чистого вывода
@@ -334,8 +332,7 @@ module DN1Code
             text_bold:     FontService.font_weight_setting(settings) == "bold",
             aspect_cache:  {},
             primary_color: settings[:primary_color] || "005EB0",
-            secondary_color: settings[:secondary_color] || "64748B",
-            stamp_color:   settings[:stamp_color] || "D32F2F"
+            secondary_color: settings[:secondary_color] || "64748B"
           }
         end
 
@@ -391,14 +388,6 @@ module DN1Code
         def layout_color(hex, fallback = [51, 65, 85])
           r, g, b = hex_to_rgb(hex, fallback)
           ::Sketchup::Color.new(r, g, b)
-        end
-
-        # LayOut не поддерживает alpha в цвете текста — эмулируем прозрачность
-        # смешиванием с белой бумагой
-        def tinted_rgb(hex, opacity, fallback = [51, 65, 85])
-          r, g, b = hex_to_rgb(hex, fallback)
-          k = opacity.to_f.clamp(0.0, 1.0)
-          [((255.0 * (1 - k)) + (r * k)).round, ((255.0 * (1 - k)) + (g * k)).round, ((255.0 * (1 - k)) + (b * k)).round]
         end
 
         # ------------------------------------------------------------------
@@ -633,25 +622,6 @@ module DN1Code
           longest * size_pt * font_char_width_ratio(font_name)
         end
 
-        # Повернутый текст (штамп): привязка в точке + поворот вокруг нее.
-        # Положительный угол в геометрии — против часовой стрелки;
-        # в LayOut y направлен вниз, поэтому знак угла инвертируется.
-        def add_rotated_text(ctx, doc, page, layer, text, x_pt, y_pt, size_pt, color_obj, bold, angle_deg)
-          return if text.to_s.empty?
-
-          anchor_pt = ::Geom::Point2d.new(pt2in(x_pt), pt2in(lay_y(ctx, y_pt)))
-          text_ent = ::Layout::FormattedText.new(text.to_s, anchor_pt, ::Layout::FormattedText::ANCHOR_TYPE_TOP_LEFT)
-          style = text_ent.style(0)
-          apply_text_style!(style, size: size_pt, color_obj: color_obj, font: ctx[:font], bold: bold || ctx[:text_bold])
-          text_ent.apply_style(style)
-          doc.add_entity(text_ent, layer, page)
-          text_ent.transform!(::Geom::Transformation2d.rotation(anchor_pt, -angle_deg * Math::PI / 180.0))
-          text_ent
-        rescue StandardError => e
-          warn "Ошибка добавления штампа LayOut: #{e.message}"
-          nil
-        end
-
         # ------------------------------------------------------------------
         # Рендер страницы по модульной сетке
         # ------------------------------------------------------------------
@@ -684,7 +654,6 @@ module DN1Code
           vp_layer  = layer.is_a?(Hash) ? (layer[:viewport] || layer[:default]) : layer
           gfx_layer = layer.is_a?(Hash) ? (layer[:graphics] || layer[:default]) : layer
           cnt_layer = layer.is_a?(Hash) ? (layer[:content] || layer[:default]) : layer
-          ann_layer = layer.is_a?(Hash) ? (layer[:annotation] || layer[:default]) : layer
 
           # 1. Видовой экран чертежа/модели (Layout::SketchUpModel / Layout::Image)
           is_viewport_on = if scene_item && scene_item.respond_to?(:viewport_visible) && !scene_item.viewport_visible.nil?
@@ -707,9 +676,6 @@ module DN1Code
 
           # 2. Параметры шаблона со свободным размещением
           render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, page_ctx, rctx)
-
-          # 3. Штамп/водяной знак
-          render_stamp(doc, page, ann_layer, content, page_ctx)
         end
 
         # ------------------------------------------------------------------
@@ -1397,41 +1363,6 @@ module DN1Code
           else
             0.50
           end
-        end
-
-        # ------------------------------------------------------------------
-        # Штамп (зеркало PageBase#render_stamp)
-        # ------------------------------------------------------------------
-
-        def render_stamp(doc, page, layer, content, ctx)
-          settings = ctx[:settings]
-          stamp_type = settings[:stamp_type].to_s
-          return if stamp_type == "none" || stamp_type.empty?
-
-          text1 = case stamp_type
-                  when "draft"
-                    settings[:stamp_custom] || "НЕ УТВЕРЖДЕН"
-                  when "approved"
-                    "В ПРОИЗВОДСТВО"
-                  else
-                    settings[:stamp_custom] || "КОНЦЕПТ"
-                  end
-
-          text2 = "Проект не является финальным чертежом"
-
-          # Координаты штампа в правом нижнем углу
-          pos_x = content[:left] + content[:w] - 260.0
-          pos_y = content[:top] - content[:h] + 110.0
-
-          stamp_rgb = tinted_rgb(ctx[:stamp_color], 0.35)
-          color = begin
-            ::Sketchup::Color.new(*stamp_rgb)
-          rescue StandardError
-            nil
-          end
-
-          add_rotated_text(ctx, doc, page, layer, text1.to_s.upcase, pos_x, pos_y, 28.0, color, true, 25.0)
-          add_rotated_text(ctx, doc, page, layer, text2, pos_x - 10, pos_y - 32, 10.0, color, false, 25.0)
         end
       end
     end

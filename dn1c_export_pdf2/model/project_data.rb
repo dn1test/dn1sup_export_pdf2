@@ -41,8 +41,8 @@ module DN1Code
           image_aspect_ratio custom_ratio_w custom_ratio_h show_aspect_overlay
           overlay_border_color overlay_border_opacity overlay_mask_color overlay_mask_opacity
           scale_factor scale_multiplier annotation_font_size antialias
-          stamp_type stamp_custom auto_open_pdf save_skp_backup
-          primary_color secondary_color stamp_color font_family font_weight font_width
+          auto_open_pdf save_skp_backup
+          primary_color secondary_color font_family font_weight font_width
         ].freeze
 
         # Булевы ключи pdf_settings: строки 'true'/'false' приводятся к boolean
@@ -652,13 +652,10 @@ module DN1Code
             scale_multiplier:   "2.0",
             annotation_font_size: "auto",
             antialias:          true,
-            stamp_type:         "draft",
-            stamp_custom:       "НЕ УТВЕРЖДЕН",
             auto_open_pdf:      true,
             save_skp_backup:    true,
             primary_color:      "005EB0",
             secondary_color:    "64748B",
-            stamp_color:        "D32F2F",
             font_family:        "Sofia Sans Condensed",
             font_weight:        "normal",
             font_width:         "condensed",
@@ -764,9 +761,6 @@ module DN1Code
             return "auto" if s == "auto"
 
             numeric.call(value)&.positive?
-          when :stamp_type
-            s = value.to_s.downcase.strip
-            %w[draft approved custom none].include?(s) ? s : nil
           when :image_width
             n = numeric.call(value)
             n&.positive? ? n.round : nil
@@ -778,11 +772,11 @@ module DN1Code
           when :font_width
             s = value.to_s.downcase.strip
             %w[condensed extra_condensed].include?(s) ? s : nil
-          when :primary_color, :secondary_color, :stamp_color
+          when :primary_color, :secondary_color
             s = value.to_s.strip.sub(/\A#/, "")
             s.match?(/\A[0-9a-fA-F]{6}\z/) ? s.upcase : nil
           else
-            # строковые ключи (font_family, stamp_custom, overlay-цвета) — как есть
+            # строковые ключи (font_family, overlay-цвета) — как есть
             value
           end
         end

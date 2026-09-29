@@ -115,8 +115,8 @@
                   </select>
                 </div>
                 <div class="toolbar-font-control">
-                  <label for="selectFontWeight" class="toolbar-label-sub" title="Начертание всего текста PDF: заголовков, таблиц, подвала и штампа">Начертание:</label>
-                  <select id="selectFontWeight" class="form-control toolbar-select-sm" title="Начертание всего текста PDF: заголовков, таблиц, подвала и штампа">
+                  <label for="selectFontWeight" class="toolbar-label-sub" title="Начертание всего текста PDF: заголовков, таблиц, подвала">Начертание:</label>
+                  <select id="selectFontWeight" class="form-control toolbar-select-sm" title="Начертание всего текста PDF: заголовков, таблиц, подвала">
                     <option value="normal" selected>Обычное</option>
                     <option value="bold">Жирное</option>
                   </select>

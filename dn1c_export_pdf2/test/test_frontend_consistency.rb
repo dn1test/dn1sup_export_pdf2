@@ -81,8 +81,8 @@ module DN1Code
         # мёртвые id должны попадать сюда явно, иначе проверка падает.
         soft_ok = %w[
           selectImageAspect customAspectGroup inputAspectCustomW inputAspectCustomH
-          selectAnnotationFontSize selectStamp customStampGroup inputCustomStamp
-          inputPrimaryColor primaryColorHex inputStampColor stampColorHex
+          selectAnnotationFontSize
+          inputPrimaryColor primaryColorHex
           selectPageSize selectCompression selectQuality selectFontFamily selectLayoutFontFamily
           inputTags inputStatus scenesSplitResizer
         ]
