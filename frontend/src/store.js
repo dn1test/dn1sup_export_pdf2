@@ -18,7 +18,19 @@ export const ui = reactive({
     previewEmpty: true,
     labelPlaceholder: '',
   },
+  // Вкладка «Папки»: записи пишет legacy (refreshDirectoriesUI), мутации —
+  // DirectoriesTab.vue с последующим commitDirectories() в legacy.
+  directories: [],
 })
+
+let dirUidSeq = 1
+export function nextDirUid() {
+  return 'dir-' + dirUidSeq++
+}
+
+export function defaultDirPreview() {
+  return { state: 'loading', files: [], count: 0 }
+}
 
 let toastTimer = null
 export function showToast(msg, type = 'success') {

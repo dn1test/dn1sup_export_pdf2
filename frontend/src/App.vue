@@ -365,26 +365,9 @@
         </div>
       </section>
 
-      <!-- TAB: DIRECTORIES, SPECIFICATIONS & PREVIEWS -->
+      <!-- TAB: DIRECTORIES, SPECIFICATIONS & PREVIEWS — рендерится Vue-компонентом -->
       <section id="tab-directories" class="tab-pane">
-        <!-- Section 1: Каталоги и спецификации проекта -->
-        <div class="settings-card">
-          <div class="card-header">
-            <div class="card-header-title-wrap">
-              <span class="card-header-icon"><i class="modus-icons">folder</i></span>
-              <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
-            </div>
-            <div class="card-header-buttons">
-              <button type="button" class="btn btn-xs btn-secondary" id="btnRefreshDirectories"><i class="modus-icons">refresh</i> Обновить</button>
-              <button type="button" class="btn btn-xs btn-primary" id="btnAddDirectory"><i class="modus-icons">add_circle</i> Добавить папку</button>
-            </div>
-          </div>
-          <p class="field-hint">Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра файлов (фото, замеры, материалы, чертежи):</p>
-          
-          <div id="directoriesCardsContainer" class="directories-cards-container">
-            <!-- Dynamically populated via JS -->
-          </div>
-        </div>
+        <DirectoriesTab />
       </section>
 
       <!-- TAB 5: HISTORY -->
@@ -868,4 +851,5 @@
 <script setup>
 import AppToast from './components/AppToast.vue'
 import ParamModal from './components/ParamModal.vue'
+import DirectoriesTab from './components/DirectoriesTab.vue'
 </script>

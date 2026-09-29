@@ -7,7 +7,7 @@
    ../store.js, рендер — в Vue-компонентах. Бизнес-логика пока остаётся здесь.
 ------------------------------------------------------------------------------- */
 
-import { ui, showToast as uiShowToast } from "../store.js";
+import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../store.js";
 
 (function () {
   "use strict";
@@ -512,9 +512,7 @@ const DEFAULT_LAYOUTS = {
     inputLastEdit: document.getElementById("inputLastEdit"),
 
     // Tab Directories
-    directoriesCardsContainer: document.getElementById("directoriesCardsContainer"),
-    btnRefreshDirectories: document.getElementById("btnRefreshDirectories"),
-    btnAddDirectory: document.getElementById("btnAddDirectory"),
+    // Вкладка «Папки» рендерится Vue-компонентом DirectoriesTab.vue
 
     // Tab Settings
     apiTargetsList: document.getElementById("apiTargetsList"),
@@ -3154,26 +3152,6 @@ function updateParamModalPreview() {
     updateLayoutUsageBadge();
   }
 
-  // Helper: Format file size
-  function formatFileSize(bytes) {
-    if (!bytes || bytes <= 0) return "0 B";
-    const k = 1024;
-    const sizes = ["B", "KB", "MB", "GB"];
-    const i = Math.floor(Math.log(bytes) / Math.log(k));
-    return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + " " + sizes[i];
-  }
-
-  // Helper: Get icon for document extensions
-  function getDocIcon(ext) {
-    ext = (ext || "").toUpperCase();
-    if (ext === "PDF") return '<i class="modus-icons">file_template</i>';
-    if (ext === "DWG" || ext === "DXF") return '<i class="modus-icons">views</i>';
-    if (ext === "SKP") return '<i class="modus-icons">views</i>';
-    if (ext === "DOC" || ext === "DOCX" || ext === "TXT" || ext === "RTF") return '<i class="modus-icons">short_text</i>';
-    if (ext === "XLS" || ext === "XLSX" || ext === "CSV") return '<i class="modus-icons">table</i>';
-    return '<i class="modus-icons">file</i>';
-  }
-
   // Helper: Extract folder basename from directory path
   function getFolderName(pathStr) {
     if (!pathStr || typeof pathStr !== "string") return "";
@@ -3195,36 +3173,21 @@ function updateParamModalPreview() {
   function scheduleScanTimeout(index, path) {
     clearScanTimeout(index);
     scanTimeouts[index] = setTimeout(() => {
-      const badge = document.getElementById(`dirFileBadge_${index}`);
-      const grid = document.getElementById(`dirPreviewGrid_${index}`);
-      if (badge && badge.textContent === "Сканирование...") {
-        badge.textContent = "Не ответил";
-        badge.className = "badge badge-tag badge-list";
-      }
-      if (grid && grid.querySelector(".dir-empty-state")) {
-        grid.innerHTML = `
-          <div class="dir-empty-state" style="grid-column: 1 / -1; color: #b45309;">
-            ⏱️ Сканирование заняло слишком много времени. Проверьте правильность пути или нажмите «🔄 Обновить».
-          </div>`;
+      const entry = ui.directories[index];
+      if (entry && entry.preview && entry.preview.state === "loading") {
+        entry.preview = { state: "timeout", files: [], count: 0 };
       }
     }, 4500);
   }
 
-  // Пересканирует файлы одной папки: сбрасывает кеш и бейджи, запрашивает
+  // Пересканирует файлы одной папки: сбрасывает кеш и предпросмотр, запрашивает
   // список файлов у Ruby. Используется общей кнопкой «Обновить» в заголовке секции.
   // @return [Boolean] false, если у папки не указан путь
   function refreshDirectoryFiles(index) {
     const d = state.directories[index];
     if (!d || !d.path) return false;
-    const badge = document.getElementById(`dirFileBadge_${index}`);
-    const grid = document.getElementById(`dirPreviewGrid_${index}`);
-    if (badge) {
-      badge.textContent = "Сканирование...";
-      badge.className = "badge badge-tag badge-grid";
-    }
-    if (grid) {
-      grid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
-    }
+    const entry = ui.directories[index];
+    if (entry) entry.preview = defaultDirPreview();
     if (state.folderFiles) delete state.folderFiles[index];
     if (state.folderFilesByPath && d.path) delete state.folderFilesByPath[d.path];
     scheduleScanTimeout(index, d.path);
@@ -3284,12 +3247,10 @@ function updateParamModalPreview() {
     });
   }
 
-  let draggedDirIndex = null;
-
-  // Render Project Directories (directories from YAML) as full Cards with Previews
+  // Render Project Directories: источник — state.directories, рендер — Vue-компонент
+  // DirectoriesTab.vue через ui.directories (../store.js). Здесь только синхронизация
+  // и запрос списков файлов у Ruby.
   function renderDirectories() {
-    if (!els.directoriesCardsContainer) return;
-    els.directoriesCardsContainer.innerHTML = "";
     syncDirectoriesSpecifications();
 
     // Нормализация к массиву объектов
@@ -3310,443 +3271,114 @@ function updateParamModalPreview() {
       state.directories = [];
     }
 
-    if (state.directories.length === 0) {
-      els.directoriesCardsContainer.innerHTML = `
-        <div class="empty-dirs-placeholder">
-          <div style="font-size: 32px; margin-bottom: 8px;"><i class="modus-icons" style="font-size: 36px; color: var(--text-dim, #6a6e79);">folder</i></div>
-          <div style="font-weight: 600; color: var(--text-color); font-size: 14px;">Папки проекта не заданы</div>
-          <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px;">Нажмите «+ Добавить папку», чтобы создать раздел спецификаций и привязать рабочие файлы.</div>
-        </div>`;
-      return;
-    }
+    syncDirectoriesUI();
+  }
 
-    state.directories.forEach((d, index) => {
-      const card = document.createElement("div");
-      card.className = "directory-card";
-      card.dataset.index = index;
-
-      const folderName = getFolderName(d.path);
-      if (!d.title && folderName) {
-        d.title = folderName;
-      }
-
-      // Drag and Drop обработчики для карточки
-      card.addEventListener("dragstart", (e) => {
-        draggedDirIndex = index;
-        card.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", index.toString());
-      });
-
-      card.addEventListener("dragend", () => {
-        card.classList.remove("dragging");
-        card.setAttribute("draggable", "false");
-        draggedDirIndex = null;
-        if (els.directoriesCardsContainer) {
-          els.directoriesCardsContainer.querySelectorAll(".directory-card").forEach((c) => {
-            c.classList.remove("drag-over-top", "drag-over-bottom");
-          });
-        }
-      });
-
-      card.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (draggedDirIndex === null || draggedDirIndex === index) return;
-
-        const rect = card.getBoundingClientRect();
-        const relY = e.clientY - rect.top;
-        const isTop = relY < rect.height / 2;
-
-        card.classList.toggle("drag-over-top", isTop);
-        card.classList.toggle("drag-over-bottom", !isTop);
-      });
-
-      card.addEventListener("dragleave", () => {
-        card.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-
-      card.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        card.classList.remove("drag-over-top", "drag-over-bottom");
-
-        if (draggedDirIndex === null || draggedDirIndex === index) return;
-
-        const rect = card.getBoundingClientRect();
-        const relY = e.clientY - rect.top;
-        const isTop = relY < rect.height / 2;
-
-        let dropIndex = index;
-        if (!isTop) {
-          dropIndex = index + 1;
-        }
-        if (draggedDirIndex < dropIndex) {
-          dropIndex--;
-        }
-
-        const moved = state.directories.splice(draggedDirIndex, 1)[0];
-        state.directories.splice(dropIndex, 0, moved);
-
-        renderDirectories();
-        notifyChange();
-        showNotification(`Раздел «${moved.title || "Папка"}» перемещен на позицию #${dropIndex + 1}`, "info");
-      });
-
-      // 1. HEADER — порядок по макету: заголовок, путь (клик — выбрать папку),
-      // Обновить; справа — стрелки порядка, ручка перетаскивания и удаление
-      const headerDiv = document.createElement("div");
-      headerDiv.className = "dir-card-header";
-
-      const headerLeft = document.createElement("div");
-      headerLeft.className = "dir-header-left";
-
-      const titleInput = document.createElement("input");
-      titleInput.type = "text";
-      titleInput.className = "form-control dir-title-input";
-      titleInput.value = d.title || folderName || `Папка #${index + 1}`;
-      titleInput.placeholder = "Название раздела проекта (например: Материалы и фурнитура)...";
-      titleInput.title = "Название блока/раздела (сохраняется в спецификациях)";
-      titleInput.addEventListener("input", (e) => {
-        d.title = e.target.value;
-      });
-      titleInput.addEventListener("change", (e) => {
-        d.title = e.target.value.trim();
-        notifyChange();
-      });
-
-      // Путь — кнопка рядом с названием раздела; клик открывает проводник для выбора
-      // папки, заголовок при выборе берется из имени конечного каталога (onDirectorySelected)
-      const pathText = document.createElement("button");
-      pathText.type = "button";
-      pathText.className = "dir-path-text btn btn-xs btn-secondary" + (d.path ? "" : " empty");
-      pathText.textContent = d.path || "выбрать папку…";
-      pathText.title = d.path
-        ? `${d.path}\nНажмите, чтобы выбрать другую папку`
-        : "Нажмите, чтобы выбрать папку на диске";
-      pathText.addEventListener("click", () => {
-        callRuby("selectDirectory", index.toString());
-      });
-
-      // Действия шапки справа: чекбокс отправки на сервер
-      const headerActions = document.createElement("div");
-      headerActions.className = "dir-header-actions";
-
-      // Отправлять папку на сервер (directories[].send_to_server,
-      // по умолчанию включено — отсутствие ключа в старых данных трактуется как true)
-      const sendServerLabel = document.createElement("label");
-      sendServerLabel.className = "checkbox-label dir-send-server-label";
-      const sendServerChk = document.createElement("input");
-      sendServerChk.type = "checkbox";
-      sendServerChk.checked = d.send_to_server !== false;
-      sendServerChk.title = "Отправлять эту папку на сервер при отправке проекта";
-      sendServerChk.addEventListener("change", (e) => {
-        d.send_to_server = e.target.checked;
-        notifyChange();
-      });
-      sendServerLabel.appendChild(sendServerChk);
-      const sendServerText = document.createElement("span");
-      sendServerText.textContent = "Отправлять на сервер";
-      sendServerLabel.appendChild(sendServerText);
-
-      headerActions.appendChild(sendServerLabel);
-
-      headerLeft.appendChild(titleInput);
-      headerLeft.appendChild(pathText);
-      headerLeft.appendChild(headerActions);
-
-      const headerRight = document.createElement("div");
-      headerRight.className = "dir-header-right";
-
-      // Ручка перетаскивания мышкой — в правой группе, после стрелок
-      const dragHandle = document.createElement("div");
-      dragHandle.className = "dir-drag-handle";
-      dragHandle.innerHTML = "&#x283F;"; // ⠿
-      dragHandle.title = "Потяните мышкой для изменения порядка разделов";
-      dragHandle.addEventListener("mousedown", () => {
-        card.setAttribute("draggable", "true");
-      });
-      dragHandle.addEventListener("mouseup", () => {
-        card.setAttribute("draggable", "false");
-      });
-
-      // Кнопка перемещения вверх
-      const btnUp = document.createElement("button");
-      btnUp.type = "button";
-      btnUp.className = "btn-move-dir";
-      btnUp.innerHTML = "&#9650;"; // ▲
-      btnUp.title = "Поднять раздел выше";
-      btnUp.disabled = (index === 0);
-      btnUp.addEventListener("click", () => {
-        if (index > 0) {
-          const item = state.directories.splice(index, 1)[0];
-          state.directories.splice(index - 1, 0, item);
-          renderDirectories();
-          notifyChange();
-        }
-      });
-
-      // Кнопка перемещения вниз
-      const btnDown = document.createElement("button");
-      btnDown.type = "button";
-      btnDown.className = "btn-move-dir";
-      btnDown.innerHTML = "&#9660;"; // ▼
-      btnDown.title = "Опустить раздел ниже";
-      btnDown.disabled = (index === state.directories.length - 1);
-      btnDown.addEventListener("click", () => {
-        if (index < state.directories.length - 1) {
-          const item = state.directories.splice(index, 1)[0];
-          state.directories.splice(index + 1, 0, item);
-          renderDirectories();
-          notifyChange();
-        }
-      });
-
-      const btnDelete = document.createElement("button");
-      btnDelete.type = "button";
-      btnDelete.className = "btn-icon btn-delete";
-      btnDelete.innerHTML = MODUS_CROSS_SVG;
-      btnDelete.title = "Удалить этот раздел папки";
-      btnDelete.addEventListener("click", () => {
-        state.directories.splice(index, 1);
-        renderDirectories();
-        notifyChange();
-      });
-
-      headerRight.appendChild(btnUp);
-      headerRight.appendChild(btnDown);
-      headerRight.appendChild(dragHandle);
-      headerRight.appendChild(btnDelete);
-
-      headerDiv.appendChild(headerLeft);
-      headerDiv.appendChild(headerRight);
-      card.appendChild(headerDiv);
-
-      // 2. DESCRIPTION SECTION (Описание и спецификация — сразу поле, без шапки)
-      const descSection = document.createElement("div");
-      descSection.className = "dir-section-desc";
-
-      const descTextarea = document.createElement("textarea");
-      descTextarea.className = "form-control dir-desc-textarea";
-      descTextarea.rows = 3;
-      descTextarea.placeholder = "Спецификация раздела (материалы, фурнитура, техника, размеры, пояснения к заказу)...";
-      descTextarea.value = d.description || "";
-      descTextarea.addEventListener("input", (e) => {
-        d.description = e.target.value;
-        syncDirectoriesSpecifications();
-        notifyChange();
-      });
-      descTextarea.addEventListener("change", (e) => {
-        d.description = e.target.value;
-        syncDirectoriesSpecifications();
-        notifyChange();
-      });
-
-      descSection.appendChild(descTextarea);
-      card.appendChild(descSection);
-
-      // 4. PREVIEWS SECTION (Блок файлов и предпросмотра)
-      const previewSection = document.createElement("div");
-      previewSection.className = "dir-section-box dir-section-previews";
-      previewSection.id = `dirPreviewBlock_${index}`;
-
-      // Размер эскизов папки: small / medium / large (сохраняется в directories[].thumb_size)
+  // Копирует state.directories в ui.directories, сохраняя uid и предпросмотр
+  // для карточек, чьи путь/индекс не изменились; запускает сканирование папок.
+  function syncDirectoriesUI() {
+    const oldEntries = ui.directories;
+    ui.directories = state.directories.map((d, index) => {
+      const prev = oldEntries[index];
+      const pathUnchanged = prev && prev.path === (d.path || "");
       const thumbSize = ["small", "medium", "large"].includes(d.thumb_size) ? d.thumb_size : "medium";
       d.thumb_size = thumbSize;
+      return {
+        uid: pathUnchanged ? prev.uid : nextDirUid(),
+        path: d.path || "",
+        title: d.title || "",
+        description: d.description || "",
+        send_to_server: d.send_to_server !== false,
+        thumb_size: thumbSize,
+        preview: pathUnchanged ? prev.preview : defaultDirPreview()
+      };
+    });
 
-      const previewHeader = document.createElement("div");
-      previewHeader.className = "dir-preview-header";
-
-      const previewTitle = document.createElement("div");
-      previewTitle.className = "dir-section-title";
-      previewTitle.innerHTML = `
-        <span><i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px;">insert_photo</i> Файлы и предпросмотр в папке:</span>
-        <code style="font-size: 11px; color: var(--text-dim); text-transform: none;">${d.path || "(папка не задана)"}</code>`;
-
-      const sizeGroup = document.createElement("div");
-      sizeGroup.className = "dir-thumb-size-group";
-      [
-        { key: "small", label: "S", title: "Мелкие эскизы" },
-        { key: "medium", label: "M", title: "Средние эскизы" },
-        { key: "large", label: "L", title: "Крупные эскизы" }
-      ].forEach((variant) => {
-        const sizeBtn = document.createElement("button");
-        sizeBtn.type = "button";
-        sizeBtn.className = "dir-thumb-size-btn" + (variant.key === thumbSize ? " active" : "");
-        sizeBtn.textContent = variant.label;
-        sizeBtn.title = variant.title;
-        sizeBtn.addEventListener("click", () => {
-          if (d.thumb_size === variant.key) return;
-          d.thumb_size = variant.key;
-          sizeGroup.querySelectorAll(".dir-thumb-size-btn").forEach((b) => b.classList.remove("active"));
-          sizeBtn.classList.add("active");
-          const gridForSize = document.getElementById(`dirPreviewGrid_${index}`);
-          if (gridForSize) {
-            gridForSize.classList.remove("thumb-small", "thumb-medium", "thumb-large");
-            gridForSize.classList.add(`thumb-${variant.key}`);
-          }
-          notifyChange();
-        });
-        sizeGroup.appendChild(sizeBtn);
-      });
-
-      const previewRight = document.createElement("div");
-      previewRight.className = "dir-preview-header-right";
-      const btnOpenFolder = document.createElement("button");
-      btnOpenFolder.type = "button";
-      btnOpenFolder.className = "dir-open-folder-btn";
-      btnOpenFolder.textContent = "↗";
-      btnOpenFolder.title = "Открыть папку в проводнике Windows";
-      btnOpenFolder.addEventListener("click", () => {
-        if (d.path) {
-          callRuby("openDirectoryPath", d.path);
-        } else {
-          showNotification("Папка не выбрана", "warning");
-        }
-      });
-      previewRight.appendChild(btnOpenFolder);
-      const previewBadge = document.createElement("span");
-      previewBadge.className = "badge badge-tag badge-grid";
-      previewBadge.id = `dirFileBadge_${index}`;
-      previewBadge.textContent = "Сканирование...";
-      previewRight.appendChild(sizeGroup);
-      previewRight.appendChild(previewBadge);
-
-      previewHeader.appendChild(previewTitle);
-      previewHeader.appendChild(previewRight);
-      previewSection.appendChild(previewHeader);
-
-      const previewGrid = document.createElement("div");
-      previewGrid.className = `dir-preview-grid thumb-${thumbSize}`;
-      previewGrid.id = `dirPreviewGrid_${index}`;
-      previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;">Загрузка файлов...</div>`;
-      previewSection.appendChild(previewGrid);
-
-      card.appendChild(previewSection);
-
-      // Предотвращение случайного старта drag при клике на текстовые поля и кнопки
-      card.querySelectorAll("input, textarea, button").forEach((el) => {
-        el.addEventListener("mousedown", (e) => {
-          e.stopPropagation();
-          card.setAttribute("draggable", "false");
-        });
-      });
-
-      els.directoriesCardsContainer.appendChild(card);
-
-      // Запрашиваем файлы для папки, если путь указан
-      if (d.path) {
-        const cached = (state.folderFiles && state.folderFiles[index] && state.folderFiles[index].path === d.path)
-          ? state.folderFiles[index]
-          : (state.folderFilesByPath ? state.folderFilesByPath[d.path] : null);
-        if (cached) {
-          state.folderFiles[index] = cached;
-          renderDirectoryPreview(index, cached);
-        } else {
-          scheduleScanTimeout(index, d.path);
-          callRuby("getFolderFiles", JSON.stringify({ index: index, path: d.path }));
-        }
+    ui.directories.forEach((entry, index) => {
+      if (!entry.path) {
+        entry.preview = { state: "nopath", files: [], count: 0 };
+        return;
+      }
+      const cached = (state.folderFiles && state.folderFiles[index] && state.folderFiles[index].path === entry.path)
+        ? state.folderFiles[index]
+        : (state.folderFilesByPath ? state.folderFilesByPath[entry.path] : null);
+      if (cached) {
+        state.folderFiles[index] = cached;
+        renderDirectoryPreview(index, cached);
       } else {
-        const badge = document.getElementById(`dirFileBadge_${index}`);
-        if (badge) {
-          badge.textContent = "0 файлов";
-          badge.className = "badge badge-tag badge-list";
-        }
-        previewGrid.innerHTML = `<div class="dir-empty-state" style="grid-column: 1 / -1;"><i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">folder</i> Путь к папке не задан. Нажмите «Обзор», чтобы выбрать рабочую папку с файлами.</div>`;
+        scheduleScanTimeout(index, entry.path);
+        callRuby("getFolderFiles", JSON.stringify({ index: index, path: entry.path }));
       }
     });
   }
 
-  // Render file previews for a specific directory card
+  // Commit из Vue-компонента: принимает plain-копию ui.directories
+  // (порядок и поля уже изменены пользователем)
+  function commitDirectories(plainList) {
+    state.directories = plainList;
+    syncDirectoriesSpecifications();
+    // sync может подтянуть описания из project_info — возвращаем их в ui
+    plainList.forEach((d, i) => {
+      const entry = ui.directories[i];
+      if (entry && entry.description !== d.description) entry.description = d.description;
+    });
+    notifyChange();
+  }
+
+  // Кнопка «Добавить папку» (теперь из DirectoriesTab.vue)
+  function addDirectory() {
+    if (!Array.isArray(state.directories)) state.directories = [];
+    const nextNum = state.directories.length + 1;
+    state.directories.push({
+      path: "",
+      title: `Раздел #${nextNum}`,
+      description: "Дополнительное описание"
+    });
+    renderDirectories();
+    notifyChange();
+    const newIndex = state.directories.length - 1;
+    const container = document.querySelector(".directories-cards-container");
+    const cards = container ? container.querySelectorAll(".directory-card") : [];
+    if (cards.length > 0) {
+      cards[cards.length - 1].scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+    // Сразу открываем проводник для выбора папки у новой карточки:
+    // после выбора путь и заголовок из имени папки придут в onDirectorySelected
+    callRuby("selectDirectory", newIndex.toString());
+  }
+
+  // Кнопка «Обновить»: пересканирует файлы во всех папках с указанным путём
+  function refreshDirectories() {
+    const dirs = Array.isArray(state.directories) ? state.directories : [];
+    if (dirs.length === 0) {
+      showNotification("Нет папок для обновления", "warning");
+      return;
+    }
+    let refreshed = 0;
+    dirs.forEach((d, index) => {
+      if (refreshDirectoryFiles(index)) refreshed++;
+    });
+    if (refreshed === 0) {
+      showNotification("Укажите путь к папке", "warning");
+    } else {
+      showNotification(`Обновление файлов: папок ${refreshed}`, "info");
+    }
+  }
+
+  // Render file previews for a specific directory card (пишет в ui.directories,
+  // рендер — DirectoriesTab.vue)
   function renderDirectoryPreview(index, data) {
     clearScanTimeout(index);
-    const gridEl = document.getElementById(`dirPreviewGrid_${index}`);
-    const badgeEl = document.getElementById(`dirFileBadge_${index}`);
-    if (!gridEl) return;
+    const entry = ui.directories[index];
+    if (!entry) return;
 
     if (!data.exists) {
-      if (badgeEl) {
-        badgeEl.textContent = "Не найдена";
-        badgeEl.className = "badge badge-tag badge-list";
-      }
-      gridEl.innerHTML = `
-        <div class="dir-empty-state" style="grid-column: 1 / -1; color: #b45309;">
-          <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">warning</i> Папка не найдена на диске. Нажмите «Обзор», чтобы указать существующий каталог.
-        </div>`;
+      entry.preview = { state: "missing", files: [], count: 0 };
       return;
     }
 
     const files = data.files || [];
-    if (badgeEl) {
-      badgeEl.textContent = `${files.length} ${files.length === 1 ? "файл" : (files.length >= 2 && files.length <= 4 ? "файла" : "файлов")}`;
-      badgeEl.className = files.length > 0 ? "badge badge-tag badge-grid" : "badge badge-tag badge-list";
-    }
-
-    if (files.length === 0) {
-      gridEl.innerHTML = `
-        <div class="dir-empty-state" style="grid-column: 1 / -1;">
-          <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px;">folder</i> Папка существует, но файлов в ней пока нет. Вы можете поместить в неё фото, замеры или спецификации.
-        </div>`;
-      return;
-    }
-
-    gridEl.innerHTML = "";
-    files.forEach((file) => {
-      const item = document.createElement("div");
-      item.className = "dir-preview-item";
-      item.title = `${file.name} (${formatFileSize(file.size)})\nНажмите, чтобы открыть файл`;
-
-      const thumbWrap = document.createElement("div");
-      thumbWrap.className = "dir-preview-thumb-wrap";
-
-      if (file.is_image && file.url) {
-        const img = document.createElement("img");
-        img.src = file.url;
-        img.alt = file.name;
-        img.loading = "lazy";
-        img.onerror = () => {
-          img.remove();
-          const docIcon = document.createElement("div");
-          docIcon.className = "dir-preview-doc-icon";
-          docIcon.innerHTML = `<span><i class="modus-icons">insert_photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
-          thumbWrap.appendChild(docIcon);
-        };
-        thumbWrap.appendChild(img);
-      } else if (file.is_image) {
-        const docIcon = document.createElement("div");
-        docIcon.className = "dir-preview-doc-icon";
-        docIcon.innerHTML = `<span><i class="modus-icons">insert_photo</i></span><span class="dir-preview-doc-ext">${file.ext || "IMG"}</span>`;
-        thumbWrap.appendChild(docIcon);
-      } else {
-        const docIcon = document.createElement("div");
-        docIcon.className = "dir-preview-doc-icon";
-        docIcon.innerHTML = `<span>${getDocIcon(file.ext)}</span><span class="dir-preview-doc-ext">${file.ext}</span>`;
-        thumbWrap.appendChild(docIcon);
-      }
-
-      const meta = document.createElement("div");
-      meta.className = "dir-preview-meta";
-
-      const nameDiv = document.createElement("div");
-      nameDiv.className = "dir-preview-name";
-      nameDiv.textContent = file.name;
-
-      const sizeDiv = document.createElement("div");
-      sizeDiv.className = "dir-preview-size";
-      sizeDiv.textContent = formatFileSize(file.size);
-
-      meta.appendChild(nameDiv);
-      meta.appendChild(sizeDiv);
-
-      item.appendChild(thumbWrap);
-      item.appendChild(meta);
-
-      item.addEventListener("click", () => {
-        callRuby("openFile", file.path);
-      });
-
-      gridEl.appendChild(item);
-    });
+    entry.preview = { state: files.length > 0 ? "ready" : "empty", files: files, count: files.length };
   }
 
   // Render API Targets (api_targets from project_config.yaml / settings)
@@ -5122,51 +4754,9 @@ function updateParamModalPreview() {
       els.btnGenerateCustomerId.addEventListener("click", triggerGenerateCustomerId);
     }
 
-    // Directories Add button
-    if (els.btnAddDirectory) {
-      els.btnAddDirectory.addEventListener("click", () => {
-        if (!Array.isArray(state.directories)) state.directories = [];
-        const nextNum = state.directories.length + 1;
-        state.directories.push({
-          path: "",
-          title: `Раздел #${nextNum}`,
-          description: "Дополнительное описание"
-        });
-        renderDirectories();
-        notifyChange();
-        const newIndex = state.directories.length - 1;
-        if (els.directoriesCardsContainer) {
-          const cards = els.directoriesCardsContainer.querySelectorAll(".directory-card");
-          if (cards.length > 0) {
-            const lastCard = cards[cards.length - 1];
-            lastCard.scrollIntoView({ behavior: "smooth", block: "nearest" });
-          }
-        }
-        // Сразу открываем проводник для выбора папки у новой карточки:
-        // после выбора путь и заголовок из имени папки придут в onDirectorySelected
-        callRuby("selectDirectory", newIndex.toString());
-      });
-    }
-
-    // Общая кнопка «Обновить»: пересканирует файлы во всех папках с указанным путём
-    if (els.btnRefreshDirectories) {
-      els.btnRefreshDirectories.addEventListener("click", () => {
-        const dirs = Array.isArray(state.directories) ? state.directories : [];
-        if (dirs.length === 0) {
-          showNotification("Нет папок для обновления", "warning");
-          return;
-        }
-        let refreshed = 0;
-        dirs.forEach((d, index) => {
-          if (refreshDirectoryFiles(index)) refreshed++;
-        });
-        if (refreshed === 0) {
-          showNotification("Укажите путь к папке", "warning");
-        } else {
-          showNotification(`Обновление файлов: папок ${refreshed}`, "info");
-        }
-      });
-    }
+    // Directories: кнопки «Добавить папку» и «Обновить» перенесены в
+    // DirectoriesTab.vue — действия приходят через window.legacy
+    // (addDirectory / refreshDirectories).
 
     // API Targets Add button
     if (els.btnAddApiTarget) {
@@ -6053,7 +5643,11 @@ function updateParamModalPreview() {
     openParamModal,
     closeParamModal,
     confirmParamModal,
-    updateParamModalPreview
+    updateParamModalPreview,
+    addDirectory,
+    refreshDirectories,
+    commitDirectories,
+    callRuby
   };
 
   // Initialization. Модуль грузится динамическим импортом уже после монтирования
