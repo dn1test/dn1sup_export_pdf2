@@ -108,6 +108,28 @@ module DN1Code
           data[:total_seconds].to_i <= 0 && seconds_map(data[:daily]).empty?
         end
 
+        # Человекочитаемая длительность для workflow.total_duration:
+        # «45 мин», «2 ч 30 мин», «1 д 4 ч». Пустая строка при нуле.
+        # @param seconds [Numeric]
+        # @return [String]
+        def format_duration(seconds)
+          total = seconds.to_i
+          return "" if total <= 0
+
+          minutes = total / 60
+          return "#{[minutes, 1].max} мин" if minutes < 60
+
+          hours = minutes / 60
+          if hours < 24
+            rem = minutes % 60
+            rem.positive? ? "#{hours} ч #{rem} мин" : "#{hours} ч"
+          else
+            days = hours / 24
+            rem_h = hours % 24
+            rem_h.positive? ? "#{days} д #{rem_h} ч" : "#{days} д"
+          end
+        end
+
         # Данные для вкладки «Статистика»: сводки и серии для графиков.
         # @param data [Hash] структура статистики
         # @param now [Time]

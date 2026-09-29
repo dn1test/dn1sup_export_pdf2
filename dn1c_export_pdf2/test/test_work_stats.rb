@@ -159,6 +159,53 @@ module DN1Code
           empty_payload = pd2.work_stats_report
           assert(empty_payload[:empty?] == true, "work_stats_report нового проекта помечен пустым")
         end
+
+        puts "=========================================================="
+        puts "  Автозаполнение workflow.total_duration из статистики"
+        puts "=========================================================="
+
+        # --- Форматирование длительности ---
+        assert(STATS.format_duration(0) == "", "format_duration(0) — пустая строка")
+        assert(STATS.format_duration(45 * 60) == "45 мин", "format_duration меньше часа — минуты")
+        assert(STATS.format_duration(3600) == "1 ч", "format_duration час ровно — без минут")
+        assert(STATS.format_duration(2 * 3600 + 30 * 60) == "2 ч 30 мин", "format_duration часы + минуты")
+        assert(STATS.format_duration(26 * 3600) == "1 д 2 ч", "format_duration больше суток — дни и часы")
+        assert(STATS.format_duration(24 * 3600) == "1 д", "format_duration сутки ровно — без часов")
+
+        # --- Начисление заполняет поле, ручное значение затирается ---
+        pd4 = PD.new
+        pd4.workflow[:total_duration] = "ручное значение"
+        pd4.accrue_work_stats(9000, Time.new(2026, 9, 29, 10, 0, 0)) # 2 ч 30 мин
+        assert(pd4.workflow[:total_duration] == "2 ч 30 мин", "accrue_work_stats записывает итог в workflow.total_duration")
+        assert(pd4.project_info[:total_duration] == "2 ч 30 мин", "прокси project_info синхронизирован с автозначением")
+
+        # --- apply_payload! не затирает автозначение данными формы ---
+        pd4.accrue_work_stats(26 * 3600, Time.new(2026, 9, 30, 10, 0, 0)) # итого 28 ч 30 мин
+        assert(pd4.workflow[:total_duration] == "1 д 4 ч", "после новых начислений длительность пересчитана (1 д 4 ч)")
+        pd4.apply_payload!(workflow: { total_duration: "вручную из формы" })
+        assert(pd4.workflow[:total_duration] == "1 д 4 ч", "apply_payload! сохраняет автозначение из статистики")
+
+        # --- Пустая статистика: поле остается ручным ---
+        pd5 = PD.new
+        pd5.apply_payload!(workflow: { total_duration: "9 дней / 45 часов" })
+        assert(pd5.workflow[:total_duration] == "9 дней / 45 часов", "при пустой статистике ручное значение сохраняется")
+
+        # --- Загрузка project.yaml восстанавливает автозначение ---
+        Dir.mktmpdir do |tmp|
+          yaml_path = File.join(tmp, "project.yaml")
+          pd4.save_to_yaml(yaml_path, include_settings: false)
+          written = YAML.safe_load(File.read(yaml_path))
+          assert(written["workflow"]["total_duration"] == "1 д 4 ч", "в project.yaml пишется автозначение длительности")
+
+          pd6 = PD.new
+          pd6.load_from_yaml(yaml_path, include_settings: false)
+          assert(pd6.workflow[:total_duration] == "1 д 4 ч", "load_from_yaml восстанавливает автозначение")
+
+          # Сброс статистики возвращает полю ручное управление
+          pd6.reset_work_stats!
+          pd6.apply_payload!(workflow: { total_duration: "снова вручную" })
+          assert(pd6.workflow[:total_duration] == "снова вручную", "после сброса статистики поле снова ручное")
+        end
       end
     end
   end

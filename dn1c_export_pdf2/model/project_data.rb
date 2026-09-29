@@ -248,6 +248,7 @@ module DN1Code
         def accrue_work_stats(seconds, now = Time.now)
           WorkStats.accrue!(@work_stats, seconds, now)
           WorkStats.prune!(@work_stats, now)
+          sync_total_duration_from_stats!
         end
 
         # Данные статистики для вкладки «Статистика» (сводки + серии графиков)
@@ -261,6 +262,21 @@ module DN1Code
         # @return [void]
         def reset_work_stats!
           @work_stats = WorkStats.blank_data
+        end
+
+        # Автозаполнение «Общей длительности проекта» (workflow.total_duration)
+        # итогом статистики работы. Пока статистика пуста, поле остается
+        # ручным; как только учет ведется — значение управляется статистикой
+        # (в т.ч. попадает в PDF через информационные строки).
+        # @return [void]
+        def sync_total_duration_from_stats!
+          return if WorkStats.blank?(@work_stats)
+
+          formatted = WorkStats.format_duration(@work_stats[:total_seconds])
+          return if formatted.empty?
+
+          @workflow[:total_duration]     = formatted
+          @project_info[:total_duration] = formatted
         end
 
         # Загружает глобальные настройки программы из файлов конфигурации плагина:
@@ -1196,6 +1212,9 @@ module DN1Code
             @scenes = payload[:scenes].map { |h| SceneItem.from_h(h) }
           end
 
+          # Статистика работы главнее данных формы: автозначение длительности
+          # не затирается ручной правкой, пришедшей из интерфейса
+          sync_total_duration_from_stats!
           sync_project_fields!
           self
         end
@@ -1876,6 +1895,7 @@ module DN1Code
               # YAML с чужой машины
               if include_work_stats && root[:work_stats].is_a?(Hash)
                 @work_stats = WorkStats.normalize(root[:work_stats])
+                sync_total_duration_from_stats!
               end
 
               # Проверяем, есть ли рядом файл edit_history.yaml
@@ -1944,6 +1964,7 @@ module DN1Code
         def save_to_yaml(file_path, include_settings: true)
           FileUtils.mkdir_p(File.dirname(file_path))
           sync_project_fields!
+          sync_total_duration_from_stats!
 
           # 1. Секция project (Паспорт объекта)
           prj_out = {
@@ -2052,6 +2073,7 @@ module DN1Code
         # @return [Hash] хэш со всеми полями проекта, настройками, сценами и историей
         def to_h
           sync_project_fields!
+          sync_total_duration_from_stats!
 
           hist_out = (@history || []).map do |h|
             next unless h.is_a?(Hash)
