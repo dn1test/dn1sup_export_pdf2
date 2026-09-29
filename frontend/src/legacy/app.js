@@ -2,7 +2,12 @@
    DN1C Export PDF 2 - Frontend Application Logic
    Provides two-way binding between HTML UI and SketchUp Ruby API,
    plus Interactive WYSIWYG Page Layout Editor (Drag & Drop Block Positioning)
+
+   В процессе миграции на Vue: состояние уведомлений и модалок живёт в
+   ../store.js, рендер — в Vue-компонентах. Бизнес-логика пока остаётся здесь.
 ------------------------------------------------------------------------------- */
+
+import { ui, showToast as uiShowToast } from "../store.js";
 
 (function () {
   "use strict";
@@ -471,7 +476,6 @@ const DEFAULT_LAYOUTS = {
   const els = {
     tabs: document.querySelectorAll(".tab-btn"),
     tabPanes: document.querySelectorAll(".tab-pane"),
-    toast: document.getElementById("toastNotification"),
     sceneCountBadge: document.getElementById("sceneCountBadge"),
 
     // Header Titles
@@ -969,18 +973,9 @@ const DEFAULT_LAYOUTS = {
     }
   }
 
-  // Toast Notifications
-  let toastTimer = null;
+  // Toast Notifications (рендер — в Vue-компоненте AppToast через ui-store)
   function showNotification(msg, type = "success") {
-    clearTimeout(toastTimer);
-    const iconName = type === "error" ? "cancel" : (type === "warning" ? "warning" : (type === "info" ? "info" : "check-circle"));
-    els.toast.innerHTML = `<i class="modus-icons">${iconName}</i> <span>${msg}</span>`;
-    els.toast.className = `toast ${type}`;
-    els.toast.classList.remove("hidden");
-
-    toastTimer = setTimeout(() => {
-      els.toast.classList.add("hidden");
-    }, 3500);
+    uiShowToast(msg, type);
   }
 
   // Auto-Save Engine (Debounced automatic persistence to YAML)
@@ -2454,70 +2449,48 @@ function setTemplateLineSettings(tplKey, updates) {
 
 // -------------------------------------------------------------
 // Модал создания/редактирования параметра шаблона
+// (разметка — Vue-компонент ParamModal.vue, форма — ui-store)
 // -------------------------------------------------------------
 let paramModalState = { mode: "create", id: null, tplKey: null };
 
-function fillParamSourceOptions(selectedSource) {
-  const sel = document.getElementById("paramModalSource");
-  if (!sel) return;
-  sel.innerHTML = buildParamSources().map((g) => `
-    <optgroup label="${g.title}">
-      ${g.options.map((o) => `<option value="${o.value}">${o.label}</option>`).join("")}
-    </optgroup>
-  `).join("");
-  if (selectedSource) sel.value = selectedSource;
-}
-
 function updateParamModalPreview() {
-  const sel = document.getElementById("paramModalSource");
-  const box = document.getElementById("paramModalPreview");
-  if (!sel || !box) return;
-  const val = paramPreviewValue(sel.value).replace(/\n+/g, " ⏎ ");
-  box.textContent = val ? `Пример: ${val}` : "Данные не заполнены — параметр не будет выведен на лист";
-  box.classList.toggle("empty", !val);
+  const val = paramPreviewValue(ui.paramModal.source).replace(/\n+/g, " ⏎ ");
+  ui.paramModal.preview = val ? `Пример: ${val}` : "Данные не заполнены — параметр не будет выведен на лист";
+  ui.paramModal.previewEmpty = !val;
   // Подсказка в поле заголовка: что напечатается, если оставить его пустым
-  const lbl = document.getElementById("paramModalLabel");
-  if (lbl) {
-    const auto = effectiveParamLabel(sel.value, "");
-    lbl.placeholder = auto ? `Авто: ${auto}` : "Заголовок (авто-подпись недоступна)";
-  }
+  const auto = effectiveParamLabel(ui.paramModal.source, "");
+  ui.paramModal.labelPlaceholder = auto ? `Авто: ${auto}` : "Заголовок (авто-подпись недоступна)";
 }
 
   function openParamModal(mode, paramId, tplKey) {
     paramModalState = { mode: mode, id: paramId || null, tplKey: tplKey || layoutState.currentTemplate || defaultTemplateKey() };
-    const modal = document.getElementById("paramModal");
-    if (!modal) return;
-
-    fillParamSourceOptions();
-    const title = document.getElementById("paramModalTitle");
-    const srcSel = document.getElementById("paramModalSource");
-    const inpLabel = document.getElementById("paramModalLabel");
 
     const existing = mode === "edit" ? getTemplateParams(paramModalState.tplKey).find((p) => p.id === paramId) : null;
+    const sources = buildParamSources();
+    const firstSource = sources[0] && sources[0].options[0] ? sources[0].options[0].value : "";
 
-    if (title) title.textContent = mode === "edit" ? "Редактировать параметр" : "Создать параметр";
-    if (srcSel) srcSel.value = existing ? existing.source : (srcSel.options[0] ? srcSel.options[0].value : "");
-    if (inpLabel) inpLabel.value = existing ? existing.label : "";
+    ui.paramModal.mode = mode;
+    ui.paramModal.id = paramModalState.id;
+    ui.paramModal.tplKey = paramModalState.tplKey;
+    ui.paramModal.title = mode === "edit" ? "Редактировать параметр" : "Создать параметр";
+    ui.paramModal.sources = sources;
+    ui.paramModal.source = existing ? existing.source : firstSource;
+    ui.paramModal.label = existing ? existing.label : "";
     updateParamModalPreview();
-
-    modal.classList.remove("hidden");
-    if (srcSel) srcSel.focus();
+    ui.paramModal.visible = true;
   }
 
   function closeParamModal() {
-    const modal = document.getElementById("paramModal");
-    if (modal) modal.classList.add("hidden");
+    ui.paramModal.visible = false;
     paramModalState = { mode: "create", id: null, tplKey: null };
   }
 
   function confirmParamModal() {
-    const srcSel = document.getElementById("paramModalSource");
-    const source = srcSel ? srcSel.value : "";
+    const source = ui.paramModal.source;
     if (!source) {
       showNotification("Выберите источник данных", "warning");
       return;
     }
-    const inpLabel = document.getElementById("paramModalLabel");
 
     const isEdit = paramModalState.mode === "edit";
     // Шрифт, размер, выравнивания, цвет, заголовок и «Вкл» задаются в строке
@@ -2526,7 +2499,7 @@ function updateParamModalPreview() {
     const value = {
       id: paramModalState.id || undefined,
       source: source,
-      label: inpLabel ? inpLabel.value.trim() : "",
+      label: ui.paramModal.label.trim(),
       show_label: existing ? existing.show_label : true,
       align: existing ? existing.align : DEFAULT_PARAM_SETTINGS.align,
       valign: existing ? existing.valign : DEFAULT_PARAM_SETTINGS.valign,
@@ -2787,34 +2760,9 @@ function updateParamModalPreview() {
       });
     }
 
-    // Параметр шаблона: модал создания/редактирования
-    const btnCancelParam = document.getElementById("btnCancelParam");
-    if (btnCancelParam) {
-      btnCancelParam.addEventListener("click", closeParamModal);
-    }
-    const btnConfirmParam = document.getElementById("btnConfirmParam");
-    if (btnConfirmParam) {
-      btnConfirmParam.addEventListener("click", confirmParamModal);
-    }
-    const paramModalEl = document.getElementById("paramModal");
-    if (paramModalEl) {
-      paramModalEl.addEventListener("keydown", (e) => {
-        if (e.key === "Escape") closeParamModal();
-      });
-    }
-    const paramSourceSel = document.getElementById("paramModalSource");
-    if (paramSourceSel) {
-      paramSourceSel.addEventListener("change", updateParamModalPreview);
-    }
-    const paramLabelInp = document.getElementById("paramModalLabel");
-    if (paramLabelInp) {
-      paramLabelInp.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") {
-          e.preventDefault();
-          if (btnConfirmParam) btnConfirmParam.click();
-        }
-      });
-    }
+    // Параметр шаблона: модал создания/редактирования перенесён в Vue-компонент
+    // ParamModal.vue — события (отмена/сохранение/ESC/Enter/смена источника)
+    // обрабатываются там и приходят через window.legacy.
 
     syncTemplateDropdowns();
     renderTemplatesList();
@@ -6100,8 +6048,17 @@ function updateParamModalPreview() {
     syncCurrentTemplateOverlay: syncCurrentTemplateOverlay
   };
 
-  // Initialization
-  document.addEventListener("DOMContentLoaded", () => {
+  // Мост для Vue-компонентов на время миграции: они вызывают бизнес-логику отсюда
+  window.legacy = {
+    openParamModal,
+    closeParamModal,
+    confirmParamModal,
+    updateParamModalPreview
+  };
+
+  // Initialization. Модуль грузится динамическим импортом уже после монтирования
+  // Vue, поэтому DOMContentLoaded мог уже пройти — инициализируемся сразу.
+  function init() {
     setupTabs();
     setupEventListeners();
     setupLayoutEditor();
@@ -6110,5 +6067,11 @@ function updateParamModalPreview() {
 
     // Request initial data from SketchUp
     callRuby("getData");
-  });
+  }
+
+  if (document.readyState === "loading") {
+    document.addEventListener("DOMContentLoaded", init);
+  } else {
+    init();
+  }
 })();

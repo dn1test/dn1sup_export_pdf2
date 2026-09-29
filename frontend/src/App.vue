@@ -47,8 +47,7 @@
       </button>
     </nav>
 
-    <!-- Toast Notification -->
-    <div id="toastNotification" class="toast hidden"></div>
+    <!-- Toast Notification: перенесён в Vue-компонент AppToast.vue -->
 
     <!-- Main Content Area -->
     <main class="app-content">
@@ -797,32 +796,7 @@
       </div>
     </div>
 
-    <!-- Template Parameter Create/Edit Modal -->
-    <div id="paramModal" class="modal-overlay hidden" tabindex="-1">
-      <div class="modal-card modal-form-card param-modal-card">
-        <div class="modal-header-row">
-          <span class="modal-card-icon"><i class="modus-icons">tune</i></span>
-          <h3 id="paramModalTitle">Создать параметр</h3>
-        </div>
-        <p class="field-hint">Выберите источник данных параметра. Шрифт, размер, выравнивания (задают место на странице), цвет и заголовок настраиваются в строке параметра.</p>
-
-        <div class="form-group">
-          <label for="paramModalSource">Источник данных *</label>
-          <select id="paramModalSource" class="form-control"></select>
-          <div id="paramModalPreview" class="param-modal-preview"></div>
-        </div>
-
-        <div class="form-group">
-          <label for="paramModalLabel" title="Текст перед значением на листе (показ включается галкой «Заголовок» в строке параметра)">Заголовок</label>
-          <input type="text" id="paramModalLabel" class="form-control" placeholder="Например: Помещение">
-        </div>
-
-        <div class="modal-actions">
-          <button type="button" class="btn btn-secondary" id="btnCancelParam"><i class="modus-icons">content_close</i> Отмена</button>
-          <button type="button" class="btn btn-primary" id="btnConfirmParam"><i class="modus-icons">check_mark</i> Сохранить параметр</button>
-        </div>
-      </div>
-    </div>
+    <!-- Template Parameter Create/Edit Modal: перенесён в Vue-компонент ParamModal.vue -->
 
     <!-- Save Template Set Modal -->
     <div id="saveTemplateSetModal" class="modal-overlay hidden">
@@ -884,5 +858,14 @@
         <button class="btn btn-success" id="btnStartExport"><i class="modus-icons">launch</i> Экспорт в PDF</button>
       </div>
     </footer>
+
+    <!-- Vue: общие компоненты (тосты, модалки) -->
+    <AppToast />
+    <ParamModal />
   </div>
 </template>
+
+<script setup>
+import AppToast from './components/AppToast.vue'
+import ParamModal from './components/ParamModal.vue'
+</script>
