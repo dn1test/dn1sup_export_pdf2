@@ -101,15 +101,44 @@ dn1c_export_pdf2/
     │   └── export_controller.rb               # Контроллер запуска экспорта через LayOut
     ├── dialog/
     │   ├── export_dialog.rb                   # Ruby-обёртка над UI::HtmlDialog
-    │   └── html/                              # Веб-интерфейс диалога (HTML5, CSS3, JS)
-    │       ├── index.html
-    │       ├── app.css
-    │       └── app.js
+    │   └── html/                              # СОБРАННЫЙ веб-интерфейс (результат npm run build)
+    │       ├── index.html                     # Точка входа (генерируется Vite)
+    │       ├── app.css                        # Стили (копия из frontend/public)
+    │       ├── modus-bootstrap.min.css        # CSS-фреймворк (копия из frontend/public)
+    │       ├── fonts/                         # Иконки Modus (копия из frontend/public)
+    │       └── assets/                        # JS-бандлы (генерируются Vite, имена с хешами)
     └── test/                                  # Автономные тесты без GUI SketchUp
         ├── mock_sketchup.rb
         ├── test_export.rb
         └── comprehensive_test.rb
+frontend/                                      # Исходники веб-интерфейса (Vue 3 + Vite)
+├── package.json                               # Зависимости: vue, vite, @vitejs/plugin-vue
+├── vite.config.js                             # outDir → dn1c_export_pdf2/dialog/html
+├── index.html                                 # Vite-шаблон входа
+├── public/                                    # Копируются в сборку как есть (css, шрифты)
+└── src/
+    ├── main.js                                # createApp + монтирование
+    ├── App.vue                                # Корневой компонент интерфейса
+    └── legacy/                                # Vanilla JS в процессе миграции на Vue (по вкладкам)
+        └── app.js
 ```
+
+---
+
+## 🎨 Разработка GUI (Vue 3 + Vite)
+
+Веб-интерфейс диалога переносится с vanilla JS на Vue 3 по вкладкам. Источники — в `frontend/`, готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
+
+```bash
+cd frontend
+npm install        # один раз
+npm run dev        # dev-сервер с HMR: http://localhost:5173 (работает мок-режим без SketchUp)
+npm run build      # сборка в dn1c_export_pdf2/dialog/html
+```
+
+- Ruby↔JS мост не зависит от фреймворка: `callRuby(action, json)` и `window.app.*` — контракты сохраняются.
+- В `update_from_dev.rb` сборка GUI выполняется автоматически перед копированием в Plugins.
+- Перед упаковкой `.rbz` выполните `npm run build`, чтобы в архив попала актуальная сборка.
 
 ---
 

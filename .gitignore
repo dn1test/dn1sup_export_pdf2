@@ -28,3 +28,5 @@ dn1c_export_pdf2/config/settings.yaml
 .tmp*
 dist/
 dn1c_export_pdf2/test/test_snapshot_worker/
+# Frontend build deps
+node_modules/

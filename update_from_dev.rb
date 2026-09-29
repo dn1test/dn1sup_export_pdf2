@@ -35,7 +35,20 @@ unless dst && Dir.exist?(dst)
   exit 1
 end
 
-puts "\n[2/3] Копирование файлов расширения..."
+puts "\n[2/4] Сборка веб-интерфейса (Vue + Vite)..."
+frontend_dir = File.join(__dir__, "frontend")
+if Dir.exist?(File.join(frontend_dir, "node_modules"))
+  npm = Gem.win_platform? ? "npm.cmd" : "npm"
+  if system(npm, "run", "build", chdir: frontend_dir)
+    puts "  ✅ GUI собран в dn1c_export_pdf2/dialog/html"
+  else
+    warn "  ⚠️  Сборка GUI завершилась с ошибкой — в Plugins уйдёт последняя успешная сборка"
+  end
+else
+  puts "  ℹ️  frontend/node_modules не установлен — берётся закоммиченная сборка dialog/html"
+end
+
+puts "\n[3/4] Копирование файлов расширения..."
 res = DN1Code::ExportPdf2::Service::DevUpdater.update!(src, dst)
 
 if res[:success]
@@ -50,7 +63,7 @@ else
   exit 1
 end
 
-puts "\n[3/3] Проверка запущенного SketchUp и горячая перезагрузка..."
+puts "\n[4/4] Проверка запущенного SketchUp и горячая перезагрузка..."
 # Попытка послать команду горячей перезагрузки через dev-мост SketchUp (порт 9877)
 bridge_port = 9877
 begin
