@@ -98,6 +98,11 @@ module DN1Code
         assert(rep[:today_seconds] == 300, "report.today_seconds берет текущий день (300)")
         assert(rep[:series][:hourly].size == 24, "hourly-серия содержит 24 точки")
         assert(rep[:series][:hourly].last[:label] == "14:00", "hourly-серия заканчивается текущим часом (14:00)")
+        hourly_sum = rep[:series][:hourly].sum { |p| p[:seconds] }
+        assert(hourly_sum == 900, "hourly-серия берет данные из hourly-бакетов: 600 (29.09 23) + 300 (30.09 00) = 900 (получилось #{hourly_sum})")
+        assert(rep[:series][:hourly][8][:label] == "29.09 23:00" && rep[:series][:hourly][8][:seconds] == 600, "вчерашний час подписан с датой и содержит 600 сек")
+        assert(rep[:series][:hourly][9][:label] == "00:00" && rep[:series][:hourly][9][:seconds] == 300, "сегодняшний час 00:00 подписан без даты и содержит 300 сек")
+        assert(rep[:series][:hourly][0][:label] == "29.09 15:00", "старейшая точка hourly-серии — 29.09 15:00")
         assert(rep[:series][:daily].size == 30, "daily-серия содержит 30 точек")
         assert(rep[:series][:daily].last[:seconds] == 300, "последняя точка daily — сегодня (300)")
         assert(rep[:series][:weekly].size == 12, "weekly-серия содержит 12 точек")
@@ -106,11 +111,11 @@ module DN1Code
         assert(rep[:series][:monthly].size == 12, "monthly-серия содержит 12 точек")
         assert(rep[:series][:monthly].last[:seconds] == 4500, "текущий месяц содержит сентябрьские начисления (4500)")
         assert(rep[:series][:yearly].last[:label] == "2026" && rep[:series][:yearly].last[:seconds] == 4560, "годовая серия содержит 2026 = 4560")
-        assert(rep[:empty?] == false, "report.empty? = false после начислений")
+        assert(rep[:empty] == false, "report.empty = false после начислений")
 
         # --- report на пустой статистике ---
         empty_rep = STATS.report(STATS.blank_data, now)
-        assert(empty_rep[:empty?] == true && empty_rep[:total_seconds] == 0, "report пустой статистики: empty? = true")
+        assert(empty_rep[:empty] == true && empty_rep[:total_seconds] == 0, "report пустой статистики: empty = true")
         assert(empty_rep[:series][:daily].size == 30, "пустой report все равно отдает серии нужной длины")
         assert(STATS.blank?(STATS.blank_data) == true, "blank? распознает пустую статистику")
       end
@@ -157,7 +162,7 @@ module DN1Code
 
           # --- Отчет пустого проекта ---
           empty_payload = pd2.work_stats_report
-          assert(empty_payload[:empty?] == true, "work_stats_report нового проекта помечен пустым")
+          assert(empty_payload[:empty] == true, "work_stats_report нового проекта помечен пустым")
         end
 
         puts "=========================================================="

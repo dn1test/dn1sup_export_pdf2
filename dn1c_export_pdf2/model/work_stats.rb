@@ -134,7 +134,7 @@ module DN1Code
         # @param data [Hash] структура статистики
         # @param now [Time]
         # @return [Hash] { total_seconds, today_seconds, week7_seconds,
-        #   month30_seconds, first_tracked, last_tracked, empty?,
+        #   month30_seconds, first_tracked, last_tracked, empty,
         #   series: { hourly, daily, weekly, monthly, yearly } }
         def report(data, now = Time.now)
           data    = normalize(data)
@@ -142,7 +142,7 @@ module DN1Code
           date    = now.to_date
 
           series = {
-            hourly:  hourly_series(daily, now),
+            hourly:  hourly_series(data[:hourly], now),
             daily:   daily_series(daily, date),
             weekly:  weekly_series(daily, date),
             monthly: monthly_series(daily, date),
@@ -156,7 +156,7 @@ module DN1Code
             month30_seconds: window_seconds(daily, date - 29, date),
             first_tracked:   data[:first_tracked],
             last_tracked:    data[:last_tracked],
-            empty?:          data[:total_seconds].to_i <= 0,
+            empty:           data[:total_seconds].to_i <= 0,
             series:          series
           }
         end
@@ -181,12 +181,16 @@ module DN1Code
           end
         end
 
-        # Почасовой график: последние 24 часа, выровненные на начало часа
-        def hourly_series(daily, now)
+        # Почасовой график: последние 24 часа, выровненные на начало часа.
+        # Окно пересекает полночь, поэтому часы не из сегодняшнего дня
+        # подписываются с датой («28.09 15:00»).
+        def hourly_series(hourly, now)
           hour0 = Time.at((now.to_i / 3600) * 3600)
+          today = now.to_date
           (0...24).reverse_each.map do |i|
             t = hour0 - i * 3600
-            { label: t.strftime("%H:00"), seconds: daily[t.strftime("%Y-%m-%d %H")].to_i }
+            label = t.to_date == today ? t.strftime("%H:00") : t.strftime("%d.%m %H:00")
+            { label: label, seconds: hourly[t.strftime("%Y-%m-%d %H")].to_i }
           end
         end
 

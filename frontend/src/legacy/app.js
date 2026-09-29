@@ -764,7 +764,8 @@ const DEFAULT_LAYOUTS = {
             const hourly = [];
             for (let i = 23; i >= 0; i--) {
               const d = new Date(now); d.setHours(now.getHours() - i, 0, 0, 0);
-              hourly.push({ label: hm(d), seconds: i < 4 ? 2400 - i * 450 : 0 });
+              const label = d.getDate() === now.getDate() ? hm(d) : dm(d) + " " + hm(d);
+              hourly.push({ label: label, seconds: i < 4 ? 2400 - i * 450 : 0 });
             }
             const daily = [];
             for (let i = 29; i >= 0; i--) {
@@ -800,7 +801,7 @@ const DEFAULT_LAYOUTS = {
                 month30_seconds: 238500,
                 first_tracked: "2026-06-02",
                 last_tracked: now.toISOString().slice(0, 10),
-                "empty?": false,
+                empty: false,
                 series: { hourly, daily, weekly, monthly, yearly }
               }
             });
@@ -815,7 +816,7 @@ const DEFAULT_LAYOUTS = {
               product: "",
               report: {
                 total_seconds: 0, today_seconds: 0, week7_seconds: 0, month30_seconds: 0,
-                first_tracked: null, last_tracked: null, "empty?": true,
+                first_tracked: null, last_tracked: null, empty: true,
                 series: { hourly: [], daily: [], weekly: [], monthly: [], yearly: [] }
               }
             });
