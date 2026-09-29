@@ -71,7 +71,12 @@ module DN1Code
           @viewport_background = (viewport_background == true || viewport_background.to_s == "true")
           @viewport_watermarks = (viewport_watermarks == true || viewport_watermarks.to_s == "true")
           @aspect_ratio     = (aspect_ratio || "4:3").to_s.strip
-          @scale_pct        = (scale_pct || 100).to_i
+          # Документированный диапазон масштаба кадра 60–100 %: значения извне
+          # (payload/YAML/ручная правка) приводятся к диапазону; 0/отрицательное
+          # трактуется как «не задано» -> 100
+          raw_scale = (scale_pct || 100).to_i
+          raw_scale = 100 if raw_scale <= 0
+          @scale_pct        = raw_scale.clamp(60, 100)
           @align_h          = normalize_alignment(align_h, VALID_ALIGN_H)
           @align_v          = normalize_alignment(align_v, VALID_ALIGN_V)
           @page_type        = page_type ? page_type.to_sym : detect_page_type(@name)

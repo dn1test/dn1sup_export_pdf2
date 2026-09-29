@@ -301,16 +301,21 @@ module DN1Code
           { w: w, h: h }
         end
 
-        # Поля страницы в дюймах (margin_mm -> pt -> in)
+        # Поля страницы в дюймах (margin_mm -> pt -> in).
+        # Диапазон 0..100 мм (0..~283pt) — последняя линия защиты от
+        # отрицательных/гигантских полей, заданных мимо sanitize_pdf_settings
+        MAX_MARGIN_MM = 100.0
+        MAX_MARGIN_PT = MAX_MARGIN_MM * PT_PER_INCH / 25.4
+
         def resolve_margin_inches(settings)
           if settings.key?(:margin_mm) && !settings[:margin_mm].nil?
-            settings[:margin_mm].to_f * PT_PER_INCH / 25.4 / PT_PER_INCH
+            settings[:margin_mm].to_f.clamp(0.0, MAX_MARGIN_MM) * PT_PER_INCH / 25.4 / PT_PER_INCH
           elsif settings.key?("margin_mm") && !settings["margin_mm"].nil?
-            settings["margin_mm"].to_f * PT_PER_INCH / 25.4 / PT_PER_INCH
+            settings["margin_mm"].to_f.clamp(0.0, MAX_MARGIN_MM) * PT_PER_INCH / 25.4 / PT_PER_INCH
           elsif settings.key?(:margin) && !settings[:margin].nil?
-            settings[:margin].to_f / PT_PER_INCH
+            settings[:margin].to_f.clamp(0.0, MAX_MARGIN_PT) / PT_PER_INCH
           elsif settings.key?("margin") && !settings["margin"].nil?
-            settings["margin"].to_f / PT_PER_INCH
+            settings["margin"].to_f.clamp(0.0, MAX_MARGIN_PT) / PT_PER_INCH
           else
             15.0 / PT_PER_INCH
           end

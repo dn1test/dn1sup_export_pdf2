@@ -84,7 +84,8 @@ begin
 
   http = Net::HTTP.new(uri.host, uri.port)
   http.open_timeout = 1.0
-  http.read_timeout = 2.0
+  # Перезагрузка расширения внутри SketchUp может занять несколько секунд
+  http.read_timeout = 15.0
   response = http.request(req)
 
   if response.is_a?(Net::HTTPSuccess)

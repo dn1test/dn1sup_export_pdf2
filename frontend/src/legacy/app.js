@@ -714,10 +714,10 @@ const DEFAULT_LAYOUTS = {
                 font_width: "condensed",
                 layout_render_mode: "image",
                 image_format: "png",
-                quality: "medium",
+                render_quality: "medium",
                 scale_multiplier: "2.0",
                 save_layout_file: true,
-                save_backup: true,
+                save_skp_backup: true,
                 antialias: true,
                 custom_layouts: {
                   cover: { name: "Титульный лист (Cover)", description: "Обложка проекта" },
@@ -2976,12 +2976,15 @@ function updateParamModalPreview() {
       els.chkScenesFrameAll.checked = scenes.length > 0 && scenes.every((s) => s.frame_overlay === true);
     }
 
-    const oldEntries = ui.scenes;
-    ui.scenes = scenes.map((item, idx) => {
-      const uid = "sc" + idx + "-" + (item.name || "") + "-" + (item.original_name || "");
-      const prev = oldEntries[idx];
-      return prev && prev.uid === uid ? prev : { uid, item };
-    });
+    // Обёртки пересоздаём с ТЕКУЩИМИ объектами state.scenes: onScenesRefreshed
+    // заменяет объекты сцен новыми после синхронизации с моделью, и переиспользование
+    // старой обёртки по совпавшему uid оставляло таблицу привязанной к устаревшим
+    // объектам (кнопки «Все»/«Снять» и правки state не отражались на галочках).
+    // Ключ v-for (uid) детерминирован — строки DOM не пересоздаются.
+    ui.scenes = scenes.map((item, idx) => ({
+      uid: "sc" + idx + "-" + (item.name || "") + "-" + (item.original_name || ""),
+      item
+    }));
 
     // Свежий список шаблонов для селекта «Шаблон» (перестраивается при каждом
     // рендере таблицы — как в оригинале)
@@ -3275,7 +3278,7 @@ function updateParamModalPreview() {
       image_format: els.selectImageFormat ? els.selectImageFormat.value : (state.pdf_settings?.image_format || "png"),
       webp_quality: els.selectWebpQuality ? els.selectWebpQuality.value : (state.pdf_settings?.webp_quality ?? 85),
       save_layout_file: els.chkSaveLayoutFile ? els.chkSaveLayoutFile.checked : true,
-      page_size: "A3",
+      page_size: els.selectPageSize ? els.selectPageSize.value : (state.pdf_settings?.page_size || "A3"),
       page_layout: els.selectPageLayout.value,
       margin_mm: els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5),
       margin: Math.round((((els.inputPageMargin ? parseFloat(els.inputPageMargin.value) || 0 : (state.pdf_settings?.margin_mm ?? 5)) * 72.0) / 25.4) * 10) / 10,

@@ -90,7 +90,9 @@ module DN1Code
                   else 150
                   end
             psz = (options[:page_size] || options["page_size"] || "A4").to_s.upcase.strip
-            long_inches = (psz == "A3") ? 16.535433 : 11.692913
+            # Длинная сторона листа по формату (A2/LETTER раньше получали сторону A4)
+            long_inches = Model::ProjectData::PDF_PAGE_SIZES[psz] ||
+                          Model::ProjectData::PDF_PAGE_SIZES["A4"]
             width = (long_inches * dpi).round
           end
           ratio = if options[:ratio]

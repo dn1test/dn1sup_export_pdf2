@@ -32,6 +32,33 @@ module DN1Code
         # Допустимые пропорции кадра в настройках плагина
         VALID_ASPECT_RATIOS   = %w[page 16:9 4:3 3:2 5:4 4:5 1:1 custom].freeze
 
+        # Белый список ключей pdf_settings, принимаемых из диалога и YAML.
+        # Все прочие ключи отбрасываются (protect от орфанных ключей старых
+        # версий и мусора из payload). custom_layouts обрабатывается отдельно.
+        PDF_SETTINGS_ALLOWED  = %i[
+          layout_render_mode save_layout_file compress_pdf image_format webp_quality
+          render_quality page_size page_layout margin margin_mm image_width
+          image_aspect_ratio custom_ratio_w custom_ratio_h show_aspect_overlay
+          overlay_border_color overlay_border_opacity overlay_mask_color overlay_mask_opacity
+          scale_factor scale_multiplier annotation_font_size antialias
+          stamp_type stamp_custom auto_open_pdf save_skp_backup
+          primary_color secondary_color stamp_color font_family font_weight font_width
+        ].freeze
+
+        # Булевы ключи pdf_settings: строки 'true'/'false' приводятся к boolean
+        PDF_SETTINGS_BOOL_KEYS = %i[
+          save_layout_file compress_pdf show_aspect_overlay antialias
+          auto_open_pdf save_skp_backup
+        ].freeze
+
+        # Поддерживаемые форматы листа (длинная сторона листа в дюймах)
+        PDF_PAGE_SIZES = {
+          "A4"     => 11.692_913,
+          "A3"     => 16.535_433,
+          "A2"     => 23.385_8,
+          "LETTER" => 11.0
+        }.freeze
+
         # Метаданные шаблона, которые переносятся через layout.yaml
         # (имя, описание, база, иконка) — см. load_from_layout_yaml
         TEMPLATE_META_KEYS    = %w[name _name description _description _base_type _icon].freeze
@@ -293,7 +320,7 @@ module DN1Code
               raw = begin
                       YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
                     rescue ArgumentError
-                      YAML.load(content)
+                      YAML.safe_load(content)
                     end
               if raw.is_a?(Hash)
                 data = self.class.deep_symbolize_keys(raw)
@@ -304,7 +331,7 @@ module DN1Code
                 if pdf_cfg.is_a?(Hash)
                   layouts_backup = @pdf_settings ? @pdf_settings[:custom_layouts] : nil
                   @pdf_settings ||= {}
-                  @pdf_settings.merge!(pdf_cfg)
+                  @pdf_settings.merge!(self.class.sanitize_pdf_settings(pdf_cfg))
                   @pdf_settings[:custom_layouts] = layouts_backup if layouts_backup && !pdf_cfg.key?(:custom_layouts)
                   ratio_str = @pdf_settings[:image_aspect_ratio].to_s.strip
                   @pdf_settings[:image_aspect_ratio] = "4:3" unless VALID_ASPECT_RATIOS.include?(ratio_str)
@@ -648,6 +675,116 @@ module DN1Code
             return s unless s.empty?
           end
           ""
+        end
+
+        # Нормализация входящих pdf_settings (диалог / settings.yaml / импорт):
+        # пропускает только ключи из белого списка и приводит значения к
+        # допустимым диапазонам. Невалидные значения отбрасываются —
+        # действующее значение остаётся прежним (умолчание).
+        # @param raw [Hash] сырые настройки
+        # @return [Hash] очищенные настройки (может быть пустым)
+        def self.sanitize_pdf_settings(raw)
+          return {} unless raw.is_a?(Hash)
+
+          src = deep_symbolize_keys(raw)
+          clean = {}
+          src.each do |k, v|
+            next unless PDF_SETTINGS_ALLOWED.include?(k)
+            next if v.nil?
+
+            val = sanitize_pdf_setting_value(k, v)
+            clean[k] = val unless val.nil?
+          end
+          clean
+        end
+
+        # Нормализация одного значения pdf_settings: возвращает очищенное
+        # значение или nil (значение невалидно, остаётся прежнее).
+        # @param key [Symbol] ключ из PDF_SETTINGS_ALLOWED
+        # @param value [Object] сырое значение
+        # @return [Object, nil]
+        def self.sanitize_pdf_setting_value(key, value)
+          numeric = lambda do |v|
+            return v.to_f if v.is_a?(Numeric)
+            s = v.to_s.strip
+            s.match?(/\A-?\d+(\.\d+)?\z/) ? s.to_f : nil
+          end
+
+          case key
+          when *PDF_SETTINGS_BOOL_KEYS
+            return value if value == true || value == false
+
+            s = value.to_s.strip.downcase
+            return true  if s == "true" || s == "1"
+            return false if s == "false" || s == "0"
+
+            nil
+          when :margin_mm
+            numeric.call(value)&.clamp(0.0, 100.0)
+          when :margin
+            # legacy-ключ в пунктах: не больше 100 мм в pt
+            numeric.call(value)&.clamp(0.0, 100.0 * 72.0 / 25.4)
+          when :webp_quality
+            s = value.to_s.downcase.strip
+            return "lossless" if s == "lossless"
+
+            n = numeric.call(value)
+            return nil unless n
+            return 100 if n > 100
+
+            n >= 1 ? n.round : nil
+          when :page_size
+            s = value.to_s.upcase.strip
+            PDF_PAGE_SIZES.key?(s) ? s : nil
+          when :page_layout
+            s = value.to_s.downcase.strip
+            %w[landscape portrait].include?(s) ? s : nil
+          when :layout_render_mode
+            s = value.to_s.downcase.strip
+            %w[image hybrid].include?(s) ? s : nil
+          when :render_quality
+            s = value.to_s.downcase.strip
+            %w[low medium high].include?(s) ? s : nil
+          when :image_format
+            s = value.to_s.downcase.strip
+            %w[png jpg jpeg].include?(s) ? s : nil
+          when :image_aspect_ratio
+            s = value.to_s.strip
+            VALID_ASPECT_RATIOS.include?(s) ? s : nil
+          when :custom_ratio_w, :custom_ratio_h, :scale_factor
+            n = numeric.call(value)
+            n&.positive?
+          when :scale_multiplier
+            s = value.to_s.downcase.strip
+            return "auto" if s == "auto"
+
+            numeric.call(value)&.positive? ? s : nil
+          when :annotation_font_size
+            s = value.to_s.downcase.strip
+            return "auto" if s == "auto"
+
+            numeric.call(value)&.positive?
+          when :stamp_type
+            s = value.to_s.downcase.strip
+            %w[draft approved custom none].include?(s) ? s : nil
+          when :image_width
+            n = numeric.call(value)
+            n&.positive? ? n.round : nil
+          when :overlay_border_opacity, :overlay_mask_opacity
+            numeric.call(value)&.clamp(0.0, 100.0)
+          when :font_weight
+            s = value.to_s.downcase.strip
+            %w[normal bold].include?(s) ? s : nil
+          when :font_width
+            s = value.to_s.downcase.strip
+            %w[condensed extra_condensed].include?(s) ? s : nil
+          when :primary_color, :secondary_color, :stamp_color
+            s = value.to_s.strip.sub(/\A#/, "")
+            s.match?(/\A[0-9a-fA-F]{6}\z/) ? s.upcase : nil
+          else
+            # строковые ключи (font_family, stamp_custom, overlay-цвета) — как есть
+            value
+          end
         end
 
         # Двусторонняя синхронизация полей между модульными сущностями (@project, @customer, @workflow),
@@ -1201,7 +1338,14 @@ module DN1Code
             @api_targets = payload[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
           end
           @directories = payload[:directories] if payload[:directories].is_a?(Array)
-          @pdf_settings.merge!(payload[:pdf_settings]) if payload[:pdf_settings]
+          if payload[:pdf_settings].is_a?(Hash)
+            incoming = self.class.sanitize_pdf_settings(payload[:pdf_settings])
+            raw_layouts = payload[:pdf_settings][:custom_layouts] || payload[:pdf_settings]["custom_layouts"]
+            if raw_layouts.is_a?(Hash)
+              incoming[:custom_layouts] = self.class.deep_symbolize_keys(raw_layouts)
+            end
+            @pdf_settings.merge!(incoming)
+          end
           if payload[:history_edit] && payload[:history_edit].is_a?(Array)
             @history = payload[:history_edit].map { |item| normalize_history_entry(item) }
           elsif payload[:history]
@@ -1388,7 +1532,7 @@ module DN1Code
             raw_data = begin
                          YAML.safe_load(content, permitted_classes: [Date, Time])
                        rescue ArgumentError
-                         YAML.load(content)
+                         YAML.safe_load(content)
                        end
             return false unless raw_data.is_a?(Hash)
 
@@ -1486,7 +1630,7 @@ module DN1Code
           return [] unless raw.is_a?(Array)
 
           bool_val = lambda do |v, def_val|
-            v.nil? ? def_val : !(v == false || v.to_s == "false" || v == 0 || v.to_s == "0")
+            v.nil? ? def_val : !(v == false || %w[false no off 0].include?(v.to_s.strip.downcase))
           end
 
           raw.filter_map do |p|
@@ -1543,7 +1687,7 @@ module DN1Code
             raw = begin
                     YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
                   rescue ArgumentError
-                    YAML.load(content)
+                    YAML.safe_load(content)
                   end
             return false unless raw.is_a?(Hash)
 
@@ -1579,9 +1723,14 @@ module DN1Code
                   page[:image_4_3] ||= {}
                   page[:image_4_3].merge!(slot_cfg)
                   page[:image_4_3][:aspect_ratio] ||= "4:3"
+                  # масштаб слота хранится как есть: ограничение 60..100 — на рендере
                   page[:image_4_3][:scale_pct] = (page[:image_4_3][:scale_pct] || 100).to_i
-                  raw_bg = page[:image_4_3][:show_background]
-                  page[:image_4_3][:show_background] = !(raw_bg == false || raw_bg.to_s == "false" || raw_bg == 0 || raw_bg.to_s == "0")
+                  # Булевы флаги блока приводятся к настоящему boolean: строка
+                  # 'false' в YAML/JS истинна и ломала бы чекбоксы редактора
+                  [:show_background, :visible].each do |flag|
+                    raw = page[:image_4_3][flag]
+                    page[:image_4_3][flag] = !(raw == false || raw.to_s == "false" || raw == 0 || raw.to_s == "0")
+                  end
                 elsif slot_id.to_s == "params" && slot_cfg.is_a?(Array)
                   page[:params] = normalize_template_params(slot_cfg)
                 elsif slot_id.to_s == "line_gap" || slot_id.to_s == "line_enabled"
@@ -1878,7 +2027,10 @@ module DN1Code
               # Секция pdf_settings читается только при явном запросе (импорт полного
               # YAML): настройки PDF глобальные и хранятся в settings.yaml расширения
               if include_settings && root.key?(:pdf_settings) && root[:pdf_settings].is_a?(Hash)
-                @pdf_settings.merge!(root[:pdf_settings])
+                incoming = self.class.sanitize_pdf_settings(root[:pdf_settings])
+                raw_layouts = root[:pdf_settings][:custom_layouts]
+                incoming[:custom_layouts] = self.class.deep_symbolize_keys(raw_layouts) if raw_layouts.is_a?(Hash)
+                @pdf_settings.merge!(incoming)
                 legacy_font = Service::FontService.legacy_family_for(@pdf_settings[:font_family])
                 @pdf_settings[:font_family] = legacy_font if legacy_font
               end
@@ -1944,7 +2096,10 @@ module DN1Code
               sync_history_entries!
             end
             if docs[3].is_a?(Hash)
-              @pdf_settings.merge!(docs[3])
+              incoming = self.class.sanitize_pdf_settings(docs[3])
+              raw_layouts = docs[3][:custom_layouts] || docs[3]["custom_layouts"]
+              incoming[:custom_layouts] = self.class.deep_symbolize_keys(raw_layouts) if raw_layouts.is_a?(Hash)
+              @pdf_settings.merge!(incoming)
             end
 
             # Шаблоны страниц не читаются из папки проекта —
