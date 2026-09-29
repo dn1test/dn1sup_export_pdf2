@@ -610,8 +610,7 @@ const DEFAULT_LAYOUTS = {
     chkAntialias: document.getElementById("chkAntialias"),
 
     // Tab 4 Elements
-    historyTableBody: document.getElementById("historyTableBody"),
-    btnAddHistoryEntry: document.getElementById("btnAddHistoryEntry"),
+    // История рендерится Vue-компонентом HistoryTab.vue
 
     // Global Actions
     btnSaveYaml: document.getElementById("btnSaveYaml"),
@@ -4404,94 +4403,56 @@ function updateParamModalPreview() {
   }
 
   // Render History Table
+  // Render History Table: ui.history хранит { uid, item }, где item — тот же
+  // объект state.history (прокси Vue пишет насквозь); рендер — HistoryTab.vue
   function renderHistoryTable() {
-    els.historyTableBody.innerHTML = "";
-    const history = state.history || [];
+    ui.history = (state.history || []).map((item, index) => ({ uid: "h" + index + "-" + (item.data || ""), item }));
+  }
 
-    history.forEach((item, index) => {
-      const tr = document.createElement("tr");
+  // Добавление правки (кнопка в HistoryTab.vue)
+  function addHistoryEntry() {
+    const now = new Date();
+    const y = now.getFullYear();
+    const m = String(now.getMonth() + 1).padStart(2, '0');
+    const d = String(now.getDate()).padStart(2, '0');
+    const hh = String(now.getHours()).padStart(2, '0');
+    const mm = String(now.getMinutes()).padStart(2, '0');
+    const nowStr = `${y}-${m}-${d} ${hh}:${mm}`;
+    const defaultText = "Новые правки";
 
-      // 1. Дата и время (data / date) — только чтение, проставляется автоматически
-      const tdDate = document.createElement("td");
-      tdDate.className = "history-date-cell font-mono";
-      const dateStr = item.data || item.date || "";
-      tdDate.textContent = dateStr;
-      tdDate.title = "Дата и время проставляются автоматически";
-
-      // 2. Версия # Ревизия (ver / rev) — только чтение
-      const tdRev = document.createElement("td");
-      tdRev.className = "history-rev-cell font-mono";
-      const verStr = String(item.ver || "").trim();
-      const revStr = String(item.rev || "").trim();
-      tdRev.textContent = `${verStr || "—"} # ${revStr || "—"}`;
-      tdRev.title = revStr
-        ? `Версия ${verStr || "—"} # Ревизия ${revStr}`
-        : "Ревизия не назначена (запись без экспорта)";
-
-      // 3. Название правки (edit / text)
-      const tdDesc = document.createElement("td");
-      const inputDesc = document.createElement("input");
-      inputDesc.type = "text";
-      inputDesc.className = "table-input";
-      inputDesc.value = item.edit || item.text || item.description || "";
-      inputDesc.placeholder = "Текст правки / комментарий...";
-      inputDesc.addEventListener("input", (e) => {
-        item.edit = e.target.value;
-        item.text = e.target.value;
-        item.description = e.target.value;
-        // Синхронизируем верхнюю (самую свежую) запись с полем last_edit
-        if (index === 0 && els.inputLastEdit) {
-          els.inputLastEdit.value = e.target.value;
-        }
-      });
-      inputDesc.addEventListener("change", (e) => {
-        item.edit = e.target.value;
-        item.text = e.target.value;
-        item.description = e.target.value;
-        if (index === 0 && els.inputLastEdit) {
-          els.inputLastEdit.value = e.target.value;
-        }
-        notifyChange();
-      });
-      tdDesc.appendChild(inputDesc);
-
-      // 4. Открыть привязанный PDF (виден путь в подсказке; активна, когда ссылка есть)
-      const tdOpen = document.createElement("td");
-      tdOpen.className = "history-action-cell";
-      const btnOpenPdf = document.createElement("button");
-      btnOpenPdf.className = "btn btn-xs btn-secondary";
-      btnOpenPdf.innerHTML = '<i class="modus-icons">launch</i> Открыть';
-      const pdfLink = (item.pdf_link || "").trim();
-      btnOpenPdf.disabled = !pdfLink;
-      btnOpenPdf.title = pdfLink ? `Открыть PDF: ${pdfLink}` : "PDF ещё не создан для этой правки";
-      btnOpenPdf.addEventListener("click", () => {
-        const link = (item.pdf_link || "").trim();
-        if (link) callRuby("openFile", link);
-      });
-      tdOpen.appendChild(btnOpenPdf);
-
-      // 5. Удаление
-      const tdDelete = document.createElement("td");
-      tdDelete.className = "history-action-cell";
-      const btnDel = document.createElement("button");
-      btnDel.className = "btn btn-xs btn-danger";
-      btnDel.innerHTML = '<i class="modus-icons">delete</i> Удалить';
-      btnDel.title = "Удалить запись";
-      btnDel.addEventListener("click", () => {
-        state.history.splice(index, 1);
-        renderHistoryTable();
-        notifyChange();
-      });
-      tdDelete.appendChild(btnDel);
-
-      tr.appendChild(tdDate);
-      tr.appendChild(tdRev);
-      tr.appendChild(tdDesc);
-      tr.appendChild(tdOpen);
-      tr.appendChild(tdDelete);
-
-      els.historyTableBody.appendChild(tr);
+    state.history.unshift({
+      data: nowStr,
+      date: nowStr,
+      edit: defaultText,
+      text: defaultText,
+      description: defaultText,
+      pdf_link: "",
+      ver: "",
+      rev: ""
     });
+
+    if (els.inputLastEdit) els.inputLastEdit.value = defaultText;
+    renderHistoryTable();
+    notifyChange();
+  }
+
+  // Удаление правки (кнопка в строке таблицы HistoryTab.vue)
+  function removeHistoryEntry(index) {
+    state.history.splice(index, 1);
+    renderHistoryTable();
+    notifyChange();
+  }
+
+  // Синхронизация трёх полей записи (edit/text/description) и поля «Последняя правка»
+  function syncHistoryEdit(index, value) {
+    const item = state.history[index];
+    if (!item) return;
+    item.edit = value;
+    item.text = value;
+    item.description = value;
+    if (index === 0 && els.inputLastEdit) {
+      els.inputLastEdit.value = value;
+    }
   }
 
   // Collect Current Form Data into State
@@ -4993,31 +4954,7 @@ function updateParamModalPreview() {
     }
 
     // Add History Entry (edit_history.yaml)
-    els.btnAddHistoryEntry.addEventListener("click", () => {
-      const now = new Date();
-      const y = now.getFullYear();
-      const m = String(now.getMonth() + 1).padStart(2, '0');
-      const d = String(now.getDate()).padStart(2, '0');
-      const hh = String(now.getHours()).padStart(2, '0');
-      const mm = String(now.getMinutes()).padStart(2, '0');
-      const nowStr = `${y}-${m}-${d} ${hh}:${mm}`;
-      const defaultText = "Новые правки";
-
-      state.history.unshift({
-        data: nowStr,
-        date: nowStr,
-        edit: defaultText,
-        text: defaultText,
-        description: defaultText,
-        pdf_link: "",
-        ver: "",
-        rev: ""
-      });
-
-      if (els.inputLastEdit) els.inputLastEdit.value = defaultText;
-      renderHistoryTable();
-      notifyChange();
-    });
+    // Кнопка «Добавить правку» перенесена в HistoryTab.vue → window.legacy.addHistoryEntry
 
     // Actual export execution helper
     function executeExport() {
@@ -5647,6 +5584,10 @@ function updateParamModalPreview() {
     addDirectory,
     refreshDirectories,
     commitDirectories,
+    addHistoryEntry,
+    removeHistoryEntry,
+    syncHistoryEdit,
+    notifyChange,
     callRuby
   };
 

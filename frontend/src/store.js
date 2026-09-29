@@ -21,6 +21,9 @@ export const ui = reactive({
   // Вкладка «Папки»: записи пишет legacy (refreshDirectoriesUI), мутации —
   // DirectoriesTab.vue с последующим commitDirectories() в legacy.
   directories: [],
+  // Вкладка «История»: ui.history = [{ uid, item }], где item — тот же объект,
+  // что и в state.history (прокси Vue пишет данные насквозь в legacy-state).
+  history: [],
 })
 
 let dirUidSeq = 1
