@@ -28,6 +28,14 @@ export const ui = reactive({
   apiTargets: [],
   // Вкладка «Проект»: стадии { uid, item } (write-through в state.workflow.stadia)
   stadia: [],
+  // Вкладка «Страницы»: строки таблицы { uid, item } (write-through в state.scenes),
+  // эскизы (имя сцены / original_name / индекс → dataURL), выделенная строка,
+  // текущий шаблон редактора и список шаблонов для селекта «Шаблон»
+  scenes: [],
+  sceneThumbnails: {},
+  selectedSceneIndex: -1,
+  currentTemplate: '',
+  templateOptions: [],
 })
 
 let dirUidSeq = 1

@@ -57,57 +57,9 @@
         <ProjectTab />
       </section>
       <!-- TAB 2: PROJECT PAGES / SCENES -->
+      <!-- TAB 2: PROJECT PAGES / SCENES — рендерится Vue-компонентом -->
       <section id="tab-scenes" class="tab-pane">
-        <!-- Scenes Panel -->
-        <div class="scenes-panel" id="scenesPanel">
-          <div class="scenes-toolbar">
-            <div class="scenes-quick-actions">
-              <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check_mark</i> Все</button>
-              <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content_close</i> Снять</button>
-              <button class="btn btn-xs btn-secondary" id="btnRefreshThumbs" title="Перерисовать мини-превью заново: SketchUp по очереди переключится на каждую страницу, снимет свежий эскиз и вернётся на текущую страницу">
-                <i class="modus-icons">refresh</i> Обновить эскизы
-              </button>
-            </div>
-            <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
-            <div class="scenes-quick-actions">
-              <label class="checkbox-label" title="Фон сцены (небо/земля/туман) включается/выключается сразу на всех страницах и на эскизах; водяные знаки — отдельная галка">
-                <input type="checkbox" id="chk_scenes_background">
-                <span>Фон</span>
-              </label>
-              <label class="checkbox-label" title="Водяные знаки из стиля сцены SketchUp включаются/выключаются сразу на всех страницах и на эскизах — независимо от фона">
-                <input type="checkbox" id="chk_scenes_watermarks">
-                <span>Водяной знак</span>
-              </label>
-              <label class="checkbox-label" title="Рамка кадра в окне SketchUp: включить/выключить сразу на всех страницах (индивидуально — в меню кадра строки)">
-                <input type="checkbox" id="chk_scenes_frame_all">
-                <span>Кадр все</span>
-              </label>
-              <button class="btn btn-xs btn-secondary" id="btnApplyTemplateAll" title="Назначить шаблон из первой строки всем сценам сразу">
-                <i class="modus-icons">layers</i> Шаблон всем
-              </button>
-            </div>
-          </div>
-
-          <div class="table-container">
-            <table class="scenes-table" id="scenesTable">
-              <thead>
-                <tr>
-                  <th width="34" class="th-check" title="Включить в экспорт">Вкл</th>
-                  <th width="44" class="th-order" title="Перетащите строку мышью для изменения порядка следования">№</th>
-                  <th width="108" class="th-preview" title="Мини предпросмотр страницы (3:2)">Превью</th>
-                  <th>Сцена / Описание</th>
-                  <th width="92" class="th-aspect" title="Пропорции кадра, рамка и видовой экран — индивидуально для каждой страницы (меню открывается кликом)">Кадр</th>
-                  <th width="74" class="th-scale" title="Размещение картинки на странице, % от листа — индивидуально для каждой страницы">Масштаб</th>
-                  <th width="64" class="th-align" title="Выравнивание эскиза на странице — индивидуально для каждой страницы">Выравн.</th>
-                  <th width="120" title="Шаблон страницы, назначаемый этой сцене">Шаблон</th>
-                </tr>
-              </thead>
-              <tbody id="scenesTableBody">
-                <!-- Dynamically populated via JS -->
-              </tbody>
-            </table>
-          </div>
-        </div>
+        <ScenesTab />
       </section>
 
       <!-- TAB 3: TEMPLATE SETTINGS -->
@@ -522,4 +474,5 @@ import SettingsTab from './components/SettingsTab.vue'
 import HistoryTab from './components/HistoryTab.vue'
 import SendTab from './components/SendTab.vue'
 import ProjectTab from './components/ProjectTab.vue'
+import ScenesTab from './components/ScenesTab.vue'
 </script>

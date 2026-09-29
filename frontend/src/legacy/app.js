@@ -519,7 +519,7 @@ const DEFAULT_LAYOUTS = {
 
     // Tab 2 Elements: Scenes & Layout Split View
     layoutTplUsageBadge: document.getElementById("layoutTplUsageBadge"),
-    scenesTableBody: document.getElementById("scenesTableBody"),
+    // Таблица сцен рендерится Vue-компонентом ScenesTab.vue
     btnSelectAllScenes: document.getElementById("btnSelectAllScenes"),
     btnDeselectAllScenes: document.getElementById("btnDeselectAllScenes"),
     btnApplyTemplateAll: document.getElementById("btnApplyTemplateAll"),
@@ -1240,6 +1240,7 @@ const DEFAULT_LAYOUTS = {
   function selectTemplate(tplKey) {
     flushAutoSave();
     layoutState.currentTemplate = tplKey;
+    ui.currentTemplate = tplKey;
     const tplDef = getTemplateDef(tplKey);
 
     // Если в выбранном шаблоне выключен видовой экран, выключаем оверлей
@@ -1376,9 +1377,11 @@ const DEFAULT_LAYOUTS = {
     renderScenesTable();
     if (fallbackKey) {
       layoutState.currentTemplate = fallbackKey;
+      ui.currentTemplate = layoutState.currentTemplate;
       selectTemplate(fallbackKey);
     } else {
       layoutState.currentTemplate = "";
+      ui.currentTemplate = layoutState.currentTemplate;
       renderTemplateSettingsList(true);
       updateLayoutUsageBadge();
     }
@@ -3507,8 +3510,6 @@ function updateParamModalPreview() {
     notifyChange();
   }
 
-  let draggedSceneIndex = null;
-
   function updateSceneBadge() {
     const activeCount = (state.scenes || []).filter(s => s.enabled !== false && s.page_type !== "skip").length;
     const totalCount = (state.scenes || []).length;
@@ -3568,148 +3569,19 @@ function updateParamModalPreview() {
     syncCurrentSceneOverlay(scene, null, true);
   }
 
-  // Highlight active scene row in table
+  // Выделение строки сцены: layoutState — источник для legacy, ui — для Vue-классов
   function highlightActiveSceneRow(index) {
-    if (!els.scenesTableBody) return;
-    const rows = els.scenesTableBody.querySelectorAll("tr");
-    rows.forEach((row, idx) => {
-      if (idx === index) {
-        row.classList.add("selected-scene-row");
-      } else {
-        row.classList.remove("selected-scene-row");
-      }
-    });
+    layoutState.selectedSceneIndex = index;
+    ui.selectedSceneIndex = index;
   }
 
-  // Update frame menu button label in scenes table row
-  function updateSceneTableAspectCell(index, ratio) {
-    if (!els.scenesTableBody) return;
-    const row = els.scenesTableBody.querySelector(`tr[data-index="${index}"]`);
-    if (!row) return;
-    const frameBtn = row.querySelector(".scene-frame-btn");
-    if (frameBtn) {
-      const r = (ratio || "4:3").trim();
-      const label = frameBtn.querySelector(".scene-frame-ratio");
-      if (label) label.textContent = r.toLowerCase() === "page" ? "По листу" : r;
-    }
-  }
+  // Выравнивание (глифы/подписи) и попапы кадра перенесены в ScenesTab.vue;
+  // мини-превью страницы рендерится декларативно из ui.sceneThumbnails.
 
-  // Обновить индикаторы рамки кадра во всех строках таблицы (без перерендера таблицы)
-  function updateSceneTableFrameStates() {
-    if (!els.scenesTableBody) return;
-    const rows = els.scenesTableBody.querySelectorAll("tr");
-    rows.forEach((row) => {
-      const idx = parseInt(row.dataset.index, 10);
-      const scene = (state.scenes || [])[idx];
-      if (!scene) return;
-      const btn = row.querySelector(".scene-frame-btn");
-      if (btn) btn.classList.toggle("frame-on", scene.frame_overlay === true);
-      const chk = row.querySelector(".scene-frame-check");
-      if (chk) chk.checked = scene.frame_overlay === true;
-    });
-  }
-
-  // -------------------------------------------------------------
-  // Выравнивание эскиза на странице — постраничная настройка, сетка 3×3
-  // -------------------------------------------------------------
-  const ALIGN_GLYPHS = {
-    "left|top": "↖", "center|top": "↑", "right|top": "↗",
-    "left|center": "←", "center|center": "•", "right|center": "→",
-    "left|bottom": "↙", "center|bottom": "↓", "right|bottom": "↘"
-  };
-  const SCENE_ALIGN_H = ["left", "center", "right"];
-  const SCENE_ALIGN_V = ["top", "center", "bottom"];
-
-  function alignGlyph(h, v) {
-    return ALIGN_GLYPHS[`${h}|${v}`] || "•";
-  }
-
-  function sceneAlignTitle(h, v) {
-    const H = { left: "по левому краю", center: "по центру", right: "по правому краю" };
-    const V = { top: "по верху", center: "по центру", bottom: "по низу" };
-    if (h === "center" && v === "center") return "по центру страницы";
-    if (v === "center") return `по горизонтали ${H[h] || h}`;
-    if (h === "center") return `по вертикали ${V[v] || v}`;
-    return `${H[h] || h} · ${V[v] || v}`;
-  }
-
-  function closeSceneAlignPopover() {
-    const pop = document.getElementById("sceneAlignPopover");
-    if (pop) pop.remove();
-    document.removeEventListener("click", closeSceneAlignPopover);
-    document.removeEventListener("keydown", closeSceneAlignPopover);
-  }
-
-  function closeSceneFramePopover() {
-    const pop = document.getElementById("sceneFramePopover");
-    if (pop) pop.remove();
-    document.removeEventListener("click", closeSceneFramePopover);
-    document.removeEventListener("keydown", closeSceneFramePopover);
-  }
-
-  // Create mini page preview element for a scene (3:2 clean image, no blue lines)
-  function createMiniPagePreview(scene, index) {
-    const tplKey = scene.page_type || "cover";
-    const tplDefObj = getTemplateDef(tplKey);
-    const wrap = document.createElement("div");
-    wrap.className = "scene-mini-preview-wrap";
-
-    const thumbBox = document.createElement("div");
-    thumbBox.className = "scene-mini-sheet";
-    thumbBox.dataset.index = index;
-    thumbBox.dataset.template = tplKey;
-    thumbBox.title = `Сцена ${index + 1}: ${scene.name || "Сцена"}\nНажмите для перехода к этому виду в SketchUp`;
-
-    // Check if thumbnail exists
-    const sceneKey = scene.name || scene.original_name || "";
-    const thumbUrl = scene.thumbnail || sceneThumbnails[sceneKey] || sceneThumbnails[scene.original_name] || sceneThumbnails[index];
-
-    if (thumbUrl) {
-      const img = document.createElement("img");
-      img.src = thumbUrl;
-      img.alt = scene.name || "Preview";
-      img.className = "mini-sheet-img";
-      thumbBox.appendChild(img);
-    } else {
-      const placeholder = document.createElement("div");
-      placeholder.className = "mini-sheet-placeholder";
-      placeholder.innerHTML = `<span class="mini-sheet-placeholder-icon"><i class="modus-icons" style="font-size: 18px; color: var(--text-dim, #6a6e79);">insert_photo</i></span>`;
-      thumbBox.appendChild(placeholder);
-    }
-
-    // Click on thumbnail switches scene in SketchUp (stays on current tab)
-    thumbBox.addEventListener("click", (e) => {
-      e.stopPropagation();
-      layoutState.selectedSceneIndex = index;
-      selectTemplate(scene.page_type || "cover");
-      highlightActiveSceneRow(index);
-      switchToSketchupScene(scene, index);
-    });
-
-    wrap.appendChild(thumbBox);
-    return wrap;
-  }
-
-  // Update existing scene preview sheets in table without re-rendering inputs
-  function updateSceneTablePreviews() {
-    if (!els.scenesTableBody) return;
-    const rows = els.scenesTableBody.querySelectorAll("tr");
-    rows.forEach((row) => {
-      const idx = parseInt(row.dataset.index, 10);
-      const scene = (state.scenes || [])[idx];
-      if (scene) {
-        const cell = row.querySelector(".scene-preview-cell");
-        if (cell) {
-          cell.innerHTML = "";
-          cell.appendChild(createMiniPagePreview(scene, idx));
-        }
-      }
-    });
-  }
-
-  // Render Scenes Table
+  // Render Scenes Table: источник — state.scenes, рендер — Vue-компонент
+  // ScenesTab.vue (ui.scenes, write-through). Здесь только синхронизация,
+  // галки тулбара и запрос эскизов.
   function renderScenesTable() {
-    els.scenesTableBody.innerHTML = "";
     const scenes = state.scenes || [];
     updateSceneBadge();
 
@@ -3726,498 +3598,16 @@ function updateParamModalPreview() {
       els.chkScenesFrameAll.checked = scenes.length > 0 && scenes.every((s) => s.frame_overlay === true);
     }
 
-    scenes.forEach((scene, index) => {
-      const tr = document.createElement("tr");
-      tr.setAttribute("draggable", "true");
-      tr.dataset.index = index;
-
-      if (scene.page_type === layoutState.currentTemplate) {
-        tr.classList.add("active-split-scene");
-      }
-      if (layoutState.selectedSceneIndex === index) {
-        tr.classList.add("selected-scene-row");
-      }
-
-      // 1. Checkbox (Вкл)
-      const tdCheck = document.createElement("td");
-      tdCheck.className = "scene-check-cell";
-
-      const chk = document.createElement("input");
-      chk.type = "checkbox";
-      chk.checked = scene.enabled !== false;
-      chk.title = "Включить / исключить сцену из экспорта в PDF";
-      chk.addEventListener("change", (e) => {
-        scene.enabled = e.target.checked;
-        updateSceneBadge();
-        renderLayoutCanvas();
-        updateLayoutUsageBadge();
-        notifyChange();
-      });
-      chk.addEventListener("click", (e) => e.stopPropagation());
-      tdCheck.appendChild(chk);
-
-      // 2. Order & Drag Handle (Перемещение и номер)
-      const tdNum = document.createElement("td");
-      tdNum.className = "scene-num-cell";
-      tdNum.title = "Перетащите строку мышью для изменения порядка";
-
-      const numRow = document.createElement("div");
-      numRow.className = "scene-num-row";
-      const dragHandle = document.createElement("span");
-      dragHandle.className = "drag-handle";
-      dragHandle.textContent = "⠿";
-      dragHandle.title = "Перетащите мышью для изменения порядка";
-      const rowNum = document.createElement("span");
-      rowNum.className = "row-num";
-      rowNum.textContent = index + 1;
-      numRow.appendChild(dragHandle);
-      numRow.appendChild(rowNum);
-      tdNum.appendChild(numRow);
-
-      // 3. Mini Preview of Page (Мини превью страницы)
-      const tdPreview = document.createElement("td");
-      tdPreview.className = "scene-preview-cell";
-      tdPreview.appendChild(createMiniPagePreview(scene, index));
-
-      // Scene Name & Description (two rows in one cell)
-      const tdInfo = document.createElement("td");
-      tdInfo.className = "scene-info-cell";
-
-      const infoWrap = document.createElement("div");
-      infoWrap.className = "scene-info-wrap";
-
-      const inputName = document.createElement("input");
-      inputName.type = "text";
-      inputName.className = "table-input scene-name-input";
-      inputName.value = scene.name || "";
-      inputName.placeholder = "Название сцены...";
-      inputName.title = "Редактировать название сцены";
-      inputName.addEventListener("focus", () => {
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-      inputName.addEventListener("input", (e) => {
-        scene.name = e.target.value;
-        renderLayoutCanvas();
-      });
-      inputName.addEventListener("change", (e) => {
-        scene.name = e.target.value.trim();
-        e.target.value = scene.name;
-        renderTemplateSettingsList();
-        updateLayoutUsageBadge();
-        notifyChange();
-      });
-      inputName.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") inputName.blur();
-      });
-      inputName.addEventListener("click", (e) => e.stopPropagation());
-
-      const inputDesc = document.createElement("input");
-      inputDesc.type = "text";
-      inputDesc.className = "table-input scene-desc-input";
-      inputDesc.value = scene.description || "";
-      inputDesc.placeholder = "Описание на листе...";
-      inputDesc.title = "Описание / примечание на листе";
-      inputDesc.addEventListener("focus", () => {
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-      inputDesc.addEventListener("input", (e) => {
-        scene.description = e.target.value;
-        renderLayoutCanvas();
-      });
-      inputDesc.addEventListener("change", (e) => {
-        scene.description = e.target.value.trim();
-        e.target.value = scene.description;
-        renderTemplateSettingsList();
-        notifyChange();
-      });
-      inputDesc.addEventListener("keydown", (e) => {
-        if (e.key === "Enter") inputDesc.blur();
-      });
-      inputDesc.addEventListener("click", (e) => e.stopPropagation());
-
-      infoWrap.appendChild(inputName);
-      infoWrap.appendChild(inputDesc);
-      tdInfo.appendChild(infoWrap);
-
-      // 4. Frame Cell (Кадр) — постраничные пропорции и рамка кадра (меню)
-      const tdAspect = document.createElement("td");
-      tdAspect.className = "scene-aspect-cell";
-      const ASPECT_OPTIONS = [["3:2", "3:2"], ["4:3", "4:3"], ["5:4", "5:4"], ["16:9", "16:9"], ["1:1", "1:1"], ["4:5", "4:5"], ["page", "По листу"]];
-      const curRatio = (scene.aspect_ratio || "4:3").trim();
-      const sceneRatio = ASPECT_OPTIONS.some(([val]) => val === curRatio) ? curRatio : "4:3";
-      const ratioLabel = (val) => (String(val).toLowerCase() === "page" ? "По листу" : val);
-
-      const frameBtn = document.createElement("button");
-      frameBtn.type = "button";
-      frameBtn.className = "scene-frame-btn" + (scene.frame_overlay === true ? " frame-on" : "");
-      frameBtn.innerHTML =
-        `<span class="scene-frame-ratio">${ratioLabel(sceneRatio)}</span>` +
-        `<span class="scene-frame-dot"></span>` +
-        `<i class="modus-icons scene-frame-caret">expand_more</i>`;
-      frameBtn.title = "Пропорции кадра для этой страницы";
-      frameBtn.addEventListener("focus", () => {
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-
-      // Рамка кадра — постраничный флаг отображения Safe Frame Overlay в окне SketchUp
-      const frameChk = document.createElement("input");
-      frameChk.type = "checkbox";
-      frameChk.className = "scene-frame-check";
-      frameChk.checked = scene.frame_overlay === true;
-      frameChk.title = "Рамка кадра для этой страницы (вкл/выкл)";
-      frameChk.addEventListener("click", (e) => e.stopPropagation());
-      frameChk.addEventListener("change", (ev) => {
-        const on = ev.target.checked;
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-        scene.frame_overlay = on;
-        frameBtn.classList.toggle("frame-on", on);
-        callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, scene_index: index }));
-        if (on && layoutState.selectedSceneIndex === index) {
-          syncCurrentSceneOverlay(scene, null, true);
-        }
-        notifyChange();
-      });
-
-      frameBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-
-        const existing = document.getElementById("sceneFramePopover");
-        if (existing) {
-          closeSceneFramePopover();
-          return;
-        }
-        const pop = document.createElement("div");
-        pop.id = "sceneFramePopover";
-        pop.className = "scene-frame-pop";
-        pop.addEventListener("click", (ev) => ev.stopPropagation());
-
-        // Пропорции кадра
-        const ratioTitle = document.createElement("div");
-        ratioTitle.className = "scene-frame-pop-title";
-        ratioTitle.textContent = "Пропорции кадра";
-        pop.appendChild(ratioTitle);
-
-        const ratioGrid = document.createElement("div");
-        ratioGrid.className = "scene-frame-ratio-grid";
-        ASPECT_OPTIONS.forEach(([val, label]) => {
-          const optBtn = document.createElement("button");
-          optBtn.type = "button";
-          optBtn.className = "scene-frame-ratio-opt" + (val === sceneRatio ? " active" : "");
-          optBtn.textContent = label;
-          optBtn.title = `Пропорции кадра ${label}`;
-          optBtn.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            // Пропорции — персональная настройка страницы (scene.aspect_ratio);
-            // в блок шаблона не пишем, чтобы не менять другие страницы шаблона
-            scene.aspect_ratio = val;
-            const labelSpan = frameBtn.querySelector(".scene-frame-ratio");
-            if (labelSpan) labelSpan.textContent = ratioLabel(val);
-            pop.querySelectorAll(".scene-frame-ratio-opt").forEach((b) => b.classList.toggle("active", b === optBtn));
-            if (layoutState.selectedSceneIndex === index) {
-              syncCurrentSceneOverlay(scene, val, true);
-            }
-            notifyChange();
-            closeSceneFramePopover();
-          });
-          ratioGrid.appendChild(optBtn);
-        });
-        pop.appendChild(ratioGrid);
-
-        pop.style.position = "fixed";
-        document.body.appendChild(pop);
-        const btnRect = frameBtn.getBoundingClientRect();
-        const popRect = pop.getBoundingClientRect();
-        pop.style.left = `${Math.round(btnRect.left + btnRect.width / 2)}px`;
-        pop.style.transform = "translateX(-50%)";
-        const spaceBelow = window.innerHeight - btnRect.bottom;
-        if (spaceBelow < popRect.height + 8) {
-          pop.style.top = `${Math.round(btnRect.top)}px`;
-          pop.style.transform = "translate(-50%, -100%)";
-        } else {
-          pop.style.top = `${Math.round(btnRect.bottom + 4)}px`;
-        }
-        setTimeout(() => {
-          document.addEventListener("click", closeSceneFramePopover, { once: true });
-          document.addEventListener("keydown", closeSceneFramePopover, { once: true });
-        }, 0);
-      });
-      const frameCtrl = document.createElement("div");
-      frameCtrl.className = "scene-frame-ctrl";
-      frameCtrl.appendChild(frameBtn);
-      frameCtrl.appendChild(frameChk);
-      tdAspect.appendChild(frameCtrl);
-
-      // 5. Scale Cell (Масштаб) — постраничное размещение на листе
-      const tdScale = document.createElement("td");
-      tdScale.className = "scene-scale-cell";
-      const selScale = document.createElement("select");
-      selScale.className = "table-select scene-scale-select";
-      selScale.title = "Размещение картинки на странице (% от листа)";
-      [60, 70, 80, 90, 100].forEach((pct) => {
-        const opt = document.createElement("option");
-        opt.value = String(pct);
-        opt.textContent = `${pct}%`;
-        selScale.appendChild(opt);
-      });
-      selScale.value = String(parseInt(scene.scale_pct, 10) || 100);
-      selScale.addEventListener("focus", () => {
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-      selScale.addEventListener("change", (e) => {
-        const scale = parseInt(e.target.value, 10) || 100;
-        scene.scale_pct = scale;
-        updateBlockSlot("image_4_3", { scale_pct: scale });
-        if (layoutState.selectedSceneIndex === index) {
-          syncCurrentSceneOverlay(scene, null, true);
-        }
-        notifyChange();
-      });
-      selScale.addEventListener("click", (e) => e.stopPropagation());
-      tdScale.appendChild(selScale);
-
-      // 6. Align Cell (Выравнивание) — постраничное выравнивание эскиза (сетка 3×3)
-      const tdAlign = document.createElement("td");
-      tdAlign.className = "scene-align-cell";
-      const alignBtn = document.createElement("button");
-      alignBtn.type = "button";
-      alignBtn.className = "scene-align-btn";
-      const sceneAlignH = SCENE_ALIGN_H.includes(scene.align_h) ? scene.align_h : "center";
-      const sceneAlignV = SCENE_ALIGN_V.includes(scene.align_v) ? scene.align_v : "center";
-      alignBtn.textContent = alignGlyph(sceneAlignH, sceneAlignV);
-      alignBtn.title = `Выравнивание эскиза: ${sceneAlignTitle(sceneAlignH, sceneAlignV)}`;
-      alignBtn.addEventListener("click", (e) => {
-        e.stopPropagation();
-        const existing = document.getElementById("sceneAlignPopover");
-        if (existing) {
-          closeSceneAlignPopover();
-          return;
-        }
-        const pop = document.createElement("div");
-        pop.id = "sceneAlignPopover";
-        pop.className = "scene-align-pop";
-        pop.addEventListener("click", (ev) => ev.stopPropagation());
-        [
-          ["left", "top"], ["center", "top"], ["right", "top"],
-          ["left", "center"], ["center", "center"], ["right", "center"],
-          ["left", "bottom"], ["center", "bottom"], ["right", "bottom"]
-        ].forEach(([h, v]) => {
-          const optBtn = document.createElement("button");
-          optBtn.type = "button";
-          optBtn.className = "scene-align-opt" + (h === sceneAlignH && v === sceneAlignV ? " active" : "");
-          optBtn.textContent = alignGlyph(h, v);
-          optBtn.title = sceneAlignTitle(h, v);
-          optBtn.addEventListener("click", (ev) => {
-            ev.stopPropagation();
-            scene.align_h = h;
-            scene.align_v = v;
-            alignBtn.textContent = alignGlyph(h, v);
-            alignBtn.title = `Выравнивание эскиза: ${sceneAlignTitle(h, v)}`;
-            closeSceneAlignPopover();
-            notifyChange();
-          });
-          pop.appendChild(optBtn);
-        });
-        pop.style.position = "fixed";
-        document.body.appendChild(pop);
-        const btnRect = alignBtn.getBoundingClientRect();
-        const popRect = pop.getBoundingClientRect();
-        pop.style.left = `${Math.round(btnRect.left + btnRect.width / 2)}px`;
-        pop.style.transform = "translateX(-50%)";
-        const spaceBelow = window.innerHeight - btnRect.bottom;
-        if (spaceBelow < popRect.height + 8) {
-          pop.style.top = `${Math.round(btnRect.top)}px`;
-          pop.style.transform = "translate(-50%, -100%)";
-        } else {
-          pop.style.top = `${Math.round(btnRect.bottom + 4)}px`;
-        }
-        setTimeout(() => {
-          document.addEventListener("click", closeSceneAlignPopover, { once: true });
-          document.addEventListener("keydown", closeSceneAlignPopover, { once: true });
-        }, 0);
-      });
-      tdAlign.appendChild(alignBtn);
-
-      // 5. Page Type Select
-      const tdType = document.createElement("td");
-      tdType.className = "scene-type-cell";
-      const typeWrap = document.createElement("div");
-      typeWrap.className = "scene-template-cell-wrap";
-
-      const selType = document.createElement("select");
-      selType.className = "table-select";
-      const allTemplates = getAllTemplates();
-      allTemplates.forEach((t) => {
-        const opt = document.createElement("option");
-        opt.value = t.key;
-        opt.textContent = t.name; // в списке страниц — только имя шаблона
-        if (t.description) opt.title = t.description; // описание — в подсказке при наведении
-        if (scene.page_type === t.key) opt.selected = true;
-        selType.appendChild(opt);
-      });
-      if (scene.page_type && !allTemplates.some((t) => t.key === scene.page_type)) {
-        const opt = document.createElement("option");
-        opt.value = scene.page_type;
-        opt.textContent = scene.page_type;
-        opt.selected = true;
-        selType.appendChild(opt);
-      }
-      // Подсказка на закрытом селекте — описание выбранного шаблона
-      const selectedTpl = allTemplates.find((t) => t.key === scene.page_type) || allTemplates[0];
-      if (selectedTpl && selectedTpl.description) {
-        selType.title = selectedTpl.description;
-      }
-      selType.addEventListener("focus", () => {
-        layoutState.selectedSceneIndex = index;
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-      selType.addEventListener("change", (e) => {
-        scene.page_type = e.target.value;
-        layoutState.selectedSceneIndex = index;
-        updateSceneBadge();
-        selectTemplate(e.target.value);
-        updateLayoutUsageBadge();
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-        const prevCell = tr.querySelector(".scene-preview-cell");
-        if (prevCell) {
-          prevCell.innerHTML = "";
-          prevCell.appendChild(createMiniPagePreview(scene, index));
-        }
-        notifyChange();
-      });
-      selType.addEventListener("click", (e) => e.stopPropagation());
-
-      const btnEditTpl = document.createElement("button");
-      btnEditTpl.type = "button";
-      btnEditTpl.className = "btn-goto-template";
-      btnEditTpl.title = "Перейти к настройке этого шаблона страницы";
-      btnEditTpl.innerHTML = '<i class="modus-icons" style="font-size: 13px;">settings</i>';
-      btnEditTpl.addEventListener("click", (e) => {
-        e.stopPropagation();
-        layoutState.selectedSceneIndex = index;
-        selectTemplate(scene.page_type || (allTemplates[0] ? allTemplates[0].key : ""));
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-        switchToTab("tab-templates");
-      });
-
-      typeWrap.appendChild(selType);
-      typeWrap.appendChild(btnEditTpl);
-      tdType.appendChild(typeWrap);
-
-      // Drag and Drop event listeners for row reordering
-      tr.addEventListener("mousedown", (e) => {
-        if (e.target.closest("input, select, button, a")) {
-          tr.setAttribute("draggable", "false");
-        } else {
-          tr.setAttribute("draggable", "true");
-        }
-      });
-
-      tr.addEventListener("mouseup", () => {
-        tr.setAttribute("draggable", "true");
-      });
-
-      tr.addEventListener("dragstart", (e) => {
-        draggedSceneIndex = index;
-        tr.classList.add("dragging");
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("text/plain", index.toString());
-      });
-
-      tr.addEventListener("dragend", () => {
-        tr.classList.remove("dragging");
-        draggedSceneIndex = null;
-        els.scenesTableBody.querySelectorAll("tr").forEach((row) => {
-          row.classList.remove("drag-over-top", "drag-over-bottom");
-        });
-      });
-
-      tr.addEventListener("dragover", (e) => {
-        e.preventDefault();
-        e.dataTransfer.dropEffect = "move";
-        if (draggedSceneIndex === null || draggedSceneIndex === index) return;
-
-        const rect = tr.getBoundingClientRect();
-        const relY = e.clientY - rect.top;
-        const isTop = relY < rect.height / 2;
-
-        tr.classList.toggle("drag-over-top", isTop);
-        tr.classList.toggle("drag-over-bottom", !isTop);
-      });
-
-      tr.addEventListener("dragleave", () => {
-        tr.classList.remove("drag-over-top", "drag-over-bottom");
-      });
-
-      tr.addEventListener("drop", (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        tr.classList.remove("drag-over-top", "drag-over-bottom");
-
-        if (draggedSceneIndex === null || draggedSceneIndex === index) return;
-
-        const rect = tr.getBoundingClientRect();
-        const relY = e.clientY - rect.top;
-        const isTop = relY < rect.height / 2;
-
-        let dropIndex = index;
-        if (!isTop) {
-          dropIndex = index + 1;
-        }
-        if (draggedSceneIndex < dropIndex) {
-          dropIndex -= 1;
-        }
-
-        if (dropIndex !== draggedSceneIndex) {
-          const item = state.scenes.splice(draggedSceneIndex, 1)[0];
-          state.scenes.splice(dropIndex, 0, item);
-          state.scenes.forEach((s, idx) => (s.order = idx));
-          renderScenesTable();
-          updateLayoutUsageBadge();
-          const tplTab = document.getElementById("tab-templates");
-          if (tplTab && tplTab.classList.contains("active")) {
-            renderLayoutCanvas();
-          }
-          notifyChange();
-        }
-      });
-
-      // Click on row to focus template, select scene, and switch SketchUp scene
-      tr.addEventListener("click", () => {
-        const tpl = scene.page_type || "cover";
-        layoutState.selectedSceneIndex = index;
-        selectTemplate(tpl);
-        updateLayoutUsageBadge();
-        highlightActiveSceneRow(index);
-        switchToSketchupScene(scene, index);
-      });
-
-      tr.appendChild(tdCheck);
-      tr.appendChild(tdNum);
-      tr.appendChild(tdPreview);
-      tr.appendChild(tdInfo);
-      tr.appendChild(tdAspect);
-      tr.appendChild(tdScale);
-      tr.appendChild(tdAlign);
-      tr.appendChild(tdType);
-
-      els.scenesTableBody.appendChild(tr);
+    const oldEntries = ui.scenes;
+    ui.scenes = scenes.map((item, idx) => {
+      const uid = "sc" + idx + "-" + (item.name || "") + "-" + (item.original_name || "");
+      const prev = oldEntries[idx];
+      return prev && prev.uid === uid ? prev : { uid, item };
     });
+
+    // Свежий список шаблонов для селекта «Шаблон» (перестраивается при каждом
+    // рендере таблицы — как в оригинале)
+    ui.templateOptions = getAllTemplates().map((t) => ({ key: t.key, name: t.name, description: t.description || "" }));
 
     updateLayoutUsageBadge();
 
@@ -4810,7 +4200,6 @@ function updateParamModalPreview() {
       els.chkScenesFrameAll.addEventListener("change", (e) => {
         const on = e.target.checked;
         (state.scenes || []).forEach((s) => { s.frame_overlay = on; });
-        updateSceneTableFrameStates();
         callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, all: true }));
         notifyChange();
       });
@@ -5196,6 +4585,7 @@ function updateParamModalPreview() {
       const tplKeys = Object.keys(state.pdf_settings?.custom_layouts || {});
       if (!tplKeys.includes(layoutState.currentTemplate)) {
         layoutState.currentTemplate = tplKeys[0] || "";
+        ui.currentTemplate = layoutState.currentTemplate;
       }
       syncDirectoriesSpecifications();
       renderUI();
@@ -5237,6 +4627,7 @@ function updateParamModalPreview() {
 
       if (!keys.includes(layoutState.currentTemplate)) {
         layoutState.currentTemplate = fallbackKey;
+      ui.currentTemplate = layoutState.currentTemplate;
       }
 
       syncTemplateDropdowns();
@@ -5245,6 +4636,7 @@ function updateParamModalPreview() {
         selectTemplate(fallbackKey);
       } else {
         layoutState.currentTemplate = "";
+      ui.currentTemplate = layoutState.currentTemplate;
         renderTemplateSettingsList(true);
         renderTemplatesList();
         updateLayoutUsageBadge();
@@ -5375,7 +4767,6 @@ function updateParamModalPreview() {
       const scenes = state.scenes || [];
       if (typeof index !== "number" || index < 0 || index >= scenes.length) return;
       if (layoutState.selectedSceneIndex === index) return;
-      layoutState.selectedSceneIndex = index;
       highlightActiveSceneRow(index);
     },
 
@@ -5393,7 +4784,6 @@ function updateParamModalPreview() {
       const scene = (state.scenes || [])[idx];
       if (scene) {
         scene.aspect_ratio = ratio;
-        updateSceneTableAspectCell(idx, ratio);
       }
       updateBlockSlot("image_4_3", { aspect_ratio: ratio });
       if (!state.pdf_settings) state.pdf_settings = {};
@@ -5408,7 +4798,7 @@ function updateParamModalPreview() {
       const gotThumbs = thumbs && typeof thumbs === "object" && Object.keys(thumbs).length > 0;
       if (thumbs && typeof thumbs === "object") {
         Object.assign(sceneThumbnails, thumbs);
-        updateSceneTablePreviews();
+        ui.sceneThumbnails = Object.assign({}, sceneThumbnails);
       }
       sceneThumbnailsSig = sceneThumbnailsSignature();
       if (sceneThumbsManualRequest) {
@@ -5425,7 +4815,7 @@ function updateParamModalPreview() {
       if (Array.isArray(scenes)) {
         state.scenes = scenes;
         if (layoutState.selectedSceneIndex >= scenes.length) {
-          layoutState.selectedSceneIndex = Math.max(0, scenes.length - 1);
+          highlightActiveSceneRow(Math.max(0, scenes.length - 1));
         }
       }
       renderScenesTable();
@@ -5437,6 +4827,125 @@ function updateParamModalPreview() {
 
     syncCurrentTemplateOverlay: syncCurrentTemplateOverlay
   };
+
+  // -------------------------------------------------------------
+  // Мосты для ScenesTab.vue: действия строк таблицы страниц
+  // -------------------------------------------------------------
+  // Клик/фокус по строке: выделение, (опционально) выбор шаблона, сцена в SketchUp
+  function focusScene(index, withTemplate) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    highlightActiveSceneRow(index);
+    if (withTemplate !== false) {
+      selectTemplate(scene.page_type || "cover");
+    }
+    updateLayoutUsageBadge();
+    switchToSketchupScene(scene, index);
+  }
+
+  // Галка «Вкл» в строке
+  function sceneEnabledChanged() {
+    updateSceneBadge();
+    renderLayoutCanvas();
+    updateLayoutUsageBadge();
+    notifyChange();
+  }
+
+  // Ввод названия/описания: живое обновление WYSIWYG-канвы
+  function sceneTextChanged() {
+    renderLayoutCanvas();
+  }
+
+  // Фиксация названия/описания (change): trim + пересчёт списков
+  function sceneNameCommitted(index) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    scene.name = String(scene.name || "").trim();
+    ui.scenes[index].item.name = scene.name;
+    renderTemplateSettingsList();
+    updateLayoutUsageBadge();
+    notifyChange();
+  }
+
+  function sceneDescCommitted(index) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    scene.description = String(scene.description || "").trim();
+    ui.scenes[index].item.description = scene.description;
+    renderTemplateSettingsList();
+    notifyChange();
+  }
+
+  // Галка рамки кадра в строке
+  function sceneFrameToggled(index, on) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    highlightActiveSceneRow(index);
+    switchToSketchupScene(scene, index);
+    callRuby("toggleAspectOverlay", JSON.stringify({ enabled: on, scene_index: index }));
+    if (on && layoutState.selectedSceneIndex === index) {
+      syncCurrentSceneOverlay(scene, null, true);
+    }
+    notifyChange();
+  }
+
+  // Выбор пропорции в попапе кадра (scene.aspect_ratio уже записан Vue)
+  function sceneRatioPicked(index, val) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    if (layoutState.selectedSceneIndex === index) {
+      syncCurrentSceneOverlay(scene, val, true);
+    }
+    notifyChange();
+  }
+
+  // Смена масштаба (scene.scale_pct уже записан Vue)
+  function sceneScaleChanged(index, scale) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    updateBlockSlot("image_4_3", { scale_pct: scale });
+    if (layoutState.selectedSceneIndex === index) {
+      syncCurrentSceneOverlay(scene, null, true);
+    }
+    notifyChange();
+  }
+
+  // Смена шаблона страницы в строке
+  function scenePageTypeChanged(index, val) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    highlightActiveSceneRow(index);
+    updateSceneBadge();
+    selectTemplate(val);
+    updateLayoutUsageBadge();
+    switchToSketchupScene(scene, index);
+    notifyChange();
+  }
+
+  // Кнопка «к шаблону» в строке: перейти к настройке шаблона страницы
+  function gotoTemplateEditor(index) {
+    const scene = (state.scenes || [])[index];
+    if (!scene) return;
+    highlightActiveSceneRow(index);
+    const allTemplates = getAllTemplates();
+    selectTemplate(scene.page_type || (allTemplates[0] ? allTemplates[0].key : ""));
+    switchToSketchupScene(scene, index);
+    switchToTab("tab-templates");
+  }
+
+  // Drop переупорядочивания строк (ui.scenes уже переставлен Vue)
+  function commitScenesReorder(from, to) {
+    const item = state.scenes.splice(from, 1)[0];
+    state.scenes.splice(to, 0, item);
+    state.scenes.forEach((s, idx) => (s.order = idx));
+    updateSceneBadge();
+    updateLayoutUsageBadge();
+    const tplTab = document.getElementById("tab-templates");
+    if (tplTab && tplTab.classList.contains("active")) {
+      renderLayoutCanvas();
+    }
+    notifyChange();
+  }
 
   // Мост для Vue-компонентов на время миграции: они вызывают бизнес-логику отсюда
   window.legacy = {
@@ -5456,6 +4965,17 @@ function updateParamModalPreview() {
     removeStadia,
     commitStadia,
     addStadia,
+    focusScene,
+    sceneEnabledChanged,
+    sceneTextChanged,
+    sceneNameCommitted,
+    sceneDescCommitted,
+    sceneFrameToggled,
+    sceneRatioPicked,
+    sceneScaleChanged,
+    scenePageTypeChanged,
+    gotoTemplateEditor,
+    commitScenesReorder,
     notifyChange,
     callRuby
   };
