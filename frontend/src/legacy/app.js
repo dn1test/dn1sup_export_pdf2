@@ -754,6 +754,58 @@ const DEFAULT_LAYOUTS = {
           }
         }, 50);
       }
+      if (action === "getWorkStats") {
+        setTimeout(() => {
+          if (window.app && window.app.onWorkStats) {
+            const now = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
+            const hm = (d) => pad(d.getHours()) + ":00";
+            const dm = (d) => pad(d.getDate()) + "." + pad(d.getMonth() + 1);
+            const hourly = [];
+            for (let i = 23; i >= 0; i--) {
+              const d = new Date(now); d.setHours(now.getHours() - i, 0, 0, 0);
+              hourly.push({ label: hm(d), seconds: i < 4 ? 2400 - i * 450 : 0 });
+            }
+            const daily = [];
+            for (let i = 29; i >= 0; i--) {
+              const d = new Date(now); d.setDate(now.getDate() - i);
+              const weekend = d.getDay() === 0 || d.getDay() === 6;
+              daily.push({ label: dm(d), seconds: weekend ? 0 : 9000 + ((i * 7919) % 7200) });
+            }
+            const weekly = [];
+            for (let i = 11; i >= 0; i--) {
+              const d = new Date(now); d.setDate(now.getDate() - i * 7);
+              const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
+              const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
+              weekly.push({ label: dm(mon) + "–" + dm(sun), seconds: 36000 + ((i * 4523) % 18000) });
+            }
+            const monthsRu = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
+            const monthly = [];
+            for (let i = 11; i >= 0; i--) {
+              const d = new Date(now.getFullYear(), now.getMonth() - i, 1);
+              monthly.push({ label: monthsRu[d.getMonth()] + " " + d.getFullYear(), seconds: 120000 + ((i * 9973) % 90000) });
+            }
+            const yearly = [];
+            for (let y = now.getFullYear() - 3; y <= now.getFullYear(); y++) {
+              yearly.push({ label: String(y), seconds: y === now.getFullYear() ? 540000 : 800000 + (y % 7) * 40000 });
+            }
+            window.app.onWorkStats({
+              articul: state.project?.articul || "HF#260924_104500",
+              product: state.project?.furniture_name || "",
+              report: {
+                total_seconds: 2160000,
+                today_seconds: 7200,
+                week7_seconds: 61200,
+                month30_seconds: 238500,
+                first_tracked: "2026-06-02",
+                last_tracked: now.toISOString().slice(0, 10),
+                "empty?": false,
+                series: { hourly, daily, weekly, monthly, yearly }
+              }
+            });
+          }
+        }, 50);
+      }
       if (action === "getFolderFiles") {
         try {
           const p = typeof param === "string" ? JSON.parse(param) : param;
