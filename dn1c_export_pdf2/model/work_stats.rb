@@ -18,7 +18,7 @@ module DN1Code
       #     daily:  { "YYYY-MM-DD"    => seconds },
       #     hourly: { "YYYY-MM-DD HH" => seconds } }  # HH — 00..23
       #
-      # Недельные/месячные/годовые разрезы не хранятся — вычисляются из daily
+      # Месячные/годовые разрезы не хранятся — вычисляются из daily
       # в report(). hourly нужен для почасового графика и чистится до
       # HOURLY_KEEP_DAYS дней.
       module WorkStats
@@ -133,9 +133,9 @@ module DN1Code
         # Данные для вкладки «Статистика»: сводки и серии для графиков.
         # @param data [Hash] структура статистики
         # @param now [Time]
-        # @return [Hash] { total_seconds, today_seconds, week7_seconds,
+        # @return [Hash] { total_seconds, today_seconds, weeks3_seconds,
         #   month30_seconds, first_tracked, last_tracked, empty,
-        #   series: { hourly, daily, weekly, monthly, yearly } }
+        #   series: { hourly, daily, monthly, yearly } }
         def report(data, now = Time.now)
           data    = normalize(data)
           daily   = data[:daily]
@@ -144,7 +144,6 @@ module DN1Code
           series = {
             hourly:  hourly_series(data[:hourly], now),
             daily:   daily_series(daily, date),
-            weekly:  weekly_series(daily, date),
             monthly: monthly_series(daily, date),
             yearly:  yearly_series(daily, date)
           }
@@ -152,7 +151,7 @@ module DN1Code
           {
             total_seconds:   data[:total_seconds].to_i,
             today_seconds:   daily[date.strftime("%Y-%m-%d")].to_i,
-            week7_seconds:   window_seconds(daily, date - 6, date),
+            weeks3_seconds:  window_seconds(daily, date - 20, date),
             month30_seconds: window_seconds(daily, date - 29, date),
             first_tracked:   data[:first_tracked],
             last_tracked:    data[:last_tracked],
@@ -194,29 +193,11 @@ module DN1Code
           end
         end
 
+        # Дневной график: последние 3 недели (21 день)
         def daily_series(daily, date)
-          (0...30).reverse_each.map do |i|
+          (0...21).reverse_each.map do |i|
             d = date - i
             { label: d.strftime("%d.%m"), seconds: daily[d.strftime("%Y-%m-%d")].to_i }
-          end
-        end
-
-        # Недели по ISO (начало — понедельник), последние 12 недель
-        def weekly_series(daily, date)
-          monday = date - date.cwday + 1
-          by_week = Hash.new(0)
-          daily.each do |key, sec|
-            d = begin
-              Date.strptime(key, "%Y-%m-%d")
-            rescue ArgumentError
-              next
-            end
-            by_week[(d - d.cwday + 1).strftime("%Y-%m-%d")] += sec.to_i
-          end
-          (0...12).reverse_each.map do |i|
-            ws = monday - i * 7
-            { label: "#{ws.strftime('%d.%m')}–#{(ws + 6).strftime('%d.%m')}",
-              seconds: by_week[ws.strftime("%Y-%m-%d")].to_i }
           end
         end
 

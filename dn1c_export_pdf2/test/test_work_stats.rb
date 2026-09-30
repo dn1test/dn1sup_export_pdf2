@@ -4,8 +4,8 @@
 # Проверка статистики активной работы над проектом (вкладка «Статистика»).
 #
 # Покрывается чистая логика Model::WorkStats (начисление по дням/часам,
-# нормализация, очистка hourly, агрегации для графиков часы/дни/недели/месяцы/
- # годы) и интеграция с ProjectData: round-trip через project.yaml, сброс,
+# нормализация, очистка hourly, агрегации для графиков часы/дни/месяцы/
+# годы) и интеграция с ProjectData: round-trip через project.yaml, сброс,
 # игнорирование секции при импорте YAML.
 #
 # Запуск отдельно:
@@ -103,11 +103,9 @@ module DN1Code
         assert(rep[:series][:hourly][8][:label] == "29.09 23:00" && rep[:series][:hourly][8][:seconds] == 600, "вчерашний час подписан с датой и содержит 600 сек")
         assert(rep[:series][:hourly][9][:label] == "00:00" && rep[:series][:hourly][9][:seconds] == 300, "сегодняшний час 00:00 подписан без даты и содержит 300 сек")
         assert(rep[:series][:hourly][0][:label] == "29.09 15:00", "старейшая точка hourly-серии — 29.09 15:00")
-        assert(rep[:series][:daily].size == 30, "daily-серия содержит 30 точек")
+        assert(rep[:series][:daily].size == 21, "daily-серия содержит 21 точку (3 недели)")
         assert(rep[:series][:daily].last[:seconds] == 300, "последняя точка daily — сегодня (300)")
-        assert(rep[:series][:weekly].size == 12, "weekly-серия содержит 12 точек")
-        current_week = rep[:series][:weekly].last
-        assert(current_week[:seconds] == 4500, "текущая ISO-неделя содержит начисления 29.09 (4200) + 30.09 (300) = 4500 (получилось #{current_week[:seconds]})")
+        assert(rep[:weeks3_seconds] == 4500, "report.weeks3_seconds = сумма за 21 день: 4200 + 300 = 4500 (получилось #{rep[:weeks3_seconds]})")
         assert(rep[:series][:monthly].size == 12, "monthly-серия содержит 12 точек")
         assert(rep[:series][:monthly].last[:seconds] == 4500, "текущий месяц содержит сентябрьские начисления (4500)")
         assert(rep[:series][:yearly].last[:label] == "2026" && rep[:series][:yearly].last[:seconds] == 4560, "годовая серия содержит 2026 = 4560")
@@ -116,7 +114,7 @@ module DN1Code
         # --- report на пустой статистике ---
         empty_rep = STATS.report(STATS.blank_data, now)
         assert(empty_rep[:empty] == true && empty_rep[:total_seconds] == 0, "report пустой статистики: empty = true")
-        assert(empty_rep[:series][:daily].size == 30, "пустой report все равно отдает серии нужной длины")
+        assert(empty_rep[:series][:daily].size == 21, "пустой report все равно отдает серии нужной длины")
         assert(STATS.blank?(STATS.blank_data) == true, "blank? распознает пустую статистику")
       end
 

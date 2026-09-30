@@ -24,38 +24,23 @@
 
     <div v-if="statsError" class="stats-error">{{ statsError }}</div>
 
-    <!-- Сводки -->
-    <div class="stats-cards">
-      <div class="stats-card">
-        <span class="stats-card-label">Сегодня</span>
-        <span class="stats-card-value">{{ fmt(report?.today_seconds) }}</span>
-      </div>
-      <div class="stats-card">
-        <span class="stats-card-label">7 дней</span>
-        <span class="stats-card-value">{{ fmt(report?.week7_seconds) }}</span>
-      </div>
-      <div class="stats-card">
-        <span class="stats-card-label">30 дней</span>
-        <span class="stats-card-value">{{ fmt(report?.month30_seconds) }}</span>
-      </div>
-      <div class="stats-card stats-card-total">
-        <span class="stats-card-label">Всего</span>
-        <span class="stats-card-value">{{ fmt(report?.total_seconds) }}</span>
-      </div>
+    <!-- Сводки: клик по карточке переключает разрез графика -->
+    <div class="stats-cards" role="group" aria-label="Период статистики">
+      <button
+        v-for="c in CARDS"
+        :key="c.key"
+        type="button"
+        class="stats-card"
+        :class="[{ active: range === c.key }, { 'stats-card-total': c.total }]"
+        @click="range = c.key"
+      >
+        <span class="stats-card-label">{{ c.label }}</span>
+        <span class="stats-card-value">{{ fmt(report?.[c.seconds]) }}</span>
+      </button>
     </div>
 
     <!-- График -->
     <div class="stats-chart-panel">
-      <div class="stats-range-toggle" role="group" aria-label="Период группировки">
-        <button
-          v-for="opt in RANGES"
-          :key="opt.key"
-          type="button"
-          class="stats-range-btn"
-          :class="{ active: range === opt.key }"
-          @click="range = opt.key"
-        >{{ opt.label }}</button>
-      </div>
       <div class="stats-chart-box">
         <canvas ref="canvasRef"></canvas>
         <div v-if="isEmpty" class="stats-empty">
@@ -78,12 +63,12 @@ import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import Chart from 'chart.js/auto'
 import { ui } from '../store.js'
 
-const RANGES = [
-  { key: 'hourly', label: 'Часы' },
-  { key: 'daily', label: 'Дни' },
-  { key: 'weekly', label: 'Недели' },
-  { key: 'monthly', label: 'Месяцы' },
-  { key: 'yearly', label: 'Годы' },
+// Карточки-кнопки: клик переключает разрез графика (series из report)
+const CARDS = [
+  { key: 'hourly',  label: 'Сегодня',  seconds: 'today_seconds' },
+  { key: 'daily',   label: '3 недели', seconds: 'weeks3_seconds' },
+  { key: 'monthly', label: '30 дней',  seconds: 'month30_seconds' },
+  { key: 'yearly',  label: 'Всего',    seconds: 'total_seconds', total: true },
 ]
 
 const canvasRef = ref(null)
@@ -246,6 +231,26 @@ onBeforeUnmount(() => {
   border: 1px solid #e2e8f0;
   border-radius: 8px;
   background: #f8fafc;
+  cursor: pointer;
+  text-align: left;
+  font: inherit;
+  transition: border-color 0.15s ease, background-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.stats-card:hover {
+  border-color: #c5dbf3;
+  background: #f1f6fc;
+}
+
+.stats-card:focus-visible {
+  outline: 2px solid #005eb0;
+  outline-offset: 1px;
+}
+
+.stats-card.active {
+  border-color: #005eb0;
+  background: #eaf2fb;
+  box-shadow: inset 0 0 0 1px #005eb0;
 }
 
 .stats-card-label {
@@ -263,7 +268,6 @@ onBeforeUnmount(() => {
 }
 
 .stats-card-total {
-  background: #eaf2fb;
   border-color: #c5dbf3;
 }
 
@@ -280,35 +284,6 @@ onBeforeUnmount(() => {
   gap: 8px;
   flex: 1;
   min-height: 0;
-}
-
-.stats-range-toggle {
-  display: inline-flex;
-  gap: 2px;
-  align-self: flex-start;
-  border: 1px solid #e2e8f0;
-  border-radius: 6px;
-  padding: 2px;
-  background: #f8fafc;
-}
-
-.stats-range-btn {
-  border: none;
-  background: transparent;
-  padding: 4px 14px;
-  font-size: 13px;
-  border-radius: 4px;
-  cursor: pointer;
-  color: #334155;
-}
-
-.stats-range-btn:hover {
-  background: #eef2f7;
-}
-
-.stats-range-btn.active {
-  background: #005eb0;
-  color: #fff;
 }
 
 .stats-chart-box {

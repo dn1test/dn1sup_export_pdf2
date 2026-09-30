@@ -856,17 +856,10 @@ const DEFAULT_LAYOUTS = {
               hourly.push({ label: label, seconds: i < 4 ? 2400 - i * 450 : 0 });
             }
             const daily = [];
-            for (let i = 29; i >= 0; i--) {
+            for (let i = 20; i >= 0; i--) {
               const d = new Date(now); d.setDate(now.getDate() - i);
               const weekend = d.getDay() === 0 || d.getDay() === 6;
               daily.push({ label: dm(d), seconds: weekend ? 0 : 9000 + ((i * 7919) % 7200) });
-            }
-            const weekly = [];
-            for (let i = 11; i >= 0; i--) {
-              const d = new Date(now); d.setDate(now.getDate() - i * 7);
-              const mon = new Date(d); mon.setDate(d.getDate() - ((d.getDay() + 6) % 7));
-              const sun = new Date(mon); sun.setDate(mon.getDate() + 6);
-              weekly.push({ label: dm(mon) + "–" + dm(sun), seconds: 36000 + ((i * 4523) % 18000) });
             }
             const monthsRu = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
             const monthly = [];
@@ -886,12 +879,12 @@ const DEFAULT_LAYOUTS = {
               report: {
                 total_seconds: 2160000,
                 today_seconds: 7200,
-                week7_seconds: 61200,
+                weeks3_seconds: 148500,
                 month30_seconds: 238500,
                 first_tracked: "2026-06-02",
                 last_tracked: now.toISOString().slice(0, 10),
                 empty: false,
-                series: { hourly, daily, weekly, monthly, yearly }
+                series: { hourly, daily, monthly, yearly }
               }
             });
           }
@@ -904,9 +897,9 @@ const DEFAULT_LAYOUTS = {
               articul: state.project?.articul || "HF#260924_104500",
               product: "",
               report: {
-                total_seconds: 0, today_seconds: 0, week7_seconds: 0, month30_seconds: 0,
+                total_seconds: 0, today_seconds: 0, weeks3_seconds: 0, month30_seconds: 0,
                 first_tracked: null, last_tracked: null, empty: true,
-                series: { hourly: [], daily: [], weekly: [], monthly: [], yearly: [] }
+                series: { hourly: [], daily: [], monthly: [], yearly: [] }
               }
             });
           }
