@@ -125,7 +125,6 @@
             <div class="form-group span-2">
               <label for="inputTotalDuration">Общая длительность проекта</label>
               <input type="text" id="inputTotalDuration" class="form-control" placeholder="например: 9 дней / 45 часов">
-              <span class="field-hint">Пока ведется учет времени (вкладка «Статистика»), поле заполняется автоматически: «2 ч 30 мин», «1 д 4 ч»</span>
             </div>
 
             <div class="form-group span-1">
@@ -150,7 +149,7 @@
 
             <div class="form-group full-width">
               <label for="inputProjectDescription">Описание проекта / задания</label>
-              <textarea id="inputProjectDescription" class="form-control" rows="7" placeholder="Краткое описание задания и назначения изделия..."></textarea>
+              <textarea id="inputProjectDescription" class="form-control" rows="8" placeholder="Краткое описание задания и назначения изделия..."></textarea>
             </div>
           </div>
         </div>
