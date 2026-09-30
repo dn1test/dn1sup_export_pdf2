@@ -23,11 +23,6 @@
             <label for="inputAddress">Адрес установки объекта</label>
             <input type="text" id="inputAddress" class="form-control" placeholder="например: г. Москва, ул. Никитская, д. 12, кв. 45">
           </div>
-
-          <div class="form-group full-width">
-            <label for="inputProjectDescription">Описание проекта / задания</label>
-            <textarea id="inputProjectDescription" class="form-control" rows="7" placeholder="Краткое описание задания и назначения изделия..."></textarea>
-          </div>
         </div>
       </div>
 
@@ -38,7 +33,7 @@
           <span class="card-header-title">Карточка заказчика (Customer)</span>
         </div>
         <div class="form-grid">
-          <div class="form-group full-width">
+          <div class="form-group">
             <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
             <div class="input-action-group">
               <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
@@ -46,7 +41,7 @@
             </div>
           </div>
 
-          <div class="form-group full-width">
+          <div class="form-group">
             <label for="inputCustomer">ФИО / Контактное лицо *</label>
             <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
           </div>
@@ -56,12 +51,12 @@
             <input type="text" id="inputCompany" class="form-control" placeholder="ООО &quot;Техно-Дизайн&quot;, ТЦ &quot;Атриум&quot;">
           </div>
 
-          <div class="form-group full-width">
+          <div class="form-group">
             <label for="inputPhone">Номер телефона</label>
             <input type="text" id="inputPhone" class="form-control" placeholder="+7 (999) 000-00-00">
           </div>
 
-          <div class="form-group full-width">
+          <div class="form-group">
             <label for="inputEmail">Электронная почта (Email)</label>
             <input type="email" id="inputEmail" class="form-control" placeholder="client@example.com">
           </div>
@@ -151,6 +146,11 @@
             <div class="form-group full-width">
               <label for="inputLastEdit">Комментарий к последней правке</label>
               <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
+            </div>
+
+            <div class="form-group full-width">
+              <label for="inputProjectDescription">Описание проекта / задания</label>
+              <textarea id="inputProjectDescription" class="form-control" rows="7" placeholder="Краткое описание задания и назначения изделия..."></textarea>
             </div>
           </div>
         </div>

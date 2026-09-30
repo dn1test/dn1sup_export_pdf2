@@ -855,11 +855,12 @@ const DEFAULT_LAYOUTS = {
               const label = d.getDate() === now.getDate() ? hm(d) : dm(d) + " " + hm(d);
               hourly.push({ label: label, seconds: i < 4 ? 2400 - i * 450 : 0 });
             }
+            const daysRu = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
             const daily = [];
             for (let i = 20; i >= 0; i--) {
               const d = new Date(now); d.setDate(now.getDate() - i);
               const weekend = d.getDay() === 0 || d.getDay() === 6;
-              daily.push({ label: dm(d), seconds: weekend ? 0 : 9000 + ((i * 7919) % 7200) });
+              daily.push({ label: daysRu[d.getDay()] + " " + dm(d), seconds: weekend ? 0 : 9000 + ((i * 7919) % 7200), weekend: weekend });
             }
             const monthsRu = ["Янв", "Фев", "Мар", "Апр", "Май", "Июн", "Июл", "Авг", "Сен", "Окт", "Ноя", "Дек"];
             const monthly = [];

@@ -26,6 +26,7 @@ module DN1Code
         HOURLY_KEEP_DAYS = 90
 
         RU_MONTHS = %w[Янв Фев Мар Апр Май Июн Июл Авг Сен Окт Ноя Дек].freeze
+        RU_DAYS   = %w[Вс Пн Вт Ср Чт Пт Сб].freeze
 
         module_function
 
@@ -193,11 +194,14 @@ module DN1Code
           end
         end
 
-        # Дневной график: последние 3 недели (21 день)
+        # Дневной график: последние 3 недели (21 день), метки с днём недели
+        # и флагом weekend для выделения сб/вс на графике
         def daily_series(daily, date)
           (0...21).reverse_each.map do |i|
             d = date - i
-            { label: d.strftime("%d.%m"), seconds: daily[d.strftime("%Y-%m-%d")].to_i }
+            { label: "#{RU_DAYS[d.wday]} #{d.strftime('%d.%m')}",
+              seconds: daily[d.strftime("%Y-%m-%d")].to_i,
+              weekend: d.saturday? || d.sunday? }
           end
         end
 

@@ -110,6 +110,14 @@ function onResetClick() {
   legacy('resetStats')
 }
 
+// Будни — синие, выходные (сб/вс) — красные: столбцы и подписи на оси
+const BAR_WEEKDAY = 'rgba(0, 94, 176, 0.78)'
+const BAR_WEEKDAY_HOVER = 'rgba(0, 94, 176, 1)'
+const BAR_WEEKEND = 'rgba(214, 69, 69, 0.75)'
+const BAR_WEEKEND_HOVER = 'rgba(214, 69, 69, 1)'
+const TICK_DEFAULT = '#666666'
+const TICK_WEEKEND = '#d64545'
+
 function renderChart() {
   const canvas = canvasRef.value
   if (!canvas || !canvas.isConnected || canvas.clientWidth === 0) return
@@ -118,9 +126,25 @@ function renderChart() {
   const labels = series.map((p) => p.label)
   const seconds = series.map((p) => Math.max(0, Math.round(p.seconds || 0)))
 
+  // Разцветка выходных есть только у дневного разреза (daily)
+  const isDaily = range.value === 'daily'
+  const weekend = series.map((p) => Boolean(p.weekend))
+  const barColors = isDaily
+    ? series.map((_, i) => (weekend[i] ? BAR_WEEKEND : BAR_WEEKDAY))
+    : BAR_WEEKDAY
+  const hoverColors = isDaily
+    ? series.map((_, i) => (weekend[i] ? BAR_WEEKEND_HOVER : BAR_WEEKDAY_HOVER))
+    : BAR_WEEKDAY_HOVER
+  const tickColors = isDaily
+    ? series.map((_, i) => (weekend[i] ? TICK_WEEKEND : TICK_DEFAULT))
+    : undefined
+
   if (chart) {
     chart.data.labels = labels
     chart.data.datasets[0].data = seconds
+    chart.data.datasets[0].backgroundColor = barColors
+    chart.data.datasets[0].hoverBackgroundColor = hoverColors
+    chart.options.scales.x.ticks.color = tickColors
     chart.update()
     return
   }
@@ -132,8 +156,8 @@ function renderChart() {
       datasets: [{
         label: 'Активная работа',
         data: seconds,
-        backgroundColor: 'rgba(0, 94, 176, 0.78)',
-        hoverBackgroundColor: 'rgba(0, 94, 176, 1)',
+        backgroundColor: barColors,
+        hoverBackgroundColor: hoverColors,
         borderWidth: 0,
         borderRadius: 3,
         maxBarThickness: 42,
@@ -157,6 +181,7 @@ function renderChart() {
           ticks: {
             autoSkip: true,
             maxRotation: 45,
+            color: tickColors,
             font: { size: 11 },
           },
         },
