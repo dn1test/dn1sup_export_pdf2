@@ -190,10 +190,20 @@ module DN1Code
         pd4.apply_payload!(workflow: { total_duration: "вручную из формы" })
         assert(pd4.workflow[:total_duration] == "1 д 4 ч", "apply_payload! сохраняет автозначение из статистики")
 
+        # --- Payload статистики для диалога несет автозначение длительности ---
+        stats_payload = Dialog::ExportDialog.build_work_stats_payload(pd4)
+        assert(stats_payload[:total_duration] == "1 д 4 ч", "build_work_stats_payload отдает автозначение total_duration из статистики")
+
         # --- Пустая статистика: поле остается ручным ---
         pd5 = PD.new
         pd5.apply_payload!(workflow: { total_duration: "9 дней / 45 часов" })
         assert(pd5.workflow[:total_duration] == "9 дней / 45 часов", "при пустой статистике ручное значение сохраняется")
+        manual_payload = Dialog::ExportDialog.build_work_stats_payload(pd5)
+        assert(manual_payload[:total_duration] == "9 дней / 45 часов", "payload статистики при пустом учете отдает ручное значение длительности")
+
+        # --- Payload без проекта (нет активной модели) ---
+        nil_payload = Dialog::ExportDialog.build_work_stats_payload(nil)
+        assert(nil_payload[:total_duration] == "", "payload статистики без проекта отдает пустую total_duration")
 
         # --- Загрузка project.yaml восстанавливает автозначение ---
         Dir.mktmpdir do |tmp|

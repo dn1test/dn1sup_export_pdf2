@@ -900,15 +900,19 @@ module DN1Code
         end
 
         # Собирает данные статистики для вкладки «Статистика»: отчёт трекера
-        # (сводки и серии графиков) + подпись проекта
+        # (сводки и серии графиков) + подпись проекта. Перед сбором
+        # синхронизирует автозначение «Общей длительности проекта» — открытие
+        # «Проекта»/«Статистики» показывает актуальный итог без пересохранения.
         # @param project_data [Model::ProjectData, nil]
         # @return [Hash]
         def self.build_work_stats_payload(project_data)
           now = Time.now
+          project_data&.sync_total_duration_from_stats!
           report = project_data ? project_data.work_stats_report(now) : Model::WorkStats.report(Model::WorkStats.blank_data, now)
           {
             articul: project_data ? project_data.project_info[:articul].to_s : "",
             product: project_data ? project_data.project[:product].to_s : "",
+            total_duration: project_data ? project_data.workflow[:total_duration].to_s : "",
             report:  report,
             saved_at: now.strftime("%Y-%m-%d %H:%M")
           }

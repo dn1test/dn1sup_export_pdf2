@@ -788,6 +788,7 @@ const DEFAULT_LAYOUTS = {
             window.app.onWorkStats({
               articul: state.project?.articul || "HF#260924_104500",
               product: state.project?.furniture_name || "",
+              total_duration: state.workflow?.total_duration || "",
               saved_at: (() => { const d = new Date(); return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())} ${pad(d.getHours())}:${pad(d.getMinutes())}`; })(),
               report: {
                 total_seconds: 2160000,
@@ -955,6 +956,12 @@ const DEFAULT_LAYOUTS = {
       report: payload.report || null,
       seq: (ui.stats ? ui.stats.seq : 0) + 1
     };
+    // «Общая длительность проекта» (вкладка «Проект»): Ruby присылает
+    // актуальное автозначение из статистики (workflow.total_duration).
+    // Пустая строка — учет не велся, ручное значение поля не трогаем.
+    if (els.inputTotalDuration && typeof payload.total_duration === "string" && payload.total_duration !== "") {
+      els.inputTotalDuration.value = payload.total_duration;
+    }
   }
 
   // Navigation Tabs Switching
@@ -989,6 +996,11 @@ const DEFAULT_LAYOUTS = {
           } else if (tab.dataset.tab === "tab-stats") {
             refreshWorkStats();
             startStatsAutoRefresh();
+          } else if (tab.dataset.tab === "tab-project") {
+            // Открытие «Проекта» подтягивает статистику: поле «Общая
+            // длительность проекта» обновляется актуальным итогом
+            stopStatsAutoRefresh();
+            refreshWorkStats();
           } else {
             stopStatsAutoRefresh();
           }
@@ -1037,6 +1049,11 @@ const DEFAULT_LAYOUTS = {
     } else if (tabId === "tab-stats") {
       refreshWorkStats();
       startStatsAutoRefresh();
+    } else if (tabId === "tab-project") {
+      // Открытие «Проекта» подтягивает статистику: поле «Общая
+      // длительность проекта» обновляется актуальным итогом
+      stopStatsAutoRefresh();
+      refreshWorkStats();
     } else {
       stopStatsAutoRefresh();
     }

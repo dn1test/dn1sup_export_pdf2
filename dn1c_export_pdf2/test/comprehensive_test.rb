@@ -243,6 +243,7 @@ class TestRunner
     test_86_overlay_follows_native_page_switch
     test_87_refresh_thumbnails_button_and_sig_guard
     test_88_directory_send_to_server_flag
+    test_89_total_duration_refreshed_from_stats_on_project_tab
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -5548,6 +5549,21 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
            "app.js по клику «Обновить эскизы» форсирует перегенерацию")
     assert(js.include?("Эскизы сцен обновлены"), "app.js уведомляет об успешном обновлении эскизов")
     assert(js.include?("requestSceneThumbnails(false)"), "onScenesRefreshed больше не форсирует перегенерацию эскизов (сигнатура решает)")
+  end
+
+  def test_89_total_duration_refreshed_from_stats_on_project_tab
+    puts "\n--- 89. Тест: «Общая длительность проекта» обновляется из статистики при открытии вкладки Проект ---"
+
+    js = frontend_source
+    assert(js.include?("payload.total_duration"), "app.js читает total_duration из payload статистики")
+    assert(js.include?("els.inputTotalDuration.value = payload.total_duration"), "app.js записывает автозначение в поле inputTotalDuration")
+    assert(js.include?('tab.dataset.tab === "tab-project"'), "app.js обрабатывает открытие вкладки Проект в setupTabs")
+    assert(js.include?('tabId === "tab-project"'), "app.js обрабатывает открытие вкладки Проект в switchToTab")
+    assert(js.include?("total_duration: state.workflow?.total_duration"), "мок браузера отдает total_duration для автономной проверки")
+
+    dialog_rb = File.read(File.expand_path("../dialog/export_dialog.rb", __dir__), encoding: "utf-8")
+    assert(dialog_rb.include?("project_data&.sync_total_duration_from_stats!"), "export_dialog.rb синхронизирует автозначение перед сборкой payload")
+    assert(dialog_rb.include?("total_duration: project_data"), "export_dialog.rb отдает total_duration в payload статистики")
   end
 end
 
