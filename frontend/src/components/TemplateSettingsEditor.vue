@@ -78,6 +78,7 @@
               <div class="tpl-param-main">
                 <span v-if="!p.group" class="tpl-param-label">{{ p._label }}</span>
                 <span v-else class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px">{{ p.direction === 'vertical' ? 'drag_vert' : 'drag_horiz' }}</i> Блок</span>
+                <span class="param-help-badge" :title="paramHelpTitle(p)">!</span>
                 <span v-if="!p.group && p._shownLabel" class="tpl-param-caption">«{{ p._shownLabel }}»</span>
                 <template v-if="!p.group">
                   <span v-if="p._preview" class="tpl-line-preview">({{ p._preview }})</span>
@@ -169,6 +170,7 @@
               >
                 <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
                 <span class="tpl-param-child-label">{{ c._label }}</span>
+                <span class="param-help-badge" :title="paramHelpTitle(c)">!</span>
                 <span v-if="c._shownLabel" class="tpl-param-caption">«{{ c._shownLabel }}»</span>
                 <span v-if="c._preview" class="tpl-line-preview">({{ c._preview }})</span>
                 <span v-else class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>
@@ -215,6 +217,7 @@
 <script setup>
 import { computed, nextTick, ref } from 'vue'
 import { ui } from '../store.js'
+import { paramHelpTitle } from './paramHelp.js'
 
 // legacy пересоздаёт объект ui.tplEditor при каждом ре-синке — только computed
 const ed = computed(() => ui.tplEditor)

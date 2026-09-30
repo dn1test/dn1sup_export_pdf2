@@ -185,7 +185,7 @@ class TestRunner
     test_scenes_table_two_row_layout
     test_drawing_image_settings_proportions_and_placement
     test_manual_revision_prompt_before_pdf_export_and_no_auto_history
-    test_40_template_usage_separate_line
+    test_40_template_usage_badge_in_main_row
     test_41_api_targets_addition_and_deletion
     test_42_safe_frame_overlay_and_aspect_ratios
     test_42b_overlay_header_texts
@@ -1323,9 +1323,13 @@ class TestRunner
       raw_saved = YAML.load_file(save_tmp_path)
       prj_saved = raw_saved["project"] || raw_saved[:project] || {}
       assert(!prj_saved.key?("notes") && !prj_saved.key?(:notes), "Отдельное поле notes отсутствует в секции project")
-      assert(!prj_saved.key?("materials") && !prj_saved.key?(:materials), "Отдельное поле materials отсутствует в секции project")
+      # Материалы/фурнитура и подсветка/техника — редактируемые поля формы «Ход
+      # работы»: непустые значения сохраняются в секцию project
+      assert(prj_saved["materials"] == "Фасады: МДФ эмаль RAL 9003, корпус: ЛДСП Egger, фурнитура: Blum Legrabox",
+             "Заполненное поле materials сохраняется в секции project")
+      assert(prj_saved["lighting"].include?("3000K"),
+             "Заполненное поле lighting сохраняется в секции project")
       assert(!prj_saved.key?("appliances") && !prj_saved.key?(:appliances), "Отдельное поле appliances отсутствует в секции project")
-      assert(!prj_saved.key?("lighting") && !prj_saved.key?(:lighting), "Отдельное поле lighting отсутствует в секции project")
       # Проверка сканирования превью файлов папки
       sample_folder = File.join(test_dir, "!_материалы_фурнитура")
       FileUtils.mkdir_p(sample_folder)
@@ -1783,26 +1787,27 @@ class TestRunner
   # ============================================================================
   # 39. ТЕСТ: Выравнивание заголовка по верхней границе страницы по умолчанию
   # ============================================================================
-  def test_40_template_usage_separate_line
-    puts "\n--- 40. Тест отображения строки использования шаблона на отдельной строке ---"
+  def test_40_template_usage_badge_in_main_row
+    puts "\n--- 40. Тест: бейдж использования шаблона в основной строке тулбара ---"
 
     html_path = frontend_source
     html_content = html_path
 
-    # 1. Проверка наличия отдельной строки toolbar-usage-row для layoutTplUsageBadge в index.html
-    assert(html_content.include?('class="toolbar-row toolbar-usage-row"'), "index.html содержит отдельную строку .toolbar-usage-row")
+    # 1. Бейдж использования шаблона находится в основной строке тулбара
+    #    (df8c310: отдельная строка .toolbar-usage-row удалена)
+    assert(html_content.include?('class="toolbar-row toolbar-main-row"'), "index.html содержит основную строку .toolbar-main-row")
     assert(html_content.include?('id="layoutTplUsageBadge"'), "index.html содержит #layoutTplUsageBadge")
-    assert(html_content.match?(/toolbar-usage-row[^<]*>\s*<span[^>]+id="layoutTplUsageBadge"/m), "layoutTplUsageBadge находится внутри отдельной строки .toolbar-usage-row")
+    assert(html_content.match?(/toolbar-main-row.*layoutTplUsageBadge/m), "layoutTplUsageBadge находится внутри .toolbar-main-row")
+    assert(!html_content.include?("toolbar-usage-row"), "Устаревшая строка .toolbar-usage-row удалена")
 
     # 2. Проверка того, что основные элементы управления находятся в .toolbar-main-row
-    assert(html_content.include?('class="toolbar-row toolbar-main-row"'), "index.html содержит основную строку .toolbar-main-row")
     assert(html_content.match?(/toolbar-main-row.*?selectLayoutTemplate.*?inputLayoutMargin/m), "Селектор шаблона и поля находятся в .toolbar-main-row")
 
     # 3. Проверка стилей в app.css
     css_path = File.expand_path("../dialog/html/app.css", __dir__)
     css_content = File.read(css_path, encoding: "utf-8")
 
-    assert(css_content.include?(".template-settings-toolbar .toolbar-usage-row"), "app.css содержит стили для .toolbar-usage-row")
+    assert(css_content.include?(".toolbar-main-row .layout-tpl-usage"), "app.css содержит стили бейджа в основной строке")
     assert(css_content.include?(".layout-tpl-usage"), "app.css содержит стили для .layout-tpl-usage")
     assert(css_content.include?(".layout-tpl-usage.empty-usage"), "app.css содержит стили для .empty-usage")
 
@@ -2251,7 +2256,7 @@ class TestRunner
     pdata.project[:place] = "Гостиная"
     pdata.project[:product] = "Кухня"
     pdata.project[:articul] = "CF#260930_120000"
-    pdata.project[:description] = "Первичная строка\nВторая строка  с двойными  пробелами"
+    pdata.project[:materials] = "Первичная строка\nВторая строка  с двойными  пробелами"
     pdata.workflow[:version] = "01"
     pdata.workflow[:revision] = "001"
     pdata.workflow[:start_date] = "01.02.2026"
@@ -2267,16 +2272,16 @@ class TestRunner
     assert(texts[:top_center][1] == "Кухня_гостиная",
            "Верх-центр строка 2: имя файла .skp без расширения и пути")
     assert(texts[:top_left] == "Первичная строка\nВторая строка  с двойными  пробелами",
-           "Описание проекта выводится как написано (внутренние пробелы и переносы сохранены)")
+           "Материалы и фурнитура выводятся как написано (внутренние пробелы и переносы сохранены)")
     assert(texts[:right] == ["CF#260930_120000", "v01 # r001", "15.03.2026", "2 ч 30 мин"],
            "Верх-право столбец: артикул, версия # ревизия, только дата финиша, время работы")
 
-    # 2. Описание выводится как написано: переносы сохранены, без обрезки
-    long_desc = "Строка 1\nСтрока 2\n" + ("Описание проекта " * 20)
-    pdata.project[:description] = long_desc
+    # 2. Материалы выводятся как написано: переносы сохранены, без обрезки
+    long_desc = "Строка 1\nСтрока 2\n" + ("Материалы и фурнитура " * 20)
+    pdata.project[:materials] = long_desc
     texts_long = overlay_svc.build_header_texts(project_data: pdata, model_path: nil)
     assert(texts_long[:top_left] == long_desc.strip,
-           "Описание не обрезается и сохраняет переносы строк (внешние пробелы снимаются)")
+           "Материалы не обрезаются и сохраняют переносы строк (внешние пробелы снимаются)")
 
     # 3. Пустые и частично заполненные поля не выводятся
     empty_pd = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2284,7 +2289,7 @@ class TestRunner
     empty_pd.workflow[:revision] = ""
     empty_texts = overlay_svc.build_header_texts(project_data: empty_pd, model_path: nil)
     assert(empty_texts[:top_center] == [nil, nil], "Без данных верх-центр пуст (обе строки nil)")
-    assert(empty_texts[:top_left].nil?, "Без описания верх-лево не выводится")
+    assert(empty_texts[:top_left].nil?, "Без материалов верх-лево не выводится")
     assert(empty_texts[:right].empty?, "Без данных верх-право столбец пуст")
 
     partial_pd = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2306,7 +2311,7 @@ class TestRunner
     pdata_draw.project[:adress] = "ул. Ленина, 1"
     pdata_draw.project[:place] = "Гостиная"
     pdata_draw.project[:product] = "Кухня"
-    pdata_draw.project[:description] = "Тестовое описание проекта\nВторая строка описания"
+    pdata_draw.project[:materials] = "Тестовое описание проекта\nВторая строка описания"
     pdata_draw.workflow[:total_duration] = "2 ч 30 мин"
 
     # Явное перекрытие шаблона — изоляция от пользовательского config/layout.yaml
@@ -2326,7 +2331,7 @@ class TestRunner
     assert(drawn_strings.any? { |t| t.include?("ул. Ленина, 1") && t.include?("Гостиная") && t.include?("Кухня") },
            "draw выводит строку «Адрес | Место | Изделие»")
     assert(drawn_strings.include?("Тестовое описание проекта\nВторая строка описания"),
-           "draw выводит описание проекта слева сверху с переносами строк")
+           "draw выводит материалы и фурнитуру слева сверху с переносами строк")
     assert(drawn_strings.include?("header_model"), "draw выводит имя файла модели")
     assert(drawn_strings.include?("2 ч 30 мин"), "draw выводит время работы в правом столбце")
 
@@ -2336,7 +2341,7 @@ class TestRunner
            "Строка «Адрес | Место | Изделие» — по центру, с отступом от верхнего края кадра")
     desc_el = text_elements.find { |el| el[:text] == "Тестовое описание проекта\nВторая строка описания" }
     assert(desc_el[:options][:align] == 0 && desc_el[:pos].x == 252.0,
-           "Описание проекта — слева, с отступом от левого края кадра")
+           "Материалы и фурнитура — слева, с отступом от левого края кадра")
     duration_el = text_elements.find { |el| el[:text] == "2 ч 30 мин" }
     assert(duration_el[:options][:align] == 2 && duration_el[:pos].x == 1668.0,
            "Время работы — справа, с отступом от правого края кадра")
@@ -2834,15 +2839,14 @@ test_project_data.pdf_settings[:custom_layouts] = {
     image_4_3: { x: 25.0, y: 12.0, w: 50.0, h: 82.0, visible: false, content: "render_viewport",
                  show_background: false, aspect_ratio: "4:3", scale_pct: 100 },
     params: [
-      { id: "pc1", source: "project.description", label: "О сцене", show_label: true,
+      { id: "pc1", source: "project.materials", label: "О сцене", show_label: true,
         x: 8.0, y: 6.0, align: "left", font_size: 10.0, color: "#0F172A", visible: true }
     ]
   }
 }
+test_project_data.project[:materials] = "Фасады МДФ"
 test_project_data.project_info[:materials] = "Фасады МДФ"
 test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
-    test_project_data.project_info[:materials] = "Фасады МДФ"
-    test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     pdf_doc_render = Prawn::Document.new(page_size: "A4", page_layout: :landscape, margin: [14.17, 14.17, 14.17, 14.17])
     DN1Code::ExportPdf2::Service::FontService.setup_fonts(pdf_doc_render)

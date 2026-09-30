@@ -147,9 +147,14 @@
               <input type="text" id="inputLastEdit" class="form-control" placeholder="например: Добавлены замки, правки по люку...">
             </div>
 
-            <div class="form-group full-width">
-              <label for="inputProjectDescription">Описание проекта / задания</label>
-              <textarea id="inputProjectDescription" class="form-control" rows="8" placeholder="Краткое описание задания и назначения изделия..."></textarea>
+            <div class="form-group span-2">
+              <label for="inputMaterials">Материалы и фурнитура</label>
+              <textarea id="inputMaterials" class="form-control" rows="10" placeholder="например: Корпус — ЛДСП 16 мм, фасады — MDF, фурнитура — Blum..."></textarea>
+            </div>
+
+            <div class="form-group span-2">
+              <label for="inputLighting">Подсветка и Техника</label>
+              <textarea id="inputLighting" class="form-control" rows="10" placeholder="например: LED-профиль 24V, встраиваемая техника..."></textarea>
             </div>
           </div>
         </div>

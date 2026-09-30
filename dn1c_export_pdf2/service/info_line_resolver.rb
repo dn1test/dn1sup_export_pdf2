@@ -47,7 +47,8 @@ module DN1Code
             "project.room_name"       => "Помещение / Место установки",
             "project.address"         => "Адрес установки",
             "project.company"         => "Название компании",
-            "project.description"     => "Описание проекта",
+            "project.materials"       => "Материалы и фурнитура",
+            "project.lighting"        => "Подсветка и Техника",
             "customer.id"             => "ID заказчика",
             "customer.name"           => "Заказчик (контактное лицо)",
             "customer.name_or_company" => "Заказчик / Компания (по типу проекта)",
@@ -89,7 +90,8 @@ module DN1Code
           when "project.room_name"      then non_blank(info[:room_name] || info[:name_place])
           when "project.address"        then non_blank(info[:address] || info[:adress])
           when "project.company"        then non_blank(info[:company] || info[:name_company])
-          when "project.description"    then non_blank(info[:project_description] || info[:description])
+          when "project.materials"      then non_blank(info[:materials])
+          when "project.lighting"       then non_blank(info[:lighting])
           when "customer.id"            then non_blank(info[:customer_id] || info[:id])
           when "customer.name"          then non_blank(info[:name_customer] || info[:customer])
           when "customer.name_or_company"

@@ -289,7 +289,16 @@ layout:
       font_size: 10.0
       color: "#0F172A"
       visible: true
-      source: project.description
+      source: project.materials
+    - id: p_mumsyf0j_light
+      label: ''
+      show_label: false
+      align: right
+      valign: top
+      font_size: 10.0
+      color: "#0F172A"
+      visible: true
+      source: project.lighting
     line_gap: 0.0
     line_enabled: true
     _name: Материалы

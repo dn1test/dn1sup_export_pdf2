@@ -2218,6 +2218,31 @@ tr:hover td {
   white-space: nowrap;
 }
 
+/* Кружок «!» со справкой по параметру (текст подсказки — в title) */
+.param-help-badge {
+  flex-shrink: 0;
+  align-self: center;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  border: 1px solid var(--border-input);
+  border-radius: 50%;
+  font-size: 9px;
+  font-weight: 700;
+  line-height: 1;
+  color: var(--text-muted);
+  background: #ffffff;
+  cursor: help;
+  user-select: none;
+}
+
+.param-help-badge:hover {
+  border-color: var(--bs-primary);
+  color: var(--bs-primary);
+}
+
 .tpl-param-main .tpl-line-preview {
   overflow: hidden;
   text-overflow: ellipsis;

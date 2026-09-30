@@ -841,11 +841,12 @@ module DN1Code
           # 2. Переполнение колонки: нижняя группа прижимается вниз,
           #    наложения текстов верхней и нижней групп нет
           pd2 = tp_make_project
-          pd2.project_info[:description] = "Корпусная мебель из ЛДСП 16 мм с фасадами МДФ, наполнение Blum. " * 6
+          pd2.project[:materials] = "Корпусная мебель из ЛДСП 16 мм с фасадами МДФ, наполнение Blum. " * 6
+          pd2.project_info[:materials] = pd2.project[:materials]
           pd2.workflow[:stadia] = Array.new(8) { |i| { name: "Этап №#{i + 1}", status: i.even? } }
           list2 = tp_params(pd2, :cover)
           4.times do |i|
-            list2 << { id: "t#{i}", source: "project.description", label: "Описание", align: "left", valign: "top",
+            list2 << { id: "t#{i}", source: "project.materials", label: "Материалы", align: "left", valign: "top",
                        show_label: true, font_family: "", font_size: 10.0, color: "#0F172A", visible: true }
           end
           2.times do |i|
@@ -854,7 +855,7 @@ module DN1Code
           end
           doc2 = tp_render(pd2)
           texts2 = tp_texts(doc2)
-          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Описание") }
+          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Материалы") }
                            .map { |t| (t.bounds.y + t.bounds.height) * 72.0 }.max
           bot_first = texts2.select { |t| t.plain_text.to_s.strip == "Этап №1" }
                             .map { |t| t.bounds.y * 72.0 }.min

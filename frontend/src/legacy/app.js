@@ -191,7 +191,8 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
         { value: "project.furniture_name", label: "🪑 Изделие" },
         { value: "project.room_name",      label: "🚪 Помещение / Место установки" },
         { value: "project.address",        label: "📍 Адрес установки" },
-        { value: "project.description",    label: "📋 Описание проекта" }
+        { value: "project.materials",      label: "🧱 Материалы и фурнитура" },
+        { value: "project.lighting",       label: "💡 Подсветка и Техника" }
       ] },
       { title: "Данные проекта — Заказчик", options: [
         { value: "customer.id",    label: "🆔 ID заказчика" },
@@ -268,7 +269,8 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     "project.room_name":    "Помещение",
     "project.address":      "Адрес",
     "project.company":      "Компания",
-    "project.description":  "Описание проекта",
+    "project.materials":    "Материалы и фурнитура",
+    "project.lighting":     "Подсветка и Техника",
     "customer.id":          "ID заказчика",
     "customer.name":        "Заказчик",
     "customer.phone":       "Телефон",
@@ -329,7 +331,8 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
       case "project.room_name":      return tval(info.room_name || info.name_place);
       case "project.address":        return tval(info.address || info.adress);
       case "project.company":        return tval(info.company || info.name_company);
-      case "project.description":    return tval(info.project_description || info.description);
+      case "project.materials":      return tval(info.materials);
+      case "project.lighting":       return tval(info.lighting);
       case "customer.id":            return tval(info.customer_id || info.id);
       case "customer.name":          return tval(info.name_customer || info.customer);
       case "customer.name_or_company":
@@ -572,7 +575,8 @@ const DEFAULT_LAYOUTS = {
     inputArticul: document.getElementById("inputArticul"),
     headerTradeBadge: document.getElementById("headerTradeBadge"),
     inputTags: document.getElementById("inputTags"),
-    inputProjectDescription: document.getElementById("inputProjectDescription"),
+    inputMaterials: document.getElementById("inputMaterials"),
+    inputLighting: document.getElementById("inputLighting"),
     inputPhone: document.getElementById("inputPhone"),
     inputEmail: document.getElementById("inputEmail"),
     inputAddress: document.getElementById("inputAddress"),
@@ -729,7 +733,8 @@ const DEFAULT_LAYOUTS = {
                 furniture_name: "Шкаф купе, Тумба прикроватная, Зеркало",
                 place: "Прихожая и Спальня",
                 adress: "г. Москва, ул. Арбат, д. 24, кв. 12",
-                description: "Комплексный дизайн-проект интерьера с технической документацией",
+                materials: "Корпус — ЛДСП 16 мм, фасады — MDF эмаль, фурнитура — Blum Legrabox",
+                lighting: "LED-подсветка 3000K, встраиваемая техника Bosch",
                 commercial: false
               },
               customer: {
@@ -763,7 +768,8 @@ const DEFAULT_LAYOUTS = {
                 room_name: "Прихожая и Спальня",
                 address: "г. Москва, ул. Арбат, д. 24, кв. 12",
                 company: "ООО \"Интерьер-Дизайн\"",
-                project_description: "Комплексный дизайн-проект интерьера с технической документацией",
+                materials: "Корпус — ЛДСП 16 мм, фасады — MDF эмаль, фурнитура — Blum Legrabox",
+                lighting: "LED-подсветка 3000K, встраиваемая техника Bosch",
                 customer_id: "CUST-2609241045",
                 name_customer: "Алексей Смирнов",
                 phone: "+7 (999) 123-45-67",
@@ -2487,7 +2493,8 @@ function updateParamModalPreview() {
     }
     if (els.inputRoomName) els.inputRoomName.value = prj.place || info.name_place || info.room_name || "";
     if (els.inputAddress) els.inputAddress.value = prj.adress || info.adress || info.address || "";
-    if (els.inputProjectDescription) els.inputProjectDescription.value = prj.description || info.description || info.task_description || "";
+    if (els.inputMaterials) els.inputMaterials.value = prj.materials || info.materials || "";
+    if (els.inputLighting) els.inputLighting.value = prj.lighting || info.lighting || "";
 
     // 2. Карточка заказчика (Customer)
     if (els.inputCustomerId) els.inputCustomerId.value = cust.id || cust.customer_id || "";
@@ -2677,7 +2684,8 @@ function updateParamModalPreview() {
       if (pathStr.includes("материал") || pathStr.includes("фурнитур") ||
           titleStr.includes("материал") || titleStr.includes("фурнитур")) {
         if (descIsReal) {
-          state.project_info.materials = descVal;
+          // Поле редактируется вручную в разделе «Ход работы» — не затираем непустое
+          if (!(state.project_info.materials || "").trim()) state.project_info.materials = descVal;
         } else if ((state.project_info.materials || "").trim()) {
           d.description = state.project_info.materials.trim();
         }
@@ -3237,7 +3245,8 @@ function updateParamModalPreview() {
     const tradeVal = isCommercial ? "1" : "0";
     const lastEditVal = (els.inputLastEdit ? els.inputLastEdit.value : "").trim();
     const tagsVal = (els.inputTags ? els.inputTags.value : "").trim();
-    const descVal = (els.inputProjectDescription ? els.inputProjectDescription.value : "").trim();
+    const materialsVal = (els.inputMaterials ? els.inputMaterials.value : "").trim();
+    const lightingVal = (els.inputLighting ? els.inputLighting.value : "").trim();
     const custIdVal = (els.inputCustomerId ? els.inputCustomerId.value : "").trim();
     const phoneVal = (els.inputPhone ? els.inputPhone.value : "").trim();
     const emailVal = (els.inputEmail ? els.inputEmail.value : "").trim();
@@ -3273,7 +3282,8 @@ function updateParamModalPreview() {
       product: furniture,
       place: room,
       adress: addrVal,
-      description: descVal,
+      materials: materialsVal,
+      lighting: lightingVal,
       tags: productTags,
       commercial: isCommercial,
       name_company: compVal
@@ -3327,7 +3337,6 @@ function updateParamModalPreview() {
       last_edit:        lastEditVal,
       trade:            tradeVal,
       tags:             tagsVal,
-      description:      descVal,
       room_name:        room,
       furniture_name:   furniture,
       name_project:     computedTitle,
@@ -3339,7 +3348,7 @@ function updateParamModalPreview() {
       author:           authorVal,
       price:            priceVal,
       rate:             rateVal,
-      task_description: (els.inputTaskDescription ? els.inputTaskDescription.value : "").trim() || descVal,
+      task_description: (els.inputTaskDescription ? els.inputTaskDescription.value : "").trim(),
       task_dimensions:  (els.inputTaskDimensions ? els.inputTaskDimensions.value : "").trim(),
       task_wishes:      (els.inputTaskWishes ? els.inputTaskWishes.value : "").trim(),
       materials:        (els.inputMaterials ? els.inputMaterials.value : "").trim(),
@@ -3356,7 +3365,8 @@ function updateParamModalPreview() {
         const desc = (d.description || "").trim();
         if (!desc) return;
         if (p.includes("материал") || t.includes("материал") || p.includes("фурнитур") || t.includes("фурнитур")) {
-          state.project_info.materials = desc;
+          // Поле редактируется вручную в разделе «Ход работы» — не затираем непустое
+          if (!(state.project_info.materials || "").trim()) state.project_info.materials = desc;
         } else if (p.includes("техник") || t.includes("техник") || p.includes("подсветк") || t.includes("подсветк")) {
           if (!state.project_info.appliances) state.project_info.appliances = desc;
           if (!state.project_info.lighting) state.project_info.lighting = desc;
@@ -3999,12 +4009,12 @@ function updateParamModalPreview() {
     const autoSaveInputIds = [
       "inputRoomName", "inputFurnitureName", "inputCustomer", "inputCustomerId",
       "inputCompany", "inputArticul", "inputTags",
-      "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
+      "inputMaterials", "inputLighting", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
       "inputStartDateDisplay", "inputEndDateDisplay",
       "inputTotalDuration", "inputRate", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
-      "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
+      "inputAppliances", "inputNotes",
       "selectLayoutRenderMode", "selectCompression", "selectImageFormat", "chkSaveLayoutFile",
       "selectWebpQuality",
       "selectPageSize", "selectPageLayout", "inputPageMargin", "inputLayoutMargin", "selectFontFamily", "selectLayoutFontFamily", "selectFontWeight", "selectFontWidth",

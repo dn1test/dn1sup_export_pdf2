@@ -622,10 +622,10 @@ module DN1Code
           base_name = File.basename(model_path.to_s, ".skp").to_s.strip
           file_name = base_name.empty? ? nil : base_name
 
-          # Верх-лево: описание проекта как написано — с переносами строк,
+          # Верх-лево: материалы и фурнитура как написано — с переносами строк,
           # без обрезки (нормализуются только CRLF и внешние пробелы)
-          description = clean_overlay_text(project[:description])
-          description = description.gsub("\r\n", "\n").gsub("\r", "\n").strip unless description.nil?
+          materials_text = clean_overlay_text(project[:materials])
+          materials_text = materials_text.gsub("\r\n", "\n").gsub("\r", "\n").strip unless materials_text.nil?
 
           # Верх-право, столбец: артикул; версия # ревизия; дата финиша; время работы
           version  = clean_overlay_text(workflow[:version])
@@ -644,7 +644,7 @@ module DN1Code
 
           {
             top_center: [header_line, file_name],
-            top_left:   description,
+            top_left:   materials_text,
             right:      right
           }
         end

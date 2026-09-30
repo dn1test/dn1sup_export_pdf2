@@ -442,6 +442,8 @@ module DN1Code
             place:        "",
             adress:       "",
             description:  "",
+            materials:    "",
+            lighting:     "",
             tags:         [],
             commercial:   false,
             name_company: ""
@@ -922,6 +924,13 @@ module DN1Code
           @project_info[:description]   = desc
           @project_info[:task_description] = desc if @project_info[:task_description].to_s.empty?
 
+          # --- 4а. Материалы и фурнитура / Подсветка и Техника ---
+          # project — канон (значения полей формы), project_info — зеркало для
+          # резолвера параметров и синхронизации со спецификациями directories
+          %i[materials lighting].each do |spec_key|
+            @project_info[spec_key] = @project[spec_key].to_s
+          end
+
           tags_val = @project[:tags] || @project_info[:tags] || []
           if tags_val.is_a?(String)
             tags_val = tags_val.split(",").map(&:strip).reject(&:empty?)
@@ -1047,7 +1056,11 @@ module DN1Code
             if path_str.include?("материал") || path_str.include?("фурнитур") ||
                title_str.include?("материал") || title_str.include?("фурнитур")
               if desc_is_real
-                @project_info[:materials] = desc_val
+                # Поле редактируется вручную в разделе «Ход работы» — не затираем непустое
+                if @project_info[:materials].to_s.strip.empty?
+                  @project_info[:materials] = desc_val
+                  @project[:materials]      = desc_val
+                end
               elsif !@project_info[:materials].to_s.strip.empty?
                 d[:description] = @project_info[:materials].to_s
               end
@@ -1056,7 +1069,10 @@ module DN1Code
                   title_str.include?("техник") || title_str.include?("подсветк")
               if desc_is_real
                 @project_info[:appliances] = desc_val if @project_info[:appliances].to_s.strip.empty?
-                @project_info[:lighting]   = desc_val if @project_info[:lighting].to_s.strip.empty?
+                if @project_info[:lighting].to_s.strip.empty?
+                  @project_info[:lighting] = desc_val
+                  @project[:lighting]      = desc_val
+                end
               else
                 comb = [@project_info[:appliances], @project_info[:lighting]].map(&:to_s).reject { |s| s.strip.empty? }.join("; ")
                 d[:description] = comb unless comb.empty?
@@ -2079,6 +2095,10 @@ module DN1Code
                   [:notes, :materials, :appliances, :lighting, :task_dimensions, :task_wishes].each do |k|
                     @project_info[k] = src[k] if src[k]
                   end
+                  # Материалы и подсветка — канон в project (поля формы «Ход работы»)
+                  [:materials, :lighting].each do |k|
+                    @project[k] = src[k].to_s if src[k]
+                  end
                 end
               end
 
@@ -2205,6 +2225,10 @@ module DN1Code
             prj_out[:product_tags] = @project[:product].to_s.split(",").map(&:strip).reject(&:empty?)
           end
           prj_out[:product] = @project[:product].to_s unless @project[:product].to_s.empty?
+          # Материалы/фурнитура и подсветка/техника — значения полей формы
+          # «Ход работы»; пустые не пишем, чтобы не засорять YAML
+          prj_out[:materials] = @project[:materials].to_s unless @project[:materials].to_s.strip.empty?
+          prj_out[:lighting]  = @project[:lighting].to_s unless @project[:lighting].to_s.strip.empty?
           if !@project[:name_company].to_s.strip.empty?
             prj_out[:name_company] = @project[:name_company].to_s.strip
           end
