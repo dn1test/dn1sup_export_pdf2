@@ -30,6 +30,8 @@ module DN1Code
           attr_accessor :ratio_cache, :label_cache, :width_cache, :height_cache, :visible_cache
           attr_accessor :border_color_cache, :border_opacity_cache, :mask_color_cache, :mask_opacity_cache
           attr_accessor :line_width_cache
+          attr_accessor :aspect_mode_cache, :page_format_cache, :info_text_cache, :info_text_at
+          attr_accessor :font_raw_key_cache, :font_name_cache, :font_bold_cache
 
           def initialize
             if defined?(Sketchup::Overlay)
@@ -45,6 +47,13 @@ module DN1Code
             @mask_color_cache     = "#0F172A"
             @mask_opacity_cache   = 80
             @line_width_cache     = 1
+            @aspect_mode_cache    = "4:3"
+            @page_format_cache    = ""
+            @info_text_cache      = nil
+            @info_text_at         = nil
+            @font_raw_key_cache   = nil
+            @font_name_cache      = nil
+            @font_bold_cache      = false
           end
 
           # Отрисовка рамки в окне просмотра SketchUp
@@ -59,6 +68,12 @@ module DN1Code
 
             begin
               model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+
+              # Тексты шапки и шрифт из настроек резолвим до отрисовки текста
+              # (кэшируются внутри; при nil-модели используется системный fallback)
+              header_texts = model ? info_header_texts(model) : nil
+              font_family = @font_name_cache || ((RUBY_PLATFORM =~ /darwin/i) ? "Helvetica Neue" : "Segoe UI")
+              font_bold = @font_bold_cache == true
 
               target_ratio = @ratio_cache
               target_label = @label_cache
@@ -81,6 +96,8 @@ module DN1Code
                 @mask_color_cache     = ratio_info[:mask_color]
                 @mask_opacity_cache   = ratio_info[:mask_opacity]
                 @line_width_cache     = ratio_info[:line_width] || 1
+                @aspect_mode_cache    = ratio_info[:aspect_ratio]
+                @page_format_cache    = ratio_info[:page_format] || ""
               end
 
               return if @visible_cache == false
@@ -207,22 +224,119 @@ module DN1Code
               # 5. Информационная строка пропорций и разрешения (внизу по центру кадра, тонкий черный шрифт 9pt без темной рамки)
               if view.respond_to?(:draw_text)
                 badge_text = "📐 #{target_label || 'Кадр'}  |  #{target_w || 2400} × #{target_h || 1800} px"
+                # Формат листа добавляется к пропорциям; в режиме "page" он уже
+                # входит в label («A3 Альбомный (1.41:1)») — дублировать не нужно
+                if @aspect_mode_cache != "page" && !@page_format_cache.to_s.empty?
+                  badge_text += "  |  #{@page_format_cache}"
+                end
                 center_x = (frame_x + (frame_w / 2.0)).round
                 label_y = [frame_y + frame_h - 18.0, frame_y + 4.0].max
                 label_pos = Geom::Point3d.new(center_x, label_y, 0.0)
-                font_family = (RUBY_PLATFORM =~ /darwin/i) ? "Helvetica Neue" : "Segoe UI"
                 align_center = defined?(TextAlignCenter) ? TextAlignCenter : 1
                 options = {
                   :font => font_family,
                   :size => 9,
-                  :bold => false,
+                  :bold => font_bold,
                   :align => align_center,
                   :color => defined?(Sketchup::Color) ? Sketchup::Color.new(0, 0, 0, 255) : "black"
                 }
                 view.draw_text(label_pos, badge_text, options)
               end
+
+              # 6. Информационная шапка проекта (верх кадра): по центру —
+              # «Адрес | Место | Изделие» и имя файла; слева — описание проекта;
+              # справа столбцом — артикул, версия # ревизия, даты, время работы
+              if view.respond_to?(:draw_text) && !header_texts.nil?
+                text_color = defined?(Sketchup::Color) ? Sketchup::Color.new(0, 0, 0, 255) : "black"
+                base_options = { :font => font_family, :size => 9, :bold => font_bold, :color => text_color }
+                align_left   = defined?(TextAlignLeft)   ? TextAlignLeft   : 0
+                align_center = defined?(TextAlignCenter) ? TextAlignCenter : 1
+                align_right  = defined?(TextAlignRight)  ? TextAlignRight  : 2
+
+                # Небольшой отступ текстов шапки от линий рамки кадра
+                pad = 12.0
+                center_x = (frame_x + (frame_w / 2.0)).round
+                top_y    = frame_y + pad
+
+                header_line, file_name = header_texts[:top_center]
+                center_options = base_options.merge(:align => align_center)
+                if header_line
+                  view.draw_text(Geom::Point3d.new(center_x, top_y, 0.0), header_line, center_options)
+                end
+                if file_name
+                  view.draw_text(Geom::Point3d.new(center_x, top_y + 16.0, 0.0), file_name, center_options)
+                end
+
+                if header_texts[:top_left]
+                  view.draw_text(Geom::Point3d.new(frame_x + pad, top_y, 0.0),
+                                 header_texts[:top_left], base_options.merge(:align => align_left))
+                end
+
+                unless header_texts[:right].empty?
+                  right_x = (frame_x + frame_w).round - pad
+                  right_options = base_options.merge(:align => align_right)
+                  header_texts[:right].each_with_index do |row, i|
+                    view.draw_text(Geom::Point3d.new(right_x, top_y + (14.0 * i), 0.0), row, right_options)
+                  end
+                end
+              end
             rescue StandardError
             end
+          end
+
+          # Тексты шапки с кэшем на 1 секунду: draw вызывается на каждую
+          # перерисовку вида, а чтение данных проекта на каждом кадре избыточно.
+          # Кэш сбрасывается при смене модели/сцены/настроек (enable/refresh/
+          # update_settings/on_model_opened), поэтому 1 секунда — только подстраховка.
+          # @param model [Sketchup::Model, nil]
+          # @return [Hash, nil] результат OverlayService.build_header_texts
+          def info_header_texts(model)
+            now = Time.now.to_f
+            return @info_text_cache if @info_text_cache && @info_text_at && (now - @info_text_at) < 1.0
+
+            pdata = if model && defined?(Model::SessionStore) && Model::SessionStore.respond_to?(:data)
+                      begin
+                        Model::SessionStore.data(model)
+                      rescue StandardError
+                        nil
+                      end
+                    end
+            resolve_overlay_font(pdata)
+            model_path = begin
+              model.path if model.respond_to?(:path)
+            rescue StandardError
+              nil
+            end
+
+            @info_text_cache = OverlayService.build_header_texts(project_data: pdata, model_path: model_path)
+            @info_text_at    = now
+            @info_text_cache
+          end
+
+          # Шрифт оверлея берется из настроек PDF (font_family/font_width/
+          # font_weight) через FontService — тот же, что рендерит текст на
+          # листах PDF. GDI-проверки FontService недешевы, поэтому резолв
+          # выполняется только при изменении сырых значений настроек.
+          # @param pdata [Model::ProjectData, nil]
+          # @return [String, nil] имя семейства/начертания (nil — нет данных, системный fallback)
+          def resolve_overlay_font(pdata)
+            return nil unless defined?(FontService)
+
+            settings = pdata.respond_to?(:pdf_settings) ? pdata.pdf_settings : nil
+            raw = [settings && (settings[:font_family] || settings["font_family"]),
+                   settings && (settings[:font_width] || settings["font_width"]),
+                   settings && (settings[:font_weight] || settings["font_weight"])].join("|")
+            return @font_name_cache if @font_raw_key_cache == raw && @font_name_cache
+
+            @font_raw_key_cache = raw
+            begin
+              family = FontService.layout_font_family(settings)
+              @font_name_cache = family unless family.to_s.strip.empty?
+              @font_bold_cache = FontService.font_weight_setting(settings) == "bold"
+            rescue StandardError
+              @font_name_cache ||= nil
+            end
+            @font_name_cache
           end
         end
 
@@ -407,6 +521,9 @@ module DN1Code
             end
           end
 
+          # Подпись формата листа для нижней строки оверлея
+          page_format = "#{page_size} #{page_layout == 'portrait' ? 'Книжная' : 'Альбомная'}"
+
           # Стиль рамки зафиксирован (настроек в GUI больше нет):
           # контур — красный #FF0000, затемнение вне кадра — 10%
           border_color_val   = "#FF0000"
@@ -435,6 +552,7 @@ module DN1Code
             ratio:          ratio,
             label:          label,
             aspect_ratio:   aspect_mode,
+            page_format:    page_format,
             template_key:   tpl_key.to_s,
             scene_aspect:   scene_aspect,
             scene_index:    scene_index,
@@ -482,6 +600,59 @@ module DN1Code
           else
             "rgba(#{r},#{g},#{b},#{(alpha / 255.0).round(2)})"
           end
+        end
+
+        # Сборка текстов информационной шапки оверлея (верх кадра).
+        # Выводятся только значения без подписей; пустые поля не выводятся.
+        # @param project_data [Model::ProjectData, nil]
+        # @param model_path [String, nil] путь к .skp (model.path)
+        # @return [Hash] { top_center: [String, nil], top_left: String, nil, right: [String] }
+        #   top_center[0] — «Адрес | Место | Изделие», top_center[1] — имя файла .skp
+        def self.build_header_texts(project_data: nil, model_path: nil)
+          project  = project_data.respond_to?(:project) ? (project_data.project || {}) : {}
+          workflow = project_data.respond_to?(:workflow) ? (project_data.workflow || {}) : {}
+
+          # Верх-центр, строка 1: адрес | место | изделие
+          segments = [clean_overlay_text(project[:adress] || project[:address]),
+                      clean_overlay_text(project[:place]),
+                      clean_overlay_text(project[:product])].compact
+          header_line = segments.empty? ? nil : segments.join(" | ")
+
+          # Верх-центр, строка 2: имя файла модели (для несохранённой модели — nil)
+          base_name = File.basename(model_path.to_s, ".skp").to_s.strip
+          file_name = base_name.empty? ? nil : base_name
+
+          # Верх-лево: описание проекта как написано — с переносами строк,
+          # без обрезки (нормализуются только CRLF и внешние пробелы)
+          description = clean_overlay_text(project[:description])
+          description = description.gsub("\r\n", "\n").gsub("\r", "\n").strip unless description.nil?
+
+          # Верх-право, столбец: артикул; версия # ревизия; дата финиша; время работы
+          version  = clean_overlay_text(workflow[:version])
+          revision = clean_overlay_text(workflow[:revision])
+          ver_rev_parts = []
+          ver_rev_parts << "v#{version}" if version
+          ver_rev_parts << "r#{revision}" if revision
+          ver_rev_text = ver_rev_parts.empty? ? nil : ver_rev_parts.join(" # ")
+
+          dates_text = clean_overlay_text(workflow[:end_date])
+
+          right = [clean_overlay_text(project[:articul]),
+                   ver_rev_text,
+                   dates_text,
+                   clean_overlay_text(workflow[:total_duration])].compact
+
+          {
+            top_center: [header_line, file_name],
+            top_left:   description,
+            right:      right
+          }
+        end
+
+        # Первая строка-непустое значение или nil (пустые поля не выводятся)
+        def self.clean_overlay_text(val)
+          s = val.to_s.strip
+          s.empty? ? nil : s
         end
 
         # Возвращает текущий синглтон-экземпляр оверлея
@@ -551,6 +722,10 @@ module DN1Code
           ov.mask_color_cache     = info[:mask_color]
           ov.mask_opacity_cache   = info[:mask_opacity]
           ov.line_width_cache     = info[:line_width] || 1
+          ov.aspect_mode_cache    = info[:aspect_ratio]
+          ov.page_format_cache    = info[:page_format] || ""
+          ov.info_text_cache      = nil
+          ov.info_text_at         = nil
 
           if info[:visible] == false || info[:overlay_on] == false
             disable(m)
@@ -809,6 +984,9 @@ module DN1Code
             ov.border_opacity_cache = info[:border_opacity]
             ov.mask_color_cache     = info[:mask_color]
             ov.mask_opacity_cache   = info[:mask_opacity]
+            # Смена модели — тексты шапки прошлой модели недействительны
+            ov.info_text_cache      = nil
+            ov.info_text_at         = nil
           end
 
           is_active = overlay_active?(m)

@@ -845,6 +845,31 @@ module DN1Code
             end
           end
 
+          # Сохранить текущий список стадий как список по умолчанию:
+          # { stadia: [имена] } — только имена и порядок, без статусов галочек
+          dialog.add_action_callback("saveStadiaDefault") do |_action_context, data_json|
+            begin
+              payload = JSON.parse(data_json.to_s, symbolize_names: true)
+              names = payload.is_a?(Hash) ? payload[:stadia] : nil
+              saved = names.is_a?(Array) ? Model::ProjectData.set_stadia_default(names) : []
+              if saved.empty?
+                notify_js(dialog, "Список стадий пуст — сохранять нечего", "error")
+                next
+              end
+
+              model = Sketchup.active_model
+              project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
+              ok = project_data ? project_data.save_program_settings : false
+              if ok
+                notify_js(dialog, "Список стадий сохранён по умолчанию (#{saved.size} шт.)", "success")
+              else
+                notify_js(dialog, "Не удалось сохранить список стадий по умолчанию", "error")
+              end
+            rescue StandardError => e
+              notify_js(dialog, "Ошибка сохранения стадий по умолчанию: #{e.message}", "error")
+            end
+          end
+
           # Обновление из dev-папки
           dialog.add_action_callback("updateFromDev") do |_action_context, custom_dev_path|
             res = Service::DevUpdater.update_and_reload!(custom_dev_path.to_s.strip)

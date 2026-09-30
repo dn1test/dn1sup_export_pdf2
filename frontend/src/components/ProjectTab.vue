@@ -133,6 +133,14 @@
             <div class="workflow-stadia-header">
               <span class="workflow-stadia-icon"><i class="modus-icons">check_mark</i></span>
               <span class="workflow-stadia-title">Стадии проекта (workflow.stadia):</span>
+              <button
+                type="button"
+                class="btn btn-xs btn-secondary btn-icon-only stadia-save-default"
+                title="Сохранить текущий список стадий (без галочек) как список по умолчанию"
+                @click="legacy('saveStadiaDefault')"
+              >
+                <i class="modus-icons">save</i>
+              </button>
             </div>
             <div class="stadia-checkboxes-vertical">
               <label

@@ -324,6 +324,7 @@ module DN1Code
                     end
               if raw.is_a?(Hash)
                 data = self.class.deep_symbolize_keys(raw)
+                self.class.stadia_default_names = data[:default_stadia] if data[:default_stadia].is_a?(Array)
                 if data[:api_targets].is_a?(Array)
                   @api_targets = data[:api_targets].map(&:to_s).map(&:strip).reject(&:empty?)
                 end
@@ -367,8 +368,9 @@ module DN1Code
           pdf_clean.delete("custom_layouts")
 
           settings_data = {
-            "pdf_settings" => self.class.deep_stringify_keys(pdf_clean),
-            "api_targets"  => (@api_targets || []).map(&:to_s).map(&:strip).reject(&:empty?)
+            "pdf_settings"   => self.class.deep_stringify_keys(pdf_clean),
+            "api_targets"    => (@api_targets || []).map(&:to_s).map(&:strip).reject(&:empty?),
+            "default_stadia" => (self.class.stadia_default_names || [])
           }
           File.open(PROGRAM_SETTINGS_FILE, "w:utf-8") do |f|
             f.write settings_data.to_yaml
@@ -449,9 +451,33 @@ module DN1Code
           }
         end
 
-        # Возвращает эталонный список стадий проекта (по умолчанию из project.yaml)
+        # --- Список стадий по умолчанию (глобальный, config/settings.yaml) -------
+
+        # @return [Array<String>] имена стадий, сохранённые пользователем как
+        #   список по умолчанию (nil/[] — используется встроенный список)
+        def self.stadia_default_names
+          @stadia_default_names
+        end
+
+        # Нормализует и сохраняет в памяти класса список стадий по умолчанию
+        # (только имена, без статусов галочек)
+        # @param names [Object] ожидается массив имён
+        def self.stadia_default_names=(names)
+          @stadia_default_names = Array(names).map { |n| n.to_s.strip }.reject(&:empty?)
+        end
+
+        # Устанавливает новый список стадий по умолчанию (только имена).
+        # Запись в settings.yaml выполняет save_program_settings.
+        # @param names [Object] ожидается массив имён стадий
+        # @return [Array<String>] нормализованный список (пустой — невалидный ввод)
+        def self.set_stadia_default(names)
+          self.stadia_default_names = names
+          @stadia_default_names
+        end
+
+        # Встроенный (заводской) список стадий проекта
         # @return [Array<Hash>]
-        def default_stadia
+        def default_builtin_stadia
           [
             { name: "Предварительный проект", status: true },
             { name: "Правки проекта (история правок)", status: false },
@@ -462,6 +488,17 @@ module DN1Code
             { name: "Отправлен в производство", status: false },
             { name: "Оплачен", status: false }
           ]
+        end
+
+        # Возвращает список стадий проекта по умолчанию: сохранённый пользователем
+        # (config/settings.yaml -> default_stadia, только имена, галочки сброшены)
+        # либо встроенный default_builtin_stadia
+        # @return [Array<Hash>]
+        def default_stadia
+          names = self.class.stadia_default_names
+          return default_builtin_stadia if names.nil? || names.empty?
+
+          names.map { |n| { name: n, status: false } }
         end
 
         # Нормализует список стадий к массиву хэшей [{ name: "...", status: true/false }]

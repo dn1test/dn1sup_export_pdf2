@@ -188,6 +188,7 @@ class TestRunner
     test_40_template_usage_separate_line
     test_41_api_targets_addition_and_deletion
     test_42_safe_frame_overlay_and_aspect_ratios
+    test_42b_overlay_header_texts
     test_43_new_project_yaml_data_structure
     test_44_template_independence_and_autosave
     test_directories_start_empty_and_deletions_persist
@@ -1962,6 +1963,14 @@ class TestRunner
     assert((info_custom[:ratio] - (21.0 / 9.0)).abs < 0.01, "Кастомное соотношение 21:9 рассчитано верно (~2.333)")
     assert(info_custom[:render_h] == 1029, "Высота рендера для 21:9 равна 1029")
 
+    # Формат листа (page_format) для нижней строки оверлея
+    assert(info_a4_l[:page_format] == "A4 Альбомная", "page_format для A4 landscape — 'A4 Альбомная'")
+    assert(info_a4_p[:page_format] == "A4 Книжная", "page_format для A4 portrait — 'A4 Книжная'")
+    # После A4 portrait настройка page_layout сохраняется в сессии — последующие
+    # режимы пропорций (вне 'page') резолвят page_format из тех же настроек листа
+    assert(info_16_9[:page_format] == "A4 Книжная", "page_format резолвится и вне режима 'page' (настройки листа сохраняются в сессии)")
+    assert(info_custom[:page_format] == "A4 Книжная", "page_format доступен для произвольных пропорций кадра")
+
     # 3. Проверка жизненного цикла оверлея (enable, disable, toggle, active?)
     # Явное перекрытие шаблона — изоляция от пользовательского config/layout.yaml
     overlay_svc.update_settings({ custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "16:9" } } } })
@@ -2227,6 +2236,122 @@ class TestRunner
     assert(!html_text.include?("id=\"selectStamp\""), "из общих настроек index.html удален id=\"selectStamp\"")
 
     FileUtils.rm_rf(tmp_dir)
+  end
+
+  def test_42b_overlay_header_texts
+    puts "\n--- 42b. Тест информационной шапки оверлея (build_header_texts и отрисовка) ---"
+
+    require_relative "../service/overlay_service"
+    overlay_svc = DN1Code::ExportPdf2::Service::OverlayService
+
+    # 1. Полная карточка проекта: все блоки собираются из значений
+    pdata = DN1Code::ExportPdf2::Model::ProjectData.new
+    pdata.project[:adress] = "ул. Ленина, 1"
+    pdata.project[:place] = "Гостиная"
+    pdata.project[:product] = "Кухня"
+    pdata.project[:articul] = "CF#260930_120000"
+    pdata.project[:description] = "Первичная строка\nВторая строка  с двойными  пробелами"
+    pdata.workflow[:version] = "01"
+    pdata.workflow[:revision] = "001"
+    pdata.workflow[:start_date] = "01.02.2026"
+    pdata.workflow[:end_date] = "15.03.2026"
+    pdata.workflow[:total_duration] = "2 ч 30 мин"
+
+    texts = overlay_svc.build_header_texts(
+      project_data: pdata,
+      model_path: "C:/Projects/Кухня_гостиная.skp"
+    )
+    assert(texts[:top_center][0] == "ул. Ленина, 1 | Гостиная | Кухня",
+           "Верх-центр строка 1: «Адрес | Место | Изделие» через разделитель ' | '")
+    assert(texts[:top_center][1] == "Кухня_гостиная",
+           "Верх-центр строка 2: имя файла .skp без расширения и пути")
+    assert(texts[:top_left] == "Первичная строка\nВторая строка  с двойными  пробелами",
+           "Описание проекта выводится как написано (внутренние пробелы и переносы сохранены)")
+    assert(texts[:right] == ["CF#260930_120000", "v01 # r001", "15.03.2026", "2 ч 30 мин"],
+           "Верх-право столбец: артикул, версия # ревизия, только дата финиша, время работы")
+
+    # 2. Описание выводится как написано: переносы сохранены, без обрезки
+    long_desc = "Строка 1\nСтрока 2\n" + ("Описание проекта " * 20)
+    pdata.project[:description] = long_desc
+    texts_long = overlay_svc.build_header_texts(project_data: pdata, model_path: nil)
+    assert(texts_long[:top_left] == long_desc.strip,
+           "Описание не обрезается и сохраняет переносы строк (внешние пробелы снимаются)")
+
+    # 3. Пустые и частично заполненные поля не выводятся
+    empty_pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    empty_pd.workflow[:version] = ""
+    empty_pd.workflow[:revision] = ""
+    empty_texts = overlay_svc.build_header_texts(project_data: empty_pd, model_path: nil)
+    assert(empty_texts[:top_center] == [nil, nil], "Без данных верх-центр пуст (обе строки nil)")
+    assert(empty_texts[:top_left].nil?, "Без описания верх-лево не выводится")
+    assert(empty_texts[:right].empty?, "Без данных верх-право столбец пуст")
+
+    partial_pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    partial_pd.project[:product] = "Шкаф"
+    partial_pd.workflow[:version] = "02"
+    partial_pd.workflow[:revision] = ""
+    partial_pd.workflow[:end_date] = "15.03.2026"
+    partial_texts = overlay_svc.build_header_texts(project_data: partial_pd, model_path: "U:/x/model.skp")
+    assert(partial_texts[:top_center][0] == "Шкаф", "Частично заполненная строка 1 содержит только изделие")
+    assert(partial_texts[:right] == ["v02", "15.03.2026"], "Частичные данные: только версия и дата финиша")
+
+    # 4. Отрисовка: draw выводит шапку у краёв кадра с нужным выравниванием,
+    #    а нижняя строка дополняется форматом листа
+    prev_settings = overlay_svc.current_settings
+    prev_active = Sketchup.active_model
+    mock_model = Sketchup::MockModel.new("U:/tmp/dn1c_test_header_#{Time.now.to_i}/header_model.skp")
+    Sketchup.active_model = mock_model
+    pdata_draw = DN1Code::ExportPdf2::Model::SessionStore.data(mock_model)
+    pdata_draw.project[:adress] = "ул. Ленина, 1"
+    pdata_draw.project[:place] = "Гостиная"
+    pdata_draw.project[:product] = "Кухня"
+    pdata_draw.project[:description] = "Тестовое описание проекта\nВторая строка описания"
+    pdata_draw.workflow[:total_duration] = "2 ч 30 мин"
+
+    # Явное перекрытие шаблона — изоляция от пользовательского config/layout.yaml
+    overlay_svc.update_settings({ image_aspect_ratio: "4:3", image_width: 2400,
+                                  page_size: "A4", page_layout: "landscape", show_aspect_overlay: true,
+                                  custom_layouts: { cover: { image_4_3: { visible: true, aspect_ratio: "4:3" } } } })
+    assert(overlay_svc.enable(mock_model) == true, "Оверлей включается для теста шапки")
+    ov = overlay_svc.find_model_overlay(mock_model)
+    view = mock_model.active_view
+    view.drawn_elements.clear
+    ov.draw(view)
+
+    # Кадр 4:3 во вьюпорте 1920x1080 — pillarbox: frame_x=240, frame_w=1440, frame_y=0;
+    # тексты шапки рисуются с отступом 12px от линий рамки
+    text_elements = view.drawn_elements.select { |el| el[:mode] == :text }
+    drawn_strings = text_elements.map { |el| el[:text].to_s }
+    assert(drawn_strings.any? { |t| t.include?("ул. Ленина, 1") && t.include?("Гостиная") && t.include?("Кухня") },
+           "draw выводит строку «Адрес | Место | Изделие»")
+    assert(drawn_strings.include?("Тестовое описание проекта\nВторая строка описания"),
+           "draw выводит описание проекта слева сверху с переносами строк")
+    assert(drawn_strings.include?("header_model"), "draw выводит имя файла модели")
+    assert(drawn_strings.include?("2 ч 30 мин"), "draw выводит время работы в правом столбце")
+
+    # TextAlign* вне SketchUp не определены — используется числовой fallback (0/1/2)
+    header_el = text_elements.find { |el| el[:text].to_s.include?("ул. Ленина, 1") }
+    assert(header_el[:options][:align] == 1 && header_el[:pos].y == 12.0,
+           "Строка «Адрес | Место | Изделие» — по центру, с отступом от верхнего края кадра")
+    desc_el = text_elements.find { |el| el[:text] == "Тестовое описание проекта\nВторая строка описания" }
+    assert(desc_el[:options][:align] == 0 && desc_el[:pos].x == 252.0,
+           "Описание проекта — слева, с отступом от левого края кадра")
+    duration_el = text_elements.find { |el| el[:text] == "2 ч 30 мин" }
+    assert(duration_el[:options][:align] == 2 && duration_el[:pos].x == 1668.0,
+           "Время работы — справа, с отступом от правого края кадра")
+
+    expected_font = DN1Code::ExportPdf2::Service::FontService.layout_font_family(pdata_draw.pdf_settings)
+    assert(!expected_font.to_s.empty? && text_elements.all? { |el| el[:options][:font] == expected_font },
+           "Все тексты оверлея (бейдж и шапка) используют шрифт из настроек (#{expected_font})")
+
+    badge_el = text_elements.find { |el| el[:text].to_s.include?("px") }
+    assert(badge_el && badge_el[:text].to_s.include?("A4 Альбомная"),
+           "Нижняя строка содержит формат страницы")
+    assert(badge_el[:pos].y > view.vpheight / 2.0, "Нижняя строка осталась внизу кадра")
+
+    overlay_svc.disable(mock_model)
+    overlay_svc.current_settings = prev_settings
+    Sketchup.active_model = prev_active
   end
 
   def test_43_new_project_yaml_data_structure

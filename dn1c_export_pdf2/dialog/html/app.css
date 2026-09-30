@@ -1024,6 +1024,10 @@ textarea.form-control {
   color: var(--bs-primary);
 }
 
+.workflow-stadia-header .stadia-save-default {
+  margin-left: auto;
+}
+
 .stadia-checkboxes-vertical {
   display: flex;
   flex-direction: column;

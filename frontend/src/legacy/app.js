@@ -3079,6 +3079,17 @@ function updateParamModalPreview() {
     notifyChange();
   }
 
+  // Сохранить текущий список стадий (только имена и порядок, без галочек)
+  // как глобальный список по умолчанию (config/settings.yaml -> default_stadia)
+  function saveStadiaDefault() {
+    const stadia = (state.workflow && Array.isArray(state.workflow.stadia)) ? state.workflow.stadia : [];
+    const names = stadia
+      .map((s) => (s && s.name ? String(s.name) : ""))
+      .filter((n) => n.trim().length > 0);
+    if (names.length === 0) return;
+    callRuby("saveStadiaDefault", JSON.stringify({ stadia: names }));
+  }
+
   // Render History Table
   // Render History Table: ui.history хранит { uid, item }, где item — тот же
   // объект state.history (прокси Vue пишет насквозь); рендер — HistoryTab.vue
@@ -4340,6 +4351,7 @@ function updateParamModalPreview() {
     removeStadia,
     commitStadia,
     addStadia,
+    saveStadiaDefault,
     focusScene,
     selectTemplate,
     tplEditorSetVisible,
