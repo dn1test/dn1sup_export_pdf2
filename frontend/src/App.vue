@@ -97,11 +97,13 @@
                 <select id="selectLayoutTemplate" class="form-control toolbar-select" style="display: none;">
                   <!-- Опции заполняются динамически (syncTemplateDropdowns) -->
                 </select>
-                <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" style="display: none;">
-                  <i class="modus-icons">edit</i> Переименовать
+                <button type="button" class="btn btn-xs btn-secondary" id="btnRenameCurrentTemplate" title="Переименовать этот шаблон" aria-label="Переименовать шаблон" style="display: none;">
+                  <i class="modus-icons">edit</i>
                 </button>
                 <span class="layout-page-info" id="layoutPageInfoBadge">A3 Альбомная</span>
               </div>
+
+              <span class="layout-tpl-usage" id="layoutTplUsageBadge" title="Сцены SketchUp, использующие этот шаблон"></span>
 
               <div class="toolbar-group">
                 <div class="toolbar-font-control">
@@ -129,15 +131,11 @@
                   </select>
                 </div>
                 <div class="toolbar-margin-control">
-                  <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля листа:</label>
+                  <label for="inputLayoutMargin" class="toolbar-label-sub" title="Отступ по периметру страницы">Поля:</label>
                   <input type="number" id="inputLayoutMargin" class="form-control" min="0" max="100" step="1" value="5" title="Отступ по периметру страницы в мм">
                   <span class="unit-text">мм</span>
                 </div>
               </div>
-            </div>
-
-            <div class="toolbar-row toolbar-usage-row">
-              <span class="layout-tpl-usage" id="layoutTplUsageBadge" title="Сцены SketchUp, использующие этот шаблон"></span>
             </div>
           </div>
 
