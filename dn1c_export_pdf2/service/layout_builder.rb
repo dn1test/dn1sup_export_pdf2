@@ -35,6 +35,12 @@ module DN1Code
         # Цвета оформления
         PARAM_TEXT_COLOR = "0F172A" # текст параметров по умолчанию
 
+        # Заголовок параметра печатается ЗАГЛАВНЫМИ буквами кеглем на эту
+        # величину больше кегля значения. Подписи внутри строк блоков-групп
+        # («Помещение: Гостиная») — только заглавными: LayOut держит максимум
+        # два шрифтовых рана в одном тексте, а подписей в блоке несколько.
+        PARAM_LABEL_SIZE_DELTA = 1.0
+
         # Проверка доступности LayOut Ruby API в текущем окружении
         def available?
           defined?(::Layout) && defined?(::Layout::Document)
@@ -441,7 +447,10 @@ module DN1Code
           ::Geom::Bounds2d.new(pt2in(x_pt), pt2in(lay_y(ctx, y_top_pt)), pt2in(w_pt), pt2in(h_pt))
         end
 
-        # Ограниченный текстовый блок (box — координаты блока, y — верхняя грань, в pt)
+        # Ограниченный текстовый блок (box — координаты блока, y — верхняя грань, в pt).
+        # opts[:label_len]/opts[:label_size] — второй стилевой ран для заголовка
+        # параметра: первые label_len символов печатаются кеглем label_size
+        # (LayOut поддерживает максимум два рана в одном тексте)
         def add_bounded_text(ctx, doc, page, layer, text, box, opts = {})
           return if text.to_s.empty?
 
@@ -452,11 +461,26 @@ module DN1Code
           style = text_ent.style(0)
           apply_text_style!(style, opts, ctx)
           text_ent.apply_style(style)
+          apply_label_run!(text_ent, opts, ctx)
           doc.add_entity(text_ent, layer, page)
           text_ent
         rescue StandardError => e
           warn "Ошибка добавления текста LayOut: #{e.message}"
           nil
+        end
+
+        # Ран заголовка: первые label_len символов текста кеглем label_size,
+        # остальное оформление (шрифт, цвет, жирность, выравнивание) — из opts.
+        # Сбой рана не валит отрисовку — заголовок останется кеглем значения.
+        def apply_label_run!(text_ent, opts, ctx)
+          len = opts[:label_len].to_i
+          return if len <= 0 || !opts[:label_size]
+
+          lstyle = text_ent.style(0)
+          apply_text_style!(lstyle, opts.merge(size: opts[:label_size]), ctx)
+          text_ent.apply_style(lstyle, 0, len)
+        rescue StandardError => e
+          warn "Заголовок параметра напечатан кеглем значения (#{e.message})"
         end
 
         # ------------------------------------------------------------------
@@ -575,14 +599,30 @@ module DN1Code
         # LayOut пересчитывает bounds с учетом шрифта и кегля — и удаляется.
         # Если измерение недоступно (тестовые моки), оценка по числу символов.
         def separator_width_pt(ctx, doc, page, layer, item, max_width_pt)
-          est_text =
-            if item[:stadia]
-              item[:text].to_s.gsub(/^\[[✓ ]\]\s*/, "")
-            else
-              item[:render_text].to_s
-            end
-          w = measure_text_width_pt(doc, page, layer, est_text, item[:size], item[:font], ctx[:text_bold])
-          w = est_line_width_pt(est_text, item[:size], item[:font]) if w.nil?
+          if item[:label_size] && !item[:label].to_s.empty?
+            # Заголовок печатается ЗАГЛАВНЫМИ кеглем +1 — меряем его отдельно
+            # и берем самую широкую строку параметра (заголовок или значение)
+            value_text =
+              if item[:stadia]
+                item[:text].to_s.gsub(/^\[[✓ ]\]\s*/, "")
+              else
+                item[:render_text].to_s.split("\n", 2)[1].to_s
+              end
+            w_label = measure_text_width_pt(doc, page, layer, item[:label], item[:label_size], item[:font], ctx[:text_bold])
+            w_label = est_line_width_pt(item[:label], item[:label_size], item[:font]) if w_label.nil?
+            w_value = measure_text_width_pt(doc, page, layer, value_text, item[:size], item[:font], ctx[:text_bold])
+            w_value = est_line_width_pt(value_text, item[:size], item[:font]) if w_value.nil?
+            w = [w_label.to_f, w_value.to_f].max
+          else
+            est_text =
+              if item[:stadia]
+                item[:text].to_s.gsub(/^\[[✓ ]\]\s*/, "")
+              else
+                item[:render_text].to_s
+              end
+            w = measure_text_width_pt(doc, page, layer, est_text, item[:size], item[:font], ctx[:text_bold])
+            w = est_line_width_pt(est_text, item[:size], item[:font]) if w.nil?
+          end
           # У стадий впереди еще квадрат-чекбокс
           w += item[:size] * 1.15 if item[:stadia]
           w.round(2).clamp(1.0, max_width_pt)
@@ -1146,10 +1186,11 @@ module DN1Code
         # рисует тонкий разделитель между каждой парой соседних строк.
         # Формат: заголовок на своей строке, значение на следующей
         # ([Заголовок\n]Значение) — при включённом «Заголовок» и пустом label
-        # подпись берётся из AUTO_PARAM_LABELS; у детей блока подпись печатается
-        # перед значением внутри общей строки блока («Помещение: Гостиная | …»);
-        # пустое значение или visible: false — параметр не выводится. Стадии
-        # проекта (чек-лист) рисуются с квадратами.
+        # подпись берётся из AUTO_PARAM_LABELS; заголовок печатается ЗАГЛАВНЫМИ
+        # буквами кеглем на PARAM_LABEL_SIZE_DELTA больше кегля значения;
+        # у детей блока подпись печатается перед значением внутри общей строки
+        # блока («Помещение: Гостиная | …»); пустое значение или visible: false —
+        # параметр не выводится. Стадии проекта (чек-лист) рисуются с квадратами.
         def render_params(doc, page, cnt_layer, gfx_layer, content, page_cfg, ctx, rctx)
           params = page_cfg[:params] || page_cfg["params"]
           return unless params.is_a?(Array)
@@ -1182,7 +1223,7 @@ module DN1Code
                 # блока («Помещение: Гостиная | Адрес: …»)
                 if param_show_label?(child, default: false)
                   eff = effective_param_label(child_src, param_label_text(child), rctx)
-                  child_val = "#{eff}: #{child_val}" unless eff.empty?
+                  child_val = "#{eff.upcase}: #{child_val}" unless eff.empty?
                 end
                 child_val
               end
@@ -1207,6 +1248,8 @@ module DN1Code
             # источника (у блока своего источника нет).
             label = param_label_text(param)
             label = effective_param_label(source, label, rctx) if show_label && !is_group
+            # Заголовок печатается ЗАГЛАВНЫМИ буквами независимо от источника подписи
+            label = label.upcase
 
             # Итоговый текст с заголовком: заголовок на своей строке, значение —
             # на следующей. Высота блока считается по нему, иначе длинный
@@ -1239,6 +1282,7 @@ module DN1Code
               render_text: render_text,
               label:       label,
               show_label:  show_label,
+              label_size:  (show_label && !label.empty?) ? (size + PARAM_LABEL_SIZE_DELTA).round(2) : nil,
               size:        size,
               color:       raw_col,
               font:        font
@@ -1262,7 +1306,12 @@ module DN1Code
               est_text = it[:stadia] ? it[:text] : it[:render_text]
               h = estimate_text_height(est_text, it[:size], w, it[:font], ctx[:text_bold])
               if it[:stadia] && it[:show_label] && !it[:label].empty?
-                h += it[:size] * font_line_pitch_ratio(it[:font])
+                # Заголовок чек-листа — отдельная строка своим (бо́льшим) кеглем
+                h += (it[:label_size] || it[:size]) * font_line_pitch_ratio(it[:font])
+              elsif it[:label_size]
+                # Оценка считает строку заголовка кеглем значения — компенсируем
+                # фактический кегль +1, иначе заголовок наезжает на предыдущий параметр
+                h += PARAM_LABEL_SIZE_DELTA * font_line_pitch_ratio(it[:font])
               end
               h
             end
@@ -1328,10 +1377,11 @@ module DN1Code
                 # Стадии (чек-лист): заголовок — отдельной строкой над списком,
                 # чтобы не ломать разбор строк "[✓]/[ ]" с квадратами-чекбоксами.
                 if it[:show_label] && !it[:label].empty?
-                  pitch = it[:size] * font_line_pitch_ratio(it[:font])
+                  lsize = it[:label_size] || it[:size]
+                  pitch = lsize * font_line_pitch_ratio(it[:font])
                   add_bounded_text(ctx, doc, page, cnt_layer, it[:label],
                                    { x: box[:x], y: box[:y], width: box[:width], height: pitch },
-                                   size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
+                                   size: lsize, color: it[:color], align: align, anchor: :top, font: it[:font])
                   box = box.merge(y: box[:y] - pitch, height: [box[:height] - pitch, 10.0].max)
                 end
                 draw_stadia_check_rows(ctx, doc, page, cnt_layer,
@@ -1339,7 +1389,8 @@ module DN1Code
                                        box, it[:font], 1.0, (gfx_layer || cnt_layer))
               else
                 add_bounded_text(ctx, doc, page, cnt_layer, it[:render_text], box,
-                                 size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font])
+                                 size: it[:size], color: it[:color], align: align, anchor: :top, font: it[:font],
+                                 label_size: it[:label_size], label_len: it[:label_size] ? it[:label].length : 0)
               end
 
               # Небольшая линия-разделитель «Линия» — в зазоре между соседними

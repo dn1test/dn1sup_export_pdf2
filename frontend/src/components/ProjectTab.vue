@@ -34,16 +34,16 @@
         </div>
         <div class="form-grid">
           <div class="form-group">
-            <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
-            <div class="input-action-group">
-              <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
-              <button type="button" class="btn btn-secondary btn-action" id="btnGenerateCustomerId" title="Сгенерировать уникальный идентификатор клиента"><i class="modus-icons">autorenew</i> Создать ID</button>
-            </div>
+            <label for="inputCustomer">ФИО / Контактное лицо *</label>
+            <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
           </div>
 
           <div class="form-group">
-            <label for="inputCustomer">ФИО / Контактное лицо *</label>
-            <input type="text" id="inputCustomer" class="form-control" placeholder="например: Мария Смирнова, Алексей">
+            <label for="inputCustomerId">Идентификатор заказчика (ID)</label>
+            <div class="input-action-group">
+              <input type="text" id="inputCustomerId" class="form-control font-mono" placeholder="CUST-260905-142650">
+              <button type="button" class="btn btn-secondary btn-action btn-icon-only" id="btnGenerateCustomerId" title="Создать ID — сгенерировать уникальный идентификатор клиента" aria-label="Создать ID"><i class="modus-icons">autorenew</i></button>
+            </div>
           </div>
 
           <div class="form-group full-width" id="companyFieldGroup">
@@ -195,9 +195,29 @@
                 @dragend="clearDrag"
               >
                 <input v-model="st.item.status" type="checkbox" @change="legacy('stadiaChanged')">
-                <span class="stadia-name">{{ st.item.name || `Стадия ${idx + 1}` }}</span>
+                <input
+                  v-if="editingIdx === idx"
+                  ref="editInput"
+                  v-model="editName"
+                  type="text"
+                  class="form-control stadia-edit-input"
+                  @click.stop
+                  @keydown.enter.prevent="commitEdit(idx)"
+                  @keydown.esc.prevent="cancelEdit"
+                  @blur="commitEdit(idx)"
+                >
+                <span v-else class="stadia-name">{{ st.item.name || `Стадия ${idx + 1}` }}</span>
                 <button
-                  v-if="ui.stadia.length > 1"
+                  v-if="editingIdx !== idx"
+                  type="button"
+                  class="stadia-edit"
+                  title="Редактировать стадию"
+                  @click.stop.prevent="startEdit(idx)"
+                >
+                  <i class="modus-icons" style="font-size: 11px">edit</i>
+                </button>
+                <button
+                  v-if="ui.stadia.length > 1 && editingIdx !== idx"
                   type="button"
                   class="stadia-delete"
                   title="Удалить стадию"
@@ -227,7 +247,7 @@
 </template>
 
 <script setup>
-import { ref } from 'vue'
+import { ref, nextTick } from 'vue'
 import { ui } from '../store.js'
 
 function legacy(fn, ...args) {
@@ -239,6 +259,31 @@ function addStadia() {
   if (!newStadiaName.value.trim()) return
   legacy('addStadia', newStadiaName.value)
   newStadiaName.value = ''
+}
+
+// Инлайн-переименование стадии по иконке-карандашу
+const editingIdx = ref(null)
+const editName = ref('')
+const editInput = ref(null)
+
+function startEdit(idx) {
+  editingIdx.value = idx
+  editName.value = ui.stadia[idx]?.item.name || ''
+  nextTick(() => {
+    const el = Array.isArray(editInput.value) ? editInput.value[0] : editInput.value
+    el?.focus()
+    el?.select()
+  })
+}
+function commitEdit(idx) {
+  if (editingIdx.value !== idx) return
+  editingIdx.value = null
+  const name = editName.value.trim()
+  if (!name || name === ui.stadia[idx]?.item.name) return
+  legacy('renameStadia', idx, name)
+}
+function cancelEdit() {
+  editingIdx.value = null
 }
 
 // Drag & Drop переупорядочивание стадий

@@ -142,8 +142,8 @@ module DN1Code
           doc = tp_render(pd)
           ent = tp_find_text(doc, "Шкаф-купе АЛЬФА")
           assert(ent, "Параметр с заполненным источником выводится на страницу")
-          assert(ent.plain_text.split("\n", -1) == ["Изделие", "Шкаф-купе АЛЬФА"],
-                 "Заголовок параметра выводится на своей строке, значение — на следующей (#{ent.plain_text.inspect})")
+          assert(ent.plain_text.split("\n", -1) == ["ИЗДЕЛИЕ", "Шкаф-купе АЛЬФА"],
+                 "Заголовок печатается ЗАГЛАВНЫМИ на своей строке, значение — на следующей (#{ent.plain_text.inspect})")
 
           # 2. Чекбокс «Вкл» (param.visible)
           tp_params(pd, :cover).first[:visible] = false
@@ -202,11 +202,18 @@ module DN1Code
           assert(y_second - y_first < 120.0,
                  "Отступ между параметрами зоны небольшой (#{(y_second - y_first).round(1)} pt)")
 
-          # 7. Кегль параметра (font_size)
+          # 7. Кегль параметра (font_size): значение — своим кеглем, заголовок —
+          #    ЗАГЛАВНЫМИ буквами кеглем на 1 pt больше (PARAM_LABEL_SIZE_DELTA)
           pd_fs = tp_make_project
           tp_add_param(pd_fs, :cover, "project.room_name", label: "Помещение", font_size: 20.0)
-          sz = tp_find_text(tp_render(pd_fs), "Прихожая").style.font_size
+          ent_fs = tp_find_text(tp_render(pd_fs), "Прихожая")
+          value_at = ent_fs.plain_text.index("Прихожая")
+          sz = ent_fs.style(value_at).font_size
           assert((sz - 20.0).abs < 0.01, "Кегль параметра 20 → font_size=20 (получено #{sz})")
+          sz_label = ent_fs.style(0).font_size
+          assert((sz_label - 21.0).abs < 0.01, "Заголовок печатается кеглем +1 → 21 (получено #{sz_label})")
+          assert(ent_fs.plain_text.start_with?("ПОМЕЩЕНИЕ\n"),
+                 "Заголовок печатается ЗАГЛАВНЫМИ буквами (#{ent_fs.plain_text.inspect})")
 
           # 8. Цвет параметра (color)
           pd_col = tp_make_project
@@ -351,6 +358,10 @@ module DN1Code
                  "Названия стадий выводятся строками")
           assert(tp_rects(doc_st).size == 3, "На каждую стадию рисуется квадрат-чекбокс (3 шт)")
           assert(tp_paths(doc_st).size == 1, "Галочка рисуется только для отмеченной стадии (1 шт)")
+          stadia_header = tp_texts(doc_st).find { |t| t.plain_text.strip == "СТАДИИ" }
+          assert(stadia_header, "Заголовок стадий печатается отдельной строкой ЗАГЛАВНЫМИ («СТАДИИ»)")
+          assert((stadia_header.style(0).font_size - 11.0).abs < 0.01,
+                 "Заголовок стадий печатается кеглем +1 → 11 (получено #{stadia_header.style(0).font_size})")
 
           # 5b. Стадии в центральной колонке: текст центрируется самим LayOut
           # на всю ширину зоны — точно по центру колонки при любой ширине строки
@@ -417,8 +428,8 @@ module DN1Code
           g = tp_params(pd, :cover).first
           g[:label] = "Реквизиты"
           g[:show_label] = true
-          ent3 = tp_find_text(tp_render(pd), "Реквизиты\nПрихожая")
-          assert(ent3, "Заголовок блока выводится на своей строке перед объединенной строкой")
+          ent3 = tp_find_text(tp_render(pd), "РЕКВИЗИТЫ\nПрихожая")
+          assert(ent3, "Заголовок блока выводится на своей строке (ЗАГЛАВНЫМИ) перед объединенной строкой")
 
           # 4. Порядок детей внутри блока = порядок в строке
           c = g[:params]
@@ -494,8 +505,8 @@ module DN1Code
           tp_add_param(pd, :cover, "project.articul")
           ent = tp_find_text(tp_render(pd), "CF#260922_100000")
           assert(ent, "Параметр с авто-подписью выводится на страницу")
-          assert(ent.plain_text.include?("Артикул\nCF#260922_100000"),
-                 "Пустой label заменяется авто-подписью «Артикул» на своей строке (#{ent.plain_text.inspect})")
+          assert(ent.plain_text.include?("АРТИКУЛ\nCF#260922_100000"),
+                 "Пустой label заменяется авто-подписью «АРТИКУЛ» (ЗАГЛАВНЫМИ) на своей строке (#{ent.plain_text.inspect})")
 
           # 2. «Заголовок» выключен — печатается только значение
           tp_params(pd, :cover).first[:show_label] = false
@@ -507,8 +518,8 @@ module DN1Code
           tp_params(pd, :cover).first[:show_label] = true
           tp_params(pd, :cover).first[:label] = "Код проекта:"
           ent3 = tp_find_text(tp_render(pd), "CF#260922_100000")
-          assert(ent3.plain_text.include?("Код проекта\nCF#260922_100000") && !ent3.plain_text.include?("Артикул"),
-                 "Явный label перекрывает авто-подпись, хвостовое «:» срезано (#{ent3.plain_text.inspect})")
+          assert(ent3.plain_text.include?("КОД ПРОЕКТА\nCF#260922_100000") && !ent3.plain_text.include?("АРТИКУЛ"),
+                 "Явный label перекрывает авто-подпись (ЗАГЛАВНЫМИ), хвостовое «:» срезано (#{ent3.plain_text.inspect})")
 
           # 4. Дети блока: включённый «Заголовок» ребёнка печатается перед значением
           pd4 = tp_make_project
@@ -524,8 +535,8 @@ module DN1Code
           }
           ent4 = tp_find_text(tp_render(pd4), "Прихожая")
           assert(ent4, "Блок с детьми и авто-подписями выводится")
-          assert(ent4.plain_text.include?("Помещение: Прихожая"),
-                 "Ребёнок с «Заголовок» печатается как «Помещение: значение» (#{ent4.plain_text.inspect})")
+          assert(ent4.plain_text.include?("ПОМЕЩЕНИЕ: Прихожая"),
+                 "Подпись ребёнка блока печатается ЗАГЛАВНЫМИ перед значением (#{ent4.plain_text.inspect})")
           assert(ent4.plain_text.include?("+7 999"),
                  "Ребёнок без «Заголовок» печатается просто значением")
           assert(ent4.plain_text.include?(" | "), "Дети блока по-прежнему объединены « | »")
@@ -536,8 +547,8 @@ module DN1Code
           tp_add_param(pd5, :cover, "dir.0.description")
           ent5 = tp_find_text(tp_render(pd5), "ЛДСП 16 мм, Blum")
           assert(ent5, "Параметр папки выводится на страницу")
-          assert(ent5.plain_text.include?("Материалы — спецификация\nЛДСП 16 мм, Blum"),
-                 "Авто-подпись папки = «<название> — спецификация» на своей строке (#{ent5.plain_text.inspect})")
+          assert(ent5.plain_text.include?("МАТЕРИАЛЫ — СПЕЦИФИКАЦИЯ\nЛДСП 16 мм, Blum"),
+                 "Авто-подпись папки = «<НАЗВАНИЕ> — СПЕЦИФИКАЦИЯ» ЗАГЛАВНЫМИ (#{ent5.plain_text.inspect})")
         end
 
         # ------------------------------------------------------------------
@@ -832,8 +843,11 @@ module DN1Code
           doc = tp_render(pd)
           ent = tp_find_text(doc, "CF#")
           assert(ent, "Параметр с длинным заголовком выведен")
-          expected_h = LB.send(:estimate_text_height, "#{long_label}\nCF#260922_100000",
-                               10.0, CONTENT_W * 0.45, "Sofia Sans Condensed", false) + 1.5
+          # Оценка по итоговому тексту (заголовок ЗАГЛАВНЫМИ) плюс надбавка за
+          # кегль заголовка +1 (PARAM_LABEL_SIZE_DELTA × межстрочный коэффициент)
+          expected_h = LB.send(:estimate_text_height, "#{long_label.upcase}\nCF#260922_100000",
+                               10.0, CONTENT_W * 0.45, "Sofia Sans Condensed", false) +
+                       1.0 * LB.send(:font_line_pitch_ratio, "Sofia Sans Condensed") + 1.5
           actual_h = ent.bounds.height * 72.0
           assert((actual_h - expected_h).abs < 0.6,
                  "Высота бокса = оценка итогового текста с заголовком (#{actual_h.round(1)} ≈ #{expected_h.round(1)} pt)")
@@ -855,7 +869,7 @@ module DN1Code
           end
           doc2 = tp_render(pd2)
           texts2 = tp_texts(doc2)
-          top_last = texts2.select { |t| t.plain_text.to_s.start_with?("Материалы") }
+          top_last = texts2.select { |t| t.plain_text.to_s.upcase.start_with?("МАТЕРИАЛЫ") }
                            .map { |t| (t.bounds.y + t.bounds.height) * 72.0 }.max
           bot_first = texts2.select { |t| t.plain_text.to_s.strip == "Этап №1" }
                             .map { |t| t.bounds.y * 72.0 }.min
@@ -904,7 +918,7 @@ module DN1Code
           tp_add_param(pd, :cover, "project.articul")
           tops = lambda do |doc|
             texts = tp_texts(doc)
-            room = texts.find { |t| t.plain_text.to_s.include?("Помещение") }
+            room = texts.find { |t| t.plain_text.to_s.upcase.include?("ПОМЕЩЕНИЕ") }
             art = texts.find { |t| t.plain_text.to_s.include?("CF#") }
             [room.bounds.y * 72.0, art.bounds.y * 72.0]
           end
@@ -994,16 +1008,16 @@ module DN1Code
           # 4. Рендер на лист: заголовок и значение меняются вместе с типом
           tp_add_param(pd, :cover, "customer.name_or_company")
           comm = tp_find_text(tp_render(pd), "ООО «МебельПроект»")
-          assert(comm && comm.plain_text.split("\n", -1) == ["Компания", "ООО «МебельПроект»"],
-                 "Коммерческий лист: «Компания» на своей строке, значение — на следующей (#{comm&.plain_text.inspect})")
+          assert(comm && comm.plain_text.split("\n", -1) == ["КОМПАНИЯ", "ООО «МебельПроект»"],
+                 "Коммерческий лист: «КОМПАНИЯ» (ЗАГЛАВНЫМИ) на своей строке, значение — на следующей (#{comm&.plain_text.inspect})")
           tp_params(pd_house, :cover) << {
             id: "p_house", source: "customer.name_or_company", label: "", show_label: true,
             align: "left", valign: "top", font_family: "", font_size: 10.0,
             color: "#0F172A", visible: true
           }
           house = tp_find_text(tp_render(pd_house), "Иванов И.И.")
-          assert(house && house.plain_text.split("\n", -1) == ["Заказчик", "Иванов И.И."],
-                 "Бытовой лист: «Заказчик» на своей строке, значение — на следующей (#{house&.plain_text.inspect})")
+          assert(house && house.plain_text.split("\n", -1) == ["ЗАКАЗЧИК", "Иванов И.И."],
+                 "Бытовой лист: «ЗАКАЗЧИК» (ЗАГЛАВНЫМИ) на своей строке, значение — на следующей (#{house&.plain_text.inspect})")
 
           # 5. Guard: диалог знает условный источник (список/подпись/превью)
           js = Dir[File.join(__dir__, "../../frontend/src/**/*.{js,vue}")].sort

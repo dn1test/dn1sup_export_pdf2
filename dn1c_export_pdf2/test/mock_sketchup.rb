@@ -751,15 +751,23 @@ module Layout
         @anchor_type = anchor_type
       end
       @grow_mode = GROW_MODE_BOUNDED
+      @style_runs = []
     end
 
-    # Возвращает Style для диапазона текста (мок: единый стиль)
-    def style(_index = 0, _length = nil)
-      @style
+    # Стиль символа по индексу: ран, покрывающий индекс (apply_style со
+    # явной длиной), иначе базовый стиль всего текста. Как и в реальном
+    # LayOut API, возвращается КОПИЯ стиля — правки копии не влияют на текст.
+    def style(index = 0, _length = nil)
+      run = @style_runs.find { |r| index.between?(r[:index], r[:index] + r[:length] - 1) }
+      (run ? run[:style] : @style).dup
     end
 
-    def apply_style(applied, _index = 0, _length = nil)
-      @style = applied
+    def apply_style(applied, index = 0, length = nil)
+      if length.nil?
+        @style = applied
+      else
+        @style_runs << { index: index, length: length, style: applied }
+      end
       true
     end
 

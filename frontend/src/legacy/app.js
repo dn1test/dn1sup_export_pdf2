@@ -3168,6 +3168,18 @@ function updateParamModalPreview() {
     notifyChange();
   }
 
+  // Переименование стадии (иконка-карандаш в строке списка ProjectTab.vue)
+  function renameStadia(index, name) {
+    name = String(name || "").trim();
+    if (!state.workflow || !Array.isArray(state.workflow.stadia)) return;
+    const item = state.workflow.stadia[index];
+    if (!item || !name || item.name === name) return;
+    item.name = name;
+    renderStadia();
+    updateStadiaStatus();
+    notifyChange();
+  }
+
   // Сохранить текущий список стадий (только имена и порядок, без галочек)
   // как глобальный список по умолчанию (config/settings.yaml -> default_stadia)
   function saveStadiaDefault() {
@@ -4443,6 +4455,7 @@ function updateParamModalPreview() {
     removeStadia,
     commitStadia,
     addStadia,
+    renameStadia,
     saveStadiaDefault,
     focusScene,
     selectTemplate,
