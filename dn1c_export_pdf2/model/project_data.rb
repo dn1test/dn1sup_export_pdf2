@@ -252,20 +252,22 @@ module DN1Code
         def initialize
           @project      = default_project
           @customer     = default_customer
+          @pdf_settings = default_pdf_settings
+          @api_targets  = default_api_targets
+
+          # Глобальные настройки читаем ДО построения @workflow: default_workflow
+          # берёт список стадий из default_stadia (settings.yaml -> default_stadia)
+          load_program_settings
+
           @workflow     = default_workflow
           @project_info = ProjectInfoProxy.new(self)
           @project_info.merge!(default_project_info)
-          @pdf_settings = default_pdf_settings
-          @api_targets  = default_api_targets
           @directories  = []
           @scenes       = []
           @history      = []
           @work_stats   = WorkStats.blank_data
 
           sync_project_fields!
-
-          # Загружаем глобальные настройки программы из плагина
-          load_program_settings
         end
 
         # Начисляет секунды активной работы в статистику проекта (в памяти)
