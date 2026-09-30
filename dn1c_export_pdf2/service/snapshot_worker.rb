@@ -5,26 +5,28 @@ require "fileutils"
 module DN1Code
   module ExportPdf2
     module Service
-      # Фоновый пул потоков для конвертации PNG-снимков в WebP (через VipsService).
+      # Очередь конвертации PNG/JPG-снимков в WebP (через VipsService).
       #
-      # Зачем: экспорт PDF не должен ждать конвертации снимков. Контроллер синхронно
-      # раскладывает PNG-исходники в <Артикул>/images и передает задания сюда; PDF
-      # открывается сразу, конвертация идет в фоне и не трогает SketchUp API
-      # (только файлы и libvips — она потокобезопасна, DLL/vips_init прогреваются
-      # в главном потоке до старта пула).
+      # Почему таймер на главном потоке, а не фоновые потоки: вызовы libvips из
+      # фоновых Ruby-потоков в SketchUp воспроизводимо зависают — кодирование
+      # завершается и .webp файл записан на диск, но C-вызов через Fiddle не
+      # возвращается: воркер остается «жив» навсегда (индикатор в статусной
+      # строке горит вечно), а новые Ruby-потоки перестают планироваться.
+      # Вне SketchUp тот же код на тех же DLL конвертирует за 0.06 c, а в
+      # главном потоке SketchUp — тоже (0.05-0.2 c на снимок). Поэтому обработка
+      # кооперативная: UI.start_timer берет по одному заданию за тик на главном
+      # потоке — PDF открывается сразу, SketchUp остается отзывчивым между
+      # снимками, а Sketchup.status_text= безопасен по определению.
       #
-      # Потокобезопасность: @lock защищает состояние, но никогда не держится во время
-      # длительных операций (join, конвертация) — поэтому дедлоков нет. Прогресс
-      # показывается в статусной строке SketchUp через UI.start_timer (колбэк таймера
-      # исполняется в главном потоке — API вызывается только оттуда).
-      #
-      # Повторный экспорт во время конвертации: каждая партия несет номер поколения.
-      # Новый submit увеличивает поколение — оставшиеся задания старой партии
-      # отбрасываются, а «задумавшийся» посреди конвертации воркер выбрасывает свой
-      # результат, не трогая файлы новой партии. Поэтому экспорт никогда не ждет
-      # завершения прошлой конвертации.
+      # Повторный экспорт во время конвертации: submit заменяет очередь целиком
+      # (обработка однопоточная, «задумавшихся» воркеров нет), а drain добирает
+      # остаток синхронно — перед очисткой папки images экспорт гарантированно
+      # знает, что файлы больше не двигаются.
       module SnapshotWorker
         extend self
+
+        # Интервал тика обработки очереди, секунд
+        TICK_INTERVAL = 0.25
 
         # Задание на конвертацию: { src:, dst:, quality:, lossless: }
         # @param jobs [Array<Hash>]
@@ -33,42 +35,29 @@ module DN1Code
           jobs = Array(jobs).reject { |j| j.nil? || j[:src].to_s.empty? || j[:dst].to_s.empty? }
           return status if jobs.empty? || !defined?(Service::VipsService) || !Service::VipsService.ensure_started!
 
-          queue = Queue.new
-          generation = nil
-          @lock.synchronize do
-            @generation += 1
-            generation  = @generation
-            @total      = jobs.size
-            @done       = 0
-            @failed     = 0
-            @errors     = []
-            jobs.each { |j| queue << j.merge(generation: generation) }
-          end
+          @generation += 1
+          @total  = jobs.size
+          @done   = 0
+          @failed = 0
+          @errors = []
+          @queue  = jobs.map { |j| j.merge(generation: @generation) }
 
-          count = [pool_size, jobs.size].min
-          threads = count.times.map { Thread.new(queue) { |q| work_loop(q) } }
-          @lock.synchronize { @threads = threads }
-
-          start_status_timer
+          start_worker_timer
           status
         end
 
-        # Дождаться завершения текущей партии (no-op, если ничего не выполняется).
-        # @param timeout [Float, nil] ограничение суммарного ожидания; nil — ждать до конца.
-        #   Экспорт вызывает drain(3.0): обычно партия уже закончилась (мгновенный возврат),
-        #   а остаток дождаться нельзя — чтобы не замораживать SketchUp, поколения
-        #   гарантируют корректность и без ожидания.
+        # Добработать текущую партию синхронно. Все точки вызова (экспорт, тесты)
+        # работают на главном потоке, так что конкуренции с тиком таймера нет.
+        # Ограничение timeout не дает заморозить SketchUp на большой партии:
+        # остаток остается в очереди и дообрабатывается тиками.
+        # @param timeout [Float, nil] ограничение суммарного времени; nil — до конца партии
         # @return [Hash] статус
         def drain(timeout = nil)
           deadline = timeout ? Process.clock_gettime(Process::CLOCK_MONOTONIC) + timeout : nil
-          threads = @lock.synchronize { @threads.dup }
-          threads.each do |t|
-            next unless t.alive?
+          until @queue.empty?
+            break if deadline && Process.clock_gettime(Process::CLOCK_MONOTONIC) >= deadline
 
-            remain = deadline ? deadline - Process.clock_gettime(Process::CLOCK_MONOTONIC) : nil
-            break if remain && remain <= 0
-
-            t.join(remain)
+            tick_job
           end
           status
         end
@@ -76,95 +65,106 @@ module DN1Code
         # Состояние текущей/последней партии
         # @return [Hash] { running:, total:, done:, failed:, errors: }
         def status
-          @lock.synchronize do
-            {
-              running: @threads.any?(&:alive?),
-              total:   @total,
-              done:    @done,
-              failed:  @failed,
-              errors:  @errors.dup
-            }
-          end
+          {
+            running: running?,
+            total:   @total,
+            done:    @done,
+            failed:  @failed,
+            errors:  @errors.dup
+          }
         end
 
         private
 
         def initialize_state
-          @lock       = Mutex.new
-          @threads    = []
           @generation = 0
           @total      = 0
           @done       = 0
           @failed     = 0
           @errors     = []
+          @queue      = []
           @timer_id   = nil
         end
 
-        # Размер пула: половина логических ядер, зажата в 2..4. Каждая конвертация
-        # одноядерная (VIPS_CONCURRENCY=1 в VipsService), так что пул = число занятых ядер.
-        def pool_size
-          require "etc" unless defined?(Etc)
-          [[Etc.nprocessors.to_i / 2, 2].max, 4].min
-        rescue StandardError
-          2
+        def running?
+          !@queue.empty?
         end
 
-        # Цикл рабочего потока: разбирает свою очередь до опустошения
-        def work_loop(queue)
-          loop do
-            job = begin
-              queue.pop(true)
-            rescue ThreadError
-              break
-            end
-            next if stale?(job)
+        # ------------------------------------------------------------------
+        # Обработка очереди таймером на главном потоке: по одному снимку за тик
+        # ------------------------------------------------------------------
+        def start_worker_timer
+          return if @timer_id
+          return unless defined?(UI) && UI.respond_to?(:start_timer)
 
-            begin
-              ok = run_job(job)
-              @lock.synchronize do
-                if ok
-                  @done += 1
-                else
-                  @failed += 1
-                  @errors << "#{File.basename(job[:src].to_s)}: конвертация не удалась, снимок оставлен в PNG"
-                end
-              end
-            rescue StandardError => e
-              @lock.synchronize do
-                @failed += 1
-                @errors << "#{File.basename(job[:src].to_s)}: #{e.message}"
-              end
-              warn "SnapshotWorker: ошибка конвертации #{job[:src]}: #{e.message}"
+          @timer_id = UI.start_timer(TICK_INTERVAL, true) { tick }
+        end
+
+        # Колбэк UI.start_timer: конвертирует один снимок, обновляет статусную строку
+        def tick
+          return finish_batch_and_stop unless running?
+
+          tick_job
+          set_status_text("DN1C Export PDF: WebP-снимки: #{@done + @failed}/#{@total}…") if @total.positive?
+          true # таймер продолжается
+        end
+
+        # Один шаг обработки (используется тиком таймера и drain)
+        def tick_job
+          job = @queue.shift
+          begin
+            if run_job(job)
+              @done += 1
+            else
+              @failed += 1
+              @errors << "#{File.basename(job[:src].to_s)}: конвертация не удалась, снимок оставлен в PNG"
             end
+          rescue StandardError => e
+            @failed += 1
+            @errors << "#{File.basename(job[:src].to_s)}: #{e.message}"
+            warn "SnapshotWorker: ошибка конвертации #{job[:src]}: #{e.message}"
           end
         end
 
-        # Партия устарела (шел новый экспорт) — задание больше не актуально
-        def stale?(job)
-          generation = job[:generation]
-          @lock.synchronize { generation != @generation }
+        def finish_batch_and_stop
+          stop_worker_timer
+          if @total.positive?
+            msg =
+              if @failed.zero?
+                "DN1C Export PDF: WebP-снимки готовы (#{@total})"
+              else
+                "DN1C Export PDF: WebP-снимки: готово #{@done}, с ошибками #{@failed} (эти сцены сохранены в PNG)"
+              end
+            set_status_text(msg)
+          end
+          false # остановка повторяющегося таймера
         end
 
-        # Конвертация одного снимка. Запись идет во временный <имя>.tmp.webp с
-        # атомарным переименованием: при обрыве (закрытие SketchUp) не остается
-        # битого целевого файла. При неудаче PNG-исходник остается на месте —
-        # это снимок сцены (фолбэк, как и раньше при недоступной libvips).
-        # Поколение проверяется и после конвертации: результат устаревшей партии
-        # выбрасывается, файлы новой партии не перезаписываются.
+        def stop_worker_timer
+          timer = @timer_id
+          @timer_id = nil
+          UI.stop_timer(timer) if timer && defined?(UI) && UI.respond_to?(:stop_timer)
+        end
+
+        def set_status_text(text)
+          Sketchup.status_text = text if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
+        end
+
+        # Конвертация одного снимка. Запись идет во временный файл с номером
+        # поколения (<имя>.<поколение>.tmp.webp) и атомарным переименованием:
+        # при обрыве (закрытие SketchUp) не остается битого целевого файла, а
+        # tmp от предыдущей партии не путается с новой. При неудаче PNG/JPG-
+        # исходник остается на месте — это снимок сцены (фолбэк, как и раньше
+        # при недоступной libvips).
         # @return [Boolean]
         def run_job(job)
           src = job[:src].to_s
           dst = job[:dst].to_s
-          tmp = dst.sub(/\.webp$/i, ".tmp.webp")
+          tmp = dst.sub(/\.webp$/i, ".#{job[:generation]}.tmp.webp")
           return false unless File.exist?(src)
 
           ok = VipsService.png_to_webp(src, tmp, quality: job[:quality], lossless: job[:lossless])
           return false unless ok && File.exist?(tmp)
-
-          if stale?(job)
-            File.delete(tmp) rescue nil
-            return true
-          end
 
           File.delete(dst) if File.exist?(dst) rescue nil
           begin
@@ -179,46 +179,6 @@ module DN1Code
 
           File.delete(src) if File.exist?(src) rescue nil
           true
-        end
-
-        # ------------------------------------------------------------------
-        # Индикация в статусной строке SketchUp: колбэк UI.start_timer
-        # исполняется в главном потоке, поэтому Sketchup.status_text= отсюда безопасен
-        # ------------------------------------------------------------------
-        def start_status_timer
-          return if @timer_id
-          return unless defined?(UI) && UI.respond_to?(:start_timer)
-
-          @timer_id = UI.start_timer(0.5, true) { status_tick }
-        end
-
-        def status_tick
-          st = status
-          if st[:running]
-            set_status_text("DN1C Export PDF: WebP-снимки: #{st[:done]}/#{st[:total]}…")
-            return true
-          end
-
-          stop_status_timer
-          if st[:total].to_i.positive?
-            msg = if st[:failed].to_i.zero?
-                    "DN1C Export PDF: WebP-снимки готовы (#{st[:total]})"
-                  else
-                    "DN1C Export PDF: WebP-снимки: готово #{st[:done]}, с ошибками #{st[:failed]} (эти сцены сохранены в PNG)"
-                  end
-            set_status_text(msg)
-          end
-          false # остановка повторяющегося таймера
-        end
-
-        def stop_status_timer
-          timer = @timer_id
-          @timer_id = nil
-          UI.stop_timer(timer) if timer && defined?(UI) && UI.respond_to?(:stop_timer)
-        end
-
-        def set_status_text(text)
-          Sketchup.status_text = text if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
         end
 
         initialize_state

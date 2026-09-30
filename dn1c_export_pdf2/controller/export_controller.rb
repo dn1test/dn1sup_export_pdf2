@@ -103,8 +103,9 @@ module DN1Code
         # Синхронно делается только подготовка: рендер/раскладка растровых исходников
         # (PNG либо уже отрендеренная JPEG-заготовка страницы PDF) под финальными
         # именами (рендер обязан идти в главном потоке SketchUp). Сама
-        # конвертация PNG->WebP при async: true уходит в фоновый пул SnapshotWorker —
-        # экспорт и открытие PDF не ждут снимков; при async: false конвертация
+        # конвертация PNG->WebP при async: true уходит в очередь SnapshotWorker
+        # (по одному снимку за тик таймера на главном потоке) — экспорт и
+        # открытие PDF не ждут снимков; при async: false конвертация
         # выполняется инлайн (тесты/отладка).
         # Разрешение и пропорции берутся из pdf_settings (image_width / render_quality,
         # image_aspect_ratio / custom_ratio, наценка — aspect_ratio конкретной сцены).
@@ -117,16 +118,20 @@ module DN1Code
           images_dir = scene_images_dir
           return [] if scenes.empty? || images_dir.nil?
 
-          # Прошлая фоновая партия обычно уже закончена (мгновенный возврат). Ждем не дольше
-          # 3 секунд, чтобы не замораживать SketchUp на повторном экспорте; остаток старой
-          # партии отбрасывается по поколениям — свежие файлы она не перезапишет.
+          # Очередь снимков обычно уже пуста (конвертация быстрая) — добработать
+          # остаток синхронно, не дольше 3 секунд, чтобы не замораживать SketchUp
+          # на повторном экспорте. Остаток, не уложившийся в лимит, обрабатываться
+          # не будет: ниже папка images очищается, а submit заменяет очередь новой партией.
           Service::SnapshotWorker.drain(3.0) if defined?(Service::SnapshotWorker)
           FileUtils.mkdir_p(images_dir)
           # «Только последние»: снимки удаленных/переименованных сцен не должны оставаться
           Dir.glob(File.join(images_dir, "*.{png,jpg,jpeg,webp}")).each { |f| File.delete(f) rescue nil }
 
-          settings  = @project_data.pdf_settings
-          webp_mode = defined?(Service::VipsService) && Service::VipsService.available?
+          settings = @project_data.pdf_settings
+          # Готовность libvips: не только наличие DLL (available?), но и успешная
+          # инициализация. Иначе партия тихо не ставилась в очередь и PNG-исходники
+          # оставались висеть без всякого сообщения.
+          webp_mode = defined?(Service::VipsService) && Service::VipsService.ensure_started!
           webp_opts = webp_quality_setting(settings)
           # JPEG-заготовку страницы PDF переиспользуем без повторного рендера только когда
           # она всё равно конвертируется в lossy WebP; lossless WebP и PNG-фолбэк требуют
@@ -164,6 +169,7 @@ module DN1Code
             end
           end
 
+          warn_webp_unavailable_once unless webp_mode
           return written if jobs.empty?
 
           if async && defined?(Service::SnapshotWorker)
@@ -214,10 +220,13 @@ module DN1Code
           return if @webp_warned
 
           @webp_warned = true
-          if defined?(Service::VipsService) && Service::VipsService.available?
-            warn "Предупреждение: конвертация WebP не удалась, снимок сохранен как PNG."
-          else
+          svc = defined?(Service::VipsService) ? Service::VipsService : nil
+          if svc.nil? || !svc.available?
             warn "Предупреждение: libvips не найдена (vendor/libvips) — снимки сохраняются как PNG."
+          elsif !svc.started?
+            warn "Предупреждение: libvips найдена, но инициализация не удалась — снимки сохраняются как PNG."
+          else
+            warn "Предупреждение: конвертация WebP не удалась, снимок сохранен как PNG."
           end
         end
 

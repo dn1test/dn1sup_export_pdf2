@@ -414,6 +414,34 @@ module UI
     MockMenu.new(name)
   end
 
+  # Таймеры: в тестах колбэк не исполняется сам по себе —
+  # тест вызывает UI.fire_timer(id) вручную (или UI.fire_all_timers)
+  def self.start_timer(interval, repeat = false, &block)
+    timers
+    id = (@timer_seq ||= 0) + 1
+    @timer_seq = id
+    @timers[id] = { interval: interval, repeat: repeat, block: block }
+    id
+  end
+
+  def self.stop_timer(id)
+    timers.delete(id)
+    true
+  end
+
+  def self.timers
+    @timers ||= {}
+  end
+
+  def self.fire_timer(id)
+    t = timers[id]
+    t ? t[:block].call : nil
+  end
+
+  def self.fire_all_timers
+    timers.keys.each { |id| fire_timer(id) }
+  end
+
   class MockMenu
     def initialize(name); end
     def add_submenu(name); self; end
