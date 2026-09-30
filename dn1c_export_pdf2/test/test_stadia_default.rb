@@ -13,6 +13,7 @@
 
 require_relative "mock_sketchup"
 require_relative "../main"
+require_relative "../service/dev_updater"
 require "tmpdir"
 require "fileutils"
 require "yaml"
@@ -78,6 +79,8 @@ module DN1Code
         run_save_restart_cycle
         run_builtin_fallback
         run_normalize_keeps_statuses
+        run_save_preserves_saved_list
+        run_updater_exclusions
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -161,6 +164,51 @@ module DN1Code
           assert(norm == [{ name: "Утвержден", status: true }, { name: "Оплачен", status: false }],
                  "normalize_stadia не трогает существующий список и галочки (получилось #{norm.inspect})")
         end
+      end
+
+      # --- Flush с пустым значением в памяти не стирает сохранённый список -----
+      # (имитация hot-reload плагина: классовые переменные сброшены, сессия жива)
+      def run_save_preserves_saved_list
+        puts "=========================================================="
+        puts "  save_program_settings: пустой in-memory список не затирает yaml"
+        puts "=========================================================="
+
+        yaml = { "pdf_settings" => {}, "api_targets" => [],
+                 "default_stadia" => ["Эскиз", "Согласование"] }.to_yaml
+        with_fresh_config(yaml) do
+          pd = PD.new
+          # hot-reload сбрасывает классовые переменные
+          PD.instance_variable_set(:@stadia_default_names, nil)
+          assert(pd.save_program_settings == true, "flush проходит успешно")
+          written = YAML.safe_load(File.read(PD::PROGRAM_SETTINGS_FILE))
+          assert(written["default_stadia"] == ["Эскиз", "Согласование"],
+                 "сохранённый список пережил flush с пустым значением в памяти (получилось #{written['default_stadia'].inspect})")
+        end
+
+        with_fresh_config({ "pdf_settings" => {}, "api_targets" => [], "default_stadia" => [] }.to_yaml) do
+          pd = PD.new
+          PD.instance_variable_set(:@stadia_default_names, nil)
+          pd.save_program_settings
+          written = YAML.safe_load(File.read(PD::PROGRAM_SETTINGS_FILE))
+          assert(written["default_stadia"] == [], "пустой список остаётся пустым — затирать нечего")
+        end
+      end
+
+      # --- Обновление из dev-папки не копирует пользовательские yaml -----------
+      def run_updater_exclusions
+        puts "=========================================================="
+        puts "  DevUpdater: config/settings.yaml и config/layout.yaml исключены"
+        puts "=========================================================="
+
+        patterns = ::DN1Code::ExportPdf2::Service::DevUpdater::EXCLUDE_PATTERNS
+        excluded = ->(rel) { patterns.any? { |pat| rel =~ pat } }
+
+        assert(excluded.call("config/settings.yaml"), "config/settings.yaml не копируется при обновлении")
+        assert(excluded.call("config/layout.yaml"), "config/layout.yaml не копируется при обновлении")
+        assert(!excluded.call("config/default_settings.yaml"), "config/default_settings.yaml поставляется")
+        assert(!excluded.call("config/default_layout.yaml"), "config/default_layout.yaml поставляется")
+        assert(!excluded.call("config/fonts/font.ttf"), "config/fonts поставляется")
+        assert(!excluded.call("model/project_data.rb"), "код плагина копируется как прежде")
       end
     end
   end

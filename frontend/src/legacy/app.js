@@ -52,6 +52,99 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     return `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`;
   };
 
+  // -----------------------------------------------------------------------------
+  // Поля дат («Дата начала» / «Дата сдачи»): пользователь видит и вводит дд.мм.гггг,
+  // хранение остаётся в ISO (YYYY-MM-DD) — как в сохранённых проектах. Нативный
+  // <input type="date"> в CEF всегда рисует американский порядок (09/01/2026),
+  // поэтому он спрятан и служит только источником календаря (showPicker по иконке).
+  // -----------------------------------------------------------------------------
+  const pad2 = (n) => String(n).padStart(2, "0");
+  const ISO_DATE_RE = /^\d{4}-\d{2}-\d{2}$/;
+  const isoToRuDate = (v) => {
+    const m = String(v || "").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m ? `${m[3]}.${m[2]}.${m[1]}` : String(v || "");
+  };
+  // «д.м.гггг» (точки/слэши/дефисы) → ISO или null
+  const parseRuDate = (s) => {
+    const m = String(s || "").trim().match(/^(\d{1,2})[.\/-](\d{1,2})[.\/-](\d{4})$/);
+    if (!m) return null;
+    const d = Number(m[1]);
+    const mo = Number(m[2]);
+    const y = Number(m[3]);
+    if (mo < 1 || mo > 12 || d < 1 || d > 31) return null;
+    const dt = new Date(y, mo - 1, d);
+    return (dt.getFullYear() === y && dt.getMonth() === mo - 1 && dt.getDate() === d)
+      ? `${y}-${pad2(mo)}-${pad2(d)}` : null;
+  };
+  const dateFieldDisplay = (hiddenEl) => (hiddenEl ? document.getElementById(`${hiddenEl.id}Display`) : null);
+  // Записывает значение (ISO или как есть) в пару «скрытый + видимый»
+  const setDateFieldValue = (hiddenEl, v) => {
+    const s = String(v || "");
+    hiddenEl.value = ISO_DATE_RE.test(s) ? s : (parseRuDate(s) || "");
+    const display = dateFieldDisplay(hiddenEl);
+    if (display) {
+      display.value = s ? isoToRuDate(hiddenEl.value || s) : "";
+      display.dataset.lastValid = display.value;
+    }
+  };
+  // Читает значение пары: парсит текст видимого поля; неполный/невалидный ввод —
+  // возвращает последнюю согласованную дату скрытого
+  const getDateFieldValue = (hiddenEl) => {
+    if (!hiddenEl) return "";
+    const display = dateFieldDisplay(hiddenEl);
+    if (!display) return hiddenEl.value || "";
+    const t = display.value.trim();
+    if (!t) return "";
+    return parseRuDate(t) || hiddenEl.value || "";
+  };
+  function setupDateFields() {
+    document.querySelectorAll(".date-field").forEach((wrap) => {
+      const hiddenEl = wrap.querySelector('input[type="date"]');
+      const display = wrap.querySelector('input[type="text"]');
+      const icon = wrap.querySelector(".date-field-icon");
+      if (!hiddenEl || !display) return;
+      display.addEventListener("focus", () => {
+        display.dataset.lastValid = display.value.trim();
+      });
+      display.addEventListener("blur", () => {
+        const t = display.value.trim();
+        if (!t) {
+          hiddenEl.value = "";
+          display.dataset.lastValid = "";
+          return;
+        }
+        const iso = parseRuDate(t);
+        if (iso) {
+          display.value = isoToRuDate(iso);
+          display.dataset.lastValid = display.value;
+        } else {
+          // Некорректный ввод — возвращаем последнюю согласованную дату
+          display.value = display.dataset.lastValid || "";
+        }
+        hiddenEl.value = parseRuDate(display.value) || "";
+      });
+      display.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") display.blur();
+      });
+      // Выбор даты в календаре (или её очистка) — отражаем в текстовом поле
+      hiddenEl.addEventListener("change", () => {
+        display.value = hiddenEl.value ? isoToRuDate(hiddenEl.value) : "";
+        display.dataset.lastValid = display.value;
+      });
+      if (icon) {
+        icon.addEventListener("click", () => {
+          if (typeof hiddenEl.showPicker === "function") {
+            try {
+              hiddenEl.showPicker();
+            } catch (err) {
+              // CEF может запретить showPicker — поле остаётся клавиатурным
+            }
+          }
+        });
+      }
+    });
+  }
+
   // Стадии приходят из Ruby массивом объектов {name, status};
   // поддерживаем и легаси-кортежи [_, done, title]
   const stadiaName = (st) => (st && typeof st === "object" && !Array.isArray(st) && st.name !== undefined)
@@ -251,8 +344,8 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
         const v = tval(info.price);
         return v ? `${v} руб.` : "";
       }
-      case "workflow.start_date":    return tval(info.start_date);
-      case "workflow.end_date":      return tval(info.end_date);
+      case "workflow.start_date":    return isoToRuDate(tval(info.start_date));
+      case "workflow.end_date":      return isoToRuDate(tval(info.end_date));
       case "workflow.duration": {
         const d = tval(info.total_duration);
         return d ? (/дн|день|час/i.test(d) ? d : `${d} дн.`) : "";
@@ -2418,8 +2511,8 @@ function updateParamModalPreview() {
     // 3. Ход работы (Workflow)
     if (els.inputAuthor) els.inputAuthor.value = wf.author || info.author || "";
     if (els.inputPrice) els.inputPrice.value = (wf.price !== undefined && wf.price !== null) ? wf.price : (info.price || "");
-    if (els.inputStartDate) els.inputStartDate.value = wf.start_date || "";
-    if (els.inputEndDate) els.inputEndDate.value = wf.end_date || "";
+    if (els.inputStartDate) setDateFieldValue(els.inputStartDate, wf.start_date || "");
+    if (els.inputEndDate) setDateFieldValue(els.inputEndDate, wf.end_date || "");
     if (els.inputTotalDuration) els.inputTotalDuration.value = wf.total_duration || "";
     if (els.inputStatus) els.inputStatus.value = wf.status || info.status || "Предварительный";
     if (els.inputVersion) els.inputVersion.value = wf.version || info.version || 1;
@@ -3162,8 +3255,8 @@ function updateParamModalPreview() {
     const emailVal = (els.inputEmail ? els.inputEmail.value : "").trim();
     const authorVal = (els.inputAuthor ? els.inputAuthor.value : "").trim();
     const priceVal = (els.inputPrice ? els.inputPrice.value : "").trim();
-    const startDateVal = (els.inputStartDate ? els.inputStartDate.value : "").trim();
-    const endDateVal = (els.inputEndDate ? els.inputEndDate.value : "").trim();
+    const startDateVal = getDateFieldValue(els.inputStartDate);
+    const endDateVal = getDateFieldValue(els.inputEndDate);
     const totalDurationVal = (els.inputTotalDuration ? els.inputTotalDuration.value : "").trim();
     const rateVal = (els.inputRate ? els.inputRate.value : "").trim();
 
@@ -3920,6 +4013,7 @@ function updateParamModalPreview() {
       "inputCompany", "inputArticul", "inputTags",
       "inputProjectDescription", "inputAddress", "inputPhone", "inputEmail",
       "inputAuthor", "inputPrice", "inputStartDate", "inputEndDate",
+      "inputStartDateDisplay", "inputEndDateDisplay",
       "inputTotalDuration", "inputRate", "inputStatus", "inputRevision", "inputVersion",
       "inputLastEdit", "inputTaskDescription", "inputTaskDimensions", "inputTaskWishes",
       "inputMaterials", "inputAppliances", "inputLighting", "inputNotes",
@@ -4400,6 +4494,7 @@ function updateParamModalPreview() {
   // Vue, поэтому DOMContentLoaded мог уже пройти — инициализируемся сразу.
   function init() {
     setupTabs();
+    setupDateFields();
     setupEventListeners();
     setupLayoutEditor();
     setupSplitResizer();

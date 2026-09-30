@@ -252,6 +252,20 @@ module DN1Code
           assert(res.resolve_param(rctx, "customer.name") == "Иванов И.И.", "customer.name → заказчик")
           assert(res.resolve_param(rctx, "workflow.price") == "150 000 руб.", "workflow.price → с «руб.»")
           assert(res.resolve_param(rctx, "workflow.duration") == "45 дн.", "workflow.duration → с «дн.»")
+          assert(res.resolve_param(rctx, "workflow.start_date") == "01.09.2026",
+                 "workflow.start_date в дд.мм.гггг проходит как есть")
+          pd_iso = tp_make_project
+          pd_iso.project_info[:start_date] = "2026-09-01"
+          pd_iso.project_info[:end_date]   = "2026-10-15"
+          rctx_iso = LB.send(:resolver_context, LB.send(:build_context, pd_iso, nil, "Sofia Sans Condensed"), nil, 2, 3)
+          assert(res.resolve_param(rctx_iso, "workflow.start_date") == "01.09.2026",
+                 "workflow.start_date из ISO (2026-09-01) печатается как 01.09.2026")
+          assert(res.resolve_param(rctx_iso, "workflow.end_date") == "15.10.2026",
+                 "workflow.end_date из ISO печатается как дд.мм.гггг")
+          pd_nd = tp_make_project
+          pd_nd.project_info.delete(:start_date)
+          rctx_nd = LB.send(:resolver_context, LB.send(:build_context, pd_nd, nil, "Sofia Sans Condensed"), nil, 2, 3)
+          assert(res.resolve_param(rctx_nd, "workflow.start_date").nil?, "Пустая дата начала → nil")
           assert(res.resolve_param(rctx, "workflow.rate") == "1 250", "workflow.rate → ставка руб./час")
           pd_nr = tp_make_project
           pd_nr.workflow.delete(:rate)
@@ -692,6 +706,10 @@ module DN1Code
                  "В источниках параметров нет текстовых заглушек-примеров")
           assert(!js.include?("toLocaleDateString"), "В превью нет локального формата даты (9/22/2026)")
           assert(js.include?("const previewDate ="), "app.js использует единый хелпер даты previewDate")
+          assert(js.include?("const parseRuDate =") && js.include?("const isoToRuDate ="),
+                 "app.js: поля дат конвертируют ISO ↔ дд.мм.гггг (нативный date в CEF всегда en-US)")
+          assert(js.include?("inputStartDateDisplay") && js.include?("inputEndDateDisplay"),
+                 "app.js: текстовые поля дат дд.мм.гггг подключены к загрузке/автосейву")
           assert(js.include?("histEntryText(h[0])"),
                  "«Последние изменения» берут первую (новейшую) запись истории, как Ruby-экспорт")
         end

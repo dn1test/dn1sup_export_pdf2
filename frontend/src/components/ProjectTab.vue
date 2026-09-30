@@ -90,13 +90,41 @@
             </div>
 
             <div class="form-group span-1">
-              <label for="inputStartDate">Дата начала</label>
-              <input type="date" id="inputStartDate" class="form-control">
+              <label for="inputStartDateDisplay">Дата начала</label>
+              <div class="date-field">
+                <input type="text" id="inputStartDateDisplay" class="form-control" placeholder="дд.мм.гггг"
+                       inputmode="numeric" autocomplete="off" maxlength="10">
+                <input type="date" id="inputStartDate" class="date-field-native" tabindex="-1" aria-hidden="true">
+                <button type="button" class="date-field-icon" data-date-picker="inputStartDate"
+                        aria-label="Выбрать дату" title="Выбрать дату">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div class="form-group span-1">
-              <label for="inputEndDate">Дата сдачи</label>
-              <input type="date" id="inputEndDate" class="form-control">
+              <label for="inputEndDateDisplay">Дата сдачи</label>
+              <div class="date-field">
+                <input type="text" id="inputEndDateDisplay" class="form-control" placeholder="дд.мм.гггг"
+                       inputmode="numeric" autocomplete="off" maxlength="10">
+                <input type="date" id="inputEndDate" class="date-field-native" tabindex="-1" aria-hidden="true">
+                <button type="button" class="date-field-icon" data-date-picker="inputEndDate"
+                        aria-label="Выбрать дату" title="Выбрать дату">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                       stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+                    <rect x="3" y="4" width="18" height="18" rx="2" ry="2"></rect>
+                    <line x1="16" y1="2" x2="16" y2="6"></line>
+                    <line x1="8" y1="2" x2="8" y2="6"></line>
+                    <line x1="3" y1="10" x2="21" y2="10"></line>
+                  </svg>
+                </button>
+              </div>
             </div>
 
             <div class="form-group span-2">

@@ -21,7 +21,12 @@ module DN1Code
           /\Ascratch/,
           /\AGemfile/,
           /\.bak\z/i,
-          /\.tmp\z/i
+          /\.tmp\z/i,
+          # Рабочие файлы конфигурации: в dev-папке лежит копия для тестов,
+          # копировать её поверх установленной нельзя — обновление затирало
+          # сохранённые пользователем настройки (default_stadia, шаблоны страниц)
+          %r{\Aconfig/settings\.yaml\z},
+          %r{\Aconfig/layout\.yaml\z}
         ].freeze
 
         module_function
@@ -144,7 +149,7 @@ module DN1Code
           FileUtils.mkdir_p(dst_pkg)
 
           Dir.glob(File.join(src_pkg, "**", "*"), File::FNM_DOTMATCH).each do |entry|
-            rel = entry.sub("#{src_pkg}/", "")
+            rel = entry.sub("#{src_pkg}/", "").tr("\\", "/")
             next if rel == "." || rel == ".."
             next if EXCLUDE_PATTERNS.any? { |pat| rel =~ pat }
 

@@ -369,10 +369,17 @@ module DN1Code
           pdf_clean.delete(:custom_layouts)
           pdf_clean.delete("custom_layouts")
 
+          # Пустой список в памяти не затирает сохранённый пользователем:
+          # переносим его из текущего settings.yaml
+          stadia_default = self.class.stadia_default_names
+          if stadia_default.nil? || stadia_default.empty?
+            stadia_default = self.class.saved_stadia_default_from_file(PROGRAM_SETTINGS_FILE)
+          end
+
           settings_data = {
             "pdf_settings"   => self.class.deep_stringify_keys(pdf_clean),
             "api_targets"    => (@api_targets || []).map(&:to_s).map(&:strip).reject(&:empty?),
-            "default_stadia" => (self.class.stadia_default_names || [])
+            "default_stadia" => stadia_default
           }
           File.open(PROGRAM_SETTINGS_FILE, "w:utf-8") do |f|
             f.write settings_data.to_yaml
@@ -475,6 +482,29 @@ module DN1Code
         def self.set_stadia_default(names)
           self.stadia_default_names = names
           @stadia_default_names
+        end
+
+        # Читает сохранённый список стадий по умолчанию из файла настроек
+        # (только имена). Используется при записи, чтобы пустое значение в
+        # памяти (например, после hot-reload плагина, сбрасывающего классовые
+        # переменные) не затирало сохранённый пользователем список.
+        # @param path [String] путь к settings.yaml
+        # @return [Array<String>]
+        def self.saved_stadia_default_from_file(path)
+          return [] unless path && File.exist?(path)
+
+          content = File.read(path, encoding: "utf-8")
+          raw = begin
+                  YAML.safe_load(content, permitted_classes: [Date, Time, Symbol])
+                rescue ArgumentError
+                  YAML.safe_load(content)
+                end
+          return [] unless raw.is_a?(Hash)
+
+          list = deep_symbolize_keys(raw)[:default_stadia]
+          list.is_a?(Array) ? list.map { |n| n.to_s.strip }.reject(&:empty?) : []
+        rescue StandardError
+          []
         end
 
         # Встроенный (заводской) список стадий проекта

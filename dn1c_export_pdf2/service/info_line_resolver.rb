@@ -103,8 +103,8 @@ module DN1Code
           when "workflow.price"
             v = non_blank(info[:price])
             v && "#{v} руб."
-          when "workflow.start_date"    then non_blank(info[:start_date])
-          when "workflow.end_date"      then non_blank(info[:end_date])
+          when "workflow.start_date"    then format_ru_date(info[:start_date])
+          when "workflow.end_date"      then format_ru_date(info[:end_date])
           when "workflow.duration"
             v = non_blank(info[:total_duration])
             v && (v.match?(/дн|день|час/i) ? v : "#{v} дн.")
@@ -147,6 +147,17 @@ module DN1Code
         def non_blank(val)
           s = val.to_s.strip
           s.empty? ? nil : s
+        end
+
+        # Даты полей «Дата начала»/«Дата сдачи» хранятся в ISO (2026-09-01);
+        # на лист печатаем в русском порядке дд.мм.гггг. Не-ISO строки (старые
+        # проекты) отдаём как есть.
+        def format_ru_date(val)
+          s = non_blank(val)
+          return nil unless s
+
+          m = s.match(/\A(\d{4})-(\d{2})-(\d{2})\z/)
+          m ? "#{m[3]}.#{m[2]}.#{m[1]}" : s
         end
 
         def directories_of(context)
