@@ -607,7 +607,9 @@ module DN1Code
         # @param project_data [Model::ProjectData, nil]
         # @param model_path [String, nil] путь к .skp (model.path)
         # @return [Hash] { top_center: [String, nil], top_left: String, nil, right: [String] }
-        #   top_center[0] — «Адрес | Место | Изделие», top_center[1] — имя файла .skp
+        #   top_center[0] — «Адрес | Место | Изделие», top_center[1] — имя файла .skp;
+        #   top_left — «Материалы и фурнитура», а ниже, через пустую строку,
+        #   «Подсветка и Техника» (пустая строка — визуальный отступ между блоками)
         def self.build_header_texts(project_data: nil, model_path: nil)
           project  = project_data.respond_to?(:project) ? (project_data.project || {}) : {}
           workflow = project_data.respond_to?(:workflow) ? (project_data.workflow || {}) : {}
@@ -627,6 +629,14 @@ module DN1Code
           materials_text = clean_overlay_text(project[:materials])
           materials_text = materials_text.gsub("\r\n", "\n").gsub("\r", "\n").strip unless materials_text.nil?
 
+          # Ниже, с отступом в пустую строку: подсветка и техника — тем же правилом.
+          # Оба блока идут одной draw_text-строкой: измерения текста во View нет,
+          # и только \n гарантирует отступ без наложения при любом числе строк.
+          lighting_text = clean_overlay_text(project[:lighting])
+          lighting_text = lighting_text.gsub("\r\n", "\n").gsub("\r", "\n").strip unless lighting_text.nil?
+          top_left_text = [materials_text, lighting_text].compact.join("\n\n")
+          top_left_text = nil if top_left_text.empty?
+
           # Верх-право, столбец: артикул; версия # ревизия; дата финиша; время работы
           version  = clean_overlay_text(workflow[:version])
           revision = clean_overlay_text(workflow[:revision])
@@ -644,7 +654,7 @@ module DN1Code
 
           {
             top_center: [header_line, file_name],
-            top_left:   materials_text,
+            top_left:   top_left_text,
             right:      right
           }
         end

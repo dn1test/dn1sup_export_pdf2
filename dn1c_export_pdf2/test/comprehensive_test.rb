@@ -2257,6 +2257,7 @@ class TestRunner
     pdata.project[:product] = "Кухня"
     pdata.project[:articul] = "CF#260930_120000"
     pdata.project[:materials] = "Первичная строка\nВторая строка  с двойными  пробелами"
+    pdata.project[:lighting] = "Свет: спот гарпун\nСвет: лента 24В"
     pdata.workflow[:version] = "01"
     pdata.workflow[:revision] = "001"
     pdata.workflow[:start_date] = "01.02.2026"
@@ -2271,14 +2272,15 @@ class TestRunner
            "Верх-центр строка 1: «Адрес | Место | Изделие» через разделитель ' | '")
     assert(texts[:top_center][1] == "Кухня_гостиная",
            "Верх-центр строка 2: имя файла .skp без расширения и пути")
-    assert(texts[:top_left] == "Первичная строка\nВторая строка  с двойными  пробелами",
-           "Материалы и фурнитура выводятся как написано (внутренние пробелы и переносы сохранены)")
+    assert(texts[:top_left] == "Первичная строка\nВторая строка  с двойными  пробелами\n\nСвет: спот гарпун\nСвет: лента 24В",
+           "Верх-лево: материалы, ниже через пустую строку — подсветка и техника")
     assert(texts[:right] == ["CF#260930_120000", "v01 # r001", "15.03.2026", "2 ч 30 мин"],
            "Верх-право столбец: артикул, версия # ревизия, только дата финиша, время работы")
 
     # 2. Материалы выводятся как написано: переносы сохранены, без обрезки
     long_desc = "Строка 1\nСтрока 2\n" + ("Материалы и фурнитура " * 20)
     pdata.project[:materials] = long_desc
+    pdata.project[:lighting] = ""
     texts_long = overlay_svc.build_header_texts(project_data: pdata, model_path: nil)
     assert(texts_long[:top_left] == long_desc.strip,
            "Материалы не обрезаются и сохраняют переносы строк (внешние пробелы снимаются)")
@@ -2289,7 +2291,14 @@ class TestRunner
     empty_pd.workflow[:revision] = ""
     empty_texts = overlay_svc.build_header_texts(project_data: empty_pd, model_path: nil)
     assert(empty_texts[:top_center] == [nil, nil], "Без данных верх-центр пуст (обе строки nil)")
-    assert(empty_texts[:top_left].nil?, "Без материалов верх-лево не выводится")
+    assert(empty_texts[:top_left].nil?, "Без материалов и подсветки верх-лево не выводится")
+
+    # 3a. Только подсветка (материалы пустые) — выводится одна, без пустой строки
+    only_light_pd = DN1Code::ExportPdf2::Model::ProjectData.new
+    only_light_pd.project[:lighting] = "Только подсветка"
+    only_light_texts = overlay_svc.build_header_texts(project_data: only_light_pd, model_path: nil)
+    assert(only_light_texts[:top_left] == "Только подсветка",
+           "Материалы пустые — подсветка выводится одна, без ведущей пустой строки")
     assert(empty_texts[:right].empty?, "Без данных верх-право столбец пуст")
 
     partial_pd = DN1Code::ExportPdf2::Model::ProjectData.new
@@ -2312,6 +2321,7 @@ class TestRunner
     pdata_draw.project[:place] = "Гостиная"
     pdata_draw.project[:product] = "Кухня"
     pdata_draw.project[:materials] = "Тестовое описание проекта\nВторая строка описания"
+    pdata_draw.project[:lighting] = "Тестовая подсветка"
     pdata_draw.workflow[:total_duration] = "2 ч 30 мин"
 
     # Явное перекрытие шаблона — изоляция от пользовательского config/layout.yaml
@@ -2330,8 +2340,8 @@ class TestRunner
     drawn_strings = text_elements.map { |el| el[:text].to_s }
     assert(drawn_strings.any? { |t| t.include?("ул. Ленина, 1") && t.include?("Гостиная") && t.include?("Кухня") },
            "draw выводит строку «Адрес | Место | Изделие»")
-    assert(drawn_strings.include?("Тестовое описание проекта\nВторая строка описания"),
-           "draw выводит материалы и фурнитуру слева сверху с переносами строк")
+    assert(drawn_strings.include?("Тестовое описание проекта\nВторая строка описания\n\nТестовая подсветка"),
+           "draw выводит материалы и фурнитуру, ниже через пустую строку — подсветку и технику")
     assert(drawn_strings.include?("header_model"), "draw выводит имя файла модели")
     assert(drawn_strings.include?("2 ч 30 мин"), "draw выводит время работы в правом столбце")
 
@@ -2339,7 +2349,7 @@ class TestRunner
     header_el = text_elements.find { |el| el[:text].to_s.include?("ул. Ленина, 1") }
     assert(header_el[:options][:align] == 1 && header_el[:pos].y == 12.0,
            "Строка «Адрес | Место | Изделие» — по центру, с отступом от верхнего края кадра")
-    desc_el = text_elements.find { |el| el[:text] == "Тестовое описание проекта\nВторая строка описания" }
+    desc_el = text_elements.find { |el| el[:text] == "Тестовое описание проекта\nВторая строка описания\n\nТестовая подсветка" }
     assert(desc_el[:options][:align] == 0 && desc_el[:pos].x == 252.0,
            "Материалы и фурнитура — слева, с отступом от левого края кадра")
     duration_el = text_elements.find { |el| el[:text] == "2 ч 30 мин" }
