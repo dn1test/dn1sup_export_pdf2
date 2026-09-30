@@ -947,7 +947,7 @@ textarea.form-control {
    Workflow & Lifecycle (Tab 1)
    ========================================================================== */
 .workflow-card {
-  margin-top: 2px;
+  margin-top: 16px; /* единый ритм с gap: 16px сетки .project-columns-row */
 }
 
 /* Сплит карточки Workflow: параметры слева, чекбоксы стадий справа */

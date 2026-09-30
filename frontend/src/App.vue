@@ -39,14 +39,14 @@
       <button class="tab-btn" data-tab="tab-history">
         <span class="tab-icon"><i class="modus-icons">time</i></span> История
       </button>
+      <button class="tab-btn" data-tab="tab-stats">
+        <span class="tab-icon"><i class="modus-icons">insert_chart</i></span> Статистика
+      </button>
       <button class="tab-btn tab-btn-settings" data-tab="tab-settings">
         <span class="tab-icon"><i class="modus-icons">settings</i></span> Настройки
       </button>
       <button class="tab-btn" data-tab="tab-send">
         <span class="tab-icon"><i class="modus-icons">file_upload</i></span> Отправка
-      </button>
-      <button class="tab-btn" data-tab="tab-stats">
-        <span class="tab-icon"><i class="modus-icons">insert_chart</i></span> Статистика
       </button>
     </nav>
 
