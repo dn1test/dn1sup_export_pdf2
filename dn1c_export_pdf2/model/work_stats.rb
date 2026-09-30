@@ -135,7 +135,7 @@ module DN1Code
         # @param data [Hash] структура статистики
         # @param now [Time]
         # @return [Hash] { total_seconds, today_seconds, weeks3_seconds,
-        #   month30_seconds, first_tracked, last_tracked, empty,
+        #   month_seconds, first_tracked, last_tracked, empty,
         #   series: { hourly, daily, monthly, yearly } }
         def report(data, now = Time.now)
           data    = normalize(data)
@@ -153,7 +153,7 @@ module DN1Code
             total_seconds:   data[:total_seconds].to_i,
             today_seconds:   daily[date.strftime("%Y-%m-%d")].to_i,
             weeks3_seconds:  window_seconds(daily, date - 20, date),
-            month30_seconds: window_seconds(daily, date - 29, date),
+            month_seconds:   window_seconds(daily, Date.new(date.year, date.month, 1), date),
             first_tracked:   data[:first_tracked],
             last_tracked:    data[:last_tracked],
             empty:           data[:total_seconds].to_i <= 0,

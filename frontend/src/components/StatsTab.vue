@@ -67,7 +67,7 @@ import { ui } from '../store.js'
 const CARDS = [
   { key: 'hourly',  label: 'Сегодня',  seconds: 'today_seconds' },
   { key: 'daily',   label: '3 недели', seconds: 'weeks3_seconds' },
-  { key: 'monthly', label: '30 дней',  seconds: 'month30_seconds' },
+  { key: 'monthly', label: 'Месяц',   seconds: 'month_seconds' },
   { key: 'yearly',  label: 'Всего',    seconds: 'total_seconds', total: true },
 ]
 

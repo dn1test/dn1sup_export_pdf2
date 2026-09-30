@@ -109,6 +109,14 @@ module DN1Code
         assert(rep[:series][:daily][2][:weekend] == true && rep[:series][:daily][3][:weekend] == true, "сб 12.09 и вс 13.09 помечены как weekend")
         assert(rep[:series][:daily].last[:seconds] == 300, "последняя точка daily — сегодня (300)")
         assert(rep[:weeks3_seconds] == 4500, "report.weeks3_seconds = сумма за 21 день: 4200 + 300 = 4500 (получилось #{rep[:weeks3_seconds]})")
+        assert(rep[:month_seconds] == 4500, "report.month_seconds = сумма за сентябрь с 1-го числа: 4200 + 300 = 4500 (получилось #{rep[:month_seconds]})")
+
+        # --- month_seconds: окно — календарный месяц, а не скользящие 30 дней ---
+        mdata = STATS.blank_data
+        STATS.accrue!(mdata, 100, Time.new(2026, 8, 31, 12, 0, 0)) # в скользящие 30 дней до 30.09 попадает
+        STATS.accrue!(mdata, 200, Time.new(2026, 9, 5, 12, 0, 0))
+        mrep = STATS.report(mdata, Time.new(2026, 9, 30, 14, 0, 0))
+        assert(mrep[:month_seconds] == 200, "month_seconds не захватывает 31.08 — окно строго календарный месяц (получилось #{mrep[:month_seconds]})")
         assert(rep[:series][:monthly].size == 12, "monthly-серия содержит 12 точек")
         assert(rep[:series][:monthly].last[:seconds] == 4500, "текущий месяц содержит сентябрьские начисления (4500)")
         assert(rep[:series][:yearly].last[:label] == "2026" && rep[:series][:yearly].last[:seconds] == 4560, "годовая серия содержит 2026 = 4560")

@@ -876,7 +876,7 @@ const DEFAULT_LAYOUTS = {
                 total_seconds: 2160000,
                 today_seconds: 7200,
                 weeks3_seconds: 148500,
-                month30_seconds: 238500,
+                month_seconds: 238500,
                 first_tracked: "2026-06-02",
                 last_tracked: now.toISOString().slice(0, 10),
                 empty: false,
@@ -893,7 +893,7 @@ const DEFAULT_LAYOUTS = {
               articul: state.project?.articul || "HF#260924_104500",
               product: "",
               report: {
-                total_seconds: 0, today_seconds: 0, weeks3_seconds: 0, month30_seconds: 0,
+                total_seconds: 0, today_seconds: 0, weeks3_seconds: 0, month_seconds: 0,
                 first_tracked: null, last_tracked: null, empty: true,
                 series: { hourly: [], daily: [], monthly: [], yearly: [] }
               }
