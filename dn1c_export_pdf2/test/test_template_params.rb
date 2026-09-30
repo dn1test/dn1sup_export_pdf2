@@ -6,8 +6,10 @@
 #
 # Готовых списков параметров больше нет: параметр создается из источника данных
 # («Данные проекта», «Папки спецификации», сцена, страница). Размещение — одна из
-# шести зон страницы: колонка слева/по центру/справа (align) × верх/низ (valign);
-# в строке параметра задаются кегль, цвет, заголовок и флаг «Вкл».
+# девяти зон страницы: колонка слева/по центру/справа (align) × верх/середина/низ
+# (valign; центр сетки не используется); в строке параметра задаются кегль, цвет,
+# заголовок и флаг «Вкл», шрифт наследуется из общих настроек. Блоки бывают
+# горизонтальные (строка через « | ») и вертикальные (столбец строк).
 #
 # Каждый тест проверяет ФАКТИЧЕСКИЙ результат в документе LayOut (мок): тексты,
 # позиции (bounds), стили (размер/цвет/выравнивание), чекбоксы стадий, а также
@@ -223,16 +225,39 @@ module DN1Code
           assert(tp_find_text(doc_al, "Прихожая").style.text_alignment == ::Layout::Style::ALIGN_RIGHT,
                  "Выравнивание «Справа» → ALIGN_RIGHT в стиле")
 
-          # 10. Шрифт параметра (font_family); пусто — шрифт страницы
+          # 10. Шрифт параметра: всегда из общих настроек (шрифта страницы),
+          #     сохраненный font_family старых шаблонов игнорируется
           pd_ff = tp_make_project
           tp_add_param(pd_ff, :cover, "project.room_name", label: "Помещение", font_family: "Oswald")
-          tp_add_param(pd_ff, :cover, "project.articul", label: "A", font_family: "")
+          tp_add_param(pd_ff, :cover, "project.articul", label: "A")
           doc_ff = tp_render(pd_ff)
-          expected_ff = ::DN1Code::ExportPdf2::Service::FontService.layout_font_family("Oswald")
-          assert(tp_find_text(doc_ff, "Прихожая").style.font_family == expected_ff,
-                 "Шрифт параметра Oswald → font_family=#{expected_ff} (получено: #{tp_find_text(doc_ff, 'Прихожая').style.font_family.inspect})")
+          assert(tp_find_text(doc_ff, "Прихожая").style.font_family == "Sofia Sans Condensed",
+                 "Шрифт параметра наследуется из общих настроек (Sofia Sans Condensed), font_family параметра игнорируется " \
+                 "(получено: #{tp_find_text(doc_ff, 'Прихожая').style.font_family.inspect})")
           assert(tp_find_text(doc_ff, "CF#").style.font_family == "Sofia Sans Condensed",
-                 "Пустой шрифт → шрифт страницы (Sofia Sans Condensed)")
+                 "Все параметры используют шрифт страницы (Sofia Sans Condensed)")
+
+          # 11. Средний ряд выравнивания (valign: center): зона между верхом и низом
+          pd_vc = tp_make_project
+          tp_add_param(pd_vc, :cover, "project.articul", label: "A", valign: "top")
+          tp_add_param(pd_vc, :cover, "project.room_name", label: "B", valign: "center")
+          tp_add_param(pd_vc, :cover, "workflow.version", label: "C", valign: "bottom")
+          doc_vc = tp_render(pd_vc)
+          y_top = tp_find_text(doc_vc, "CF#").bounds.y * 72.0
+          y_mid = tp_find_text(doc_vc, "Прихожая").bounds.y * 72.0
+          y_bot = tp_find_text(doc_vc, "02").bounds.y * 72.0
+          # bounds.y отсчитывается от верха страницы вниз: ниже = больше
+          assert(y_mid > y_top, "Средняя зона ниже верхней (#{y_mid.round(1)} > #{y_top.round(1)})")
+          assert(y_mid < y_bot, "Средняя зона выше нижней (#{y_mid.round(1)} < #{y_bot.round(1)})")
+
+          # 11b. Одиночный параметр «в середине» — по центру рабочей области
+          pd_vc2 = tp_make_project
+          tp_add_param(pd_vc2, :cover, "project.room_name", label: "", show_label: false, valign: "center")
+          ent_m = tp_find_text(tp_render(pd_vc2), "Прихожая")
+          mid_center = (ent_m.bounds.y + ent_m.bounds.height / 2.0) * 72.0
+          assert((mid_center - PAGE_H_PT / 2.0).abs < 6.0,
+                 "Средняя зона без верхних/нижних групп — по центру страницы " \
+                 "(#{mid_center.round(1)} ≈ #{(PAGE_H_PT / 2.0).round(1)})")
         end
 
         # ------------------------------------------------------------------
@@ -413,6 +438,51 @@ module DN1Code
         end
 
         # ------------------------------------------------------------------
+        # 84b. Вертикальный блок: дети друг под другом на отдельных строках
+        # ------------------------------------------------------------------
+        def test_84b_template_params_vertical_group_block
+          puts "\n--- 84b. Вертикальный блок: дети построчно, без « | » ---"
+
+          pd = tp_make_project
+          pd.project_info[:phone] = "+7 999 000-00-00"
+          tp_params(pd, :cover) << {
+            id: "gv", group: true, direction: "vertical", label: "", show_label: false,
+            align: "left", valign: "top", font_size: 12.0,
+            color: "#005EB0", visible: true,
+            params: [
+              { id: "c1", source: "project.room_name", label: "", show_label: false },
+              { id: "c2", source: "customer.phone", label: "", show_label: false }
+            ]
+          }
+          doc = tp_render(pd)
+          ent = tp_find_text(doc, "Прихожая")
+          assert(ent, "Вертикальный блок с заполненными детьми выводится на страницу")
+          assert(!ent.plain_text.include?(" | "), "В вертикальном блоке нет разделителя « | »")
+          assert(ent.plain_text.include?("Прихожая\n+7 999"),
+                 "Дети вертикального блока — каждый на своей строке (#{ent.plain_text.inspect})")
+
+          # Пустые дети пропускаются, стиль — у блока
+          tp_params(pd, :cover).first[:params].first[:source] = "customer.email"
+          ent2 = tp_find_text(tp_render(pd), "+7 999")
+          assert(ent2 && ent2.plain_text == "+7 999 000-00-00",
+                 "Пустой источник в вертикальном блоке пропускается (получено: #{ent2&.plain_text.inspect})")
+          assert((ent2.style.font_size - 12.0).abs < 0.01,
+                 "Вертикальный блок использует свой кегль (12)")
+
+          # Старый блок без direction рендерится как горизонтальный:
+          # возвращаем второго ребенка, чтобы в строке появился разделитель
+          g_old = tp_params(pd, :cover).first
+          g_old[:params] = [
+            { id: "c1", source: "project.room_name", label: "", show_label: false },
+            { id: "c2", source: "customer.phone", label: "", show_label: false }
+          ]
+          g_old.delete(:direction)
+          ent3 = tp_find_text(tp_render(pd), "Прихожая")
+          assert(ent3.plain_text.include?("Прихожая | +7 999"),
+                 "Блок без direction (старый шаблон) — горизонтальный, через « | »")
+        end
+
+        # ------------------------------------------------------------------
         # 85. Авто-подписи заголовков: пустой label при включённом «Заголовок»
         # берётся из AUTO_PARAM_LABELS, у детей блока — аналогично
         # ------------------------------------------------------------------
@@ -576,7 +646,8 @@ module DN1Code
           p2 = params3[1]
           assert(p2[:visible] == false, "visible: \"false\" → false")
           assert(p2[:font_size] == 10.0, "Отсутствующие поля получают дефолты")
-          assert(p2[:valign] == "top" && p2[:font_family] == "", "valign и шрифт по умолчанию: top / «» (шрифт страницы)")
+          assert(p2[:valign] == "top" && !p2.key?(:font_family),
+                 "valign по умолчанию top; шрифт параметра не хранится — наследуется из общих настроек")
           assert(pd3.pdf_settings[:custom_layouts][:visual].nil?,
                  "Шаблоны, которых нет в YAML, не досоздаются: список шаблонов задаётся layout.yaml")
 
@@ -667,23 +738,33 @@ module DN1Code
           assert(js.include?("tplEditorDrop") && js.include?("tpl-param-drag"),
                  "app.js: параметры сортируются перетаскиванием за ручку ⠿ (drag-and-drop)")
 
-          # 2e. Блок объединения параметров
-          assert(js.include?("tplEditorCreateGroup"), "TemplateSettingsEditor.vue: кнопка «Блок» создает блок объединения")
+          # 2e. Блоки объединения параметров: горизонтальный и вертикальный
+          assert(js.include?("tplEditorCreateGroup"), "TemplateSettingsEditor.vue: кнопки «Блок» создают блок объединения")
           assert(js.include?("function createParamGroup"), "app.js: createParamGroup создает пустой блок")
+          assert(js.include?("legacy('tplEditorCreateGroup', 'horizontal')") && js.include?("legacy('tplEditorCreateGroup', 'vertical')"),
+                 "TemplateSettingsEditor.vue: в шапке две кнопки блоков — горизонтальный и вертикальный")
+          assert(js.include?('direction: dirRaw === "vertical" ? "vertical" : "horizontal"'),
+                 "app.js: normalizeTemplateParam нормализует направление блока (старые блоки — горизонтальные)")
           assert(js.include?("tpl-param-group-list") && js.include?("tpl-param-child-out"),
                  "app.js: блок содержит перетаскиваемых детей с кнопкой вывода из блока")
           assert(js.include?("p.group === true"), "app.js: normalizeTemplateParam сохраняет блоки с детьми")
           lb_text = File.read(File.join(__dir__, "../service/layout_builder.rb"), encoding: "utf-8")
-          assert(lb_text.include?('values.join(" | ")'), "layout_builder.rb: блок объединяет детей через « | »")
+          assert(lb_text.include?('values.join(" | ")') && lb_text.include?('values.join("\\n")'),
+                 "layout_builder.rb: горизонтальный блок — « | », вертикальный — построчно")
           pd_rb = File.read(File.join(__dir__, "../model/project_data.rb"), encoding: "utf-8")
-          assert(pd_rb.include?("base.merge!(group: true, params: children)"),
-                 "project_data.rb: normalize_template_params нормализует блоки вместе с детьми")
-          %w[tpl-param-font tpl-param-size tpl-param-valign tpl-param-align tpl-param-color tpl-param-show-label].each do |cls|
+          assert(pd_rb.include?("base.merge!(group: true,") && pd_rb.include?('direction_raw == "vertical"'),
+                 "project_data.rb: normalize_template_params нормализует блоки вместе с детьми и направлением")
+          %w[tpl-param-size tpl-param-align9 tpl-param-color tpl-param-show-label].each do |cls|
             assert(js.include?(cls), "Контрол строки параметра #{cls} присутствует в app.js")
           end
-          assert(js.include?("PARAM_FONT_FAMILIES"), "app.js: выбор шрифта параметра из комплекта плагина")
-          assert(js.include?('["top", "bottom"].includes(valignRaw)'),
-                 "app.js: вертикальная привязка параметра — верх/низ")
+          assert(!js.include?("tpl-param-font") && !js.include?("PARAM_FONT_FAMILIES") && !js.include?("p.font_family"),
+                 "app.js: выбор шрифта параметра удален — шрифт наследуется из общих настроек")
+          assert(!lb_text.include?("param[:font_family]") && !pd_rb.include?("p[:font_family] || p[\"font_family\"]"),
+                 "Ruby: font_family параметра удален из нормализации и рендера (общие настройки)")
+          assert(js.include?('["top", "center", "bottom"].includes(valignRaw)'),
+                 "app.js: выравнивание параметра — верх/середина/низ (8 направлений, без центра)")
+          assert(js.include?("scene-align-pop") && js.include?("function pickAlign"),
+                 "TemplateSettingsEditor.vue: выравнивание — поповер 3×3 как во вкладке «Страницы»")
           assert(js.include?("PARAM_LINE_GAPS") && js.include?("tpl-header-linegap"),
                  "app.js: «размер между строками» (мм) — общий селект в шапке карточки")
           assert(js.include?("tpl-header-line") && js.include?("getTemplateLineSettings") && js.include?("setTemplateLineSettings"),
@@ -971,6 +1052,7 @@ if __FILE__ == $PROGRAM_NAME
         test_82_template_params_data_contract_and_js_guards
         test_83_template_params_render_reads_new_config_only
         test_84_template_params_group_block
+        test_84b_template_params_vertical_group_block
         test_85_template_params_height_label_and_overflow_clamp
         test_86_template_params_line_gap_and_separator
         test_87_template_params_conditional_customer_or_company

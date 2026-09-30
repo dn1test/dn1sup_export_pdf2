@@ -20,9 +20,15 @@
           <button
             type="button"
             class="btn btn-xs btn-secondary"
-            title="Создать блок объединения параметров: перетащенные в него параметры выстроятся в одну строку через « | »"
-            @click="legacy('tplEditorCreateGroup')"
-          ><i class="modus-icons">layers</i> Блок</button>
+            title="Горизонтальный блок: перетащенные в него параметры выстроятся в одну строку через « | »"
+            @click="legacy('tplEditorCreateGroup', 'horizontal')"
+          ><i class="modus-icons">drag_horiz</i> Блок</button>
+          <button
+            type="button"
+            class="btn btn-xs btn-secondary"
+            title="Вертикальный блок: перетащенные в него параметры выстроятся друг под другом, каждый на своей строке"
+            @click="legacy('tplEditorCreateGroup', 'vertical')"
+          ><i class="modus-icons">drag_vert</i> Блок</button>
           <button
             type="button"
             class="btn btn-xs btn-primary"
@@ -31,7 +37,7 @@
         </div>
       </div>
       <div class="tpl-card-body">
-        <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. Дополнительные настройки задаются в строке параметра: шрифт, размер, привязка по вертикали (⬆/⬇), выравнивание (⇤/↔/⇥), цвет и заголовок. «Размер между строками» и линия-разделитель «Линия» — общие для всех параметров и блоков, задаются в шапке карточки. Место на странице определяется выравниваниями: колонка слева/по центру/справа и привязка группы к верхнему или нижнему краю листа. 📦 Блок объединяет параметры в одну строку через « | ».</p>
+        <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. В строке параметра задаются: размер шрифта, цвет, заголовок и место на странице — кнопка с 8 направлениями (углы и стороны листа). Шрифт и начертание наследуются из общих настроек над карточкой. «Размер между строками» и линия-разделитель «Линия» — общие для всех параметров и блоков, задаются в шапке карточки. 📦 Блок объединяет параметры: горизонтальный — в одну строку через « | », вертикальный — каждый параметр на своей строке.</p>
 
         <div
           class="tpl-params-list template-settings-scroll"
@@ -71,7 +77,7 @@
               </label>
               <div class="tpl-param-main">
                 <span v-if="!p.group" class="tpl-param-label">{{ p._label }}</span>
-                <span v-else class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px">layers</i> Блок</span>
+                <span v-else class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px">{{ p.direction === 'vertical' ? 'drag_vert' : 'drag_horiz' }}</i> Блок</span>
                 <span v-if="!p.group && p._shownLabel" class="tpl-param-caption">«{{ p._shownLabel }}»</span>
                 <template v-if="!p.group">
                   <span v-if="p._preview" class="tpl-line-preview">({{ p._preview }})</span>
@@ -114,25 +120,18 @@
                 @input="legacy('tplEditorUpdate', p.id, { color: $event.target.value }, false)"
                 @change="legacy('tplEditorUpdate', p.id, { color: $event.target.value }, true)"
               >
-              <div class="tpl-param-box" title="Шрифт параметра («По умолчанию» — шрифт страницы)">
-                <select class="tpl-param-select tpl-param-font" :value="p.font_family || ''" @change="legacy('tplEditorUpdate', p.id, { font_family: $event.target.value }, false)">
-                  <option v-for="f in FONT_FAMILIES" :key="f.value" :value="f.value">{{ f.label }}</option>
-                </select>
-              </div>
               <div class="tpl-param-box" title="Размер шрифта (пт)">
                 <select class="tpl-param-select tpl-param-size" :value="String(p.font_size)" @change="setSize(p, $event)">
                   <option v-for="s in sizesFor(p.font_size)" :key="s" :value="String(s)">{{ s }} pt</option>
                 </select>
               </div>
-              <div class="tpl-btn-group" title="Вертикальная привязка: группа у верхнего / нижнего края листа">
-                <button type="button" class="tpl-param-btn tpl-param-valign" :class="{ active: p.valign !== 'bottom' }" title="По верху" @click="legacy('tplEditorUpdate', p.id, { valign: 'top' }, true)">⬆</button>
-                <button type="button" class="tpl-param-btn tpl-param-valign" :class="{ active: p.valign === 'bottom' }" title="По низу" @click="legacy('tplEditorUpdate', p.id, { valign: 'bottom' }, true)">⬇</button>
-              </div>
-              <div class="tpl-btn-group" title="Колонка: слева / по центру / справа">
-                <button type="button" class="tpl-param-btn tpl-param-align" :class="{ active: p.align === 'left' }" title="Слева" @click="legacy('tplEditorUpdate', p.id, { align: 'left' }, true)">⇤</button>
-                <button type="button" class="tpl-param-btn tpl-param-align" :class="{ active: p.align === 'center' }" title="По центру" @click="legacy('tplEditorUpdate', p.id, { align: 'center' }, true)">↔</button>
-                <button type="button" class="tpl-param-btn tpl-param-align" :class="{ active: p.align === 'right' }" title="Справа" @click="legacy('tplEditorUpdate', p.id, { align: 'right' }, true)">⇥</button>
-              </div>
+              <button
+                type="button"
+                class="tpl-param-btn tpl-param-align9"
+                :class="{ active: alignPop && alignPop.rowId === p.id }"
+                :title="`Место на странице: ${alignTitle(p.align, p.valign)}`"
+                @click.stop="toggleAlignPop(p.id, $event)"
+              >{{ alignGlyph(p.align, p.valign) }}</button>
               <label class="tpl-param-vis" title="Выводить заголовок на отдельной строке над значением на листе">
                 <input type="checkbox" class="tpl-param-show-label" :checked="p.show_label" @change="legacy('tplEditorUpdate', p.id, { show_label: $event.target.checked }, true)">
                 <span>Заголовок</span>
@@ -187,26 +186,127 @@
         </div>
       </div>
     </div>
+
+    <!-- Поповер выравнивания: 3×3 направления, центр не используется -->
+    <Teleport to="body">
+      <div
+        v-if="alignPop"
+        ref="alignPopEl"
+        class="scene-align-pop"
+        :style="alignPopStyle"
+        @click.stop
+      >
+        <template v-for="[h, v] in ALIGN_GRID" :key="h + '|' + v">
+          <span v-if="h === 'center' && v === 'center'" class="scene-align-opt tpl-align-empty"></span>
+          <button
+            v-else
+            type="button"
+            class="scene-align-opt"
+            :class="{ active: alignPopRow && alignPopRow.align === h && alignPopRow.valign === v }"
+            :title="alignTitle(h, v)"
+            @click.stop="pickAlign(h, v)"
+          >{{ alignGlyph(h, v) }}</button>
+        </template>
+      </div>
+    </Teleport>
   </div>
 </template>
 
 <script setup>
-import { computed, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ui } from '../store.js'
 
 // legacy пересоздаёт объект ui.tplEditor при каждом ре-синке — только computed
 const ed = computed(() => ui.tplEditor)
 
-const FONT_FAMILIES = [
-  { value: '', label: 'По умолчанию' },
-  { value: 'Sofia Sans Condensed', label: 'Sofia Sans Condensed' },
-  { value: 'Sofia Sans Extra Condensed', label: 'Sofia Sans Extra Condensed' },
-  { value: 'Oswald', label: 'Oswald' },
-  { value: 'Roboto Condensed', label: 'Roboto Condensed' },
-  { value: 'Ubuntu Condensed', label: 'Ubuntu Condensed' },
-]
 const FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72]
 const LINE_GAPS = [0, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
+
+// Сетка выравнивания 3×3 как во вкладке «Страницы»: центр не предлагается,
+// параметр всегда прижат к одному из 8 направлений (углы и стороны листа)
+const ALIGN_GRID = [
+  ['left', 'top'], ['center', 'top'], ['right', 'top'],
+  ['left', 'center'], ['center', 'center'], ['right', 'center'],
+  ['left', 'bottom'], ['center', 'bottom'], ['right', 'bottom'],
+]
+const ALIGN_GLYPHS = {
+  'left|top': '↖', 'center|top': '↑', 'right|top': '↗',
+  'left|center': '←', 'right|center': '→',
+  'left|bottom': '↙', 'center|bottom': '↓', 'right|bottom': '↘',
+}
+function alignGlyph(h, v) {
+  return ALIGN_GLYPHS[`${h}|${v}`] || '↖'
+}
+function alignTitle(h, v) {
+  const H = { left: 'слева', center: 'по центру', right: 'справа' }
+  const V = { top: 'вверху', center: 'в середине', bottom: 'внизу' }
+  return `${H[h] || h} · ${V[v] || v}`
+}
+
+// --- Поповер выравнивания (позиционирование как в ScenesTab) ---
+const alignPop = ref(null) // { rowId, x, anchorTop, anchorBottom, top, flip }
+const alignPopEl = ref(null)
+const alignPopStyle = ref({})
+
+const alignPopRow = computed(() =>
+  alignPop.value ? (ed.value?.params || []).find((p) => p.id === alignPop.value.rowId) : null
+)
+
+function toggleAlignPop(rowId, e) {
+  if (alignPop.value && alignPop.value.rowId === rowId) {
+    closeAlignPop()
+    return
+  }
+  const rect = e.currentTarget.getBoundingClientRect()
+  alignPop.value = {
+    rowId,
+    x: Math.round(rect.left + rect.width / 2),
+    anchorTop: Math.round(rect.top),
+    anchorBottom: Math.round(rect.bottom),
+    flip: false,
+    top: Math.round(rect.bottom + 4),
+  }
+  applyAlignPopStyle()
+  nextTick(positionAlignPop)
+}
+function positionAlignPop() {
+  const pop = alignPopEl.value
+  const st = alignPop.value
+  if (!pop || !st) return
+  const spaceBelow = window.innerHeight - st.anchorBottom
+  if (spaceBelow < pop.offsetHeight + 8) {
+    st.flip = true
+    st.top = st.anchorTop
+  } else {
+    st.flip = false
+    st.top = st.anchorBottom + 4
+  }
+  applyAlignPopStyle()
+  setTimeout(() => {
+    document.addEventListener('click', closeAlignPop, { once: true })
+    document.addEventListener('keydown', closeAlignPop, { once: true })
+  }, 0)
+}
+function applyAlignPopStyle() {
+  const st = alignPop.value
+  if (!st) return
+  alignPopStyle.value = {
+    position: 'fixed',
+    left: `${st.x}px`,
+    top: `${st.top}px`,
+    transform: st.flip ? 'translate(-50%, -100%)' : 'translateX(-50%)',
+  }
+}
+function pickAlign(h, v) {
+  const row = alignPopRow.value
+  if (row) legacy('tplEditorUpdate', row.id, { align: h, valign: v }, true)
+  closeAlignPop()
+}
+function closeAlignPop() {
+  alignPop.value = null
+  document.removeEventListener('click', closeAlignPop)
+  document.removeEventListener('keydown', closeAlignPop)
+}
 
 function legacy(fn, ...args) {
   window.legacy?.[fn]?.(...args)

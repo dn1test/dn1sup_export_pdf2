@@ -405,7 +405,6 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
   const DEFAULT_PARAM_SETTINGS = {
     align: "left",
     valign: "top",
-    font_family: "",
     font_size: 10,
     color: "#0F172A"
   };
@@ -416,19 +415,10 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
   // и блоками на листе; задается один раз в шапке карточки «Параметры страницы»
   const PARAM_LINE_GAPS = [0, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10];
 
-  // Шрифты комплекта плагина для построчного выбора («По умолчанию» = шрифт страницы)
-  const PARAM_FONT_FAMILIES = [
-    { value: "", label: "По умолчанию" },
-    { value: "Sofia Sans Condensed", label: "Sofia Sans Condensed" },
-    { value: "Sofia Sans Extra Condensed", label: "Sofia Sans Extra Condensed" },
-    { value: "Oswald", label: "Oswald" },
-    { value: "Roboto Condensed", label: "Roboto Condensed" },
-    { value: "Ubuntu Condensed", label: "Ubuntu Condensed" }
-  ];
-
   // Нормализация параметра шаблона (зеркало ProjectData#normalize_template_params).
-  // Запись с group: true — блок объединения параметров: вложенные параметры
-  // выводятся одной строкой с разделителем « | ».
+  // Запись с group: true — блок объединения параметров: горизонтальный выводит
+  // вложенные параметры одной строкой с разделителем « | », вертикальный —
+  // каждый параметр на своей строке.
   function normalizeTemplateParam(raw) {
     const p = raw && typeof raw === "object" ? raw : {};
     const bool = (v, def) => (v === undefined || v === null) ? def : !(v === false || v === "false" || v === 0 || v === "0");
@@ -438,15 +428,15 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     };
     const alignRaw = tval(p.align);
     const valignRaw = tval(p.valign);
-    const ffRaw = tval(p.font_family);
     const common = {
       id: tval(p.id),
       // Двоеточие после метки добавляет рендерер — хвостовые «:» из ввода срезаем
       label: tval(p.label).replace(/:+\s*$/, "").trim(),
       show_label: bool(p.show_label, true),
       align: ["left", "center", "right"].includes(alignRaw) ? alignRaw : "left",
-      valign: ["top", "bottom"].includes(valignRaw) ? valignRaw : "top",
-      font_family: PARAM_FONT_FAMILIES.some((f) => f.value === ffRaw) ? ffRaw : "",
+      // center — средний ряд сетки выравнивания (между верхней и нижней зонами)
+      valign: ["top", "center", "bottom"].includes(valignRaw) ? valignRaw : "top",
+      // Шрифт параметра не задается: всегда наследуется из общих настроек
       font_size: num(p.font_size, DEFAULT_PARAM_SETTINGS.font_size, 4, 72),
       color: /^#[0-9a-fA-F]{6}$/.test(tval(p.color)) ? tval(p.color) : DEFAULT_PARAM_SETTINGS.color,
       visible: bool(p.visible, true)
@@ -454,9 +444,11 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
 
     if (p.group === true || p.group === "true") {
       const children = Array.isArray(p.params) ? p.params : [];
+      const dirRaw = tval(p.direction);
       return Object.assign(common, {
         id: common.id || `g_${Date.now().toString(36)}_${Math.random().toString(36).slice(2, 7)}`,
         group: true,
+        direction: dirRaw === "vertical" ? "vertical" : "horizontal",
         show_label: bool(p.show_label, false),
         params: children
           .filter((c) => c && typeof c === "object" && tval(c.source))
@@ -475,8 +467,9 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     });
   }
 
-  // Создание пустого блока объединения параметров
-  function createParamGroup(tplKey) {
+  // Создание пустого блока объединения параметров (горизонтального или вертикального)
+  function createParamGroup(tplKey, direction) {
+    const dir = direction === "vertical" ? "vertical" : "horizontal";
     ensureCustomLayouts();
     const key = tplKey || layoutState.currentTemplate || defaultTemplateKey();
     if (!state.pdf_settings.custom_layouts[key]) {
@@ -484,11 +477,11 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     }
     const group = normalizeTemplateParam({
       group: true,
+      direction: dir,
       label: "",
       show_label: false,
       align: DEFAULT_PARAM_SETTINGS.align,
       valign: DEFAULT_PARAM_SETTINGS.valign,
-      font_family: DEFAULT_PARAM_SETTINGS.font_family,
       font_size: DEFAULT_PARAM_SETTINGS.font_size,
       color: DEFAULT_PARAM_SETTINGS.color,
       visible: true,
@@ -497,13 +490,15 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     state.pdf_settings.custom_layouts[key].params.push(group);
     renderTemplateSettingsList();
     notifyChange();
-    showNotification("Блок создан — перетащите в него параметры", "success");
+    showNotification(dir === "vertical"
+      ? "Вертикальный блок создан — перетащите в него параметры"
+      : "Блок создан — перетащите в него параметры", "success");
   }
 
   // Название зоны размещения параметра (для сводки в строке)
   function paramZoneLabel(p) {
     const h = p.align === "center" ? "По центру" : (p.align === "right" ? "Справа" : "Слева");
-    const v = p.valign === "bottom" ? "внизу" : "вверху";
+    const v = p.valign === "bottom" ? "внизу" : (p.valign === "center" ? "в середине" : "вверху");
     return `${h} ${v}`;
   }
 
@@ -1992,8 +1987,8 @@ function setTemplateLineSettings(tplKey, updates) {
     if (!isNaN(g) && g >= 0) setTemplateLineSettings(ui.tplEditor.tplKey, { line_gap: g });
   }
 
-  function tplEditorCreateGroup() {
-    createParamGroup(ui.tplEditor.tplKey);
+  function tplEditorCreateGroup(direction) {
+    createParamGroup(ui.tplEditor.tplKey, direction);
   }
 
   function tplEditorChildOut(groupId, childId) {
@@ -2146,7 +2141,6 @@ function updateParamModalPreview() {
       show_label: existing ? existing.show_label : true,
       align: existing ? existing.align : DEFAULT_PARAM_SETTINGS.align,
       valign: existing ? existing.valign : DEFAULT_PARAM_SETTINGS.valign,
-      font_family: existing ? existing.font_family : DEFAULT_PARAM_SETTINGS.font_family,
       font_size: existing ? existing.font_size : DEFAULT_PARAM_SETTINGS.font_size,
       color: existing ? existing.color : DEFAULT_PARAM_SETTINGS.color,
       visible: existing ? existing.visible : true

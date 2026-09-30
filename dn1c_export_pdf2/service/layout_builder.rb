@@ -1153,9 +1153,10 @@ module DN1Code
           params = page_cfg[:params] || page_cfg["params"]
           return unless params.is_a?(Array)
 
-          # 1. Видимые параметры с непустым значением, разложенные по шести зонам.
-          #    Блоки (group: true) объединяют вложенные параметры в одну строку
-          #    с разделителем « | » и стилем самого блока.
+          # 1. Видимые параметры с непустым значением, разложенные по девяти зонам.
+          #    Блоки (group: true) объединяют вложенные параметры: горизонтальные
+          #    — в одну строку с разделителем « | », вертикальные — друг под
+          #    другом; стиль у блока свой.
           zones = {}
           params.each do |param|
             next unless param.is_a?(Hash)
@@ -1185,7 +1186,11 @@ module DN1Code
                 child_val
               end
               next if values.empty?
-              value = values.join(" | ")
+              # Направление блока: горизонтальный — одна строка через « | »,
+              # вертикальный — каждый параметр на своей строке (старые блоки
+              # без direction — горизонтальные)
+              vertical = (param[:direction] || param["direction"]).to_s.strip.downcase == "vertical"
+              value = vertical ? values.join("\n") : values.join(" | ")
             else
               source = (param[:source] || param["source"]).to_s.strip
               value = InfoLineResolver.resolve_param(rctx, source)
@@ -1212,14 +1217,17 @@ module DN1Code
                     when "right"  then :right
                     else :left
                     end
-            valign = (param[:valign] || param["valign"] || "top").to_s.downcase.strip == "bottom" ? :bottom : :top
+            valign = case (param[:valign] || param["valign"] || "top").to_s.downcase.strip
+                     when "bottom" then :bottom
+                     when "center" then :center
+                     else :top
+                     end
 
             size = (param[:font_size] || param["font_size"] || 10.0).to_f
             size = 10.0 if size <= 0.0
 
-            # Шрифт параметра: пусто — шрифт страницы, иначе семейство из комплекта
-            raw_ff = (param[:font_family] || param["font_family"]).to_s.strip
-            font = raw_ff.empty? ? ctx[:font] : FontService.layout_font_family(raw_ff)
+            # Шрифт параметра всегда наследуется из общих настроек (шрифт страницы)
+            font = ctx[:font]
 
             raw_col = (param[:color] || param["color"] || PARAM_TEXT_COLOR).to_s.strip.sub(/^#/, "")
             raw_col = PARAM_TEXT_COLOR if raw_col.empty?
@@ -1261,21 +1269,38 @@ module DN1Code
           end
 
           # 3. Отрисовка зон: группа «верх» начинается от верхнего края рабочей
-          #    области, группа «низ» заканчивается у нижнего края. Если верхняя
-          #    группа колонки занимает столько места, что нижней не хватает,
-          #    нижняя прижимается вниз — тексты не должны накладываться.
+          #    области, «середина» центрируется в свободной полосе колонки
+          #    между верхней и нижней группами, группа «низ» заканчивается у
+          #    нижнего края. Группы одной колонки не должны накладываться:
+          #    если места не хватает, нижняя прижимается вниз, про среднюю
+          #    выводится предупреждение.
           top_used = Hash.new(0.0)
-          layout.each { |(al, va), l| top_used[al] += l[:total_h] if va == :top }
+          bottom_used = Hash.new(0.0)
+          layout.each do |(al, va), l|
+            top_used[al] += l[:total_h] if va == :top
+            bottom_used[al] += l[:total_h] if va == :bottom
+          end
 
           zones.each do |(align, valign), items|
             heights = layout[[align, valign]][:heights]
             total_h = layout[[align, valign]][:total_h]
 
+            floor_y = content[:top] - content[:h]
             cur_y =
-              if valign != :bottom
-                content[:top]
-              else
-                floor_y = content[:top] - content[:h]
+              case valign
+              when :center
+                # Средний ряд — по центру свободной полосы колонки: между
+                # нижней кромкой верхней группы и верхней кромкой нижней
+                # (нет групп — по центру рабочей области страницы)
+                band_top = content[:top] - top_used[align] - gap_pt
+                band_bottom = floor_y + bottom_used[align] + gap_pt
+                if total_h >= band_top - band_bottom
+                  warn "Параметры шаблона: средняя группа колонки «#{align}» не помещается между верхней и нижней — возможно наложение"
+                  band_top
+                else
+                  (band_top + band_bottom + total_h) / 2.0
+                end
+              when :bottom
                 start_y = floor_y + total_h
                 limit_y = content[:top] - top_used[align] - gap_pt
                 if limit_y < floor_y
@@ -1290,6 +1315,8 @@ module DN1Code
                   end
                   clamped
                 end
+              else
+                content[:top]
               end
 
             items.each_with_index do |it, i|

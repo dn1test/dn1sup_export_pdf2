@@ -1711,14 +1711,16 @@ module DN1Code
               label:      (p[:label] || p["label"]).to_s.strip,
               show_label: bool_val.call(p.key?(:show_label) ? p[:show_label] : p["show_label"], !is_group),
               align:      %w[left center right].include?(align_raw) ? align_raw : "left",
-              valign:     %w[top bottom].include?(valign_raw) ? valign_raw : "top",
-              font_family: (p[:font_family] || p["font_family"]).to_s.strip,
+              # center — средний ряд сетки выравнивания (между верхней и нижней зонами)
+              valign:     %w[top center bottom].include?(valign_raw) ? valign_raw : "top",
+              # Шрифт параметра не хранится: всегда наследуется из общих настроек
               font_size:  (p[:font_size] || p["font_size"] || 10.0).to_f.clamp(4.0, 72.0),
               color:      (p[:color] || p["color"] || "#0F172A").to_s.strip,
               visible:    bool_val.call(p.key?(:visible) ? p[:visible] : p["visible"], true)
             }
 
             if is_group
+              direction_raw = (p[:direction] || p["direction"]).to_s.strip.downcase
               children = Array(p[:params] || p["params"]).filter_map do |c|
                 next unless c.is_a?(Hash)
 
@@ -1732,7 +1734,10 @@ module DN1Code
                   show_label: bool_val.call(c.key?(:show_label) ? c[:show_label] : c["show_label"], false)
                 }
               end
-              base.merge!(group: true, params: children)
+              # Старые блоки без direction — горизонтальные (строка через « | »)
+              base.merge!(group: true,
+                          direction: direction_raw == "vertical" ? "vertical" : "horizontal",
+                          params: children)
             else
               base.merge!(source: src)
             end

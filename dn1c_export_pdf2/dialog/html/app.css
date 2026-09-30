@@ -2332,6 +2332,21 @@ tr:hover td {
   font-size: 10.5px;
 }
 
+/* Кнопка выравнивания параметра: открывает поповер 3×3 (как во вкладке «Страницы») */
+.tpl-param-controls .tpl-param-align9 {
+  width: 30px;
+  height: 24px;
+  padding: 0;
+  font-size: 13px;
+  line-height: 1;
+  flex-shrink: 0;
+}
+
+/* Пустая центральная ячейка сетки выравнивания (центр не предлагается) */
+.tpl-align-empty {
+  visibility: hidden;
+}
+
 /* Блок объединения параметров */
 .tpl-param-group {
   border-color: var(--modus-blue-border);
