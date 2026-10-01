@@ -1,7 +1,7 @@
 <template>
 <!-- Разметка перенесена из App.vue (Фаза 3). Все id сохранены: legacy читает и пишет
      значения контролов напрямую (els map), поэтому биндинги v-model не нужны. -->
-<div>
+<div class="tab-stack">
         <!-- LayOut Parameters Card -->
         <div class="settings-card">
           <div class="card-header">

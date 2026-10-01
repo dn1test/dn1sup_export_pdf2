@@ -591,11 +591,21 @@ body {
   display: none;
 }
 
+/* Единый межблочный ритм всех вкладок: 8px (между карточками/секциями) */
 .tab-pane.active {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 8px;
   animation: fadeIn 0.15s ease-in-out;
+}
+
+/* Стек блоков внутри вкладки, когда разметка обёрнута корневым div компонента
+   (иначе gap секции до карточек не доходит): Настройки, Отправка */
+.tab-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  min-width: 0;
 }
 
 #tab-history.active,
@@ -680,7 +690,7 @@ body {
 .project-columns-row {
   display: grid;
   grid-template-columns: 1fr 1fr;
-  gap: 16px;
+  gap: 8px;
 }
 
 @media (max-width: 760px) {
@@ -1005,7 +1015,7 @@ textarea.form-control {
    Workflow & Lifecycle (Tab 1)
    ========================================================================== */
 .workflow-card {
-  margin-top: 16px; /* единый ритм с gap: 16px сетки .project-columns-row */
+  margin-top: 8px; /* единый ритм с gap: 8px сетки .project-columns-row */
 }
 
 /* Сплит карточки Workflow: параметры слева, чекбоксы стадий справа */
@@ -1283,7 +1293,7 @@ textarea.form-control {
   display: flex;
   flex-direction: column;
   height: 100%;
-  gap: 12px;
+  gap: 8px;
 }
 
 .scenes-toolbar {
@@ -1740,7 +1750,7 @@ tr:hover td {
   display: flex;
   flex-direction: row;
   height: 100%;
-  gap: 16px;
+  gap: 8px;
 }
 
 .templates-sidebar {
@@ -2052,7 +2062,7 @@ tr:hover td {
   padding: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
 }
 
 /* ==========================================================================
@@ -2242,7 +2252,7 @@ tr:hover td {
 .tpl-single-column-layout {
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 8px;
   min-width: 0;
   flex: 1;
   min-height: 0;
@@ -2568,8 +2578,8 @@ tr:hover td {
 .directories-cards-container {
   display: flex;
   flex-direction: column;
-  gap: 12px;
-  margin-top: 12px;
+  gap: 8px;
+  margin-top: 8px;
 }
 
 .directory-card {
@@ -3010,6 +3020,7 @@ tr:hover td {
   border-radius: var(--radius-sm);
   box-shadow: var(--shadow-sm);
   flex-shrink: 0;
+  margin-bottom: 8px;
 }
 
 .history-table .history-date-cell {

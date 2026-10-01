@@ -224,7 +224,7 @@ onBeforeUnmount(() => {
 .stats-tab {
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 8px;
   padding: 12px 14px;
   height: 100%;
   box-sizing: border-box;
@@ -251,7 +251,7 @@ onBeforeUnmount(() => {
 .stats-cards {
   display: grid;
   grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 10px;
+  gap: 8px;
 }
 
 .stats-card {

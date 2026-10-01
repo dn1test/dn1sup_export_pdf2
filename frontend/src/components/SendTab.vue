@@ -1,5 +1,5 @@
 <template>
-  <div>
+  <div class="tab-stack">
     <!-- Send Project Card: подготовка снимков и отправка проекта на сервер -->
     <div class="settings-card">
       <div class="card-header">
