@@ -27,6 +27,8 @@ module DN1Code
 
         RU_MONTHS = %w[Янв Фев Мар Апр Май Июн Июл Авг Сен Окт Ноя Дек].freeze
         RU_DAYS   = %w[Вс Пн Вт Ср Чт Пт Сб].freeze
+        EN_MONTHS = %w[Jan Feb Mar Apr May Jun Jul Aug Sep Oct Nov Dec].freeze
+        EN_DAYS   = %w[Sun Mon Tue Wed Thu Fri Sat].freeze
 
         module_function
 
@@ -192,12 +194,22 @@ module DN1Code
           end
         end
 
+        # Короткие имена месяцев/дней недели для подписей графика —
+        # по языку интерфейса (Locale.lang, см. locale.rb)
+        def month_names
+          Locale.lang == :en ? EN_MONTHS : RU_MONTHS
+        end
+
+        def day_names
+          Locale.lang == :en ? EN_DAYS : RU_DAYS
+        end
+
         # Дневной график: последние 3 недели (21 день), метки с днём недели
         # и флагом weekend для выделения сб/вс на графике
         def daily_series(daily, date)
           (0...21).reverse_each.map do |i|
             d = date - i
-            { label: "#{RU_DAYS[d.wday]} #{d.strftime('%d.%m')}",
+            { label: "#{day_names[d.wday]} #{d.strftime('%d.%m')}",
               seconds: daily[d.strftime("%Y-%m-%d")].to_i,
               weekend: d.saturday? || d.sunday? }
           end
@@ -208,7 +220,7 @@ module DN1Code
           daily.each { |key, sec| by_month[key[0, 7]] += sec.to_i if key.size >= 7 }
           (0...12).reverse_each.map do |i|
             first = Date.new(date.year, date.month, 1) << i
-            { label: "#{RU_MONTHS[first.month - 1]} #{first.year}",
+            { label: "#{month_names[first.month - 1]} #{first.year}",
               seconds: by_month[first.strftime("%Y-%m")].to_i }
           end
         end

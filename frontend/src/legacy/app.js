@@ -4076,6 +4076,10 @@ function updateParamModalPreview() {
     // Подпись статуса автосейва переводится вместе с интерфейсом
     const autosaveTextEl = document.getElementById("autosaveText");
     if (autosaveTextEl) autosaveTextEl.textContent = t("footer.autosaveText");
+    // Подписи оси графика статистики (дни недели/месяцы) формирует Ruby —
+    // перезапрашиваем отчёт, если вкладка «Статистика» сейчас открыта
+    const statsPane = document.getElementById("tab-stats");
+    if (statsPane && statsPane.classList.contains("active")) refreshWorkStats();
   }
 
   // Public API exposed on window.app for Ruby calls
