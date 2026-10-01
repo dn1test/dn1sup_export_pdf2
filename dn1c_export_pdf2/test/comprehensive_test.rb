@@ -7,6 +7,7 @@
 require_relative "mock_sketchup"
 require_relative "../main"
 require_relative "test_template_params"
+require_relative "test_master_template"
 
 # Перехватчик системного открытия: тесты не должны реально запускать
 # ShellExecuteW / программу по умолчанию — вызовы логируются в stdout
@@ -123,6 +124,7 @@ end
 
 class TestRunner
   include DN1Code::ExportPdf2::TestSupport::TemplateParamsTests
+  include DN1Code::ExportPdf2::TestSupport::MasterTemplateTests
 
   def initialize
     @passed = 0
@@ -246,6 +248,10 @@ class TestRunner
     test_87_refresh_thumbnails_button_and_sig_guard
     test_88_directory_send_to_server_flag
     test_89_total_duration_refreshed_from_stats_on_project_tab
+
+    test_90_master_template_merge_config
+    test_91_master_template_render
+    test_92_master_template_settings_and_frontend_guards
 
     puts "\n=========================================================="
     puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -4181,16 +4187,16 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     html_path = frontend_source
     html_text = html_path
 
-    layout_card = html_text[/Параметры SketchUp LayOut API.*?Параметры страницы и документа/m]
-    assert(layout_card, "Карточка 'Параметры SketchUp LayOut API' найдена в index.html")
+    # i18n: заголовки карточек локализованы (set.layoutTitle / set.pageTitle),
+    # регион карточки в SettingsTab.vue выделяем по ключам, а не по литералам
+    layout_card = html_text[/set\.layoutTitle.*?set\.pageTitle/m] || ""
+    assert(layout_card, "Карточка 'Параметры SketchUp LayOut API' найдена в index.html (ключ set.layoutTitle)")
     assert(layout_card.include?("id=\"selectScaleMultiplier\""),
            "selectScaleMultiplier перенесен в карточку 'Параметры SketchUp LayOut API'")
-    assert(layout_card.include?("0,25 pt"), "selectScaleMultiplier содержит опцию 0,25 pt")
-    assert(layout_card.include?("0,50 pt"), "selectScaleMultiplier содержит опцию 0,50 pt")
-    assert(layout_card.include?("0,75 pt"), "selectScaleMultiplier содержит опцию 0,75 pt")
-    assert(layout_card.include?("1,00 pt"), "selectScaleMultiplier содержит опцию 1,00 pt")
-    assert(layout_card.include?("1,25 pt"), "selectScaleMultiplier содержит опцию 1,25 pt")
-    assert(layout_card.include?("1,50 pt"), "selectScaleMultiplier содержит опцию 1,50 pt")
+    # Опции множителя локализованы ключами set.scale* (auto / 0.5 … 3.0);
+    # прежние жесткие pt-опции (0,25–1,50 pt) удалены при переработке толщины линий
+    assert(layout_card.include?("set.scale0.5") && layout_card.include?("set.scale3.0"),
+           "selectScaleMultiplier содержит локализованные опции множителя (set.scale*)")
 
     # В объединённом Vue-источнике карточки живут в разных файлах: регион
     # «между карточками» неприменим — масштаб проверен выше внутри карточки LayOut

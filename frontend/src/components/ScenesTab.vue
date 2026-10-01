@@ -192,6 +192,11 @@
             <!-- 7. Шаблон страницы -->
             <td class="scene-type-cell">
               <div class="scene-template-cell-wrap">
+                <span v-if="masterAffects(sc.item)" class="scene-master-mark" :title="t('scenes.masterBadgeTitle')">
+                  <svg viewBox="0 0 24 24" width="12" height="12" aria-hidden="true">
+                    <path d="M12 2.8l2.85 5.95 6.45.82-4.76 4.5 1.22 6.4L12 17.4l-5.76 3.07 1.22-6.4-4.76-4.5 6.45-.82z" fill="currentColor" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+                  </svg>
+                </span>
                 <select
                   v-model="sc.item.page_type"
                   class="table-select"
@@ -323,6 +328,14 @@ function optionsFor(item) {
     return [...opts, { key: item.page_type, name: item.page_type, description: '' }]
   }
   return opts
+}
+// Мастер-шаблон затрагивает страницу: включен, страница не на самом мастере
+// и не является обложкой (встроенный cover или шаблон на базе cover)
+function masterAffects(item) {
+  const m = ui.masterTemplate || { key: '', enabled: false }
+  if (!m.enabled || !m.key || item.page_type === m.key) return false
+  const opt = ui.templateOptions.find((tpl) => tpl.key === item.page_type)
+  return !(opt && opt.cover)
 }
 function typeDescription(item) {
   const sel = ui.templateOptions.find((tpl) => tpl.key === item.page_type)

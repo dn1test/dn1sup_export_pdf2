@@ -44,12 +44,13 @@ module DN1Code
           auto_open_pdf save_skp_backup
           primary_color secondary_color font_family font_weight font_width
           language
+          master_template_enabled master_template_key
         ].freeze
 
         # Булевы ключи pdf_settings: строки 'true'/'false' приводятся к boolean
         PDF_SETTINGS_BOOL_KEYS = %i[
           save_layout_file compress_pdf show_aspect_overlay antialias
-          auto_open_pdf save_skp_backup
+          auto_open_pdf save_skp_backup master_template_enabled
         ].freeze
 
         # Поддерживаемые форматы листа (длинная сторона листа в дюймах)
@@ -732,6 +733,10 @@ module DN1Code
             font_weight:        "normal",
             font_width:         "condensed",
             language:           "ru",
+            # Мастер-шаблон: основа для всех страниц, кроме обложек
+            # (шаблон cover и пользовательские шаблоны на базе cover)
+            master_template_enabled: false,
+            master_template_key:     "",
             custom_layouts:     default_custom_layouts
           }
         end
@@ -852,6 +857,11 @@ module DN1Code
           when :primary_color, :secondary_color
             s = value.to_s.strip.sub(/\A#/, "")
             s.match?(/\A[0-9a-fA-F]{6}\z/) ? s.upcase : nil
+          when :master_template_key
+            # Ключ шаблона-мастера: непустая строка; существование в
+            # custom_layouts проверяется в момент использования (экспорт)
+            s = value.to_s.strip
+            s.empty? ? nil : s
           else
             # строковые ключи (font_family, overlay-цвета) — как есть
             value

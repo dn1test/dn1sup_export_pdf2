@@ -350,9 +350,68 @@ module DN1Code
         end
 
         def get_block_config(ctx, pt, block_id)
-          page_cfg = get_page_cfg(ctx, pt)
+          get_block_config_from(get_page_cfg(ctx, pt), block_id)
+        end
+
+        def get_block_config_from(page_cfg, block_id)
           cfg = page_cfg[block_id] || page_cfg[block_id.to_s] || {}
           cfg.is_a?(Hash) ? cfg : {}
+        end
+
+        # ------------------------------------------------------------------
+        # Мастер-шаблон: основа для всех страниц, кроме обложек.
+        # Включается звездой в списке шаблонов (pdf_settings:
+        # master_template_enabled + master_template_key). Параметры мастера
+        # идут первыми в зонных стеках, параметры собственного шаблона
+        # страницы дополняются рядом; общие настройки стека (line_gap,
+        # line_enabled), шрифт страницы и видовой экран (image_4_3) — от
+        # мастера. Обложки (cover и шаблоны на базе cover) не затрагиваются.
+        # ------------------------------------------------------------------
+
+        # Страница-обложка: встроенный шаблон cover или пользовательский
+        # шаблон на его базе (метаданные _base_type)
+        def cover_page?(ctx, pt)
+          return true if pt.to_s.eql?("cover")
+
+          cfg = get_page_cfg(ctx, pt)
+          base = cfg[:_base_type] || cfg["_base_type"]
+          base.to_s.strip.downcase.eql?("cover")
+        end
+
+        # Активный мастер-шаблон: включен и существует в custom_layouts.
+        # Несуществующий ключ (удалённый шаблон, набор без него) — фолбэк.
+        def active_master_cfg(ctx)
+          settings = ctx[:settings] || {}
+          enabled = settings[:master_template_enabled] || settings["master_template_enabled"]
+          is_on = enabled == true || enabled.to_s.strip.downcase == "true"
+          return nil unless is_on
+
+          key = (settings[:master_template_key] || settings["master_template_key"]).to_s.strip
+          return nil if key.empty?
+
+          custom = settings[:custom_layouts] || {}
+          cfg = custom[key] || custom[key.to_sym] || {}
+          cfg.is_a?(Hash) && !cfg.empty? ? cfg : nil
+        end
+
+        # Объединение конфига страницы с мастер-шаблоном. Возвращает исходный
+        # page_cfg, если мастер не применим (выключен, обложка, страница уже
+        # на мастере). Настройки в ctx не мутируются — возвращается копия.
+        def merge_master_page_cfg(ctx, pt, page_cfg)
+          master_cfg = active_master_cfg(ctx)
+          return page_cfg if master_cfg.nil? || cover_page?(ctx, pt)
+
+          master_key = (ctx[:settings][:master_template_key] || ctx[:settings]["master_template_key"]).to_s.strip
+          return page_cfg if master_key.eql?(pt.to_s)
+
+          merged = page_cfg.merge(master_cfg)
+          merged[:params] = cfg_params(master_cfg) + cfg_params(page_cfg)
+          merged
+        end
+
+        def cfg_params(cfg)
+          p = cfg[:params] || cfg["params"]
+          p.is_a?(Array) ? p.dup : []
         end
 
         def block_visible?(page_cfg, block_id)
@@ -657,6 +716,9 @@ module DN1Code
 
           pt = (scene_item.page_type || :general).to_sym
           page_cfg = get_page_cfg(ctx, pt)
+          # Мастер-шаблон как основа (все страницы, кроме обложек):
+          # параметры мастера + параметры собственного шаблона страницы
+          page_cfg = merge_master_page_cfg(ctx, pt, page_cfg)
 
           margin_pt = in2pt(margin_in)
           content = {
@@ -688,7 +750,7 @@ module DN1Code
                            end
 
           if is_viewport_on
-            img_cfg = get_block_config(ctx, pt, :image_4_3)
+            img_cfg = get_block_config_from(page_cfg, :image_4_3)
             render_image_block(doc, page, layer, scene_item, full_page_content, img_cfg, ctx, temp_images, pt)
           end
 

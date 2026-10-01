@@ -1651,6 +1651,20 @@ tr:hover td {
   max-width: 100%;
 }
 
+/* Звезда у страниц, затронутых мастер-шаблоном (основа + параметры страницы) */
+.scene-master-mark {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #e8a13c;
+  cursor: help;
+}
+
+.scene-master-mark svg {
+  display: block;
+}
+
 .btn-goto-template {
   border: 1px solid var(--border-color);
   background: #ffffff;
@@ -3752,5 +3766,53 @@ tr:hover td {
   border-color: #fca5a5;
   color: #da291c;
   transform: scale(1.08);
+}
+
+/* Мастер-шаблон: звезда в списке шаблонов (основа всех страниц, кроме обложек) */
+.tpl-item-action-btn.master-star-btn {
+  color: var(--bs-gray-500, #6a6e79);
+}
+
+.tpl-item-action-btn.master-star-btn .master-star {
+  display: block;
+}
+
+.tpl-item-action-btn.master-star-btn.master-active {
+  color: #e8a13c;
+  opacity: 1;
+}
+
+.tpl-item-action-btn.master-star-btn.master-active:hover {
+  background: #fdf3e0;
+  border-color: #f3cf96;
+  color: #c9821e;
+}
+
+.tpl-item-name-row {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  min-width: 0;
+}
+
+.tpl-item-name-row .tpl-item-name {
+  flex: 0 1 auto;
+  min-width: 0;
+}
+
+.tpl-master-badge {
+  flex-shrink: 0;
+  display: inline-flex;
+  align-items: center;
+  padding: 0 5px;
+  border-radius: 8px;
+  background: #fdf3e0;
+  border: 1px solid #f3cf96;
+  color: #b06e10;
+  font-size: 9px;
+  font-weight: 600;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+  line-height: 14px;
 }
 

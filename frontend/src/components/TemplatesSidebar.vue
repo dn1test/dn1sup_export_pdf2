@@ -28,11 +28,26 @@
       >
         <div class="tpl-item-main">
           <div class="tpl-item-text">
-            <span class="tpl-item-name">{{ tpl.name }}</span>
+            <span class="tpl-item-name-row">
+              <span class="tpl-item-name">{{ tpl.name }}</span>
+              <span v-if="tpl.master" class="tpl-master-badge" :title="t('tsb.masterBadgeTitle')">{{ t('tsb.masterBadge') }}</span>
+            </span>
             <span class="tpl-item-sub">{{ tpl.sub }}</span>
           </div>
         </div>
         <div class="tpl-item-actions">
+          <button
+            type="button"
+            class="tpl-item-action-btn master-star-btn"
+            :class="{ 'master-active': tpl.master }"
+            :title="tpl.master ? t('tsb.masterActiveTitle') : t('tsb.masterTitle')"
+            :aria-pressed="tpl.master ? 'true' : 'false'"
+            @click.stop="legacy('toggleMasterTemplate', tpl.key)"
+          >
+            <svg class="master-star" viewBox="0 0 24 24" width="14" height="14" aria-hidden="true">
+              <path d="M12 2.8l2.85 5.95 6.45.82-4.76 4.5 1.22 6.4L12 17.4l-5.76 3.07 1.22-6.4-4.76-4.5 6.45-.82z" :fill="tpl.master ? 'currentColor' : 'none'" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" />
+            </svg>
+          </button>
           <button
             type="button"
             class="tpl-item-action-btn"

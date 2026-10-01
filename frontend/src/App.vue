@@ -5,7 +5,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="logo-badge" id="headerVersionBadge" :title="t('app.versionBadgeTitle', { version: '2.6.0' })"><i class="modus-icons">file_template</i> export PDF</div>
+        <div class="logo-badge" id="headerVersionBadge" :title="t('app.versionBadgeTitle', { version: '2.8.0' })"><i class="modus-icons">file_template</i> export PDF</div>
         <div class="header-titles">
           <h1 id="headerProjectTitle"></h1>
           <span class="subtitle" id="headerProjectSubtitle"></span>

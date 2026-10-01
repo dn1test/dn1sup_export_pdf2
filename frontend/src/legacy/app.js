@@ -1350,10 +1350,59 @@ const DEFAULT_LAYOUTS = {
     };
   }
 
+  // --- Мастер-шаблон: звезда в списке шаблонов. Мастер — основа страницы:
+  // при экспорте его параметры рендерятся на всех страницах, кроме обложек
+  // (cover и шаблоны на базе cover), перед параметрами собственных шаблонов.
+  function masterTemplateKey() {
+    return (state.pdf_settings?.master_template_key || "").toString().trim();
+  }
+
+  function masterTemplateEnabled() {
+    const v = state.pdf_settings?.master_template_enabled;
+    return v === true || v === "true";
+  }
+
+  // Реактивный снимок для Vue (TemplatesSidebar, ScenesTab)
+  function syncMasterState() {
+    ui.masterTemplate = {
+      key: masterTemplateKey(),
+      enabled: masterTemplateEnabled()
+    };
+  }
+
+  function toggleMasterTemplate(tplKey) {
+    if (!tplKey || !state.pdf_settings) return;
+    const tplDef = getTemplateDef(tplKey);
+    if (masterTemplateEnabled() && masterTemplateKey() === tplKey) {
+      state.pdf_settings.master_template_enabled = false;
+      showNotification(t("toast.masterOff", { name: tplDef.name }), "info");
+    } else {
+      state.pdf_settings.master_template_key = tplKey;
+      state.pdf_settings.master_template_enabled = true;
+      showNotification(t("toast.masterOn", { name: tplDef.name }), "success");
+    }
+    syncMasterState();
+    renderTemplatesList();
+    renderScenesTable();
+    notifyChange();
+  }
+
+  // Снимок мастера устарел (шаблон удалён, набор загружен без него) — сбрасываем
+  function clearStaleMaster() {
+    if (!state.pdf_settings) return;
+    const keys = Object.keys(state.pdf_settings.custom_layouts || {});
+    if (masterTemplateEnabled() && !keys.includes(masterTemplateKey())) {
+      state.pdf_settings.master_template_key = "";
+      state.pdf_settings.master_template_enabled = false;
+    }
+    syncMasterState();
+  }
+
   function renderTemplatesList() {
     const templates = getAllTemplates();
     const currentKey = layoutState.currentTemplate || (templates[0] ? templates[0].key : "");
     const scenes = state.scenes || [];
+    const isMaster = masterTemplateEnabled() && masterTemplateKey();
 
     ui.templates = templates.map((tpl) => {
       const matchingScenes = scenes.filter((s) => s.page_type === tpl.key);
@@ -1365,8 +1414,9 @@ const DEFAULT_LAYOUTS = {
         : t("tpl.notUsed");
       // Второй строкой — описание шаблона (мелче); без описания — использование
       const subText = tpl.description || usageText;
-      return { key: tpl.key, name: tpl.name, description: tpl.description || "", sub: subText, active: tpl.key === currentKey };
+      return { key: tpl.key, name: tpl.name, description: tpl.description || "", sub: subText, active: tpl.key === currentKey, master: isMaster && tpl.key === masterTemplateKey() };
     });
+    syncMasterState();
   }
 
   let templatePendingDelete = null;
@@ -1483,6 +1533,12 @@ const DEFAULT_LAYOUTS = {
     }
     if (state.pdf_settings?.template_names) {
       delete state.pdf_settings.template_names[tplKey];
+    }
+    // Удалённый шаблон не может оставаться мастером
+    if (masterTemplateKey() === tplKey) {
+      state.pdf_settings.master_template_key = "";
+      state.pdf_settings.master_template_enabled = false;
+      syncMasterState();
     }
 
     // Сцены удалённого шаблона переключаем на первый оставшийся шаблон;
@@ -3079,8 +3135,10 @@ function updateParamModalPreview() {
     }));
 
     // Свежий список шаблонов для селекта «Шаблон» (перестраивается при каждом
-    // рендере таблицы — как в оригинале)
-    ui.templateOptions = getAllTemplates().map((t) => ({ key: t.key, name: t.name, description: t.description || "" }));
+    // рендере таблицы — как в оригинале); cover — признак обложки для бейджа мастера
+    ui.templateOptions = getAllTemplates().map((t) => ({ key: t.key, name: t.name, description: t.description || "", cover: t.baseType === "cover" || t.key === "cover" }));
+
+    syncMasterState();
 
     updateLayoutUsageBadge();
 
@@ -3429,6 +3487,9 @@ function updateParamModalPreview() {
       antialias: els.chkAntialias.checked,
       // Язык интерфейса: источник истины в GUI — реактивная локаль i18n
       language: locale.value === "en" ? "en" : "ru",
+      // Мастер-шаблон: звезда в списке шаблонов (основа всех страниц, кроме обложек)
+      master_template_enabled: masterTemplateEnabled(),
+      master_template_key: masterTemplateKey(),
       custom_layouts: state.pdf_settings.custom_layouts
     };
 
@@ -4101,6 +4162,11 @@ function updateParamModalPreview() {
         document.title = `DN1C Export PDF 2 v${data.plugin_version}`;
       }
       ensureCustomLayouts();
+      // Мастер-шаблон: ключи могли отсутствовать в старых settings.yaml
+      if (!state.pdf_settings) state.pdf_settings = {};
+      if (state.pdf_settings.master_template_enabled === undefined) state.pdf_settings.master_template_enabled = false;
+      if (state.pdf_settings.master_template_key === undefined) state.pdf_settings.master_template_key = "";
+      clearStaleMaster();
       // Список наборов шаблонов приходит в payload getData (state.template_sets)
       renderTemplateSetsList();
       // Если выбранный шаблон удалён (или список пуст) — выбираем первый доступный
@@ -4140,6 +4206,9 @@ function updateParamModalPreview() {
 
       if (!state.pdf_settings) state.pdf_settings = {};
       state.pdf_settings.custom_layouts = layouts;
+
+      // Мастер из прежнего списка мог не попасть в набор — сбрасываем висячую звезду
+      clearStaleMaster();
 
       // Сцены шаблонов, отсутствующих в наборе, → первый доступный шаблон
       const keys = Object.keys(layouts);
@@ -4559,6 +4628,7 @@ function updateParamModalPreview() {
     saveStadiaDefault,
     focusScene,
     selectTemplate,
+    toggleMasterTemplate,
     tplEditorSetVisible,
     tplEditorDeleteRow,
     tplEditorMove,

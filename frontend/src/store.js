@@ -36,10 +36,13 @@ export const ui = reactive({
   selectedSceneIndex: -1,
   currentTemplate: '',
   templateOptions: [],
-  // Вкладка «Шаблоны»: список шаблонов { key, name, sub }, наборы
+  // Вкладка «Шаблоны»: список шаблонов { key, name, sub, master }, наборы
   // { name, sub } и состояние пяти модалок. Бизнес-логика — в legacy.
   templates: [],
   templateSets: [],
+  // Мастер-шаблон (звезда в списке): { key, enabled } — основа всех страниц,
+  // кроме обложек; ScenesTab помечает затронутые строки
+  masterTemplate: { key: '', enabled: false },
   // Редактор параметров шаблона (TemplateSettingsEditor.vue): снимок данных
   // с вычисленными подписями (_label/_shownLabel/_preview/_zone); каждая мутация
   // идёт через legacy-мутатор состояния и завершается ре-синком
