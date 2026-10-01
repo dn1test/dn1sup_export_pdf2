@@ -703,6 +703,43 @@ module DN1Code
             end
           end
 
+          # Отправка проекта на сервер (вкладка «Отправка»). Подготовка: WebP-снимки
+          # включенных сцен в <Артикул>/images/ через export_scene_snapshots.
+          # Сетевая отправка будет добавлена позже — пока кнопка только готовит снимки.
+          dialog.add_action_callback("startSend") do |_action_context, data_json|
+            notify_js(dialog, "Подготовка снимков к отправке...", "info")
+
+            run_send = lambda do
+              begin
+                payload = data_json.to_s.empty? ? {} : JSON.parse(data_json, symbolize_names: true)
+                model = Sketchup.active_model
+                project_data = Model::SessionStore.apply(model, payload)
+
+                project_data.sync_with_model_scenes(model)
+
+                controller = Controller::ExportController.new(project_data, model)
+
+                snapshots = controller.export_scene_snapshots
+
+                Model::SessionStore.flush(model) if defined?(Model::SessionStore)
+                notify_js(
+                  dialog,
+                  "Подготовлено снимков: #{snapshots.size}. Отправка на сервер пока не реализована.",
+                  "success"
+                )
+              rescue StandardError => e
+                notify_js(dialog, "Ошибка подготовки отправки: #{e.message}", "error")
+              end
+            end
+
+            if defined?(UI) && UI.respond_to?(:start_timer)
+              UI.start_timer(0.01, false) { run_send.call }
+            else
+              # Резерв для окружений без таймера (автономные тесты)
+              run_send.call
+            end
+          end
+
           # Открыть папку с PDF
           dialog.add_action_callback("openFolder") do |_action_context, file_path|
             begin

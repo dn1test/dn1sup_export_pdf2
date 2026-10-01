@@ -1837,6 +1837,11 @@ class TestRunner
     assert(send_pane_pos && send_pane_pos < html_content.index('id="webpQualityGroup"'), "Карточка WebP перенесена на вкладку Отправка")
     assert(send_pane_pos && send_pane_pos < html_content.index('api-targets-container'), "Карточка адресатов перенесена на вкладку Отправка")
 
+    # 1b. Кнопка «Отправить»: подготовка WebP-снимков и отправка на сервер
+    assert(html_content.include?('id="btnStartSend"'), "SendTab.vue содержит кнопку Отправить (btnStartSend)")
+    assert(html_content.include?('window.legacy?.startSend?.()'), "SendTab.vue вызывает startSend через мост")
+    assert(html_content.include?('callRuby("startSend"'), "app.js отправляет startSend в Ruby")
+
     # 2. Проверка CSS стилей
     css_path = File.expand_path("../dialog/html/app.css", __dir__)
     css_content = File.read(css_path, encoding: "utf-8")
@@ -3853,8 +3858,7 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     ctx = {
       model: model,
-      settings: { layout_render_mode: "image", image_width: 800, image_aspect_ratio: "page" },
-      rendered_scene_images: {}
+      settings: { layout_render_mode: "image", image_width: 800, image_aspect_ratio: "page" }
     }
     content = { left: 0.0, top: 100.0, w: 400.0, h: 300.0 }
     img_cfg = { aspect_ratio: "4:3", scale_pct: 100, visible: true }
@@ -4748,8 +4752,6 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     controller = DN1Code::ExportPdf2::Controller::ExportController.new(project_data, model)
     result_path = controller.export(nil)
-    # Снимки конвертируются в WebP фоновым пулом — перед проверкой файлов дожидаемся партии
-    DN1Code::ExportPdf2::Service::SnapshotWorker.drain
 
     art_dir      = File.join(skp_dir, "EXP-200")
     expected_pdf = File.join(art_dir, "pdf", "EXP-200_02#005.pdf")
@@ -4759,14 +4761,11 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(File.expand_path(result_path) == File.expand_path(expected_pdf), "export вернул путь папки артикула (#{result_path})")
     assert(File.exist?(expected_skp), "Резервная копия SKP в папке артикула: #{expected_skp}")
 
+    # Снимки сцен при экспорте PDF не создаются: WebP-снимки делаются только
+    # при отправке на сервер (кнопка «Отправить» -> export_scene_snapshots)
     images_dir = File.join(art_dir, "images")
-    vips = DN1Code::ExportPdf2::Service::VipsService
-    expected_ext = vips.available? ? ".webp" : ".png"
-    snaps = Dir.glob(File.join(images_dir, "*.{png,webp}")).map { |f| File.basename(f) }.sort
-    assert(snaps.size == 3, "Снимки всех 3 сцен в папке images/ (найдено: #{snaps.size}: #{snaps.join(', ')})")
-    assert(snaps.all? { |n| n =~ /^\d{2}_/ }, "Имена снимков начинаются с номера сцены (NN_)")
-    assert(snaps.all? { |n| n.end_with?(expected_ext) },
-           "Снимки в формате #{expected_ext} при libvips #{vips.available? ? 'доступна' : 'нет'} (#{snaps.join(', ')})")
+    snaps = Dir.glob(File.join(images_dir, "*")).map { |f| File.basename(f) }
+    assert(snaps.empty?, "Экспорт PDF не создает снимки в images/ (найдено: #{snaps.join(', ')})")
 
     # project.yaml в папке артикула — для повторного открытия модели.
     # В SketchUp сессия пишется через SessionStore.flush(model); здесь контроллер
@@ -4824,8 +4823,6 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     ensure
       $stdout = orig_stdout
     end
-    # Фоновая партия снимков не должна писать в папку после ее удаления
-    DN1Code::ExportPdf2::Service::SnapshotWorker.drain
 
     expected_pdf = File.join(skp_dir, "EXP-300", "pdf", "EXP-300_01#007.pdf")
     assert(File.exist?(expected_pdf), "Версионированный PDF в папке артикула создан: #{expected_pdf}")

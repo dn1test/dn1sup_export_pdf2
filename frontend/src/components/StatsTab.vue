@@ -34,7 +34,10 @@
         :class="[{ active: range === c.key }, { 'stats-card-total': c.total }]"
         @click="range = c.key"
       >
-        <span class="stats-card-label">{{ c.label }}</span>
+        <span class="stats-card-label">
+          {{ c.label }}
+          <span v-if="c.key === 'hourly' && todayDate" class="stats-card-date">{{ todayDate }}</span>
+        </span>
         <span class="stats-card-value">{{ fmt(report?.[c.seconds]) }}</span>
       </button>
     </div>
@@ -82,6 +85,7 @@ const statsError = computed(() => ui.stats?.error || '')
 const articul = computed(() => ui.stats?.articul || '')
 const product = computed(() => ui.stats?.product || '')
 const savedAt = computed(() => ui.stats?.savedAt || '')
+const todayDate = computed(() => report.value?.today || '')
 const isEmpty = computed(() => !report.value || report.value.empty)
 
 function legacy(fn, ...args) {
@@ -126,15 +130,17 @@ function renderChart() {
   const labels = series.map((p) => p.label)
   const seconds = series.map((p) => Math.max(0, Math.round(p.seconds || 0)))
 
-  // Разцветка выходных есть только у дневного разреза (daily)
+  // Разцветка выходных есть только у дневного разреза (daily).
+  // Цвета всегда массивами — при смене разреза Chart.js перекрашивает
+  // столбцы только если меняется поэлементный набор, строка не срабатывает.
   const isDaily = range.value === 'daily'
   const weekend = series.map((p) => Boolean(p.weekend))
   const barColors = isDaily
     ? series.map((_, i) => (weekend[i] ? BAR_WEEKEND : BAR_WEEKDAY))
-    : BAR_WEEKDAY
+    : series.map(() => BAR_WEEKDAY)
   const hoverColors = isDaily
     ? series.map((_, i) => (weekend[i] ? BAR_WEEKEND_HOVER : BAR_WEEKDAY_HOVER))
-    : BAR_WEEKDAY_HOVER
+    : series.map(() => BAR_WEEKDAY_HOVER)
   const tickColors = isDaily
     ? series.map((_, i) => (weekend[i] ? TICK_WEEKEND : TICK_DEFAULT))
     : undefined
@@ -279,10 +285,23 @@ onBeforeUnmount(() => {
 }
 
 .stats-card-label {
+  display: flex;
+  align-items: center;
+  gap: 6px;
   font-size: 12px;
   color: #64748b;
   text-transform: uppercase;
   letter-spacing: 0.04em;
+}
+
+.stats-card-date {
+  padding: 1px 6px;
+  border-radius: 4px;
+  background: #e2e8f0;
+  color: #475569;
+  font-size: 11px;
+  letter-spacing: 0;
+  white-space: nowrap;
 }
 
 .stats-card-value {

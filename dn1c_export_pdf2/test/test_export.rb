@@ -92,11 +92,11 @@ else
   abort "\n[ОШИБКА] PDF файл не был создан или имеет нулевой размер!"
 end
 
-# 5. Фоновая конвертация WebP-снимков: экспорт вернулся не дожидаясь снимков,
-# дожидаемся партию и проверяем результат
+# 5. WebP-снимки сцен: при экспорте PDF не создаются — генерируем явно
+# (то же, что делает кнопка «Отправить»), затем дожидаемся фоновую партию
+snapshots = controller.export_scene_snapshots
 snapshot_status = DN1Code::ExportPdf2::Service::SnapshotWorker.drain
 images_dir      = controller.scene_images_dir
-snapshots       = images_dir ? Dir.glob(File.join(images_dir, "*.{png,webp}")) : []
 scene_count     = project_data.scenes.count(&:enabled)
 
 puts "\nСнимки сцен (фоновый пул SnapshotWorker):"

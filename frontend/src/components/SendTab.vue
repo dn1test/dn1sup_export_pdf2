@@ -1,5 +1,23 @@
 <template>
   <div>
+    <!-- Send Project Card: подготовка снимков и отправка проекта на сервер -->
+    <div class="settings-card">
+      <div class="card-header">
+        <span class="card-header-icon"><i class="modus-icons">file_upload</i></span>
+        <span class="card-header-title">Отправка проекта</span>
+      </div>
+      <p class="field-hint">Подготовка WebP-снимков страниц и отправка проекта адресатам веб-интеграции:</p>
+      <button
+        type="button"
+        class="btn btn-success"
+        id="btnStartSend"
+        title="Подготовить WebP-снимки и отправить проект адресатам"
+        @click="send"
+      >
+        <i class="modus-icons">file_upload</i> Отправить
+      </button>
+    </div>
+
     <!-- Snapshots WebP Card: значения читает/пишет legacy по id -->
     <div class="settings-card">
       <div class="card-header">
@@ -78,5 +96,9 @@ function addTarget() {
 function removeTarget(index) {
   ui.apiTargets.splice(index, 1)
   window.legacy?.commitApiTargets?.([...ui.apiTargets])
+}
+// Отправка проекта: подготовка WebP-снимков и отправка (логика в legacy/app.js)
+function send() {
+  window.legacy?.startSend?.()
 }
 </script>

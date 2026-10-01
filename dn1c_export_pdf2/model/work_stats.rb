@@ -135,7 +135,7 @@ module DN1Code
         # @param data [Hash] структура статистики
         # @param now [Time]
         # @return [Hash] { total_seconds, today_seconds, weeks3_seconds,
-        #   month_seconds, first_tracked, last_tracked, empty,
+        #   month_seconds, today, first_tracked, last_tracked, empty,
         #   series: { hourly, daily, monthly, yearly } }
         def report(data, now = Time.now)
           data    = normalize(data)
@@ -154,6 +154,7 @@ module DN1Code
             today_seconds:   daily[date.strftime("%Y-%m-%d")].to_i,
             weeks3_seconds:  window_seconds(daily, date - 20, date),
             month_seconds:   window_seconds(daily, Date.new(date.year, date.month, 1), date),
+            today:           date.strftime("%d.%m.%Y"),
             first_tracked:   data[:first_tracked],
             last_tracked:    data[:last_tracked],
             empty:           data[:total_seconds].to_i <= 0,
@@ -181,16 +182,13 @@ module DN1Code
           end
         end
 
-        # Почасовой график: последние 24 часа, выровненные на начало часа.
-        # Окно пересекает полночь, поэтому часы не из сегодняшнего дня
-        # подписываются с датой («28.09 15:00»).
+        # Почасовой график: часы текущего календарного дня 00..23 без дат —
+        # дата дня показывается отдельно (поле today в report).
         def hourly_series(hourly, now)
-          hour0 = Time.at((now.to_i / 3600) * 3600)
-          today = now.to_date
-          (0...24).reverse_each.map do |i|
-            t = hour0 - i * 3600
-            label = t.to_date == today ? t.strftime("%H:00") : t.strftime("%d.%m %H:00")
-            { label: label, seconds: hourly[t.strftime("%Y-%m-%d %H")].to_i }
+          day = now.strftime("%Y-%m-%d")
+          (0...24).map do |h|
+            key = format("%s %02d", day, h)
+            { label: format("%02d:00", h), seconds: hourly[key].to_i }
           end
         end
 

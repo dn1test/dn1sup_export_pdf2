@@ -848,13 +848,10 @@ const DEFAULT_LAYOUTS = {
           if (window.app && window.app.onWorkStats) {
             const now = new Date();
             const pad = (n) => String(n).padStart(2, "0");
-            const hm = (d) => pad(d.getHours()) + ":00";
             const dm = (d) => pad(d.getDate()) + "." + pad(d.getMonth() + 1);
             const hourly = [];
-            for (let i = 23; i >= 0; i--) {
-              const d = new Date(now); d.setHours(now.getHours() - i, 0, 0, 0);
-              const label = d.getDate() === now.getDate() ? hm(d) : dm(d) + " " + hm(d);
-              hourly.push({ label: label, seconds: i < 4 ? 2400 - i * 450 : 0 });
+            for (let h = 0; h < 24; h++) {
+              hourly.push({ label: pad(h) + ":00", seconds: h >= 9 && h < 13 ? 1800 : 0 });
             }
             const daysRu = ["Вс", "Пн", "Вт", "Ср", "Чт", "Пт", "Сб"];
             const daily = [];
@@ -883,6 +880,7 @@ const DEFAULT_LAYOUTS = {
                 today_seconds: 7200,
                 weeks3_seconds: 148500,
                 month_seconds: 238500,
+                today: `${pad(now.getDate())}.${pad(now.getMonth() + 1)}.${now.getFullYear()}`,
                 first_tracked: "2026-06-02",
                 last_tracked: now.toISOString().slice(0, 10),
                 empty: false,
@@ -895,11 +893,14 @@ const DEFAULT_LAYOUTS = {
       if (action === "resetWorkStats") {
         setTimeout(() => {
           if (window.app && window.app.onWorkStats) {
+            const d = new Date();
+            const pad = (n) => String(n).padStart(2, "0");
             window.app.onWorkStats({
               articul: state.project?.articul || "HF#260924_104500",
               product: "",
               report: {
                 total_seconds: 0, today_seconds: 0, weeks3_seconds: 0, month_seconds: 0,
+                today: `${pad(d.getDate())}.${pad(d.getMonth() + 1)}.${d.getFullYear()}`,
                 first_tracked: null, last_tracked: null, empty: true,
                 series: { hourly: [], daily: [], monthly: [], yearly: [] }
               }
@@ -2538,11 +2539,12 @@ function updateParamModalPreview() {
       const webpQ = String(settings.webp_quality ?? "85").toLowerCase();
       els.selectWebpQuality.value = ["75", "85", "95", "lossless"].includes(webpQ) ? webpQ : "85";
     }
-    // Формат снимков не настраивается: WebP при доступной libvips, иначе PNG
+    // Формат снимков не настраивается: WebP при доступной libvips, иначе PNG.
+    // Снимки создаются только при отправке на сервер (кнопка «Отправить»)
     if (els.hintWebpFormat) {
       els.hintWebpFormat.textContent = state.vips_available
-        ? "libvips доступна — снимки сцен сохраняются в WebP."
-        : "libvips не найдена (vendor/libvips) — снимки сцен сохраняются как PNG.";
+        ? "libvips доступна — при отправке снимки сцен сохраняются в WebP."
+        : "libvips не найдена (vendor/libvips) — при отправке снимки сохраняются как PNG.";
     }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
 
@@ -4423,6 +4425,16 @@ function updateParamModalPreview() {
     switchToTab("tab-templates");
   }
 
+  // Отправка проекта (вкладка «Отправка»): подготовка WebP-снимков сцен в
+  // папку артикула; сетевая отправка будет добавлена позже
+  function startSend() {
+    if (!articulValue()) {
+      showNotification("Укажите артикул проекта — снимки сохраняются в папку артикула!", "error");
+      return;
+    }
+    callRuby("startSend", JSON.stringify(collectFormData()));
+  }
+
   // Drop переупорядочивания строк (ui.scenes уже переставлен Vue)
   function commitScenesReorder(from, to) {
     const item = state.scenes.splice(from, 1)[0];
@@ -4451,6 +4463,7 @@ function updateParamModalPreview() {
     syncHistoryEdit,
     addApiTarget,
     commitApiTargets,
+    startSend,
     stadiaChanged,
     removeStadia,
     commitStadia,
