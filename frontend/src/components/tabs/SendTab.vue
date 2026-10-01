@@ -1,18 +1,19 @@
 <template>
   <div class="flex flex-col gap-3">
-    <!-- Отправка проекта -->
-    <UiCard :title="t('send.title')">
-      <template #icon><SendIcon :size="14" /></template>
-      <p class="mb-3 text-[11px] text-ink-400">{{ t('send.hint') }}</p>
-      <UiButton variant="success" :icon="SendIcon2" :title="t('send.sendTitle')" @click="app.startSend()">
-        {{ t('send.sendBtn') }}
-      </UiButton>
-    </UiCard>
+    <!-- Отправка проекта + Снимки WebP: ряд из двух карточек без прокрутки -->
+    <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+      <!-- Отправка проекта -->
+      <UiCard :title="t('send.title')">
+        <template #icon><SendIcon :size="14" /></template>
+        <p class="mb-3 text-[11px] leading-tight text-ink-400">{{ t('send.hint') }}</p>
+        <UiButton variant="success" size="md" class="w-full" :icon="SendIcon2" :title="t('send.sendTitle')" @click="app.startSend()">
+          {{ t('send.sendBtn') }}
+        </UiButton>
+      </UiCard>
 
-    <!-- Снимки WebP -->
-    <UiCard :title="t('send.webpTitle')">
-      <template #icon><ImageIcon :size="14" /></template>
-      <div class="grid max-w-md grid-cols-1 gap-3">
+      <!-- Снимки WebP -->
+      <UiCard :title="t('send.webpTitle')">
+        <template #icon><ImageIcon :size="14" /></template>
         <UiField :label="t('send.webpQualityLabel')" :hint="settings.vipsAvailable ? t('send.vipsOk') : t('send.vipsMissing')">
           <UiSelect v-model="settings.webpQuality" @update:model-value="notifyChange()">
             <option value="75">{{ t('send.webp75') }}</option>
@@ -21,10 +22,10 @@
             <option value="lossless">{{ t('send.webpLossless') }}</option>
           </UiSelect>
         </UiField>
-      </div>
-    </UiCard>
+      </UiCard>
+    </div>
 
-    <!-- Адресаты API -->
+    <!-- Адресаты API: на всю ширину — длинным URL нужна ширина ряда -->
     <UiCard :title="t('send.targetsTitle')">
       <template #icon><GlobeIcon :size="14" /></template>
       <template #actions>

@@ -2,29 +2,34 @@
   <div class="flex h-screen flex-col overflow-hidden bg-ink-100">
     <AppHeader />
 
-    <!-- Навигация по вкладкам -->
+    <!-- Навигация по вкладкам: рабочие вкладки слева, «Настройки» и «Отправка» — группа справа -->
     <nav class="flex shrink-0 items-stretch gap-0.5 overflow-x-auto border-b border-ink-200 bg-white px-2">
-      <button
-        v-for="tab in tabs"
-        :key="tab.id"
-        type="button"
-        class="relative flex shrink-0 cursor-pointer items-center gap-1.5 px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors"
-        :class="app.activeTab === tab.id ? 'text-accent-700' : 'text-ink-500 hover:text-ink-800'"
-        @click="app.switchTab(tab.id)"
-      >
-        <component :is="tab.icon" :size="14" />
-        {{ t(tab.label) }}
+      <template v-for="tab in tabs" :key="tab.id">
         <span
-          v-if="tab.id === 'tab-scenes' && scenes.totalCount"
-          class="rounded-full px-1.5 py-px font-mono text-[10px] leading-4"
-          :class="app.activeTab === tab.id ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-500'"
-          :title="t('badge.pagesCount', { active: scenes.activeCount, total: scenes.totalCount })"
-        >{{ scenes.activeCount }}</span>
-        <span
-          v-if="app.activeTab === tab.id"
-          class="absolute right-2 -bottom-px left-2 h-0.5 rounded-full bg-accent-600"
+          v-if="tab.id === 'tab-settings'"
+          class="ml-auto my-1.5 w-px shrink-0 bg-ink-200"
+          aria-hidden="true"
         />
-      </button>
+        <button
+          type="button"
+          class="relative flex shrink-0 cursor-pointer items-center gap-1.5 px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors"
+          :class="app.activeTab === tab.id ? 'text-accent-700' : 'text-ink-500 hover:text-ink-800'"
+          @click="app.switchTab(tab.id)"
+        >
+          <component :is="tab.icon" :size="14" />
+          {{ t(tab.label) }}
+          <span
+            v-if="tab.id === 'tab-scenes' && scenes.totalCount"
+            class="rounded-full px-1.5 py-px font-mono text-[10px] leading-4"
+            :class="app.activeTab === tab.id ? 'bg-accent-100 text-accent-700' : 'bg-ink-100 text-ink-500'"
+            :title="t('badge.pagesCount', { active: scenes.activeCount, total: scenes.totalCount })"
+          >{{ scenes.activeCount }}</span>
+          <span
+            v-if="app.activeTab === tab.id"
+            class="absolute right-2 -bottom-px left-2 h-0.5 rounded-full bg-accent-600"
+          />
+        </button>
+      </template>
     </nav>
 
     <!-- Контент вкладок -->
