@@ -3,7 +3,6 @@
 // пользовательские действия дополнительно толкают оверлей кадра в SketchUp.
 
 import { defineStore } from 'pinia'
-import { watch } from 'vue'
 import { callRuby } from '../bridge/sketchup.js'
 import { notifyChange } from './autosave.js'
 
@@ -202,13 +201,3 @@ export const useSettingsStore = defineStore('settings', {
     },
   },
 })
-
-// Любая смена полей, влияющих на печатный шрифт, обновляет css-переменные
-// (например, при загрузке данных); мутации через v-model тоже попадут сюда.
-export function watchSettingsFontVars() {
-  const s = useSettingsStore()
-  watch(
-    () => [s.fontFamily, s.fontWeight, s.fontWidth],
-    () => s.syncDocFontVars(),
-  )
-}

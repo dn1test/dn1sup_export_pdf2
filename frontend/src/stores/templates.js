@@ -572,7 +572,6 @@ export const useTemplatesStore = defineStore('templates', {
 
     applyPayload(pdfSettings = {}) {
       this.layouts = pdfSettings.custom_layouts || {}
-      if (this.masterEnabled === undefined) this.masterEnabled = false
       this.masterEnabled = pdfSettings.master_template_enabled === true || pdfSettings.master_template_enabled === 'true'
       this.masterKey = String(pdfSettings.master_template_key || '').trim()
       this.ensureLayouts()
