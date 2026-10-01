@@ -117,7 +117,6 @@ module DN1Code
             # писать внутрь pdf_settings нельзя, иначе ключ уйдёт в settings.yaml).
             payload = project_data.to_h
             payload[:plugin_version] = PLUGIN_VERSION
-            payload[:dev_dir] = Service::DevUpdater.resolve_dev_dir if defined?(Service::DevUpdater)
             payload[:plugins_dir] = Service::DevUpdater.resolve_plugins_dir if defined?(Service::DevUpdater)
             payload[:vips_available] = Service::VipsService.available? if defined?(Service::VipsService)
             payload[:template_sets] = project_data.list_template_sets
@@ -907,16 +906,17 @@ module DN1Code
             end
           end
 
-          # Обновление из dev-папки
-          dialog.add_action_callback("updateFromDev") do |_action_context, custom_dev_path|
-            res = Service::DevUpdater.update_and_reload!(custom_dev_path.to_s.strip)
+          # Проверка наличия новой версии в dev-папке (путь резолвится в DevUpdater,
+          # в интерфейс не передается)
+          dialog.add_action_callback("checkForUpdate") do |_action_context|
+            res = Service::DevUpdater.check_for_update
             json_res = JSON.generate(res)
-            dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
+            dialog.execute_script("window.app && window.app.onUpdateCheckResult && window.app.onUpdateCheckResult(#{json_res});")
           end
 
-          # Быстрая горячая перезагрузка плагина
-          dialog.add_action_callback("hotReload") do |_action_context|
-            res = Service::DevUpdater.reload!
+          # Обновление из dev-папки и перезагрузка плагина
+          dialog.add_action_callback("updateFromDev") do |_action_context|
+            res = Service::DevUpdater.update_and_reload!
             json_res = JSON.generate(res)
             dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
           end

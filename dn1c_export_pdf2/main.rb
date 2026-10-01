@@ -96,8 +96,6 @@ module DN1Code
       res = Service::DevUpdater.update_and_reload!(dev_dir)
       if res[:success]
         msg = "✅ #{NAME_EXTENSION} (v#{PLUGIN_VERSION}) успешно обновлен из dev-папки!\n\n" \
-              "Откуда: #{res[:dev_dir]}\n" \
-              "Куда: #{res[:plugins_dir]}\n" \
               "Скопировано файлов: #{res[:files_copied]}"
         if res[:warnings] && !res[:warnings].empty?
           msg += "\n\n⚠ Пропущены залоченные файлы (обновятся после перезапуска SketchUp):\n" \

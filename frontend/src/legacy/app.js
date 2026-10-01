@@ -3949,30 +3949,29 @@ function updateParamModalPreview() {
       callRuby("exportYaml", JSON.stringify(data));
     });
 
-    // Dev Tools Update & Hot Reload listeners
-    const btnDevUpdate = document.getElementById("btnUpdateFromDev");
-    if (btnDevUpdate) {
-      btnDevUpdate.addEventListener("click", () => {
-        const devInput = document.getElementById("inputDevDir");
-        const devPath = (devInput ? devInput.value : "").trim();
+    // Проверка обновления и обновление плагина (путь dev-папки резолвится в Ruby)
+    const btnCheckUpdate = document.getElementById("btnCheckUpdate");
+    if (btnCheckUpdate) {
+      btnCheckUpdate.addEventListener("click", () => {
         const statusEl = document.getElementById("devUpdateStatus");
         if (statusEl) {
           statusEl.style.color = "var(--bs-primary)";
-          statusEl.textContent = "Синхронизация файлов из dev-папки и перезагрузка...";
+          statusEl.textContent = "Проверка обновлений...";
         }
-        callRuby("updateFromDev", devPath);
+        callRuby("checkForUpdate");
       });
     }
 
-    const btnDevReload = document.getElementById("btnHotReload");
-    if (btnDevReload) {
-      btnDevReload.addEventListener("click", () => {
+    const btnUpdateApply = document.getElementById("btnUpdate");
+    if (btnUpdateApply) {
+      btnUpdateApply.addEventListener("click", () => {
         const statusEl = document.getElementById("devUpdateStatus");
         if (statusEl) {
           statusEl.style.color = "var(--bs-primary)";
-          statusEl.textContent = "Перезагрузка плагина в памяти SketchUp...";
+          statusEl.textContent = "Обновление плагина и перезагрузка...";
         }
-        callRuby("hotReload");
+        btnUpdateApply.disabled = true;
+        callRuby("updateFromDev");
       });
     }
 
@@ -4058,12 +4057,11 @@ function updateParamModalPreview() {
         state.plugin_version = data.plugin_version;
         const devBadge = document.getElementById("badgeDevVersion");
         if (devBadge) devBadge.textContent = `v${data.plugin_version}`;
+        const curVersionEl = document.getElementById("curVersionText");
+        if (curVersionEl) curVersionEl.textContent = `v${data.plugin_version}`;
+        const headerBadge = document.getElementById("headerVersionBadge");
+        if (headerBadge) headerBadge.title = `Версия плагина: v${data.plugin_version}`;
         document.title = `DN1C Export PDF 2 v${data.plugin_version}`;
-      }
-      if (data.dev_dir) {
-        state.dev_dir = data.dev_dir;
-        const inputDev = document.getElementById("inputDevDir");
-        if (inputDev && !inputDev.value) inputDev.value = data.dev_dir;
       }
       ensureCustomLayouts();
       // Список наборов шаблонов приходит в payload getData (state.template_sets)
@@ -4136,14 +4134,66 @@ function updateParamModalPreview() {
       notifyChange();
     },
 
+    // Результат проверки обновлений (колбэк Ruby checkForUpdate)
+    onUpdateCheckResult: function (res) {
+      const statusEl = document.getElementById("devUpdateStatus");
+      const updateBtn = document.getElementById("btnUpdate");
+      const rowAvail = document.getElementById("updateAvailableRow");
+      const newVerEl = document.getElementById("newVersionText");
+      if (!res || !res.success) {
+        state.update_dev_version = null;
+        const errMsg = res ? res.error : "Неизвестная ошибка";
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-danger)";
+          statusEl.textContent = `❌ ${errMsg}`;
+        }
+        if (rowAvail) rowAvail.style.display = "none";
+        if (updateBtn) updateBtn.disabled = true;
+        return;
+      }
+      if (res.update_available) {
+        state.update_dev_version = res.dev_version;
+        if (newVerEl) newVerEl.textContent = `v${res.dev_version}`;
+        if (rowAvail) rowAvail.style.display = "flex";
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-warning)";
+          statusEl.textContent = `Найдено обновление: v${res.current_version} → v${res.dev_version}. Нажмите «Обновить».`;
+        }
+        if (updateBtn) updateBtn.disabled = false;
+      } else {
+        state.update_dev_version = null;
+        if (rowAvail) rowAvail.style.display = "none";
+        if (statusEl) {
+          statusEl.style.color = "var(--bs-success)";
+          statusEl.textContent = `✅ Обновлений нет — установлена последняя версия v${res.current_version}.`;
+        }
+        if (updateBtn) updateBtn.disabled = true;
+      }
+    },
+
     onDevUpdateResult: function (res) {
       const statusEl = document.getElementById("devUpdateStatus");
+      const updateBtn = document.getElementById("btnUpdate");
+      const rowAvail = document.getElementById("updateAvailableRow");
       if (res && res.success) {
-        const msg = res.same_dir
-          ? "Плагин работает напрямую из рабочей dev-папки. Перезагрузка выполнена!"
-          : (res.files_copied !== undefined
-              ? `Успешно обновлено из dev-папки (${res.files_copied} файлов скопировано). Плагин перезагружен!`
-              : "Плагин успешно перезагружен!");
+        if (rowAvail) rowAvail.style.display = "none";
+        if (updateBtn) updateBtn.disabled = true;
+        // Версия, найденная при проверке: константа PLUGIN_VERSION в текущей
+        // сессии SketchUp не переопределяется — номер покажется после перезапуска
+        const newVer = state.update_dev_version || null;
+        state.update_dev_version = null;
+        let msg;
+        if (res.same_dir) {
+          msg = newVer
+            ? `Плагин уже работает из каталога разработки — версия v${newVer} активна.`
+            : "Плагин работает напрямую из рабочей dev-папки. Перезагрузка выполнена!";
+        } else if (newVer) {
+          msg = `Обновлено до v${newVer} (${res.files_copied || 0} файлов). Плагин перезагружен! Перезапустите SketchUp, чтобы номер версии отобразился в интерфейсе.`;
+        } else if (res.files_copied !== undefined) {
+          msg = `Успешно обновлено из dev-папки (${res.files_copied} файлов скопировано). Плагин перезагружен!`;
+        } else {
+          msg = "Плагин успешно перезагружен!";
+        }
         if (statusEl) {
           statusEl.style.color = "var(--bs-success)";
           statusEl.textContent = `✅ ${msg} [${res.updated_at || res.reloaded_at || ""}]`;

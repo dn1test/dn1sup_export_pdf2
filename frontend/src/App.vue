@@ -4,7 +4,7 @@
     <!-- Header -->
     <header class="app-header">
       <div class="header-brand">
-        <div class="logo-badge" title="Версия плагина: v2.5.0"><i class="modus-icons">file_template</i> export PDF</div>
+        <div class="logo-badge" id="headerVersionBadge" title="Версия плагина: v2.6.0"><i class="modus-icons">file_template</i> export PDF</div>
         <div class="header-titles">
           <h1 id="headerProjectTitle">Новый проект</h1>
           <span class="subtitle" id="headerProjectSubtitle">Заказчик — Адрес объекта</span>

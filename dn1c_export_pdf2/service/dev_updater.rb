@@ -49,6 +49,54 @@ module DN1Code
           end
         end
 
+        # Читает PLUGIN_VERSION из version.rb указанного корня плагина
+        # @param root [String] корень плагина (dev-папка или каталог Plugins)
+        # @return [String, nil] версия или nil, если файл не найден/не распарсен
+        def read_plugin_version(root)
+          version_rb = File.join(root, "dn1c_export_pdf2", "version.rb")
+          return nil unless File.exist?(version_rb)
+
+          File.read(version_rb)[/PLUGIN_VERSION\s*=\s*["']([^"']+)["']/, 1]
+        end
+
+        # Сравнивает строки версий вида "2.5.0" по сегментам
+        # @return [Integer] -1 | 0 | 1 (как spaceship)
+        def compare_versions(a, b)
+          segs_a = a.to_s.strip.split(".").map(&:to_i)
+          segs_b = b.to_s.strip.split(".").map(&:to_i)
+          len = [segs_a.size, segs_b.size].max
+          segs_a.fill(0, segs_a.size...len)
+          segs_b.fill(0, segs_b.size...len)
+          segs_a <=> segs_b
+        end
+
+        # Проверяет наличие новой версии в dev-папке. Путь dev-папки резолвится
+        # только в коде (ENV DN1C_DEV_DIR → DEFAULT_DEV_DIR) и в результат не
+        # включается — GUI пути не показывает.
+        # @param dev_dir [String, nil] переопределение пути для тестов
+        # @return [Hash]
+        def check_for_update(dev_dir = nil)
+          src_dir = resolve_dev_dir(dev_dir)
+          unless src_dir && Dir.exist?(src_dir)
+            return { success: false, current_version: PLUGIN_VERSION, error: "Каталог разработки не найден" }
+          end
+
+          dev_version = read_plugin_version(src_dir)
+          if dev_version.nil? || dev_version.empty?
+            return { success: false, current_version: PLUGIN_VERSION, error: "Не удалось прочитать версию из каталога разработки" }
+          end
+
+          {
+            success: true,
+            current_version: PLUGIN_VERSION,
+            dev_version: dev_version,
+            update_available: compare_versions(dev_version, PLUGIN_VERSION) == 1,
+            checked_at: Time.now.strftime("%Y-%m-%d %H:%M:%S")
+          }
+        rescue StandardError => e
+          { success: false, current_version: PLUGIN_VERSION, error: "#{e.class}: #{e.message}" }
+        end
+
         # Определяет целевой каталог Plugins SketchUp
         # @param custom_plugins_dir [String, nil]
         # @return [String]
@@ -105,7 +153,7 @@ module DN1Code
           unless src_dir && Dir.exist?(src_dir)
             return {
               success: false,
-              error: "Каталог разработки не найден. Укажите путь к папке с dn1c_export_pdf2.rb (проверено: #{dev_dir || DEFAULT_DEV_DIR})"
+              error: "Каталог разработки не найден (папка с dn1c_export_pdf2.rb)"
             }
           end
 
@@ -124,8 +172,6 @@ module DN1Code
             return {
               success: true,
               same_dir: true,
-              dev_dir: src_dir,
-              plugins_dir: dst_plugins,
               files_copied: 0,
               version: PLUGIN_VERSION,
               message: "Плагин уже работает напрямую из каталога разработки"
@@ -187,8 +233,6 @@ module DN1Code
           {
             success: true,
             same_dir: false,
-            dev_dir: src_dir,
-            plugins_dir: dst_plugins,
             files_copied: files_copied,
             files_pruned: pruned,
             warnings: warnings,

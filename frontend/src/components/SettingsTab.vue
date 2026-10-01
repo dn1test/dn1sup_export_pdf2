@@ -124,23 +124,27 @@
           </div>
         </div>
 
-        <!-- Section: Dev Tools & Обновление из папки разработки -->
-        <div class="settings-card" id="cardDevUpdater">
+        <!-- Section: Обновление плагина (путь к dev-папке резолвится в Ruby, в GUI не показывается) -->
+        <div class="settings-card" id="cardPluginUpdate">
           <div class="card-header">
             <div class="card-header-title-wrap">
-              <span class="card-header-icon"><i class="modus-icons">tune</i></span>
-              <span class="card-header-title">Папка разработки и обновление (Dev Tools)</span>
+              <span class="card-header-icon"><i class="modus-icons">autorenew</i></span>
+              <span class="card-header-title">Обновление плагина</span>
             </div>
-            <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.5.0</span>
+            <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.6.0</span>
           </div>
-          <p class="field-hint">Быстрое обновление плагина из рабочей dev-папки в каталог Plugins SketchUp без ручного копирования файлов:</p>
+          <p class="field-hint">Проверка новой версии и обновление плагина без ручного копирования файлов. Код обновляется сразу, номер версии применяется после перезапуска SketchUp:</p>
           <div class="form-group" style="margin-bottom: 8px;">
-            <label for="inputDevDir">Каталог разработки плагина (Dev Directory):</label>
-            <div style="display: flex; gap: 8px; margin-top: 4px;">
-              <input type="text" id="inputDevDir" class="form-control font-mono" placeholder="U:/dn1code/su_plugs_app/dn1c_export_pdf2" style="flex: 1;" />
-              <button type="button" class="btn btn-xs btn-primary" id="btnUpdateFromDev" title="Скопировать свежие файлы из dev-папки и перезагрузить плагин"><i class="modus-icons">autorenew</i> Обновить из dev-папки</button>
-              <button type="button" class="btn btn-xs btn-secondary" id="btnHotReload" title="Перезагрузить код плагина в памяти SketchUp"><i class="modus-icons">refresh</i> Перезагрузить</button>
+            <div style="display: flex; align-items: center; gap: 6px; min-height: 18px;">
+              <span>Текущая версия: <b id="curVersionText">v2.6.0</b></span>
             </div>
+            <div id="updateAvailableRow" style="display: none; align-items: center; gap: 6px; margin-top: 4px; color: var(--bs-warning); font-weight: 600;">
+              <i class="modus-icons">download</i> Доступна новая версия: <b id="newVersionText"></b>
+            </div>
+          </div>
+          <div style="display: flex; gap: 8px;">
+            <button type="button" class="btn btn-xs btn-secondary" id="btnCheckUpdate" title="Сравнить версию в каталоге разработки с установленной"><i class="modus-icons">search</i> Проверить обновление</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnUpdate" title="Скопировать новую версию и перезагрузить плагин" disabled><i class="modus-icons">autorenew</i> Обновить</button>
           </div>
           <div id="devUpdateStatus" class="field-hint" style="font-size: 11px; margin-top: 4px; min-height: 16px;"></div>
         </div>

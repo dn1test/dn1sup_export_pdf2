@@ -1,7 +1,7 @@
 {
   "name": "dn1c-export-pdf2-frontend",
   "private": true,
-  "version": "2.5.0",
+  "version": "2.6.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
