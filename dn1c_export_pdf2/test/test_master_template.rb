@@ -278,17 +278,16 @@ module DN1Code
           js = Dir[File.join(__dir__, "../../frontend/src/**/*.{js,vue}")].sort
                  .map { |f| (File.read(f, encoding: "utf-8") rescue "") }.join("\n")
 
-          assert(js.include?("function toggleMasterTemplate"), "app.js: toggleMasterTemplate переключает мастера")
-          assert(js.include?("toggleMasterTemplate,"), "app.js: toggleMasterTemplate экспортируется в window.legacy")
-          assert(js.include?("master_template_enabled: masterTemplateEnabled()") &&
-                 js.include?("master_template_key: masterTemplateKey()"),
-                 "app.js: collectFormData отправляет ключи мастера (иначе автосейв их теряет)")
-          assert(js.include?("master: isMaster && tpl.key === masterTemplateKey()"),
-                 "app.js: renderTemplatesList помечает мастер-шаблон")
-          assert(js.include?("clearStaleMaster"), "app.js: висячая звезда сбрасывается (удаление/набор)")
-          assert(js.include?("ui.masterTemplate"), "store.js: реактивный снимок мастера для Vue")
-          assert(js.include?("legacy('toggleMasterTemplate', tpl.key)"),
-                 "TemplatesSidebar.vue: звезда вызывает toggleMasterTemplate")
+          assert(js.include?("toggleMaster(tplKey)"), "templates-стор: toggleMaster переключает мастера")
+          assert(js.include?("templates.toggleMaster(tpl.key)"), "TemplatesSidebar.vue: звезда вызывает toggleMaster")
+          assert(js.include?("master_template_enabled: templates.masterEnabled") &&
+                 js.include?("master_template_key: templates.masterKey"),
+                 "payload.js отправляет ключи мастера (иначе автосейв их теряет)")
+          assert(js.include?("master: isMaster && tpl.key === this.masterKey"),
+                 "templates-стор: sidebarList помечает мастер-шаблон")
+          assert(js.include?("clearStaleMaster()"), "templates-стор: висячая звезда сбрасывается (удаление/набор)")
+          assert(js.include?("masterEnabled: false") && js.include?("masterKey: ''"),
+                 "templates-стор: мастер — реактивное состояние для Vue")
           assert(js.include?("masterAffects"), "ScenesTab.vue: бейдж на страницах, затронутых мастером")
           assert(js.include?("tsb.masterTitle") && js.include?("toast.masterOn") &&
                  js.include?("toast.masterOff") && js.include?("scenes.masterBadgeTitle"),

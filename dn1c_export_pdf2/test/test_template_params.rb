@@ -729,8 +729,8 @@ module DN1Code
           assert(js.include?("function buildParamSources"), "app.js: buildParamSources строит каталог источников из данных")
           assert(js.include?("function paramPreviewValue"), "app.js: paramPreviewValue дает живое превью значения")
           assert(js.include?("function normalizeTemplateParam"), "app.js: normalizeTemplateParam нормализует параметр")
-          assert(js.include?("function openParamModal"), "app.js: openParamModal открывает модал создания/правки")
-          assert(js.include?("openParamModal', 'create"), "TemplateSettingsEditor.vue: кнопка «+ Создать параметр» на месте")
+          assert(js.include?("openParamModal(mode, paramId, tplKey)"), "app.js: openParamModal открывает модал создания/правки")
+          assert(js.include?("openParamModal('create'"), "TemplateSettingsEditor.vue: кнопка «+ Создать параметр» на месте")
           assert(js.include?('dir.${idx}.line'), "app.js: источники папок строятся динамически (dir.N.line)")
 
           # 2c. Настройки параметра: источник/заголовок — в модале, остальное —
@@ -744,19 +744,19 @@ module DN1Code
           assert(!js.include?("DEFAULT_PARAM_SETTINGS.x") && !js.include?("num(p.x"),
                  "app.js: координаты X/Y убраны из модели параметра")
           assert(js.include?("function paramZoneLabel"), "app.js: сводка строки показывает зону размещения")
-          assert(js.include?('tpl-param-zone'), "app.js: зона размещения — во второй строке (стиль и размещение)")
-          assert(js.include?("tpl-param-preview-empty"), "app.js: пустые данные параметра помечены в строке «(нет данных)»")
-          assert(js.include?("tplEditorDrop") && js.include?("tpl-param-drag"),
-                 "app.js: параметры сортируются перетаскиванием за ручку ⠿ (drag-and-drop)")
+          assert(js.include?("p._zone"), "app.js: зона размещения — во второй строке (стиль и размещение)")
+          assert(js.include?("t('tse.noData')"), "app.js: пустые данные параметра помечены в строке «(нет данных)»")
+          assert(js.include?("templates.drop(op)") && js.include?("dndDragArm"),
+                 "app.js: параметры сортируются перетаскиванием за ручку (drag-and-drop)")
 
           # 2e. Блоки объединения параметров: горизонтальный и вертикальный
-          assert(js.include?("tplEditorCreateGroup"), "TemplateSettingsEditor.vue: кнопки «Блок» создают блок объединения")
-          assert(js.include?("function createParamGroup"), "app.js: createParamGroup создает пустой блок")
-          assert(js.include?("legacy('tplEditorCreateGroup', 'horizontal')") && js.include?("legacy('tplEditorCreateGroup', 'vertical')"),
+          assert(js.include?("createGroup('horizontal')"), "TemplateSettingsEditor.vue: кнопки «Блок» создают блок объединения")
+          assert(js.include?("createGroup(direction)"), "app.js: createGroup создает пустой блок")
+          assert(js.include?("templates.createGroup('horizontal')") && js.include?("templates.createGroup('vertical')"),
                  "TemplateSettingsEditor.vue: в шапке две кнопки блоков — горизонтальный и вертикальный")
-          assert(js.include?('direction: dirRaw === "vertical" ? "vertical" : "horizontal"'),
+          assert(js.include?("direction: dirRaw === 'vertical' ? 'vertical' : 'horizontal'"),
                  "app.js: normalizeTemplateParam нормализует направление блока (старые блоки — горизонтальные)")
-          assert(js.include?("tpl-param-group-list") && js.include?("tpl-param-child-out"),
+          assert(js.include?("tpl-group-list") && js.include?("templates.childOut("),
                  "app.js: блок содержит перетаскиваемых детей с кнопкой вывода из блока")
           assert(js.include?("p.group === true"), "app.js: normalizeTemplateParam сохраняет блоки с детьми")
           lb_text = File.read(File.join(__dir__, "../service/layout_builder.rb"), encoding: "utf-8")
@@ -765,20 +765,22 @@ module DN1Code
           pd_rb = File.read(File.join(__dir__, "../model/project_data.rb"), encoding: "utf-8")
           assert(pd_rb.include?("base.merge!(group: true,") && pd_rb.include?('direction_raw == "vertical"'),
                  "project_data.rb: normalize_template_params нормализует блоки вместе с детьми и направлением")
-          %w[tpl-param-size tpl-param-align9 tpl-param-color tpl-param-show-label].each do |cls|
-            assert(js.include?(cls), "Контрол строки параметра #{cls} присутствует в app.js")
+          %w[font_size show_label].each do |field|
+            assert(js.include?("templates.update(p.id, { #{field}"), "Контрол строки параметра #{field} присутствует в app.js")
           end
+          assert(js.include?('type="color"'), "Контрол строки параметра color присутствует в app.js")
+          assert(js.include?("toggleAlignPop(p.id"), "Контрол строки параметра align присутствует в app.js")
           assert(!js.include?("tpl-param-font") && !js.include?("PARAM_FONT_FAMILIES") && !js.include?("p.font_family"),
                  "app.js: выбор шрифта параметра удален — шрифт наследуется из общих настроек")
           assert(!lb_text.include?("param[:font_family]") && !pd_rb.include?("p[:font_family] || p[\"font_family\"]"),
                  "Ruby: font_family параметра удален из нормализации и рендера (общие настройки)")
-          assert(js.include?('["top", "center", "bottom"].includes(valignRaw)'),
+          assert(js.include?("['top', 'center', 'bottom'].includes(valignRaw)"),
                  "app.js: выравнивание параметра — верх/середина/низ (8 направлений, без центра)")
-          assert(js.include?("scene-align-pop") && js.include?("function pickAlign"),
-                 "TemplateSettingsEditor.vue: выравнивание — поповер 3×3 как во вкладке «Страницы»")
-          assert(js.include?("PARAM_LINE_GAPS") && js.include?("tpl-header-linegap"),
+          assert(js.include?("AlignGrid") && js.include?("pickAlign"),
+                 "TemplateSettingsEditor.vue: выравнивание — сетка 3×3 как во вкладке «Страницы»")
+          assert(js.include?("LINE_GAPS") && js.include?("templates.setLineGap("),
                  "app.js: «размер между строками» (мм) — общий селект в шапке карточки")
-          assert(js.include?("tpl-header-line") && js.include?("getTemplateLineSettings") && js.include?("setTemplateLineSettings"),
+          assert(js.include?("templates.setLineEnabled") && js.include?("lineSettings"),
                  "app.js: «Линия» — общая галочка в шапке карточки, чтение/запись настроек шаблона")
           assert(!js.include?("tpl-param-linegap") && !js.include?("tpl-param-line"),
                  "app.js: у строки параметра нет отдельных контролов зазора/линии — настройка общая")
@@ -788,7 +790,7 @@ module DN1Code
                  "layout_builder.rb: зазор и линия читаются из настроек шаблона (page_cfg)")
           assert(lb_text.include?("def add_thin_line"),
                  "layout_builder.rb: тонкая линия-разделитель рисуется через add_thin_line")
-          assert(js.include?('k !== "line_gap" && k !== "line_enabled"'),
+          assert(js.include?("k !== 'line_gap' && k !== 'line_enabled'"),
                  "app.js: ensureCustomLayouts не стирает line_gap/line_enabled — настройки шапки не сбрасываются")
           assert(js.include?("cfg.line_gap") && js.include?("cfg.line_enabled"),
                  "app.js: line_gap/line_enabled нормализуются при каждом проходе ensureCustomLayouts")
@@ -797,10 +799,10 @@ module DN1Code
           assert(!js.include?("Фасады МДФ, ЛДСП, Blum") && !js.include?("CF#260905_160129"),
                  "В источниках параметров нет текстовых заглушек-примеров")
           assert(!js.include?("toLocaleDateString"), "В превью нет локального формата даты (9/22/2026)")
-          assert(js.include?("const previewDate ="), "app.js использует единый хелпер даты previewDate")
-          assert(js.include?("const parseRuDate =") && js.include?("const isoToRuDate ="),
+          assert(js.include?("export function previewDate"), "app.js использует единый хелпер даты previewDate")
+          assert(js.include?("export function parseRuDate") && js.include?("export function isoToRuDate"),
                  "app.js: поля дат конвертируют ISO ↔ дд.мм.гггг (нативный date в CEF всегда en-US)")
-          assert(js.include?("inputStartDateDisplay") && js.include?("inputEndDateDisplay"),
+          assert(js.include?('v-model="project.workflow.start_date"') && js.include?('v-model="project.workflow.end_date"'),
                  "app.js: текстовые поля дат дд.мм.гггг подключены к загрузке/автосейву")
           assert(js.include?("histEntryText(h[0])"),
                  "«Последние изменения» берут первую (новейшую) запись истории, как Ruby-экспорт")

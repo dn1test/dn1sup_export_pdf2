@@ -110,47 +110,59 @@ dn1c_export_pdf2/
     │   ├── export_dialog.rb                   # Ruby-обёртка над UI::HtmlDialog
     │   └── html/                              # СОБРАННЫЙ веб-интерфейс (результат npm run build)
     │       ├── index.html                     # Точка входа (генерируется Vite)
-    │       ├── app.css                        # Стили (копия из frontend/public)
-    │       ├── modus-bootstrap.min.css        # CSS-фреймворк (копия из frontend/public)
-    │       ├── fonts/                         # Иконки Modus (копия из frontend/public)
-    │       └── assets/                        # JS-бандлы (генерируются Vite, имена с хешами)
+    │       └── assets/                        # JS-бандлы и CSS (генерируются Vite, имена с хешами)
     └── test/                                  # Автономные тесты без GUI SketchUp
         ├── mock_sketchup.rb
         ├── test_export.rb
         └── comprehensive_test.rb
-frontend/                                      # Исходники веб-интерфейса (Vue 3 + Vite)
-├── package.json                               # Зависимости: vue, vite, @vitejs/plugin-vue
-├── vite.config.js                             # outDir → dn1c_export_pdf2/dialog/html
+frontend/                                      # Исходники веб-интерфейса (Vue 3 + Vite + Tailwind)
+├── package.json                               # Зависимости: vue, pinia, chart.js, @lucide/vue, tailwindcss
+├── vite.config.js                             # outDir → dn1c_export_pdf2/dialog/html (+ @tailwindcss/vite)
 ├── index.html                                 # Vite-шаблон входа
-├── public/                                    # Копируются в сборку как есть (css, шрифты)
 └── src/
-    ├── main.js                                # createApp + монтирование, динамический import legacy
-    ├── store.js                               # Реактивный UI-store (мост legacy ↔ Vue)
+    ├── main.js                                # createApp + Pinia + initBridge (мост к Ruby)
+    ├── style.css                              # Tailwind v4 + дизайн-токены темы (CSS-first)
     ├── format.js                              # Общие утилиты (размеры файлов, иконки, плюрализация)
-    ├── App.vue                                # Корневой компонент: каркас + статичные формы
-    ├── legacy/                                # Бизнес-логика (мост callRuby/window.app, состояние, экспорт)
-    │   └── app.js
-    └── components/                            # По компоненту на вкладку + общие
-        ├── BaseModal.vue                      # Единая оболочка модалок (ESC, фокус-трап, aria)
-        ├── AppToast.vue                       # Уведомления
-        ├── ParamModal.vue                     # Модал создания/правки параметра
-        ├── ProjectTab.vue                     # Вкладка «Проект» + стадии
-        ├── ScenesTab.vue                      # Вкладка «Страницы»: таблица, попапы кадра/выравнивания
-        ├── TemplatesSidebar.vue               # Список шаблонов и наборов
-        ├── TemplateModals.vue                 # 5 модалок шаблонов/наборов
-        ├── TemplateSettingsEditor.vue         # WYSIWYG-редактор параметров с DnD
-        ├── DirectoriesTab.vue                 # Вкладка «Папки»: карточки, DnD, предпросмотр
-        ├── HistoryTab.vue                     # Вкладка «История»
-        ├── SettingsTab.vue                    # Вкладка «Настройки»
-        ├── SendTab.vue                        # Вкладка «Отправка» + API-адресаты
-        └── StatsTab.vue                       # Вкладка «Статистика»: сводные карточки + график Chart.js
+    ├── lib/dates.js                           # Даты «дд.мм.гггг» ↔ ISO, штампы времени
+    ├── i18n/                                  # Реактивный i18n (ru/en, 619 ключей)
+    ├── bridge/                                # Мост JS↔Ruby
+    │   ├── sketchup.js                        # callRuby + window.app.* + пульс активности
+    │   ├── mock.js                            # Dev-мок ответов Ruby для браузера (npm run dev)
+    │   └── payload.js                         # collectFormData — сборка payload для saveData/export
+    ├── stores/                                # Pinia-сторы (по одному на домен)
+    │   ├── app.js                             # Вкладки, прогресс, модалки ревизии/артикула, экспорт
+    │   ├── project.js                         # Проект/заказчик/ход работы/стадии/история
+    │   ├── scenes.js                          # Страницы, эскизы, оверлей кадра
+    │   ├── templates.js                       # Шаблоны, наборы, мастер, редактор параметров
+    │   ├── directories.js                     # Папки спецификаций + превью файлов
+    │   ├── settings.js                        # pdf_settings, адресаты API
+    │   ├── stats.js                           # Статистика работы
+    │   ├── autosave.js                        # Дебаунс-автосейв (notifyChange → saveData silent)
+    │   └── toast.js                           # Глобальные уведомления
+    ├── composables/useDragSort.js             # HTML5 DnD для списков (стадии, сцены, параметры)
+    └── components/
+        ├── ui/                                # UI-кит на Tailwind (Button, Input, Select, Modal,
+        │                                      #   Popover, Card, Checkbox, DateField, AlignGrid…)
+        ├── layout/                            # AppHeader, AppFooter, AppToast, ProgressOverlay
+        ├── modals/                            # Revision, ArticulType/Prompt, Success, Param, TemplateModals
+        └── tabs/                              # По компоненту на вкладку
+            ├── ProjectTab.vue                 # Вкладка «Проект» + стадии
+            ├── ScenesTab.vue                  # Вкладка «Страницы»: таблица, поповеры кадра/выравнивания
+            ├── TemplatesTab.vue               # Вкладка «Шаблоны»: сайдбар + панель + редактор
+            ├── TemplatesSidebar.vue           # Список шаблонов и наборов (звезда мастера)
+            ├── TemplateSettingsEditor.vue     # Редактор параметров с группами и DnD
+            ├── DirectoriesTab.vue             # Вкладка «Папки»: карточки, DnD, предпросмотр
+            ├── HistoryTab.vue                 # Вкладка «История»
+            ├── SettingsTab.vue                # Вкладка «Настройки» (+ обновление из dev-папки)
+            ├── SendTab.vue                    # Вкладка «Отправка» + API-адресаты
+            └── StatsTab.vue                   # Вкладка «Статистика»: карточки + график Chart.js
 ```
 
 ---
 
-## 🎨 Разработка GUI (Vue 3 + Vite)
+## 🎨 Разработка GUI (Vue 3 + Vite + Tailwind)
 
-Веб-интерфейс диалога работает на Vue 3: разметка и рендер — в SFC-компонентах (`frontend/src/components/`), бизнес-логика и мост к SketchUp — в `frontend/src/legacy/app.js`. Связь через реактивный store (`ui.*`) и `window.legacy` — контракты Ruby↔JS (`callRuby`, `window.app.*`) не изменились. Готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
+Веб-интерфейс диалога — SPA на Vue 3 (Composition API) с Pinia-сторами и Tailwind CSS v4: разметка, состояние и бизнес-логика полностью во фронтенде, без DOM-манипуляций по id. Мост к SketchUp — `frontend/src/bridge/`: `callRuby(action, json)` (JS→Ruby) и `window.app.*` (Ruby→JS), контракты не изменились. Готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
 
 ```bash
 cd frontend
@@ -160,6 +172,8 @@ npm run build      # сборка в dn1c_export_pdf2/dialog/html
 ```
 
 - Ruby↔JS мост не зависит от фреймворка: `callRuby(action, json)` и `window.app.*` — контракты сохраняются.
+- Стили — Tailwind v4 (CSS-first токены в `src/style.css`); устаревший `app.css`/`modus-bootstrap.min.css` удалены.
+- Автосейв: любая мутация зовёт `notifyChange()` → дебаунс 400 мс → `saveData(silent)` в память сессии Ruby.
 - В `update_from_dev.rb` сборка GUI выполняется автоматически перед копированием в Plugins.
 - Перед упаковкой `.rbz` выполните `npm run build`, чтобы в архив попала актуальная сборка.
 

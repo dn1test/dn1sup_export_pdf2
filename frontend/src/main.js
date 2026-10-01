@@ -1,9 +1,13 @@
 import { createApp } from 'vue'
+import { createPinia } from 'pinia'
 import App from './App.vue'
+import './style.css'
+import { initBridge } from './bridge/sketchup.js'
 
 const app = createApp(App)
+app.use(createPinia())
 app.mount('#app')
 
-// Legacy vanilla GUI (переносится по вкладкам) выполняется после монтирования Vue,
-// чтобы его getElementById/addEventListener находили элементы отрендеренного шаблона.
-import('./legacy/app.js')
+// Мост к Ruby (window.app.* + пульс активности + запрос getData);
+// в браузере отвечает dev-мок
+initBridge()

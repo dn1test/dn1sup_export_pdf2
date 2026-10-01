@@ -1,16 +1,20 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Проверка консистентности фронтенда и Ruby-бэкенда DN1C Export PDF 2:
+# Проверка консистентности фронтенда (Vue 3 + Pinia) и Ruby-бэкенда
+# DN1C Export PDF 2:
 #
-# 1. Мёртвые id: ссылки els.xxx = document.getElementById("...") в app.js,
-#    которым нет соответствующего элемента ни в одном Vue-компоненте
-#    (и в собранном dialog/html/index.html).
-# 2. Ключи pdf_settings, отправляемые collectFormData / dev-моком getData,
+# 1. Ключи pdf_settings, собираемые bridge/payload.js (collectFormData),
 #    должны входить в белый список Ruby (PDF_SETTINGS_ALLOWED) — иначе
 #    sanitize_pdf_settings молча выбросит значение.
-# 3. Ключи dev-мока getData должны совпадать с реальными ключами бэкенда
-#    (default_pdf_settings), чтобы npm run dev не искажал поведение.
+# 2. Ключи pdf_settings dev-мока (bridge/mock.js, buildGetDataPayload)
+#    должны совпадать с реальными ключами бэкенда (default_pdf_settings),
+#    чтобы npm run dev не искажал поведение.
+# 3. Опции select-ов SettingsTab соответствуют Ruby-белым спискам значений.
+# 4. Все window.app.<fn>, которые дергает Ruby (execute_script в
+#    export_dialog.rb), определены в bridge/sketchup.js.
+# 5. Все callRuby("<action>") из фронтенда зарегистрированы в Ruby
+#    (add_action_callback в export_dialog.rb).
 #
 # Запуск отдельно:
 #   ruby -I dn1c_export_pdf2 dn1c_export_pdf2/test/test_frontend_consistency.rb
@@ -22,11 +26,14 @@ require_relative "../main"
 module DN1Code
   module ExportPdf2
     class FrontendConsistencyRunner
-      ROOT     = File.expand_path("../..", __dir__)
-      APP_JS   = File.join(ROOT, "frontend", "src", "legacy", "app.js")
-      VUE_DIR  = File.join(ROOT, "frontend", "src")
-      BUILT    = File.join(ROOT, "dn1c_export_pdf2", "dialog", "html", "index.html")
-      PD       = ::DN1Code::ExportPdf2::Model::ProjectData
+      ROOT       = File.expand_path("../..", __dir__)
+      SRC_DIR    = File.join(ROOT, "frontend", "src")
+      PAYLOAD_JS = File.join(SRC_DIR, "bridge", "payload.js")
+      MOCK_JS    = File.join(SRC_DIR, "bridge", "mock.js")
+      BRIDGE_JS  = File.join(SRC_DIR, "bridge", "sketchup.js")
+      DIALOG_RB  = File.join(ROOT, "dn1c_export_pdf2", "dialog", "export_dialog.rb")
+      SETTINGS_VUE = File.join(SRC_DIR, "components", "tabs", "SettingsTab.vue")
+      PD         = ::DN1Code::ExportPdf2::Model::ProjectData
 
       def initialize
         @passed = 0
@@ -43,78 +50,38 @@ module DN1Code
         end
       end
 
-      def app_js
-        @app_js ||= File.read(APP_JS, encoding: "utf-8")
-      end
-
-      def all_frontend_ids
-        return @all_ids if @all_ids
-
-        ids = Set.new
-        Dir.glob(File.join(VUE_DIR, "**", "*.vue")).each do |f|
-          File.read(f, encoding: "utf-8").scan(/\bid="([^"]+)"/) { |m| ids << Regexp.last_match(1) }
-        end
-        File.read(BUILT, encoding: "utf-8").scan(/\bid="([^"]+)"/) { |m| ids << Regexp.last_match(1) } if File.exist?(BUILT)
-        # index.html диалога (вне Vue) тоже источник id
-        app_js.scan(/getElementById\("([^"]+)"\)/) { |_| } # сами ссылки не считаем элементами
-        @all_ids = ids
+      def read(path)
+        File.read(path, encoding: "utf-8")
       end
 
       def run_all
-        require "set"
         puts "=========================================================="
         puts "  Консистентность фронтенда и Ruby-бэкенда"
         puts "=========================================================="
 
-        # --- 1. Мёртвые id ---
-        puts "\n--- 1. Ссылки els.* на несуществующие элементы ---"
-        referenced = {}
-        app_js.scan(/getElementById\("([^"]+)"\)/) { referenced[Regexp.last_match(1)] = true }
-        dead = referenced.keys.reject { |id| all_frontend_ids.include?(id) }
-        # id из legacy-разметки index.html диалога (не Vue) — проверяем и их
-        dialog_html = File.join(ROOT, "frontend", "index.html")
-        if File.exist?(dialog_html)
-          File.read(dialog_html, encoding: "utf-8").scan(/\bid="([^"]+)"/) { |m| dead.delete(Regexp.last_match(1)) }
-        end
-        # Мягкие ссылки: элементы удалены из UI, каждое обращение защищено
-        # проверкой на null с фолбэком на state — осознанный шаблон. Новые
-        # мёртвые id должны попадать сюда явно, иначе проверка падает.
-        soft_ok = %w[
-          selectImageAspect customAspectGroup inputAspectCustomW inputAspectCustomH
-          selectAnnotationFontSize
-          inputPrimaryColor primaryColorHex
-          selectPageSize selectCompression selectQuality selectFontFamily selectLayoutFontFamily
-          inputTags inputStatus scenesSplitResizer
-        ]
-        hard_dead = dead - soft_ok
-        assert(hard_dead.empty?, "нет мёртвых id вне известного мягкого списка: #{hard_dead.inspect}")
-        unlisted_soft = (dead & soft_ok)
-        puts "  [INFO] мягкие ссылки с фолбэком (ok, #{unlisted_soft.size} шт.): #{unlisted_soft.sort.inspect}"
+        payload_js = read(PAYLOAD_JS)
+        mock_js    = read(MOCK_JS)
+        bridge_js  = read(BRIDGE_JS)
+        dialog_rb  = read(DIALOG_RB)
 
-        # --- 2. Ключи collectFormData входят в белый список Ruby ---
-        puts "\n--- 2. Ключи collectFormData vs PDF_SETTINGS_ALLOWED ---"
+        # --- 1. Ключи collectFormData входят в белый список Ruby ---
+        puts "\n--- 1. Ключи payload.js (collectFormData) vs PDF_SETTINGS_ALLOWED ---"
         allowed = PD::PDF_SETTINGS_ALLOWED + [:custom_layouts]
-        # Вырезаем блок state.pdf_settings = { ... } именно внутри collectFormData
-        cf_start = app_js.index("function collectFormData")
-        block = ""
-        if cf_start
-          ps_start = app_js.index("state.pdf_settings = {", cf_start)
-          block = brace_block(app_js, ps_start + "state.pdf_settings = ".length) if ps_start
-        end
-        js_keys = block.scan(/^(\s+)(\w+):/).select { |ind, _| ind.length == 6 }.map { |_, k| k.to_sym }.uniq
+        ps_start = payload_js.index("const outPdfSettings = {")
+        assert(ps_start, "payload.js: найден блок outPdfSettings")
+        block = ps_start ? brace_block(payload_js, payload_js.index("{", ps_start)) : ""
+        js_keys = top_level_keys(block)
         missing = js_keys - allowed
-        assert(!js_keys.empty?, "collectFormData: блок pdf_settings найден (#{js_keys.size} ключей)")
+        assert(!js_keys.empty?, "payload.js: блок pdf_settings найден (#{js_keys.size} ключей)")
         assert(missing.empty?,
                "все ключи collectFormData принимает Ruby-белый список; лишние: #{missing.inspect}")
+        assert(!block.match?(/page_size:\s*"A3"/),
+               "page_size не захардкожен в payload.js (читается из settings-стора)")
 
-        # --- 3. Ключи dev-мока getData ---
-        puts "\n--- 3. Dev-мок getData vs реальные ключи бэкенда ---"
-        mock_start = app_js.index('if (action === "getData")')
-        mock_block = ""
-        if mock_start
-          ps_start = app_js.index("pdf_settings: {", mock_start)
-          mock_block = brace_block(app_js, ps_start + "pdf_settings: ".length) if ps_start
-        end
+        # --- 2. Ключи dev-мока getData ---
+        puts "\n--- 2. Dev-мок getData vs реальные ключи бэкенда ---"
+        mock_start = mock_js.index("pdf_settings: {")
+        mock_block = mock_start ? brace_block(mock_js, mock_start) : ""
         mock_keys = top_level_keys(mock_block)
         defaults = PD.new.send(:default_pdf_settings).keys
         wrong_keys = mock_keys - defaults
@@ -124,45 +91,46 @@ module DN1Code
         assert(mock_keys.include?(:render_quality), "dev-мок отдаёт render_quality (не 'quality')")
         assert(mock_keys.include?(:save_skp_backup), "dev-мок отдаёт save_skp_backup (не 'save_backup')")
 
-        # --- 4. Опции UI-списков соответствуют Ruby-белым спискам ---
-        puts "\n--- 4. Опции select vs Ruby-белые списки ---"
-        settings_vue = File.join(VUE_DIR, "components", "SettingsTab.vue")
-        if File.exist?(settings_vue)
-          src = File.read(settings_vue, encoding: "utf-8")
+        # --- 3. Опции UI-списков соответствуют Ruby-белым спискам ---
+        puts "\n--- 3. Опции select vs Ruby-белые списки ---"
+        assert(File.exist?(SETTINGS_VUE), "SettingsTab.vue найден")
+        if File.exist?(SETTINGS_VUE)
+          src = read(SETTINGS_VUE)
           %w[landscape portrait].each do |v|
-            assert(src.include?("\"#{v}\"") || src.include?("'#{v}'") || src.include?("value=\"#{v}\""),
+            assert(src.include?("value=\"#{v}\"") || src.include?("'#{v}'"),
                    "SettingsTab: page_layout предлагает #{v}")
           end
           assert(src =~ /value="A3"/, "SettingsTab: page_size предлагает A3")
           %w[low medium high].each do |v|
-            assert(src.include?(v), "SettingsTab: render_quality предлагает #{v}")
+            assert(src.include?("value=\"#{v}\""), "SettingsTab: render_quality предлагает #{v}")
           end
           %w[png jpg].each do |v|
-            assert(src.include?("value=\"#{v}\"") || src.include?("'#{v}'"),
-                   "SettingsTab: image_format предлагает #{v}")
+            assert(src.include?("value=\"#{v}\""), "SettingsTab: image_format предлагает #{v}")
           end
           %w[image hybrid].each do |v|
-            assert(src.include?("\"#{v}\"") || src.include?("'#{v}'"),
-                   "SettingsTab: layout_render_mode предлагает #{v}")
+            assert(src.include?("value=\"#{v}\""), "SettingsTab: layout_render_mode предлагает #{v}")
           end
-        else
-          assert(false, "SettingsTab.vue найден")
         end
 
-        # --- 5. page_size больше не захардкожен в collectFormData ---
-        puts "\n--- 5. collectFormData: page_size из выпадающего списка ---"
-        assert(!block.match?(/^\s{6}page_size: "A3",$/),
-               "page_size не захардкожен в collectFormData (читается из selectPageSize)")
+        # --- 4. Ruby → JS: все window.app.<fn> определены в мосте ---
+        puts "\n--- 4. execute_script(window.app.*) vs bridge/sketchup.js ---"
+        ruby_fns = dialog_rb.scan(/window\.app\.(\w+)/).flatten.uniq
+        assert(!ruby_fns.empty?, "export_dialog.rb: найдены вызовы window.app.* (#{ruby_fns.size} шт.)")
+        js_fns = bridge_js.scan(/^\s{4}(\w+)\(/).flatten.uniq
+        undefined = ruby_fns - js_fns
+        assert(undefined.empty?,
+               "все window.app.* из Ruby определены в мосте; отсутствуют: #{undefined.inspect}")
 
-        # --- 6. Обёртки ui.scenes строятся с текущими объектами state.scenes ---
-        puts "\n--- 6. renderScenesTable: обёртки сцен без устаревших ссылок ---"
-        rs_start = app_js.index("function renderScenesTable")
-        assign = app_js.index("ui.scenes = scenes.map", rs_start) if rs_start
-        rs_block = assign ? brace_block(app_js, app_js.index("{", assign)) : ""
-        assert(!rs_block.empty?, "renderScenesTable: найдено присваивание ui.scenes = scenes.map(...)")
-        assert(!rs_block.include?("prev"), "обёртки сцен не переиспользуют prev (устаревшие item после onScenesRefreshed ломали галочки «Вкл»)")
-        assert(rs_block.include?("uid:") && rs_block.include?("item"),
-               "обёртки сцен содержат стабильный uid (ключ v-for) и текущий item")
+        # --- 5. JS → Ruby: все callRuby-действия зарегистрированы ---
+        puts "\n--- 5. callRuby(...) vs add_action_callback ---"
+        frontend_actions = Dir.glob(File.join(SRC_DIR, "**", "*.{js,vue}")).flat_map do |f|
+          read(f).scan(/callRuby\(\s*["'](\w+)["']/)
+        end.flatten.uniq.sort
+        ruby_actions = dialog_rb.scan(/add_action_callback\(["'](\w+)["']/).flatten.uniq
+        assert(!frontend_actions.empty?, "фронтенд: найдены вызовы callRuby (#{frontend_actions.size} шт.)")
+        unregistered = frontend_actions - ruby_actions
+        assert(unregistered.empty?,
+               "все callRuby-действия зарегистрированы в Ruby; незарегистрированные: #{unregistered.inspect}")
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"
@@ -176,7 +144,6 @@ module DN1Code
       def top_level_keys(block)
         first = block.scan(/^(\s+)(\w+):/).first
         return [] unless first
-
         indent = first[0]
         block.scan(/^(#{Regexp.escape(indent)})(\w+):/).map { |_, k| k.to_sym }.uniq
       end

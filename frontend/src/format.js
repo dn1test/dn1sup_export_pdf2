@@ -1,5 +1,8 @@
-// Общие утилиты форматирования, используются и legacy-кодом, и Vue-компонентами.
+// Общие утилиты форматирования
 import { locale, t } from './i18n/index.js'
+import {
+  FileText, Image as ImageIcon, Ruler, Table2, File as FileIcon,
+} from '@lucide/vue'
 
 export function formatFileSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -9,18 +12,22 @@ export function formatFileSize(bytes) {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(1)) + ' ' + sizes[i]
 }
 
-export function getDocIcon(ext) {
-  ext = (ext || '').toUpperCase()
-  if (ext === 'PDF') return '<i class="modus-icons">file_template</i>'
-  if (ext === 'DWG' || ext === 'DXF') return '<i class="modus-icons">views</i>'
-  if (ext === 'SKP') return '<i class="modus-icons">views</i>'
-  if (ext === 'DOC' || ext === 'DOCX' || ext === 'TXT' || ext === 'RTF') return '<i class="modus-icons">short_text</i>'
-  if (ext === 'XLS' || ext === 'XLSX' || ext === 'CSV') return '<i class="modus-icons">table</i>'
-  return '<i class="modus-icons">file</i>'
+// Иконка файла по расширению (компонент lucide)
+export function docIcon(ext) {
+  const e = String(ext || '').toUpperCase()
+  if (e === 'PDF') return FileText
+  if (e === 'DWG' || e === 'DXF' || e === 'SKP') return Ruler
+  if (e === 'DOC' || e === 'DOCX' || e === 'TXT' || e === 'RTF') return FileText
+  if (e === 'XLS' || e === 'XLSX' || e === 'CSV') return Table2
+  if (isImageExt(e)) return ImageIcon
+  return FileIcon
 }
 
-// Плюрализация для счётчика файлов: русская (1 файл / 2-4 файла / 5 файлов)
-// и английская (1 file / N files) ветки
+export function isImageExt(ext) {
+  return ['JPG', 'JPEG', 'PNG', 'WEBP', 'GIF', 'BMP', 'TIF', 'TIFF'].includes(String(ext || '').toUpperCase())
+}
+
+// Плюрализация для счётчика файлов
 export function pluralFiles(n) {
   if (locale.value === 'en') {
     return n === 1 ? t('plural.fileOne') : t('plural.fileMany')
@@ -29,7 +36,3 @@ export function pluralFiles(n) {
   if (n >= 2 && n <= 4) return t('plural.fileFew')
   return t('plural.fileMany')
 }
-
-// Крестик удаления в стиле Modus (иконка из шрифта)
-export const MODUS_CROSS_SVG =
-  '<i class="modus-icons icon-close-cross" style="font-size: 11px;">content_close</i>'
