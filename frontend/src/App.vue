@@ -3,7 +3,7 @@
     <AppHeader />
 
     <!-- Навигация по вкладкам: рабочие вкладки слева, «Настройки» и «Отправка» — группа справа -->
-    <nav class="flex shrink-0 items-stretch gap-0.5 overflow-x-auto border-b border-ink-200 bg-white px-2">
+    <nav class="flex shrink-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden border-b border-ink-200 bg-white px-2">
       <template v-for="tab in tabs" :key="tab.id">
         <span
           v-if="tab.id === 'tab-settings'"
@@ -12,7 +12,7 @@
         />
         <button
           type="button"
-          class="relative flex shrink-0 cursor-pointer items-center gap-1.5 px-3 py-2 text-[13px] font-medium whitespace-nowrap transition-colors"
+          class="relative flex shrink-0 cursor-pointer items-center gap-1.5 px-3 py-2.5 text-[13px] font-medium whitespace-nowrap transition-colors"
           :class="app.activeTab === tab.id ? 'text-accent-700' : 'text-ink-500 hover:text-ink-800'"
           @click="app.switchTab(tab.id)"
         >
@@ -26,7 +26,7 @@
           >{{ scenes.activeCount }}</span>
           <span
             v-if="app.activeTab === tab.id"
-            class="absolute right-2 -bottom-px left-2 h-0.5 rounded-full bg-accent-600"
+            class="absolute right-2 bottom-0 left-2 h-0.5 rounded-full bg-accent-600"
           />
         </button>
       </template>

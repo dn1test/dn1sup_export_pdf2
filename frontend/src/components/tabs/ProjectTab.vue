@@ -4,14 +4,14 @@
     <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
       <UiCard :title="t('project.title')">
         <template #icon><ClipboardListIcon :size="14" /></template>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
-          <UiField class="sm:col-span-2" :label="t('project.furnitureLabel')">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <UiField class="sm:col-span-3" :label="t('project.furnitureLabel')">
             <UiInput v-model="project.project.product" :placeholder="t('project.furniturePh')" @update:model-value="notifyChange()" />
           </UiField>
-          <UiField :label="t('project.roomLabel')">
+          <UiField class="sm:col-span-1" :label="t('project.roomLabel')">
             <UiInput v-model="project.project.place" :placeholder="t('project.roomPh')" @update:model-value="notifyChange()" />
           </UiField>
-          <UiField :label="t('project.addressLabel')">
+          <UiField class="sm:col-span-2" :label="t('project.addressLabel')">
             <UiInput v-model="project.project.adress" :placeholder="t('project.addressPh')" @update:model-value="notifyChange()" />
           </UiField>
         </div>
@@ -52,39 +52,93 @@
       <template #icon><ClockIcon :size="14" /></template>
       <div class="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_300px]">
         <!-- Левая колонка: параметры -->
-        <div class="grid grid-cols-2 gap-x-3 gap-y-3 p-3.5">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3 p-3.5">
+          <!-- Автор / Конструктор -->
           <UiField :label="t('workflow.authorLabel')">
             <UiInput v-model="project.workflow.author" :placeholder="t('workflow.authorPh')" @update:model-value="notifyChange()" />
           </UiField>
-          <UiField :label="t('workflow.priceLabel')">
-            <UiInput v-model="project.workflow.price" :placeholder="t('workflow.pricePh')" @update:model-value="notifyChange()" />
+
+          <!-- Финансы: Стоимость + Ставка -->
+          <div class="flex items-end gap-2">
+            <UiField class="flex-1 min-w-0" :label="t('workflow.priceLabel')">
+              <UiInput v-model="project.workflow.price" :placeholder="t('workflow.pricePh')" @update:model-value="notifyChange()" />
+            </UiField>
+            <UiField class="w-28 shrink-0" :label="t('workflow.rateLabel')">
+              <div class="flex items-center gap-1">
+                <UiInput v-model="project.workflow.rate" class="text-right" :placeholder="t('workflow.rateShortPh')" @update:model-value="notifyChange()" />
+                <span class="text-[11px] text-ink-400 shrink-0">₽/ч</span>
+              </div>
+            </UiField>
+          </div>
+
+          <!-- Сроки проекта: Начало — Сдача (объединённый блок) -->
+          <UiField :label="t('workflow.datesGroupLabel')">
+            <div class="flex items-center gap-1.5">
+              <UiDateField
+                v-model="project.workflow.start_date"
+                class="flex-1 min-w-0"
+                :title="t('workflow.startDate')"
+                :placeholder="t('workflow.startDatePh')"
+                :pick-title="t('workflow.pickDate')"
+                @update:model-value="notifyChange()"
+              />
+              <span class="text-ink-400 font-medium px-0.5 select-none shrink-0" title="—">—</span>
+              <UiDateField
+                v-model="project.workflow.end_date"
+                class="flex-1 min-w-0"
+                :title="t('workflow.endDate')"
+                :placeholder="t('workflow.endDatePh')"
+                :pick-title="t('workflow.pickDate')"
+                @update:model-value="notifyChange()"
+              />
+            </div>
           </UiField>
-          <UiField :label="t('workflow.startDate')">
-            <UiDateField v-model="project.workflow.start_date" :placeholder="t('workflow.datePh')" :pick-title="t('workflow.pickDate')" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField :label="t('workflow.endDate')">
-            <UiDateField v-model="project.workflow.end_date" :placeholder="t('workflow.datePh')" :pick-title="t('workflow.pickDate')" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField :label="t('workflow.durationLabel')">
-            <UiInput v-model="project.workflow.total_duration" :placeholder="t('workflow.durationPh')" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField :label="t('workflow.rateLabel')">
-            <UiInput v-model="project.workflow.rate" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField :label="t('workflow.versionLabel')">
-            <UiInput v-model="project.workflow.version" type="number" min="1" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField :label="t('workflow.revisionLabel')">
-            <UiInput v-model="project.workflow.revision" type="number" min="1" @update:model-value="notifyChange()" />
-          </UiField>
-          <UiField class="col-span-2" :label="t('workflow.lastEditLabel')">
+
+          <!-- Версия / Ревизия (компактный блок) + Длительность проекта -->
+          <div class="flex items-end gap-2">
+            <UiField class="shrink-0" :label="t('workflow.verRevGroupLabel')">
+              <div class="flex items-center gap-1">
+                <div class="relative flex items-center">
+                  <span class="absolute left-1.5 text-[10px] font-semibold text-ink-400 select-none pointer-events-none">v.</span>
+                  <UiInput
+                    v-model="project.workflow.version"
+                    type="number"
+                    min="1"
+                    class="!w-[68px] pl-5 pr-1.5 text-center font-mono font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    :title="t('workflow.versionLabel')"
+                    @update:model-value="notifyChange()"
+                  />
+                </div>
+                <span class="text-ink-300 font-mono text-xs select-none">#</span>
+                <div class="relative flex items-center">
+                  <span class="absolute left-1.5 text-[10px] font-semibold text-ink-400 select-none pointer-events-none">r.</span>
+                  <UiInput
+                    v-model="project.workflow.revision"
+                    type="number"
+                    min="1"
+                    class="!w-[68px] pl-5 pr-1.5 text-center font-mono font-medium [appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none"
+                    :title="t('workflow.revisionLabel')"
+                    @update:model-value="notifyChange()"
+                  />
+                </div>
+              </div>
+            </UiField>
+            <UiField class="flex-1 min-w-0" :label="t('workflow.durationLabel')">
+              <UiInput v-model="project.workflow.total_duration" :placeholder="t('workflow.durationPh')" @update:model-value="notifyChange()" />
+            </UiField>
+          </div>
+
+          <!-- Комментарий к последней правке -->
+          <UiField class="sm:col-span-2" :label="t('workflow.lastEditLabel')">
             <UiInput v-model="project.lastEdit" :placeholder="t('workflow.lastEditPh')" @update:model-value="notifyChange()" />
           </UiField>
-          <UiField class="col-span-1" :label="t('workflow.materialsLabel')">
-            <UiTextarea v-model="project.project.materials" :rows="6" :placeholder="t('workflow.materialsPh')" @update:model-value="onSpecsChanged" />
+
+          <!-- Спецификации -->
+          <UiField class="sm:col-span-1" :label="t('workflow.materialsLabel')">
+            <UiTextarea v-model="project.project.materials" :rows="4" :placeholder="t('workflow.materialsPh')" @update:model-value="onSpecsChanged" />
           </UiField>
-          <UiField class="col-span-1" :label="t('workflow.lightingLabel')">
-            <UiTextarea v-model="project.project.lighting" :rows="6" :placeholder="t('workflow.lightingPh')" @update:model-value="onSpecsChanged" />
+          <UiField class="sm:col-span-1" :label="t('workflow.lightingLabel')">
+            <UiTextarea v-model="project.project.lighting" :rows="4" :placeholder="t('workflow.lightingPh')" @update:model-value="onSpecsChanged" />
           </UiField>
         </div>
 
