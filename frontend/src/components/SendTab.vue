@@ -4,17 +4,17 @@
     <div class="settings-card">
       <div class="card-header">
         <span class="card-header-icon"><i class="modus-icons">file_upload</i></span>
-        <span class="card-header-title">Отправка проекта</span>
+        <span class="card-header-title">{{ t('send.title') }}</span>
       </div>
-      <p class="field-hint">Подготовка WebP-снимков страниц и отправка проекта адресатам веб-интеграции:</p>
+      <p class="field-hint">{{ t('send.hint') }}</p>
       <button
         type="button"
         class="btn btn-success"
         id="btnStartSend"
-        title="Подготовить WebP-снимки и отправить проект адресатам"
+        :title="t('send.sendTitle')"
         @click="send"
       >
-        <i class="modus-icons">file_upload</i> Отправить
+        <i class="modus-icons">file_upload</i> {{ t('send.sendBtn') }}
       </button>
     </div>
 
@@ -22,16 +22,16 @@
     <div class="settings-card">
       <div class="card-header">
         <span class="card-header-icon"><i class="modus-icons">insert_photo</i></span>
-        <span class="card-header-title">Снимки страниц (WebP)</span>
+        <span class="card-header-title">{{ t('send.webpTitle') }}</span>
       </div>
       <div class="form-grid">
         <div class="form-group" id="webpQualityGroup">
-          <label for="selectWebpQuality">Качество WebP</label>
+          <label for="selectWebpQuality">{{ t('send.webpQualityLabel') }}</label>
           <select id="selectWebpQuality" class="form-control">
-            <option value="75">75 — компактнее</option>
-            <option value="85" selected>85 — рекомендуемое</option>
-            <option value="95">95 — выше качество</option>
-            <option value="lossless">Lossless — без потерь</option>
+            <option value="75">{{ t('send.webp75') }}</option>
+            <option value="85" selected>{{ t('send.webp85') }}</option>
+            <option value="95">{{ t('send.webp95') }}</option>
+            <option value="lossless">{{ t('send.webpLossless') }}</option>
           </select>
           <span id="hintWebpFormat" class="field-hint"></span>
         </div>
@@ -43,16 +43,16 @@
       <div class="card-header">
         <div class="card-header-title-wrap">
           <span class="card-header-icon"><i class="modus-icons">browser</i></span>
-          <span class="card-header-title">Адресаты веб-интеграции (api_targets)</span>
+          <span class="card-header-title">{{ t('send.targetsTitle') }}</span>
         </div>
         <button type="button" class="btn btn-xs btn-primary" @click="addTarget">
-          <i class="modus-icons">add_circle</i> + Добавить URL
+          <i class="modus-icons">add_circle</i> {{ t('send.addBtn') }}
         </button>
       </div>
-      <p class="field-hint">Список адресатов веб-интеграции для отправки и синхронизации данных проекта:</p>
+      <p class="field-hint">{{ t('send.targetsHint') }}</p>
       <div class="api-targets-container">
         <div v-if="!ui.apiTargets.length" class="empty-targets-placeholder">
-          Адресаты API не заданы. Нажмите «+ Добавить URL», чтобы добавить адрес веб-интеграции.
+          {{ t('send.targetsEmpty') }}
         </div>
         <div v-for="(url, index) in ui.apiTargets" :key="'t' + index" class="api-target-card">
           <span class="api-target-icon"><i class="modus-icons">web_link</i></span>
@@ -62,11 +62,11 @@
             type="text"
             class="form-control api-target-input"
             placeholder="https://domain.com/api/projects?token=..."
-            title="URL адресата веб-интеграции"
+            :title="t('send.urlTitle')"
             @input="commit(false)"
             @change="commit(true)"
           >
-          <button type="button" class="btn-icon btn-delete" title="Удалить этот адрес API" @click="removeTarget(index)">
+          <button type="button" class="btn-icon btn-delete" :title="t('send.deleteTargetTitle')" @click="removeTarget(index)">
             <i class="modus-icons icon-close-cross" style="font-size: 11px">content_close</i>
           </button>
         </div>
@@ -78,11 +78,12 @@
 <script setup>
 import { nextTick } from 'vue'
 import { ui } from '../store.js'
+import { t } from '../i18n/index.js'
 
 // trim=true — событие «change» (уход из поля): нормализуем значение как в оригинале
 function commit(trim) {
   if (trim) {
-    ui.apiTargets = ui.apiTargets.map((t) => String(t ?? '').trim())
+    ui.apiTargets = ui.apiTargets.map((u) => String(u ?? '').trim())
   }
   window.legacy?.commitApiTargets?.([...ui.apiTargets])
 }

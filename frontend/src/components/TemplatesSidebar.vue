@@ -3,16 +3,16 @@
     <div class="templates-sidebar-header">
       <div class="sidebar-title-group">
         <span class="sidebar-title-icon"><i class="modus-icons">dashboard_customize</i></span>
-        <span class="sidebar-title-text">Название шаблона</span>
+        <span class="sidebar-title-text">{{ t('tsb.title') }}</span>
       </div>
       <div class="sidebar-header-actions">
         <button
           type="button"
           class="btn btn-xs btn-primary btn-add-template"
-          title="Создать новый пользовательский шаблон страницы"
+          :title="t('tsb.newTitle')"
           @click="legacy('openNewTemplateModal')"
         >
-          <i class="modus-icons">add_circle</i> Новый
+          <i class="modus-icons">add_circle</i> {{ t('tsb.newBtn') }}
         </button>
       </div>
     </div>
@@ -36,13 +36,13 @@
           <button
             type="button"
             class="tpl-item-action-btn"
-            title="Переименовать шаблон"
+            :title="t('tsb.renameTitle')"
             @click.stop="legacy('openRenameTemplateModal', tpl.key)"
           ><i class="modus-icons" style="font-size: 14px">edit</i></button>
           <button
             type="button"
             class="tpl-item-action-btn delete"
-            title="Удалить шаблон"
+            :title="t('tsb.deleteTitle')"
             @click.stop="legacy('openDeleteTemplateModal', tpl.key)"
           ><i class="modus-icons" style="font-size: 14px">delete</i></button>
         </div>
@@ -54,25 +54,25 @@
       <div class="templates-sets-header">
         <div class="sidebar-title-group">
           <span class="sidebar-title-icon"><i class="modus-icons">layers</i></span>
-          <span class="templates-sets-title">Наборы шаблонов</span>
+          <span class="templates-sets-title">{{ t('tsb.setsTitle') }}</span>
         </div>
         <button
           type="button"
           class="btn btn-xs btn-secondary btn-icon-only"
-          title="Сохранить текущий список шаблонов как набор для быстрого переключения между проектами"
-          aria-label="Сохранить набор"
+          :title="t('tsb.saveSetTitle')"
+          :aria-label="t('tsb.saveSetAria')"
           @click="legacy('openSaveTemplateSetModal')"
         >
           <i class="modus-icons">save</i>
         </button>
       </div>
       <div class="templates-sets-list">
-        <div v-if="!ui.templateSets.length" class="template-set-empty">Нет сохраненных наборов</div>
+        <div v-if="!ui.templateSets.length" class="template-set-empty">{{ t('tsb.setsEmpty') }}</div>
         <div
           v-for="set in ui.templateSets"
           :key="set.name"
           class="template-set-item"
-          :title="`Загрузить набор «${set.name}» (текущие шаблоны будут заменены)`"
+          :title="t('tsb.setLoadTitle', { name: set.name })"
           @click="legacy('openConfirmTemplateSetModal', { type: 'load', name: set.name })"
         >
           <div class="tpl-item-text">
@@ -83,13 +83,13 @@
             <button
               type="button"
               class="tpl-item-action-btn refresh"
-              title="Обновить набор: перезаписать его текущим списком шаблонов"
+              :title="t('tsb.setRefreshTitle')"
               @click.stop="legacy('openConfirmTemplateSetModal', { type: 'refresh', name: set.name })"
             ><i class="modus-icons" style="font-size: 14px">refresh</i></button>
             <button
               type="button"
               class="tpl-item-action-btn delete"
-              title="Удалить набор"
+              :title="t('tsb.setDeleteTitle')"
               @click.stop="legacy('openConfirmTemplateSetModal', { type: 'delete', name: set.name })"
             ><i class="modus-icons" style="font-size: 14px">delete</i></button>
           </div>
@@ -101,6 +101,7 @@
 
 <script setup>
 import { ui } from '../store.js'
+import { t } from '../i18n/index.js'
 
 function legacy(fn, ...args) {
   window.legacy?.[fn]?.(...args)

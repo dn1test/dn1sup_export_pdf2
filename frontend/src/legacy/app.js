@@ -8,6 +8,7 @@
 ------------------------------------------------------------------------------- */
 
 import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../store.js";
+import { t, setLocale, locale } from "../i18n/index.js";
 
 (function () {
   "use strict";
@@ -184,46 +185,47 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
   };
 
   // Группы источников для диалога создания/редактирования параметра
+  // (подписи — из словаря i18n, пересобираются при каждом открытии модалки)
   function buildParamSources() {
     const groups = [
-      { title: "Данные проекта — Паспорт объекта", options: [
-        { value: "project.articul",        label: "🔖 Артикул проекта" },
-        { value: "project.furniture_name", label: "🪑 Изделие" },
-        { value: "project.room_name",      label: "🚪 Помещение / Место установки" },
-        { value: "project.address",        label: "📍 Адрес установки" },
-        { value: "project.materials",      label: "🧱 Материалы и фурнитура" },
-        { value: "project.lighting",       label: "💡 Подсветка и Техника" }
+      { title: t("srcGroup.projectPassport"), options: [
+        { value: "project.articul",        label: t("src.project.articul") },
+        { value: "project.furniture_name", label: t("src.project.furniture_name") },
+        { value: "project.room_name",      label: t("src.project.room_name") },
+        { value: "project.address",        label: t("src.project.address") },
+        { value: "project.materials",      label: t("src.project.materials") },
+        { value: "project.lighting",       label: t("src.project.lighting") }
       ] },
-      { title: "Данные проекта — Заказчик", options: [
-        { value: "customer.id",    label: "🆔 ID заказчика" },
-        { value: "customer.name",  label: "👤 Заказчик (контактное лицо)" },
-        { value: "project.company", label: "🏢 Название компании" },
-        { value: "customer.name_or_company", label: "🔄 Заказчик / Компания (по типу проекта)" },
-        { value: "customer.phone", label: "📞 Телефон" },
-        { value: "customer.email", label: "✉️ Email" }
+      { title: t("srcGroup.projectCustomer"), options: [
+        { value: "customer.id",    label: t("src.customer.id") },
+        { value: "customer.name",  label: t("src.customer.name") },
+        { value: "project.company", label: t("src.project.company") },
+        { value: "customer.name_or_company", label: t("src.customer.name_or_company") },
+        { value: "customer.phone", label: t("src.customer.phone") },
+        { value: "customer.email", label: t("src.customer.email") }
       ] },
-      { title: "Данные проекта — Ход работы", options: [
-        { value: "workflow.author",     label: "👷 Автор / Конструктор" },
-        { value: "workflow.price",      label: "💰 Стоимость проекта" },
-        { value: "workflow.start_date", label: "📅 Дата начала" },
-        { value: "workflow.end_date",   label: "📅 Дата сдачи" },
-        { value: "workflow.duration",   label: "⏱️ Длительность / Трудозатраты" },
-        { value: "workflow.rate",       label: "🧮 Ставка руб./час" },
-        { value: "workflow.version",    label: "🔢 Версия" },
-        { value: "workflow.revision",   label: "🏷️ Ревизия" },
-        { value: "workflow.date",       label: "🗓️ Дата" },
-        { value: "workflow.status",     label: "⏳ Статус" },
-        { value: "workflow.stadia",     label: "✅ Стадии проекта (чек-лист)" },
-        { value: "workflow.last_edit",  label: "📝 Последние изменения" },
-        { value: "workflow.history",    label: "📜 История правок" }
+      { title: t("srcGroup.projectWorkflow"), options: [
+        { value: "workflow.author",     label: t("src.workflow.author") },
+        { value: "workflow.price",      label: t("src.workflow.price") },
+        { value: "workflow.start_date", label: t("src.workflow.start_date") },
+        { value: "workflow.end_date",   label: t("src.workflow.end_date") },
+        { value: "workflow.duration",   label: t("src.workflow.duration") },
+        { value: "workflow.rate",       label: t("src.workflow.rate") },
+        { value: "workflow.version",    label: t("src.workflow.version") },
+        { value: "workflow.revision",   label: t("src.workflow.revision") },
+        { value: "workflow.date",       label: t("src.workflow.date") },
+        { value: "workflow.status",     label: t("src.workflow.status") },
+        { value: "workflow.stadia",     label: t("src.workflow.stadia") },
+        { value: "workflow.last_edit",  label: t("src.workflow.last_edit") },
+        { value: "workflow.history",    label: t("src.workflow.history") }
       ] },
-      { title: "Сцена", options: [
-        { value: "scene.name",        label: "📐 Название сцены" },
-        { value: "scene.description", label: "📝 Описание сцены" }
+      { title: t("srcGroup.scene"), options: [
+        { value: "scene.name",        label: t("src.scene.name") },
+        { value: "scene.description", label: t("src.scene.description") }
       ] },
-      { title: "Страница", options: [
-        { value: "page.number_total", label: "📄 Страница | Страниц" },
-        { value: "page.toc",          label: "📑 Содержание (список страниц)" }
+      { title: t("srcGroup.page"), options: [
+        { value: "page.number_total", label: t("src.page.number_total") },
+        { value: "page.toc",          label: t("src.page.toc") }
       ] }
     ];
 
@@ -233,11 +235,11 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     const dirOptions = [];
     dirs.forEach((d, idx) => {
       if (!d) return;
-      const t = tval(d.title) || getFolderName(d.path) || `Раздел #${idx + 1}`;
-      dirOptions.push({ value: `dir.${idx}.line`, label: `📁 ${t}` });
+      const dirTitle = tval(d.title) || getFolderName(d.path) || t("src.dir.section", { n: idx + 1 });
+      dirOptions.push({ value: `dir.${idx}.line`, label: `📁 ${dirTitle}` });
     });
     if (dirOptions.length > 0) {
-      groups.splice(3, 0, { title: "Папки спецификации", options: dirOptions });
+      groups.splice(3, 0, { title: t("srcGroup.directories"), options: dirOptions });
     }
     return groups;
   }
@@ -249,9 +251,11 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     if (m) {
       const idx = parseInt(m[1], 10);
       const d = (state.directories || [])[idx];
-      const t = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
-      if (m[2] === "line") return `📁 ${t}`;
-      return m[2] === "title" ? `📁 ${t} — название` : `📁 ${t} — спецификация`;
+      const dirTitle = (d && (tval(d.title) || getFolderName(d.path))) || t("src.dir.section", { n: idx + 1 });
+      if (m[2] === "line") return `📁 ${dirTitle}`;
+      return m[2] === "title"
+        ? t("src.dir.titleSuffix", { name: dirTitle })
+        : t("src.dir.descSuffix", { name: dirTitle });
     }
     for (const g of buildParamSources()) {
       const opt = g.options.find((o) => o.value === s);
@@ -262,37 +266,11 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
 
   // Авто-подпись параметра на листе: короткие печатные формулировки для
   // чекбокса «Заголовок», когда текст подписи (label) не задан вручную.
-  // Зеркало AUTO_PARAM_LABELS в service/layout_builder.rb — держать синхронно.
-  const AUTO_PARAM_LABELS = {
-    "project.articul":      "Артикул",
-    "project.furniture_name": "Изделие",
-    "project.room_name":    "Помещение",
-    "project.address":      "Адрес",
-    "project.company":      "Компания",
-    "project.materials":    "Материалы и фурнитура",
-    "project.lighting":     "Подсветка и Техника",
-    "customer.id":          "ID заказчика",
-    "customer.name":        "Заказчик",
-    "customer.phone":       "Телефон",
-    "customer.email":       "Email",
-    "workflow.author":      "Автор",
-    "workflow.price":       "Стоимость",
-    "workflow.start_date":  "Дата начала",
-    "workflow.end_date":    "Дата сдачи",
-    "workflow.duration":    "Длительность",
-    "workflow.rate":        "Ставка руб./час",
-    "workflow.version":     "Версия",
-    "workflow.revision":    "Ревизия",
-    "workflow.date":        "Дата",
-    "workflow.status":      "Статус",
-    "workflow.stadia":      "Стадии проекта",
-    "workflow.last_edit":   "Последние изменения",
-    "workflow.history":     "История правок",
-    "scene.name":           "Сцена",
-    "scene.description":    "Описание",
-    "page.number_total":    "Страница",
-    "page.toc":             "Содержание"
-  };
+  // Зеркало AUTO_PARAM_LABELS в service/layout_builder.rb (печатные подписи PDF
+  // остаются на русском; в GUI подписи берутся из словаря текущей локали).
+  function autoParamLabel(source) {
+    return t(`auto.${tval(source)}`);
+  }
 
   // Эффективная подпись параметра: заданный label, иначе авто-подпись из
   // источника; для папок спецификаций — название раздела (dir.N.line без
@@ -305,16 +283,19 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     // Условный источник «Заказчик / Компания»: подпись тоже условная —
     // коммерческий проект печатает «Компания», бытовой — «Заказчик»
     if (s === "customer.name_or_company") {
-      return getTradeValue() === "1" ? "Компания" : "Заказчик";
+      return getTradeValue() === "1"
+        ? t("auto.customer.name_or_company.company")
+        : t("auto.customer.name_or_company.customer");
     }
-    if (AUTO_PARAM_LABELS[s]) return AUTO_PARAM_LABELS[s];
+    const auto = autoParamLabel(s);
+    if (auto !== `auto.${s}`) return auto;
     const m = s.match(/^dir\.(\d+)\.(title|description|line)$/);
     if (m) {
       if (m[2] === "line") return "";
       const idx = parseInt(m[1], 10);
       const d = (state.directories || [])[idx];
-      const base = (d && (tval(d.title) || getFolderName(d.path))) || `Раздел #${idx + 1}`;
-      return m[2] === "title" ? `${base} — название` : `${base} — спецификация`;
+      const base = (d && (tval(d.title) || getFolderName(d.path))) || t("src.dir.section", { n: idx + 1 });
+      return m[2] === "title" ? t("src.dir.titleSuffix", { name: base }) : t("src.dir.descSuffix", { name: base });
     }
     return "";
   }
@@ -382,7 +363,7 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
       }
       case "page.number_total":
         // Нумерация известна только при экспорте — в превью условный образец
-        return "Страница 1 | N";
+        return t("auto.page.numberPreview");
       case "page.toc": {
         const sc = (state.scenes || []).filter((x) => x.enabled !== false);
         return sc.length > 0 ? sc.map((x, i) => `${i + 1}. ${x.name}`).join("\n") : "";
@@ -493,15 +474,13 @@ import { ui, showToast as uiShowToast, nextDirUid, defaultDirPreview } from "../
     state.pdf_settings.custom_layouts[key].params.push(group);
     renderTemplateSettingsList();
     notifyChange();
-    showNotification(dir === "vertical"
-      ? "Вертикальный блок создан — перетащите в него параметры"
-      : "Блок создан — перетащите в него параметры", "success");
+    showNotification(t(dir === "vertical" ? "toast.groupVCreated" : "toast.groupHCreated"), "success");
   }
 
   // Название зоны размещения параметра (для сводки в строке)
   function paramZoneLabel(p) {
-    const h = p.align === "center" ? "По центру" : (p.align === "right" ? "Справа" : "Слева");
-    const v = p.valign === "bottom" ? "внизу" : (p.valign === "center" ? "в середине" : "вверху");
+    const h = t(p.align === "center" ? "zone.h.center" : (p.align === "right" ? "zone.h.right" : "zone.h.left"));
+    const v = t(p.valign === "bottom" ? "zone.v.bottom" : (p.valign === "center" ? "zone.v.center" : "zone.v.top"));
     return `${h} ${v}`;
   }
 
@@ -662,6 +641,9 @@ const DEFAULT_LAYOUTS = {
     chkAutoOpen: document.getElementById("chkAutoOpen"),
     chkSaveBackup: document.getElementById("chkSaveBackup"),
     chkAntialias: document.getElementById("chkAntialias"),
+
+    // Язык интерфейса: тумблер RU|EN в шапке (id selectLanguage — обёртка с кнопками data-lang)
+    selectLanguage: document.getElementById("selectLanguage"),
 
     // Tab 4 Elements
     // История рендерится Vue-компонентом HistoryTab.vue
@@ -1157,13 +1139,13 @@ const DEFAULT_LAYOUTS = {
       const matching = scenes.filter((s) => s.page_type === tplKey);
       if (matching.length > 0) {
         const names = matching.map((s) => s.name).join(", ");
-        badge.textContent = `Используется: ${names}`;
-        badge.title = `Сцены SketchUp, использующие этот шаблон: ${names}`;
+        badge.textContent = t("tpl.usageScenes", { names });
+        badge.title = t("tpl.usageScenesTitle", { names });
         badge.classList.remove("empty-usage");
         badge.style.display = "flex";
       } else {
-        badge.textContent = "Не привязан к сценам";
-        badge.title = "Данный шаблон сейчас не назначен ни одной из сцен SketchUp";
+        badge.textContent = t("tpl.usageEmpty");
+        badge.title = t("tpl.usageEmptyTitle");
         badge.classList.add("empty-usage");
         badge.style.display = "flex";
       }
@@ -1195,15 +1177,15 @@ const DEFAULT_LAYOUTS = {
     statusEl.classList.remove("saving", "error");
     if (status === "saving") {
       statusEl.classList.add("saving");
-      if (textEl) textEl.textContent = text || "Сохранение...";
-      statusEl.title = "Выполняется автосохранение параметров в YAML...";
+      if (textEl) textEl.textContent = text || t("footer.autosaveSaving");
+      statusEl.title = t("footer.autosaveSavingTitle");
     } else if (status === "saved") {
-      if (textEl) textEl.textContent = text || "Сохранено";
-      statusEl.title = `Изменения сохранены: ${text || ""}`.trim();
+      if (textEl) textEl.textContent = text || t("footer.autosaveSaved");
+      statusEl.title = t("footer.autosaveSavedTitle", { text: text || "" });
     } else if (status === "error") {
       statusEl.classList.add("error");
-      if (textEl) textEl.textContent = text || "Ошибка автосохранения";
-      statusEl.title = "Не удалось сохранить файл YAML";
+      if (textEl) textEl.textContent = text || t("footer.autosaveError");
+      statusEl.title = t("footer.autosaveErrorTitle");
     }
   }
 
@@ -1223,12 +1205,12 @@ const DEFAULT_LAYOUTS = {
       }
     } catch (err) {
       console.error("flushAutoSave error:", err);
-      updateAutoSaveIndicator("error", "Ошибка автосохранения");
+      updateAutoSaveIndicator("error", t("footer.autosaveError"));
     }
   }
 
   function triggerAutoSave() {
-    updateAutoSaveIndicator("saving", "Сохранение...");
+    updateAutoSaveIndicator("saving", t("footer.autosaveSaving"));
     clearTimeout(autoSaveTimer);
     autoSaveTimer = setTimeout(() => {
       flushAutoSave();
@@ -1330,7 +1312,7 @@ const DEFAULT_LAYOUTS = {
       const name = tplObj._name || tplObj.name ||
                    state.pdf_settings?.template_names?.[key] ||
                    (DEFAULT_LAYOUTS[key] && DEFAULT_LAYOUTS[key].name) ||
-                   `Шаблон (${key})`;
+                   t("tpl.fallbackName", { key });
       const description = tplObj._description || tplObj.description || "";
 
       return {
@@ -1353,7 +1335,7 @@ const DEFAULT_LAYOUTS = {
     const name = custom._name || custom.name ||
                  state.pdf_settings?.template_names?.[tplKey] ||
                  (DEFAULT_LAYOUTS[tplKey] && DEFAULT_LAYOUTS[tplKey].name) ||
-                 `Шаблон (${tplKey})`;
+                 t("tpl.fallbackName", { key: tplKey });
     const description = custom._description || custom.description || "";
 
     return {
@@ -1376,8 +1358,11 @@ const DEFAULT_LAYOUTS = {
     ui.templates = templates.map((tpl) => {
       const matchingScenes = scenes.filter((s) => s.page_type === tpl.key);
       const usageText = matchingScenes.length > 0
-        ? `${matchingScenes.length} ${matchingScenes.length === 1 ? "сцена" : (matchingScenes.length < 5 ? "сцены" : "сцен")}`
-        : "не используется";
+        ? (locale.value === "en"
+            ? t("tpl.usageScene1", { n: matchingScenes.length })
+            : t(matchingScenes.length === 1 ? "tpl.usageScene1"
+              : (matchingScenes.length < 5 ? "tpl.usageScene2" : "tpl.usageScene5"), { n: matchingScenes.length }))
+        : t("tpl.notUsed");
       // Второй строкой — описание шаблона (мелче); без описания — использование
       const subText = tpl.description || usageText;
       return { key: tpl.key, name: tpl.name, description: tpl.description || "", sub: subText, active: tpl.key === currentKey };
@@ -1468,7 +1453,7 @@ const DEFAULT_LAYOUTS = {
     selectTemplate(newKey);
     renderScenesTable();
     notifyChange();
-    showNotification(`Шаблон «${trimmedName}» успешно создан`, "success");
+    showNotification(t("toast.templateCreated", { name: trimmedName }), "success");
   }
 
   function openDeleteTemplateModal(tplKey) {
@@ -1529,7 +1514,9 @@ const DEFAULT_LAYOUTS = {
       updateLayoutUsageBadge();
     }
     notifyChange();
-    showNotification(`Шаблон «${tplDef.name}» удален${reassignedCount > 0 ? ` (сцен переключено: ${reassignedCount})` : ""}`, "info");
+    showNotification(reassignedCount > 0
+      ? t("toast.templateDeletedScenes", { name: tplDef.name, n: reassignedCount })
+      : t("toast.templateDeleted", { name: tplDef.name }), "info");
   }
 
   // -----------------------------------------------------------------------------
@@ -1540,8 +1527,9 @@ const DEFAULT_LAYOUTS = {
   let templateSetPendingAction = null; // { type: "load" | "overwrite" | "delete", name }
 
   function templateSetsCountWord(n) {
-    if (n === 1) return "шаблон";
-    return n > 1 && n < 5 ? "шаблона" : "шаблонов";
+    if (locale.value === "en") return n === 1 ? t("tpl.setWord1", { n }) : t("tpl.setWord5", { n });
+    if (n === 1) return t("tpl.setWord1", { n });
+    return n > 1 && n < 5 ? t("tpl.setWord2", { n }) : t("tpl.setWord5", { n });
   }
 
   function formatTemplateSetDate(raw) {
@@ -1575,16 +1563,16 @@ const DEFAULT_LAYOUTS = {
       type: action ? action.type : "load",
       name: name,
       title: isDelete
-        ? "Удаление набора шаблонов"
-        : (isOverwrite ? "Перезапись набора шаблонов"
-            : (isRefresh ? "Обновление набора шаблонов" : "Загрузка набора шаблонов")),
+        ? t("tm.confirmDeleteTitle")
+        : (isOverwrite ? t("tm.confirmOverwriteTitle")
+            : (isRefresh ? t("tm.confirmRefreshTitle") : t("tm.confirmLoadTitle"))),
       msg: isDelete
-        ? `Вы действительно хотите удалить набор «${name}»?`
+        ? t("tm.confirmDeleteMsg", { name })
         : (isOverwrite
-            ? `Набор «${name}» уже существует. Перезаписать его текущим списком шаблонов?`
+            ? t("tm.confirmOverwriteMsg", { name })
             : (isRefresh
-                ? `Обновить набор «${name}» текущим списком шаблонов? Содержимое набора будет перезаписано.`
-                : `Вы действительно хотите загрузить набор «${name}»?`)),
+                ? t("tm.confirmRefreshMsg", { name })
+                : t("tm.confirmLoadMsg", { name }))),
       danger: isDelete,
     };
   }
@@ -1614,7 +1602,7 @@ const DEFAULT_LAYOUTS = {
   function doSaveTemplateSet(name) {
     const layouts = state.pdf_settings?.custom_layouts || {};
     if (!Object.keys(layouts).length) {
-      showNotification("Нет шаблонов для сохранения", "error");
+      showNotification(t("toast.noTemplatesToSave"), "error");
       return;
     }
     flushAutoSave();
@@ -1624,7 +1612,7 @@ const DEFAULT_LAYOUTS = {
   function openSaveTemplateSetModal() {
     const layouts = state.pdf_settings?.custom_layouts || {};
     if (!Object.keys(layouts).length) {
-      showNotification("Нет шаблонов для сохранения", "error");
+      showNotification(t("toast.noTemplatesToSave"), "error");
       return;
     }
     ui.tplModals.saveSet = { name: "" };
@@ -1637,7 +1625,7 @@ const DEFAULT_LAYOUTS = {
   function confirmSaveTemplateSet(rawName) {
     const name = String(rawName || "").trim();
     if (!name) {
-      showNotification("Укажите название набора", "warning");
+      showNotification(t("toast.setNameRequired"), "warning");
       return;
     }
     closeSaveTemplateSetModal();
@@ -1673,7 +1661,7 @@ const DEFAULT_LAYOUTS = {
     }
     const newName = String(rawName || "").trim();
     if (!newName) {
-      showNotification("Название шаблона не может быть пустым", "warning");
+      showNotification(t("toast.templateNameEmpty"), "warning");
       return;
     }
     const newDesc = String(rawDesc || "").trim();
@@ -1694,7 +1682,7 @@ const DEFAULT_LAYOUTS = {
     renderScenesTable();
     selectTemplate(tplKey);
     notifyChange();
-    showNotification(`Шаблон переименован в «${newName}»`, "success");
+    showNotification(t("toast.templateRenamed", { name: newName }), "success");
   }
 
   // Модалка создания шаблона (TemplatesSidebar.vue / NewTemplateModal.vue)
@@ -1704,8 +1692,8 @@ const DEFAULT_LAYOUTS = {
       name: "",
       description: "",
       base: "empty",
-      bases: [{ key: "empty", name: "Пустой шаблон — базовый видовой экран" }]
-        .concat(getAllTemplates().map((t) => ({ key: t.key, name: t.name }))),
+      bases: [{ key: "empty", name: t("tpl.emptyBase") }]
+        .concat(getAllTemplates().map((tpl) => ({ key: tpl.key, name: tpl.name }))),
     };
   }
 
@@ -1713,7 +1701,7 @@ const DEFAULT_LAYOUTS = {
     const name = String(rawName || "").trim();
     const description = String(rawDescription || "").trim();
     if (!name) {
-      showNotification("Введите название шаблона", "warning");
+      showNotification(t("toast.templateNameRequired"), "warning");
       return;
     }
     createCustomTemplate(name, baseType || "empty", description);
@@ -1898,7 +1886,7 @@ function setTemplateLineSettings(tplKey, updates) {
   const isPortrait = (els.selectPageLayout ? els.selectPageLayout.value : state.pdf_settings?.page_layout) === "portrait";
   const pageSize = (els.selectPageSize ? els.selectPageSize.value : state.pdf_settings?.page_size) || "A3";
   if (els.layoutPageInfoBadge) {
-    els.layoutPageInfoBadge.textContent = `${pageSize} ${isPortrait ? "Книжная" : "Альбомная"}`;
+    els.layoutPageInfoBadge.textContent = `${pageSize} ${t(isPortrait ? "tpl.pageBadgePortrait" : "tpl.pageBadgeLandscape")}`;
   }
 
   // Margin input sync
@@ -2100,11 +2088,11 @@ let paramModalState = { mode: "create", id: null, tplKey: null };
 
 function updateParamModalPreview() {
   const val = paramPreviewValue(ui.paramModal.source).replace(/\n+/g, " ⏎ ");
-  ui.paramModal.preview = val ? `Пример: ${val}` : "Данные не заполнены — параметр не будет выведен на лист";
+  ui.paramModal.preview = val ? t("pm.previewExample", { value: val }) : t("pm.previewEmpty");
   ui.paramModal.previewEmpty = !val;
   // Подсказка в поле заголовка: что напечатается, если оставить его пустым
   const auto = effectiveParamLabel(ui.paramModal.source, "");
-  ui.paramModal.labelPlaceholder = auto ? `Авто: ${auto}` : "Заголовок (авто-подпись недоступна)";
+  ui.paramModal.labelPlaceholder = auto ? t("pm.labelAutoPh", { auto }) : t("pm.labelNoAutoPh");
 }
 
   function openParamModal(mode, paramId, tplKey) {
@@ -2117,7 +2105,7 @@ function updateParamModalPreview() {
     ui.paramModal.mode = mode;
     ui.paramModal.id = paramModalState.id;
     ui.paramModal.tplKey = paramModalState.tplKey;
-    ui.paramModal.title = mode === "edit" ? "Редактировать параметр" : "Создать параметр";
+    ui.paramModal.title = t(mode === "edit" ? "pm.titleEdit" : "pm.titleCreate");
     ui.paramModal.sources = sources;
     ui.paramModal.source = existing ? existing.source : firstSource;
     ui.paramModal.label = existing ? existing.label : "";
@@ -2133,7 +2121,7 @@ function updateParamModalPreview() {
   function confirmParamModal() {
     const source = ui.paramModal.source;
     if (!source) {
-      showNotification("Выберите источник данных", "warning");
+      showNotification(t("toast.pickSource"), "warning");
       return;
     }
 
@@ -2167,7 +2155,7 @@ function updateParamModalPreview() {
     closeParamModal();
     renderTemplateSettingsList();
     notifyChange();
-    showNotification(isEdit ? "Параметр обновлен" : "Параметр создан", "success");
+    showNotification(t(isEdit ? "toast.paramUpdated" : "toast.paramCreated"), "success");
   }
 
   // Alias for backward compatibility with existing render calls
@@ -2233,7 +2221,7 @@ function updateParamModalPreview() {
 
         renderTemplateSettingsList();
         renderTemplatesList();
-        showNotification(`Настройки шаблона «${tplDefObj.name}» сброшены к стандартам`, "success");
+        showNotification(t("toast.templateReset", { name: tplDefObj.name }), "success");
         notifyChange();
       });
     }
@@ -2377,8 +2365,10 @@ function updateParamModalPreview() {
     const hasArticul = articulValue() !== "";
     const isCommercial = currentTradeValue === "1";
     els.headerTradeBadge.innerHTML = !hasArticul
-      ? "Тип не выбран"
-      : (isCommercial ? '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">user_group</i> Коммерческий' : '<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> Бытовой');
+      ? t("app.tradeUnset")
+      : (isCommercial
+          ? `<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">user_group</i> ${t("app.tradeCommercial")}`
+          : `<i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px;">account</i> ${t("app.tradeHousehold")}`);
     els.headerTradeBadge.classList.toggle("trade-unset", !hasArticul);
     els.headerTradeBadge.classList.toggle("trade-commercial", hasArticul && isCommercial);
     els.headerTradeBadge.classList.toggle("trade-household", hasArticul && !isCommercial);
@@ -2543,8 +2533,8 @@ function updateParamModalPreview() {
     // Снимки создаются только при отправке на сервер (кнопка «Отправить»)
     if (els.hintWebpFormat) {
       els.hintWebpFormat.textContent = state.vips_available
-        ? "libvips доступна — при отправке снимки сцен сохраняются в WebP."
-        : "libvips не найдена (vendor/libvips) — при отправке снимки сохраняются как PNG.";
+        ? t("send.vipsOk")
+        : t("send.vipsMissing");
     }
     if (els.chkSaveLayoutFile) els.chkSaveLayoutFile.checked = settings.save_layout_file !== false;
 
@@ -2613,6 +2603,11 @@ function updateParamModalPreview() {
     if (els.chkAutoOpen) els.chkAutoOpen.checked = settings.auto_open_pdf !== false;
     if (els.chkSaveBackup) els.chkSaveBackup.checked = settings.save_skp_backup !== false;
     if (els.chkAntialias) els.chkAntialias.checked = settings.antialias !== false;
+
+    // Язык интерфейса: синхронизируем локаль с pdf_settings.language
+    // (активная кнопка тумблера RU|EN подсвечивается реактивно от locale)
+    const curLang = String(settings.language || "ru").toLowerCase() === "en" ? "en" : "ru";
+    setLocale(curLang);
 
     updateHeaderTitles();
     ensureCustomLayouts();
@@ -2827,7 +2822,7 @@ function updateParamModalPreview() {
   function refreshDirectories() {
     const dirs = Array.isArray(state.directories) ? state.directories : [];
     if (dirs.length === 0) {
-      showNotification("Нет папок для обновления", "warning");
+      showNotification(t("dirs.toastNoDirs"), "warning");
       return;
     }
     let refreshed = 0;
@@ -2835,9 +2830,9 @@ function updateParamModalPreview() {
       if (refreshDirectoryFiles(index)) refreshed++;
     });
     if (refreshed === 0) {
-      showNotification("Укажите путь к папке", "warning");
+      showNotification(t("dirs.toastNoPaths"), "warning");
     } else {
-      showNotification(`Обновление файлов: папок ${refreshed}`, "info");
+      showNotification(t("dirs.toastRefreshed", { n: refreshed }), "info");
     }
   }
 
@@ -2960,12 +2955,12 @@ function updateParamModalPreview() {
     const room = (els.inputRoomName ? els.inputRoomName.value : "").trim();
     const furniture = (els.inputFurnitureName ? els.inputFurnitureName.value : "").trim();
     const parts = [room, furniture].filter(Boolean);
-    const pTitle = parts.length ? parts.join(" — ") : "Новый проект";
+    const pTitle = parts.length ? parts.join(" — ") : t("app.newProject");
 
     const customer = (els.inputCustomer ? els.inputCustomer.value : "").trim();
     const address = (els.inputAddress ? els.inputAddress.value : "").trim();
     const subParts = [customer, address].filter(Boolean);
-    const subText = subParts.length ? subParts.join(" — ") : "Заказчик — Адрес объекта";
+    const subText = subParts.length ? subParts.join(" — ") : t("app.subtitlePlaceholder");
 
     if (els.headerProjectTitle) {
       els.headerProjectTitle.textContent = pTitle;
@@ -2990,7 +2985,7 @@ function updateParamModalPreview() {
     const totalCount = (state.scenes || []).length;
     if (els.sceneCountBadge) {
       els.sceneCountBadge.textContent = activeCount;
-      els.sceneCountBadge.title = `Создаваемых страниц: ${activeCount} из ${totalCount}`;
+      els.sceneCountBadge.title = t("badge.pagesCount", { active: activeCount, total: totalCount });
     }
   }
 
@@ -3209,7 +3204,7 @@ function updateParamModalPreview() {
     const hh = String(now.getHours()).padStart(2, '0');
     const mm = String(now.getMinutes()).padStart(2, '0');
     const nowStr = `${y}-${m}-${d} ${hh}:${mm}`;
-    const defaultText = "Новые правки";
+    const defaultText = t("hist.defaultEntry");
 
     state.history.unshift({
       data: nowStr,
@@ -3432,6 +3427,8 @@ function updateParamModalPreview() {
       auto_open_pdf: els.chkAutoOpen.checked,
       save_skp_backup: els.chkSaveBackup.checked,
       antialias: els.chkAntialias.checked,
+      // Язык интерфейса: источник истины в GUI — реактивная локаль i18n
+      language: locale.value === "en" ? "en" : "ru",
       custom_layouts: state.pdf_settings.custom_layouts
     };
 
@@ -3485,7 +3482,7 @@ function updateParamModalPreview() {
       const newId = generateCustomerIdLocal();
       if (els.inputCustomerId) {
         els.inputCustomerId.value = newId;
-        showNotification(`Сгенерирован ID заказчика: ${newId}`, "info");
+        showNotification(t("toast.customerIdGenerated", { id: newId }), "info");
       }
     }
   }
@@ -3701,7 +3698,7 @@ function updateParamModalPreview() {
       const data = collectFormData();
       els.progressBarFill.style.width = "0%";
       els.progressPercent.textContent = "0%";
-      els.progressMessage.textContent = "Инициализация...";
+      els.progressMessage.textContent = t("progress.init");
       els.progressOverlay.classList.remove("hidden");
 
       callRuby("startExport", JSON.stringify(data));
@@ -3721,7 +3718,7 @@ function updateParamModalPreview() {
       const data = collectFormData();
       const enabledScenes = (data.scenes || []).filter((s) => s.enabled && s.page_type !== "skip");
       if (enabledScenes.length === 0) {
-        showNotification("Выберите хотя бы одну сцену для экспорта!", "error");
+        showNotification(t("toast.selectSceneForExport"), "error");
         return;
       }
 
@@ -3779,7 +3776,7 @@ function updateParamModalPreview() {
       els.btnConfirmRevisionExport.addEventListener("click", () => {
         const rawNote = (els.inputRevisionNote ? els.inputRevisionNote.value : "").trim();
         if (!rawNote) {
-          showNotification("Введите описание правок или нажмите «Без записи правок»", "warning");
+          showNotification(t("toast.revisionNoteRequired"), "warning");
           if (els.inputRevisionNote) els.inputRevisionNote.focus();
           return;
         }
@@ -3853,7 +3850,7 @@ function updateParamModalPreview() {
         }, 50);
       } else {
         // Модалки нет в разметке — сохранение/экспорт без артикула не выполняем
-        showNotification("Укажите артикул проекта — без него данные не сохраняются.", "error");
+        showNotification(t("toast.articulRequiredSave"), "error");
         articulPromptAction = null;
       }
     }
@@ -3862,7 +3859,7 @@ function updateParamModalPreview() {
     function applyArticulFromPrompt() {
       const val = (els.inputArticulPrompt ? els.inputArticulPrompt.value : "").trim();
       if (!val) {
-        showNotification("Введите артикул проекта", "warning");
+        showNotification(t("toast.articulEnter"), "warning");
         if (els.inputArticulPrompt) els.inputArticulPrompt.focus();
         return false;
       }
@@ -3956,7 +3953,7 @@ function updateParamModalPreview() {
         const statusEl = document.getElementById("devUpdateStatus");
         if (statusEl) {
           statusEl.style.color = "var(--bs-primary)";
-          statusEl.textContent = "Проверка обновлений...";
+          statusEl.textContent = t("toast.checkingUpdate");
         }
         callRuby("checkForUpdate");
       });
@@ -3968,7 +3965,7 @@ function updateParamModalPreview() {
         const statusEl = document.getElementById("devUpdateStatus");
         if (statusEl) {
           statusEl.style.color = "var(--bs-primary)";
-          statusEl.textContent = "Обновление плагина и перезагрузка...";
+          statusEl.textContent = t("toast.updating");
         }
         btnUpdateApply.disabled = true;
         callRuby("updateFromDev");
@@ -3996,12 +3993,12 @@ function updateParamModalPreview() {
         if (text) {
           if (navigator.clipboard && navigator.clipboard.writeText) {
             navigator.clipboard.writeText(text).then(() => {
-              showNotification("Путь к PDF скопирован в буфер обмена", "success");
+              showNotification(t("toast.pdfPathCopied"), "success");
             }).catch(() => {
               showNotification(text, "info");
             });
           } else {
-            showNotification("Файл: " + text, "info");
+            showNotification(t("toast.fileInfo", { path: text }), "info");
           }
         }
       });
@@ -4043,15 +4040,51 @@ function updateParamModalPreview() {
       }
     });
 
+    // Тумблер языка RU|EN в шапке: применяется сразу — Vue перерисовывается
+    // реактивно через locale, legacy-статику (бейджи, списки, подсказки)
+    // обновляем явным ре-рендером. Автосейв уезжает через notifyChange
+    // внутри applyLanguageChange (updateHeaderTitles).
+    if (els.selectLanguage) {
+      els.selectLanguage.addEventListener("click", (e) => {
+        const btn = e.target.closest("[data-lang]");
+        if (!btn || btn.dataset.lang === locale.value) return;
+        applyLanguageChange(btn.dataset.lang);
+      });
+    }
+
     // Flush any pending auto-save on window close or navigation
     window.addEventListener("beforeunload", () => flushAutoSave());
     window.addEventListener("unload", () => flushAutoSave());
+  }
+
+  // -------------------------------------------------------------
+  // Смена языка интерфейса на лету: Vue-части перерисовываются
+  // реактивно (locale-ref), legacy-рендеры обновляем вручную
+  // -------------------------------------------------------------
+  function applyLanguageChange(lang) {
+    setLocale(lang);
+    const headerBadge = document.getElementById("headerVersionBadge");
+    if (headerBadge && state.plugin_version) {
+      headerBadge.title = t("app.versionBadgeTitle", { version: state.plugin_version });
+    }
+    updateTradeBadge();
+    updateHeaderTitles();          // плейсхолдеры шапки (заодно notifyChange → автосейв)
+    renderTemplatesList();         // подписи использования шаблонов
+    renderTemplateSettingsList();  // бейдж формата + подписи параметров/зон
+    renderScenesTable();           // список шаблонов для селекта «Шаблон»
+    updateLayoutUsageBadge();      // бейдж привязки шаблона к сценам
+    // Подпись статуса автосейва переводится вместе с интерфейсом
+    const autosaveTextEl = document.getElementById("autosaveText");
+    if (autosaveTextEl) autosaveTextEl.textContent = t("footer.autosaveText");
   }
 
   // Public API exposed on window.app for Ruby calls
   window.app = {
     loadData: function (data) {
       if (!data) return;
+      // Язык применяем до первого рендера: статика legacy сразу на нужной локали
+      const payloadLang = data.pdf_settings && data.pdf_settings.language;
+      setLocale(String(payloadLang || "ru").toLowerCase() === "en" ? "en" : "ru");
       Object.assign(state, data);
       if (data.plugin_version) {
         state.plugin_version = data.plugin_version;
@@ -4060,7 +4093,7 @@ function updateParamModalPreview() {
         const curVersionEl = document.getElementById("curVersionText");
         if (curVersionEl) curVersionEl.textContent = `v${data.plugin_version}`;
         const headerBadge = document.getElementById("headerVersionBadge");
-        if (headerBadge) headerBadge.title = `Версия плагина: v${data.plugin_version}`;
+        if (headerBadge) headerBadge.title = t("app.versionBadgeTitle", { version: data.plugin_version });
         document.title = `DN1C Export PDF 2 v${data.plugin_version}`;
       }
       ensureCustomLayouts();
@@ -4142,7 +4175,7 @@ function updateParamModalPreview() {
       const newVerEl = document.getElementById("newVersionText");
       if (!res || !res.success) {
         state.update_dev_version = null;
-        const errMsg = res ? res.error : "Неизвестная ошибка";
+        const errMsg = res ? res.error : t("toast.unknownError");
         if (statusEl) {
           statusEl.style.color = "var(--bs-danger)";
           statusEl.textContent = `❌ ${errMsg}`;
@@ -4157,7 +4190,7 @@ function updateParamModalPreview() {
         if (rowAvail) rowAvail.style.display = "flex";
         if (statusEl) {
           statusEl.style.color = "var(--bs-warning)";
-          statusEl.textContent = `Найдено обновление: v${res.current_version} → v${res.dev_version}. Нажмите «Обновить».`;
+          statusEl.textContent = t("toast.updateFound", { cur: res.current_version, dev: res.dev_version });
         }
         if (updateBtn) updateBtn.disabled = false;
       } else {
@@ -4165,7 +4198,7 @@ function updateParamModalPreview() {
         if (rowAvail) rowAvail.style.display = "none";
         if (statusEl) {
           statusEl.style.color = "var(--bs-success)";
-          statusEl.textContent = `✅ Обновлений нет — установлена последняя версия v${res.current_version}.`;
+          statusEl.textContent = t("toast.noUpdates", { cur: res.current_version });
         }
         if (updateBtn) updateBtn.disabled = true;
       }
@@ -4185,14 +4218,14 @@ function updateParamModalPreview() {
         let msg;
         if (res.same_dir) {
           msg = newVer
-            ? `Плагин уже работает из каталога разработки — версия v${newVer} активна.`
-            : "Плагин работает напрямую из рабочей dev-папки. Перезагрузка выполнена!";
+            ? t("toast.devSameDirVer", { ver: newVer })
+            : t("toast.devSameDir");
         } else if (newVer) {
-          msg = `Обновлено до v${newVer} (${res.files_copied || 0} файлов). Плагин перезагружен! Перезапустите SketchUp, чтобы номер версии отобразился в интерфейсе.`;
+          msg = t("toast.devUpdated", { ver: newVer, files: res.files_copied || 0 });
         } else if (res.files_copied !== undefined) {
-          msg = `Успешно обновлено из dev-папки (${res.files_copied} файлов скопировано). Плагин перезагружен!`;
+          msg = t("toast.devUpdatedFiles", { files: res.files_copied });
         } else {
-          msg = "Плагин успешно перезагружен!";
+          msg = t("toast.devReloaded");
         }
         if (statusEl) {
           statusEl.style.color = "var(--bs-success)";
@@ -4201,18 +4234,18 @@ function updateParamModalPreview() {
           if (warnings.length) {
             const warnEl = document.createElement("div");
             warnEl.style.color = "var(--bs-warning)";
-            warnEl.textContent = `⚠ Пропущено файлов: ${warnings.length} (загруженные DLL обновятся после перезапуска SketchUp) — ${warnings.join("; ")}`;
+            warnEl.textContent = t("toast.devWarnings", { n: warnings.length, list: warnings.join("; ") });
             statusEl.appendChild(warnEl);
           }
         }
         showNotification(msg, "success");
       } else {
-        const errMsg = res ? res.error : "Неизвестная ошибка";
+        const errMsg = res ? res.error : t("toast.unknownError");
         if (statusEl) {
           statusEl.style.color = "var(--bs-danger)";
-          statusEl.textContent = `❌ Ошибка: ${errMsg}`;
+          statusEl.textContent = t("toast.updateErrorPrefix", { msg: errMsg });
         }
-        showNotification(`Ошибка обновления: ${errMsg}`, "error");
+        showNotification(t("toast.updateFailed", { msg: errMsg }), "error");
       }
     },
 
@@ -4222,22 +4255,22 @@ function updateParamModalPreview() {
     onProjectFolderCreated: function (folderPath, yamlSaved) {
       if (!folderPath) return;
       showNotification(
-        (yamlSaved ? `Папка проекта создана: ${folderPath} (project.yaml записан)` : `Папка проекта создана: ${folderPath}`) +
-          " — сохраните модель (Ctrl+S), чтобы артикул остался в файле .skp",
+        (yamlSaved ? t("toast.folderCreated", { path: folderPath }) : t("toast.folderCreatedNoYaml", { path: folderPath })) +
+          t("toast.folderCreatedSuffix"),
         "success"
       );
     },
 
     onAutoSaved: function (yamlName) {
       const timeStr = new Date().toLocaleTimeString([], { hour: "2-digit", minute: "2-digit", second: "2-digit" });
-      const label = yamlName ? `Сохранено (${yamlName})` : `Сохранено ${timeStr}`;
+      const label = yamlName ? t("toast.savedMemory", { name: yamlName }) : t("toast.savedTime", { time: timeStr });
       updateAutoSaveIndicator("saved", label);
     },
 
     onCustomerIdGenerated: function (newCustomerId) {
       if (els.inputCustomerId && newCustomerId) {
         els.inputCustomerId.value = newCustomerId;
-        showNotification(`Сгенерирован ID заказчика: ${newCustomerId}`, "info");
+        showNotification(t("toast.customerIdGenerated", { id: newCustomerId }), "info");
       }
     },
 
@@ -4251,7 +4284,7 @@ function updateParamModalPreview() {
         }
         renderDirectories();
         notifyChange();
-        showNotification(`Выбрана папка: ${chosenPath}`, "info");
+        showNotification(t("toast.folderSelected", { path: chosenPath }), "info");
       }
     },
 
@@ -4293,7 +4326,7 @@ function updateParamModalPreview() {
 
     onExportError: function (errorMsg) {
       els.progressOverlay.classList.add("hidden");
-      showNotification(`Ошибка экспорта: ${errorMsg}`, "error");
+      showNotification(t("toast.exportError", { msg: errorMsg }), "error");
     },
 
     syncOverlayState: function (isActive) {
@@ -4346,9 +4379,9 @@ function updateParamModalPreview() {
       if (sceneThumbsManualRequest) {
         sceneThumbsManualRequest = false;
         if (gotThumbs) {
-          showNotification("Эскизы сцен обновлены", "success");
+          showNotification(t("toast.thumbsUpdated"), "success");
         } else {
-          showNotification("Не удалось получить эскизы сцен", "error");
+          showNotification(t("toast.thumbsFailed"), "error");
         }
       }
     },
@@ -4479,7 +4512,7 @@ function updateParamModalPreview() {
   // папку артикула; сетевая отправка будет добавлена позже
   function startSend() {
     if (!articulValue()) {
-      showNotification("Укажите артикул проекта — снимки сохраняются в папку артикула!", "error");
+      showNotification(t("toast.articulRequiredSend"), "error");
       return;
     }
     callRuby("startSend", JSON.stringify(collectFormData()));
@@ -4574,6 +4607,12 @@ function updateParamModalPreview() {
     setupSplitResizer();
     setupScrollWheelHandlers();
     bindActivityHeartbeat();
+
+    // Начальная подпись статуса автосейва (далее её обновляет updateAutoSaveIndicator)
+    const autosaveTextEl = document.getElementById("autosaveText");
+    if (autosaveTextEl && !autosaveTextEl.textContent.trim()) {
+      autosaveTextEl.textContent = t("footer.autosaveText");
+    }
 
     // Request initial data from SketchUp
     callRuby("getData");

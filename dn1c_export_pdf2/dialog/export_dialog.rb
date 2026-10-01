@@ -65,7 +65,7 @@ module DN1Code
           end
 
           options = {
-            dialog_title:    "#{NAME_EXTENSION} v#{PLUGIN_VERSION} — Экспорт сцен в PDF",
+            dialog_title:    "#{NAME_EXTENSION} v#{PLUGIN_VERSION}#{Locale.t(:dialog_title_suffix)}",
             preferences_key: "DN1C_ExportPdf2_Pref",
             scrollable:      true,
             resizable:       true,
@@ -212,7 +212,7 @@ module DN1Code
               end
               articul = params[:articul].to_s.strip
               if articul.empty?
-                notify_js(dialog, "Артикул не передан — папка проекта не создана", "error")
+                notify_js(dialog, Locale.t(:create_folder_no_articul), "error")
               else
                 model = (defined?(Sketchup) && Sketchup.respond_to?(:active_model)) ? Sketchup.active_model : nil
                 project_data = Model::SessionStore.data(model)
@@ -225,7 +225,7 @@ module DN1Code
 
                 art_dir = project_data.articul_dir_for_model(model)
                 if art_dir.nil? || art_dir.to_s.empty?
-                  notify_js(dialog, "Сначала сохраните модель SketchUp (Ctrl+S) — папка проекта создается рядом с рабочим файлом", "error")
+                  notify_js(dialog, Locale.t(:create_folder_save_model), "error")
                 else
                   begin
                     FileUtils.mkdir_p(art_dir)
@@ -237,7 +237,7 @@ module DN1Code
                 end
               end
             rescue StandardError => e
-              notify_js(dialog, "Ошибка создания папки проекта: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:create_folder_error, msg: e.message), "error")
             end
           end
 
@@ -256,7 +256,7 @@ module DN1Code
             end
 
             chosen_folder = UI.select_directory(
-              title:     "Выберите рабочую папку проекта",
+              title:     Locale.t(:select_dir_title),
               directory: default_dir
             )
 
@@ -581,7 +581,7 @@ module DN1Code
               if folder_abs && File.exist?(folder_abs)
                 Model::FileOpener.open_path(folder_abs)
               else
-                UI.messagebox("Папка не найдена на диске:\n#{folder_raw}")
+                UI.messagebox(Locale.t(:open_folder_missing, path: folder_raw))
               end
             rescue StandardError => e
               puts "[openDirectoryPath error]: #{e.message}"
@@ -604,17 +604,17 @@ module DN1Code
 
               if ok
                 yaml_name = Model::ProjectData::PROJECT_YAML_NAME
-                notify_js(dialog, "Сохранено: YAML проекта (#{yaml_name}) + настройки PDF и шаблоны расширения", "success")
+                notify_js(dialog, Locale.t(:save_project_ok, yaml: yaml_name), "success")
                 if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
-                  Sketchup.status_text = "DN1C Export PDF: Данные сохранены (#{yaml_name} + settings.yaml + layout.yaml)"
+                  Sketchup.status_text = Locale.t(:save_status_ok, yaml: yaml_name)
                 end
               elsif project_data.project_info[:articul].to_s.strip.empty?
-                notify_js(dialog, "Артикул не указан — данные проекта не сохранены. Создайте артикул и повторите сохранение.", "error")
+                notify_js(dialog, Locale.t(:save_articul_missing), "error")
               else
-                notify_js(dialog, "Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML", "error")
+                notify_js(dialog, Locale.t(:save_no_path), "error")
               end
             rescue StandardError => e
-              notify_js(dialog, "Ошибка сохранения YAML: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:save_yaml_error, msg: e.message), "error")
             end
           end
 
@@ -631,17 +631,17 @@ module DN1Code
 
               if is_auto
                 # Автосейв: данные живут в памяти до flush (кнопка/экспорт/закрытие)
-                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate("в память")});")
+                dialog.execute_script("window.app && window.app.onAutoSaved && window.app.onAutoSaved(#{JSON.generate(Locale.t(:save_memory_label))});")
               else
                 project_data.sync_with_model_scenes(model) if model
                 ok = Model::SessionStore.flush(model) if defined?(Model::SessionStore)
                 yaml_name = Model::ProjectData::PROJECT_YAML_NAME
                 if ok
-                  notify_js(dialog, "Сохранено в YAML (#{yaml_name}) + настройки расширения", "success")
+                  notify_js(dialog, Locale.t(:save_ok, yaml: yaml_name), "success")
                 elsif project_data.project_info[:articul].to_s.strip.empty?
-                  notify_js(dialog, "Артикул не указан — данные проекта не сохранены. Создайте артикул и повторите сохранение.", "error")
+                  notify_js(dialog, Locale.t(:save_articul_missing), "error")
                 else
-                  notify_js(dialog, "Не удалось сохранить: сохраните модель SketchUp (Ctrl+S), чтобы появился путь для YAML", "error")
+                  notify_js(dialog, Locale.t(:save_no_path), "error")
                 end
               end
 
@@ -653,7 +653,7 @@ module DN1Code
                 end
               end
             rescue StandardError => e
-              notify_js(dialog, "Ошибка сохранения: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:save_error, msg: e.message), "error")
             end
           end
 
@@ -706,7 +706,7 @@ module DN1Code
           # включенных сцен в <Артикул>/images/ через export_scene_snapshots.
           # Сетевая отправка будет добавлена позже — пока кнопка только готовит снимки.
           dialog.add_action_callback("startSend") do |_action_context, data_json|
-            notify_js(dialog, "Подготовка снимков к отправке...", "info")
+            notify_js(dialog, Locale.t(:send_preparing), "info")
 
             run_send = lambda do
               begin
@@ -723,11 +723,11 @@ module DN1Code
                 Model::SessionStore.flush(model) if defined?(Model::SessionStore)
                 notify_js(
                   dialog,
-                  "Подготовлено снимков: #{snapshots.size}. Отправка на сервер пока не реализована.",
+                  Locale.t(:send_done, n: snapshots.size),
                   "success"
                 )
               rescue StandardError => e
-                notify_js(dialog, "Ошибка подготовки отправки: #{e.message}", "error")
+                notify_js(dialog, Locale.t(:send_error, msg: e.message), "error")
               end
             end
 
@@ -748,7 +748,7 @@ module DN1Code
               elsif File.exist?(clean_path)
                 Model::FileOpener.open_path(File.dirname(clean_path))
               else
-                UI.messagebox("Папка не найдена на диске:\n#{clean_path}")
+                UI.messagebox(Locale.t(:open_folder_missing, path: clean_path))
               end
             rescue StandardError => e
               puts "[openFolder error]: #{e.message}"
@@ -764,7 +764,7 @@ module DN1Code
               elsif File.exist?(clean_path)
                 Model::FileOpener.open_path(clean_path)
               else
-                UI.messagebox("Файл не найден на диске:\n#{clean_path}")
+                UI.messagebox(Locale.t(:open_file_missing, path: clean_path))
               end
             rescue StandardError => e
               puts "[openFile error]: #{e.message}"
@@ -773,7 +773,7 @@ module DN1Code
 
           # Экспорт настроек в YAML
           dialog.add_action_callback("exportYaml") do |_action_context, data_json|
-            save_path = UI.savepanel("Экспортировать настройки в YAML", "", "project.yaml")
+            save_path = UI.savepanel(Locale.t(:export_yaml_title), "", "project.yaml")
             if save_path
               begin
                 payload = JSON.parse(data_json, symbolize_names: true)
@@ -781,25 +781,25 @@ module DN1Code
                 populate_project_data(project_data, payload)
 
                 project_data.save_to_yaml(save_path)
-                notify_js(dialog, "YAML успешно сохранен", "success")
+                notify_js(dialog, Locale.t(:export_yaml_ok), "success")
               rescue StandardError => e
-                notify_js(dialog, "Ошибка: #{e.message}", "error")
+                notify_js(dialog, Locale.t(:export_yaml_error, msg: e.message), "error")
               end
             end
           end
 
           # Импорт данных проекта из YAML (в память; запись на диск — принудительным сохранением)
           dialog.add_action_callback("importYaml") do |_action_context|
-            yaml_file = UI.openpanel("Открыть файл YAML конфигурации", "", "YAML Files|*.yaml;*.yml||")
+            yaml_file = UI.openpanel(Locale.t(:import_yaml_title), "", "YAML Files|*.yaml;*.yml||")
             if yaml_file && File.exist?(yaml_file)
               model = Sketchup.active_model
               project_data = Model::SessionStore.import_project_yaml(model, yaml_file) if defined?(Model::SessionStore)
               if project_data
                 json_str = JSON.generate(project_data.to_h)
                 dialog.execute_script("window.app && window.app.loadData(#{json_str});")
-                notify_js(dialog, "Данные проекта импортированы в память из #{File.basename(yaml_file.to_s.tr("\\", "/"))}. Запись на диск — кнопкой «Принудительно сохранить»", "success")
+                notify_js(dialog, Locale.t(:import_yaml_ok, file: File.basename(yaml_file.to_s.tr("\\", "/"))), "success")
               else
-                notify_js(dialog, "Не удалось прочитать YAML файл: #{File.basename(yaml_file.to_s)}", "error")
+                notify_js(dialog, Locale.t(:import_yaml_fail, file: File.basename(yaml_file.to_s)), "error")
               end
             end
           end
@@ -822,7 +822,7 @@ module DN1Code
               name = payload[:name].to_s
               layouts = payload[:custom_layouts]
               if name.strip.empty? || !layouts.is_a?(Hash) || layouts.empty?
-                notify_js(dialog, "Набор не сохранен: укажите имя набора", "error")
+                notify_js(dialog, Locale.t(:set_save_no_name), "error")
                 next
               end
 
@@ -830,15 +830,15 @@ module DN1Code
               project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
               ok = project_data && project_data.save_template_set(name, layouts)
               if ok
-                notify_js(dialog, "Набор шаблонов «#{name}\" сохранен", "success")
+                notify_js(dialog, Locale.t(:set_saved, name: name), "success")
               else
-                notify_js(dialog, "Не удалось сохранить набор шаблонов", "error")
+                notify_js(dialog, Locale.t(:set_save_failed), "error")
               end
               sets = project_data ? project_data.list_template_sets : []
               json_str = JSON.generate({ sets: sets })
               dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
             rescue StandardError => e
-              notify_js(dialog, "Ошибка сохранения набора: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:set_save_error, msg: e.message), "error")
             end
           end
 
@@ -852,12 +852,12 @@ module DN1Code
               if layouts
                 json_str = JSON.generate({ custom_layouts: layouts })
                 dialog.execute_script("window.app && window.app.onTemplateSetLoaded(#{json_str});")
-                notify_js(dialog, "Набор шаблонов «#{name}\" загружен", "success")
+                notify_js(dialog, Locale.t(:set_loaded, name: name), "success")
               else
-                notify_js(dialog, "Набор шаблонов не найден: #{name}", "error")
+                notify_js(dialog, Locale.t(:set_not_found, name: name), "error")
               end
             rescue StandardError => e
-              notify_js(dialog, "Ошибка загрузки набора: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:set_load_error, msg: e.message), "error")
             end
           end
 
@@ -869,15 +869,15 @@ module DN1Code
               project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
               ok = project_data && project_data.delete_template_set(name)
               if ok
-                notify_js(dialog, "Набор шаблонов «#{name}\" удален", "success")
+                notify_js(dialog, Locale.t(:set_deleted, name: name), "success")
               else
-                notify_js(dialog, "Не удалось удалить набор шаблонов", "error")
+                notify_js(dialog, Locale.t(:set_delete_failed), "error")
               end
               sets = project_data ? project_data.list_template_sets : []
               json_str = JSON.generate({ sets: sets })
               dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
             rescue StandardError => e
-              notify_js(dialog, "Ошибка удаления набора: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:set_delete_error, msg: e.message), "error")
             end
           end
 
@@ -889,7 +889,7 @@ module DN1Code
               names = payload.is_a?(Hash) ? payload[:stadia] : nil
               saved = names.is_a?(Array) ? Model::ProjectData.set_stadia_default(names) : []
               if saved.empty?
-                notify_js(dialog, "Список стадий пуст — сохранять нечего", "error")
+                notify_js(dialog, Locale.t(:stadia_empty), "error")
                 next
               end
 
@@ -897,12 +897,12 @@ module DN1Code
               project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
               ok = project_data ? project_data.save_program_settings : false
               if ok
-                notify_js(dialog, "Список стадий сохранён по умолчанию (#{saved.size} шт.)", "success")
+                notify_js(dialog, Locale.t(:stadia_saved, n: saved.size), "success")
               else
-                notify_js(dialog, "Не удалось сохранить список стадий по умолчанию", "error")
+                notify_js(dialog, Locale.t(:stadia_save_failed), "error")
               end
             rescue StandardError => e
-              notify_js(dialog, "Ошибка сохранения стадий по умолчанию: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:stadia_save_error, msg: e.message), "error")
             end
           end
 
@@ -954,9 +954,9 @@ module DN1Code
               payload = build_work_stats_payload(model ? Model::SessionStore.data(model) : nil)
               json_res = JSON.generate(payload)
               dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{json_res});")
-              notify_js(dialog, "Статистика работы сброшена", "success")
+              notify_js(dialog, Locale.t(:stats_reset), "success")
             rescue StandardError => e
-              notify_js(dialog, "Ошибка сброса статистики: #{e.message}", "error")
+              notify_js(dialog, Locale.t(:stats_reset_error, msg: e.message), "error")
             end
           end
         end

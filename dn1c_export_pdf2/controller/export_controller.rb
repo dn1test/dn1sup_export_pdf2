@@ -144,7 +144,7 @@ module DN1Code
 
           scenes.each_with_index do |scene_item, idx|
             label = webp_mode ? "WebP" : "PNG"
-            progress_block&.call(idx + 1, scenes.size, "#{label}-снимок сцены #{idx + 1}/#{scenes.size}: #{scene_item.name}")
+            progress_block&.call(idx + 1, scenes.size, Locale.t(:ec_snapshot, label: label, cur: idx + 1, total: scenes.size, name: scene_item.name))
 
             src = reusable_source(reusable, scene_item, allow_jpeg: reuse_jpeg) ||
                   render_scene_png(scene_item, settings, optimize_png: !webp_mode)

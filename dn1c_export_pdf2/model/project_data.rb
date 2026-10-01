@@ -43,6 +43,7 @@ module DN1Code
           scale_factor scale_multiplier annotation_font_size antialias
           auto_open_pdf save_skp_backup
           primary_color secondary_color font_family font_weight font_width
+          language
         ].freeze
 
         # Булевы ключи pdf_settings: строки 'true'/'false' приводятся к boolean
@@ -730,6 +731,7 @@ module DN1Code
             font_family:        "Sofia Sans Condensed",
             font_weight:        "normal",
             font_width:         "condensed",
+            language:           "ru",
             custom_layouts:     default_custom_layouts
           }
         end
@@ -843,6 +845,10 @@ module DN1Code
           when :font_width
             s = value.to_s.downcase.strip
             %w[condensed extra_condensed].include?(s) ? s : nil
+          when :language
+            # Язык интерфейса GUI: ru (умолчание) / en
+            s = value.to_s.downcase.strip
+            %w[ru en].include?(s) ? s : nil
           when :primary_color, :secondary_color
             s = value.to_s.strip.sub(/\A#/, "")
             s.match?(/\A[0-9a-fA-F]{6}\z/) ? s.upcase : nil

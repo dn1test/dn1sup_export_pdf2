@@ -1,70 +1,71 @@
 <template>
 <!-- Разметка перенесена из App.vue (Фаза 3). Все id сохранены: legacy читает и пишет
-     значения контролов напрямую (els map), поэтому биндинги v-model не нужны. -->
+     значения контролов напрямую (els map), поэтому биндинги v-model не нужны.
+     Тексты — через t() из i18n: смена локали перерисовывает карточки реактивно. -->
 <div class="tab-stack">
         <!-- LayOut Parameters Card -->
         <div class="settings-card">
           <div class="card-header">
             <span class="card-header-icon"><i class="modus-icons">layers</i></span>
-            <span class="card-header-title">Параметры SketchUp LayOut API</span>
+            <span class="card-header-title">{{ t('set.layoutTitle') }}</span>
           </div>
           <div class="form-grid">
             <div class="form-group" id="layoutRenderModeGroup">
-              <label for="selectLayoutRenderMode">Режим отображения видовых экранов LayOut</label>
+              <label for="selectLayoutRenderMode">{{ t('set.renderModeLabel') }}</label>
               <select id="selectLayoutRenderMode" class="form-control">
-                <option value="image" selected>Растровый GPU (Ambient Occlusion, мягкие тени)</option>
-                <option value="hybrid">Гибридный (Hybrid, растр + вектор)</option>
+                <option value="image" selected>{{ t('set.renderModeImage') }}</option>
+                <option value="hybrid">{{ t('set.renderModeHybrid') }}</option>
               </select>
-              <span class="field-hint">Режим GPU рендерит тени Ambient Occlusion напрямую. Гибрид совмещает растровую заливку и векторные линии в одном видовом экране LayOut.</span>
+              <span class="field-hint">{{ t('set.renderModeHint') }}</span>
             </div>
 
             <div class="form-group" id="compressionGroup" style="display: none;">
               <select id="selectCompression" class="form-control">
-                <option value="compress" selected>Применять сжатие (Оптимальный размер файла)</option>
-                <option value="none">Без сжатия (Максимальное качество, Lossless)</option>
+                <option value="compress" selected>{{ t('set.compressOn') }}</option>
+                <option value="none">{{ t('set.compressOff') }}</option>
               </select>
             </div>
 
             <div class="form-group" id="imageFormatGroup">
-              <label for="selectImageFormat">Формат изображений</label>
+              <label for="selectImageFormat">{{ t('set.imageFormatLabel') }}</label>
               <select id="selectImageFormat" class="form-control">
-                <option value="png" selected>PNG — максимальное сжатие без потерь (24-bit TrueColor)</option>
-                <option value="jpg">JPEG — максимальное качество (100%)</option>
+                <option value="png" selected>{{ t('set.imageFormatPng') }}</option>
+                <option value="jpg">{{ t('set.imageFormatJpg') }}</option>
               </select>
-              <span class="field-hint">PNG использует максимальное сжатие без потерь (TrueColor), JPEG — максимальное качество (100%).</span>
+              <span class="field-hint">{{ t('set.imageFormatHint') }}</span>
             </div>
 
             <div class="form-group" id="qualityGroup">
-              <label for="selectQuality">Качество разрешения</label>
+              <label for="selectQuality">{{ t('set.qualityLabel') }}</label>
               <select id="selectQuality" class="form-control">
-                <option value="low">low (для экранов 96 dpi)</option>
-                <option value="medium" selected>medium (оптимальный 150 dpi)</option>
-                <option value="high">high (для печати 300 dpi)</option>
+                <option value="low">{{ t('set.qualityLow') }}</option>
+                <option value="medium" selected>{{ t('set.qualityMedium') }}</option>
+                <option value="high">{{ t('set.qualityHigh') }}</option>
               </select>
-              <span class="field-hint">Разрешение вывода: 96 dpi (экраны), 150 dpi (оптимально), 300 dpi (печать).</span>
+              <span class="field-hint">{{ t('set.qualityHint') }}</span>
             </div>
 
             <div class="form-group" id="scaleMultiplierGroup">
-              <label for="selectScaleMultiplier">Толщина линий видового экрана (Множитель толщины линий, pt)</label>
+              <label for="selectScaleMultiplier">{{ t('set.scaleLabel') }}</label>
               <select id="selectScaleMultiplier" class="form-control">
-                <option value="auto">Авто (подбор под формат листа и разрешение)</option>
-                <option value="0.5">0,25 pt (тонкие, 0.5x)</option>
-                <option value="1">0,50 pt (стандарт LayOut, 1.0x)</option>
-                <option value="1.5">0,75 pt (множитель 1.5x)</option>
-                <option value="2.0" selected>1,00 pt (множитель 2.0x)</option>
-                <option value="2.5">1,25 pt (множитель 2.5x)</option>
-                <option value="3.0">1,50 pt (утолщенные, 3.0x)</option>
+                <option value="auto">{{ t('set.scaleAuto') }}</option>
+                <option value="0.5">{{ t('set.scale0.5') }}</option>
+                <option value="1">{{ t('set.scale1') }}</option>
+                <option value="1.5">{{ t('set.scale1.5') }}</option>
+                <option value="2.0" selected>{{ t('set.scale2.0') }}</option>
+                <option value="2.5">{{ t('set.scale2.5') }}</option>
+                <option value="3.0">{{ t('set.scale3.0') }}</option>
               </select>
-              <span class="field-hint">Толщина линий 3D-модели в видовом экране LayOut и рендере (0.25–1.50 pt или Авто).</span>
+              <span class="field-hint">{{ t('set.scaleHint') }}</span>
             </div>
 
 
             <div class="form-group" id="layoutSaveFileGroup">
               <label class="checkbox-label">
                 <input type="checkbox" id="chkSaveLayoutFile" checked>
-                <span>Сохранять проект (.layout) рядом с PDF</span>
+                <span>{{ t('set.saveLayoutLabel') }}</span>
               </label>
-              <span class="field-hint">Файл .layout можно открыть в Trimble LayOut для дальнейшего оформления чертежей.</span>
+              <span class="field-hint">{{ t('set.saveLayoutHint') }}</span>
             </div>
           </div>
         </div>
@@ -73,51 +74,51 @@
         <div class="settings-card">
           <div class="card-header">
             <span class="card-header-icon"><i class="modus-icons">file</i></span>
-            <span class="card-header-title">Параметры страницы и документа</span>
+            <span class="card-header-title">{{ t('set.pageTitle') }}</span>
           </div>
           <div class="form-grid">
             <div class="form-group">
-              <label for="selectPageSize">Формат листа</label>
+              <label for="selectPageSize">{{ t('set.pageSizeLabel') }}</label>
               <select id="selectPageSize" class="form-control">
-                <option value="A3" selected>A3 (297 x 420 мм)</option>
+                <option value="A3" selected>{{ t('set.pageSizeA3') }}</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="selectPageLayout">Ориентация страницы</label>
+              <label for="selectPageLayout">{{ t('set.orientLabel') }}</label>
               <select id="selectPageLayout" class="form-control">
-                <option value="landscape">Альбомная (Landscape)</option>
-                <option value="portrait">Книжная (Portrait)</option>
+                <option value="landscape">{{ t('set.orientLandscape') }}</option>
+                <option value="portrait">{{ t('set.orientPortrait') }}</option>
               </select>
             </div>
 
             <div class="form-group">
-              <label for="inputPageMargin">Отступ по периметру страницы (мм)</label>
+              <label for="inputPageMargin">{{ t('set.marginLabel') }}</label>
               <input type="number" id="inputPageMargin" class="form-control" min="0" max="100" step="1" value="5">
-              <span class="field-hint">Поля от края листа (в мм) для всех страниц при экспорте</span>
+              <span class="field-hint">{{ t('set.marginHint') }}</span>
             </div>
 
             <div class="form-group" id="fontFamilyGroup">
-              <label for="selectFontFamily">Шрифт текста на странице (font_family)</label>
+              <label for="selectFontFamily">{{ t('set.fontLabel') }}</label>
               <select id="selectFontFamily" class="form-control">
-                <option value="Sofia Sans Condensed" selected>Sofia Sans Condensed (стандарт)</option>
-                <option value="Sofia Sans Extra Condensed">Sofia Sans Extra Condensed (сверхсжатый)</option>
+                <option value="Sofia Sans Condensed" selected>Sofia Sans Condensed {{ t('set.fontStandard') }}</option>
+                <option value="Sofia Sans Extra Condensed">Sofia Sans Extra Condensed {{ t('set.fontExtraCond') }}</option>
                 <option value="Oswald">Oswald</option>
                 <option value="Roboto Condensed">Roboto Condensed</option>
                 <option value="Ubuntu Condensed">Ubuntu Condensed</option>
               </select>
-              <span class="field-hint">Основной шрифт для штампа, таблиц и текстовых блоков страниц документа LayOut / PDF. Вариативные шрифты комплекта содержат все начертания.</span>
+              <span class="field-hint">{{ t('set.fontHint') }}</span>
             </div>
 
             <div class="form-group full-width">
               <div class="checkbox-group">
                 <label class="checkbox-label">
                   <input type="checkbox" id="chkSaveBackup" checked>
-                  <span>Сохранять резервную копию модели (.skp) с номером ревизии</span>
+                  <span>{{ t('set.backupLabel') }}</span>
                 </label>
                 <label class="checkbox-label">
                   <input type="checkbox" id="chkAntialias" checked>
-                  <span>Сглаживание линий рендера (Antialiasing)</span>
+                  <span>{{ t('set.antialiasLabel') }}</span>
                 </label>
               </div>
             </div>
@@ -129,24 +130,28 @@
           <div class="card-header">
             <div class="card-header-title-wrap">
               <span class="card-header-icon"><i class="modus-icons">autorenew</i></span>
-              <span class="card-header-title">Обновление плагина</span>
+              <span class="card-header-title">{{ t('set.updateTitle') }}</span>
             </div>
             <span class="badge-dev-version" id="badgeDevVersion" style="font-weight: 600; padding: 2px 7px; border-radius: 4px; background: rgba(0,0,0,0.06); font-size: 11px;">v2.6.0</span>
           </div>
-          <p class="field-hint">Проверка новой версии и обновление плагина без ручного копирования файлов. Код обновляется сразу, номер версии применяется после перезапуска SketchUp:</p>
+          <p class="field-hint">{{ t('set.updateHint') }}</p>
           <div class="form-group" style="margin-bottom: 8px;">
             <div style="display: flex; align-items: center; gap: 6px; min-height: 18px;">
-              <span>Текущая версия: <b id="curVersionText">v2.6.0</b></span>
+              <span>{{ t('set.currentVersion') }} <b id="curVersionText">v2.6.0</b></span>
             </div>
             <div id="updateAvailableRow" style="display: none; align-items: center; gap: 6px; margin-top: 4px; color: var(--bs-warning); font-weight: 600;">
-              <i class="modus-icons">download</i> Доступна новая версия: <b id="newVersionText"></b>
+              <i class="modus-icons">download</i> {{ t('set.newVersionAvailable') }} <b id="newVersionText"></b>
             </div>
           </div>
           <div style="display: flex; gap: 8px;">
-            <button type="button" class="btn btn-xs btn-secondary" id="btnCheckUpdate" title="Сравнить версию в каталоге разработки с установленной"><i class="modus-icons">search</i> Проверить обновление</button>
-            <button type="button" class="btn btn-xs btn-primary" id="btnUpdate" title="Скопировать новую версию и перезагрузить плагин" disabled><i class="modus-icons">autorenew</i> Обновить</button>
+            <button type="button" class="btn btn-xs btn-secondary" id="btnCheckUpdate" :title="t('set.checkTitle')"><i class="modus-icons">search</i> {{ t('set.checkBtn') }}</button>
+            <button type="button" class="btn btn-xs btn-primary" id="btnUpdate" :title="t('set.updateBtnTitle')" disabled><i class="modus-icons">autorenew</i> {{ t('set.updateBtn') }}</button>
           </div>
           <div id="devUpdateStatus" class="field-hint" style="font-size: 11px; margin-top: 4px; min-height: 16px;"></div>
         </div>
 </div>
 </template>
+
+<script setup>
+import { t } from '../i18n/index.js'
+</script>

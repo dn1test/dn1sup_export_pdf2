@@ -10,12 +10,11 @@
       <h3>{{ ui.paramModal.title }}</h3>
     </div>
     <p class="field-hint">
-      Выберите источник данных параметра. Шрифт, размер, выравнивания (задают место на странице), цвет и
-      заголовок настраиваются в строке параметра.
+      {{ t('pm.hint') }}
     </p>
 
     <div class="form-group">
-      <label for="paramModalSource">Источник данных *</label>
+      <label for="paramModalSource">{{ t('pm.sourceLabel') }}</label>
       <select id="paramModalSource" v-model="ui.paramModal.source" class="form-control" @change="refreshPreview">
         <optgroup v-for="g in ui.paramModal.sources" :key="g.title" :label="g.title">
           <option v-for="o in g.options" :key="o.value" :value="o.value">{{ o.label }}</option>
@@ -29,8 +28,8 @@
     <div class="form-group">
       <label
         for="paramModalLabel"
-        title="Текст перед значением на листе (показ включается галкой «Заголовок» в строке параметра)"
-      >Заголовок</label>
+        :title="t('pm.labelTitle')"
+      >{{ t('pm.labelLabel') }}</label>
       <input
         id="paramModalLabel"
         v-model="ui.paramModal.label"
@@ -43,10 +42,10 @@
 
     <div class="modal-actions">
       <button type="button" class="btn btn-secondary" @click="close">
-        <i class="modus-icons">content_close</i> Отмена
+        <i class="modus-icons">content_close</i> {{ t('common.cancel') }}
       </button>
       <button type="button" class="btn btn-primary" @click="confirm">
-        <i class="modus-icons">check_mark</i> Сохранить параметр
+        <i class="modus-icons">check_mark</i> {{ t('pm.saveBtn') }}
       </button>
     </div>
   </BaseModal>
@@ -55,6 +54,7 @@
 <script setup>
 import BaseModal from './BaseModal.vue'
 import { ui } from '../store.js'
+import { t } from '../i18n/index.js'
 
 function close() {
   window.legacy?.closeParamModal?.()

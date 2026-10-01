@@ -2,28 +2,28 @@
   <div class="scenes-panel" id="scenesPanel">
     <div class="scenes-toolbar">
       <div class="scenes-quick-actions">
-        <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" title="Выбрать все сцены"><i class="modus-icons">check_mark</i> Все</button>
-        <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" title="Снять выбор"><i class="modus-icons">content_close</i> Снять</button>
-        <button class="btn btn-xs btn-secondary" id="btnRefreshThumbs" title="Перерисовать мини-превью заново: SketchUp по очереди переключится на каждую страницу, снимет свежий эскиз и вернётся на текущую страницу">
-          <i class="modus-icons">refresh</i> Обновить эскизы
+        <button class="btn btn-xs btn-secondary" id="btnSelectAllScenes" :title="t('scenes.selectAllTitle')"><i class="modus-icons">check_mark</i> {{ t('scenes.selectAllBtn') }}</button>
+        <button class="btn btn-xs btn-secondary" id="btnDeselectAllScenes" :title="t('scenes.deselectTitle')"><i class="modus-icons">content_close</i> {{ t('scenes.deselectBtn') }}</button>
+        <button class="btn btn-xs btn-secondary" id="btnRefreshThumbs" :title="t('scenes.refreshThumbsTitle')">
+          <i class="modus-icons">refresh</i> {{ t('scenes.refreshThumbsBtn') }}
         </button>
       </div>
-      <span class="info-text">Сцены SketchUp и сопоставление с шаблонами:</span>
+      <span class="info-text">{{ t('scenes.infoText') }}</span>
       <div class="scenes-quick-actions">
-        <label class="checkbox-label" title="Фон сцены (небо/земля/туман) включается/выключается сразу на всех страницах и на эскизах; водяные знаки — отдельная галка">
+        <label class="checkbox-label" :title="t('scenes.backgroundTitle')">
           <input type="checkbox" id="chk_scenes_background">
-          <span>Фон</span>
+          <span>{{ t('scenes.backgroundLabel') }}</span>
         </label>
-        <label class="checkbox-label" title="Водяные знаки из стиля сцены SketchUp включаются/выключаются сразу на всех страницах и на эскизах — независимо от фона">
+        <label class="checkbox-label" :title="t('scenes.watermarkTitle')">
           <input type="checkbox" id="chk_scenes_watermarks">
-          <span>Водяной знак</span>
+          <span>{{ t('scenes.watermarkLabel') }}</span>
         </label>
-        <label class="checkbox-label" title="Рамка кадра в окне SketchUp: включить/выключить сразу на всех страницах (индивидуально — в меню кадра строки)">
+        <label class="checkbox-label" :title="t('scenes.frameAllTitle')">
           <input type="checkbox" id="chk_scenes_frame_all">
-          <span>Кадр все</span>
+          <span>{{ t('scenes.frameAllLabel') }}</span>
         </label>
-        <button class="btn btn-xs btn-secondary" id="btnApplyTemplateAll" title="Назначить шаблон из первой строки всем сценам сразу">
-          <i class="modus-icons">layers</i> Шаблон всем
+        <button class="btn btn-xs btn-secondary" id="btnApplyTemplateAll" :title="t('scenes.applyTemplateTitle')">
+          <i class="modus-icons">layers</i> {{ t('scenes.applyTemplateBtn') }}
         </button>
       </div>
     </div>
@@ -32,20 +32,20 @@
       <table class="scenes-table" id="scenesTable">
         <thead>
           <tr>
-            <th width="34" class="th-check" title="Включить в экспорт">Вкл</th>
-            <th width="44" class="th-order" title="Перетащите строку мышью для изменения порядка следования">№</th>
-            <th width="108" class="th-preview" title="Мини предпросмотр страницы (3:2)">Превью</th>
-            <th>Сцена / Описание</th>
-            <th width="92" class="th-aspect" title="Пропорции кадра, рамка и видовой экран — индивидуально для каждой страницы (меню открывается кликом)">Кадр</th>
-            <th width="74" class="th-scale" title="Размещение картинки на странице, % от листа — индивидуально для каждой страницы">Масштаб</th>
-            <th width="64" class="th-align" title="Выравнивание эскиза на странице — индивидуально для каждой страницы">Выравн.</th>
-            <th width="120" title="Шаблон страницы, назначаемый этой сцене">Шаблон</th>
+            <th width="34" class="th-check" :title="t('scenes.thOnTitle')">{{ t('scenes.thOn') }}</th>
+            <th width="44" class="th-order" :title="t('scenes.thOrderTitle')">{{ t('scenes.thOrder') }}</th>
+            <th width="108" class="th-preview" :title="t('scenes.thPreviewTitle')">{{ t('scenes.thPreview') }}</th>
+            <th>{{ t('scenes.thSceneDesc') }}</th>
+            <th width="92" class="th-aspect" :title="t('scenes.thFrameTitle')">{{ t('scenes.thFrame') }}</th>
+            <th width="74" class="th-scale" :title="t('scenes.thScaleTitle')">{{ t('scenes.thScale') }}</th>
+            <th width="64" class="th-align" :title="t('scenes.thAlignTitle')">{{ t('scenes.thAlign') }}</th>
+            <th width="120" :title="t('scenes.thTemplateTitle')">{{ t('scenes.thTemplate') }}</th>
           </tr>
         </thead>
         <tbody>
           <tr v-if="!ui.scenes.length">
             <td colspan="8" class="dir-empty-state" style="text-align: center">
-              Сцены модели не загружены — откройте вкладку заново или нажмите «Обновить эскизы».
+              {{ t('scenes.empty') }}
             </td>
           </tr>
           <tr
@@ -73,15 +73,15 @@
               <input
                 type="checkbox"
                 :checked="sc.item.enabled !== false"
-                title="Включить / исключить сцену из экспорта в PDF"
+                :title="t('scenes.rowCheckTitle')"
                 @change="toggleEnabled(sc, $event)"
               >
             </td>
 
             <!-- 2. № и ручка перетаскивания -->
-            <td class="scene-num-cell" title="Перетащите строку мышью для изменения порядка">
+            <td class="scene-num-cell" :title="t('scenes.numTitle')">
               <div class="scene-num-row">
-                <span class="drag-handle" title="Перетащите мышью для изменения порядка">⠿</span>
+                <span class="drag-handle" :title="t('scenes.dragTitle')">⠿</span>
                 <span class="row-num">{{ index + 1 }}</span>
               </div>
             </td>
@@ -91,7 +91,7 @@
               <div class="scene-mini-preview-wrap">
                 <div
                   class="scene-mini-sheet"
-                  :title="`Сцена ${index + 1}: ${sc.item.name || 'Сцена'}\nНажмите для перехода к этому виду в SketchUp`"
+                  :title="t('scenes.miniTitle', { n: index + 1, name: sc.item.name || t('scenes.sceneWord') })"
                   @click.stop="legacy('focusScene', index, true)"
                 >
                   <img
@@ -116,8 +116,8 @@
                   v-model="sc.item.name"
                   type="text"
                   class="table-input scene-name-input"
-                  placeholder="Название сцены..."
-                  title="Редактировать название сцены"
+                  :placeholder="t('scenes.namePh')"
+                  :title="t('scenes.nameTitle')"
                   @click.stop
                   @focus="legacy('focusScene', index, false)"
                   @input="legacy('sceneTextChanged')"
@@ -128,8 +128,8 @@
                   v-model="sc.item.description"
                   type="text"
                   class="table-input scene-desc-input"
-                  placeholder="Описание на листе..."
-                  title="Описание / примечание на листе"
+                  :placeholder="t('scenes.descPh')"
+                  :title="t('scenes.descTitle')"
                   @click.stop
                   @focus="legacy('focusScene', index, false)"
                   @input="legacy('sceneTextChanged')"
@@ -146,7 +146,7 @@
                   type="button"
                   class="scene-frame-btn"
                   :class="{ 'frame-on': sc.item.frame_overlay === true }"
-                  title="Пропорции кадра для этой страницы"
+                  :title="t('scenes.frameBtnTitle')"
                   @click.stop="togglePopover('ratio', index, $event)"
                   @focus="legacy('focusScene', index, false)"
                 >
@@ -158,7 +158,7 @@
                   type="checkbox"
                   class="scene-frame-check"
                   :checked="sc.item.frame_overlay === true"
-                  title="Рамка кадра для этой страницы (вкл/выкл)"
+                  :title="t('scenes.frameCheckTitle')"
                   @click.stop
                   @change="toggleFrame(sc, index, $event)"
                 >
@@ -169,7 +169,7 @@
             <td class="scene-scale-cell">
               <select
                 class="table-select scene-scale-select"
-                title="Размещение картинки на странице (% от листа)"
+                :title="t('scenes.scaleTitle')"
                 :value="normScale(sc.item)"
                 @click.stop
                 @focus="legacy('focusScene', index, false)"
@@ -184,7 +184,7 @@
               <button
                 type="button"
                 class="scene-align-btn"
-                :title="`Выравнивание эскиза: ${alignTitle(normAlignH(sc.item), normAlignV(sc.item))}`"
+                :title="t('scenes.alignBtnTitle', { align: alignTitle(normAlignH(sc.item), normAlignV(sc.item)) })"
                 @click.stop="togglePopover('align', index, $event)"
               >{{ alignGlyph(normAlignH(sc.item), normAlignV(sc.item)) }}</button>
             </td>
@@ -200,12 +200,12 @@
                   @focus="legacy('focusScene', index, false)"
                   @change="legacy('scenePageTypeChanged', index, sc.item.page_type)"
                 >
-                  <option v-for="t in optionsFor(sc.item)" :key="t.key" :value="t.key">{{ t.name }}</option>
+                  <option v-for="tpl in optionsFor(sc.item)" :key="tpl.key" :value="tpl.key">{{ tpl.name }}</option>
                 </select>
                 <button
                   type="button"
                   class="btn-goto-template"
-                  title="Перейти к настройке этого шаблона страницы"
+                  :title="t('scenes.templateGotoTitle')"
                   @click.stop="legacy('gotoTemplateEditor', index)"
                 >
                   <i class="modus-icons" style="font-size: 13px">settings</i>
@@ -226,15 +226,15 @@
         :style="popStyle"
         @click.stop
       >
-        <div class="scene-frame-pop-title">Пропорции кадра</div>
+        <div class="scene-frame-pop-title">{{ t('scenes.framePopTitle') }}</div>
         <div class="scene-frame-ratio-grid">
           <button
-            v-for="[val, label] in ASPECT_OPTIONS"
+            v-for="[val, label] in aspectOptions"
             :key="val"
             type="button"
             class="scene-frame-ratio-opt"
             :class="{ active: val === normRatio(ui.scenes[popover.index]?.item) }"
-            :title="`Пропорции кадра ${label}`"
+            :title="t('scenes.ratioOptTitle', { label })"
             @click.stop="pickRatio(val)"
           >{{ label }}</button>
         </div>
@@ -261,9 +261,16 @@
 </template>
 
 <script setup>
-import { nextTick, ref } from 'vue'
+import { computed, nextTick, ref } from 'vue'
 import { ui } from '../store.js'
-const ASPECT_OPTIONS = [['3:2', '3:2'], ['4:3', '4:3'], ['5:4', '5:4'], ['16:9', '16:9'], ['1:1', '1:1'], ['4:5', '4:5'], ['page', 'По листу']]
+import { t } from '../i18n/index.js'
+
+// «По листу» переводится — опции собираются computed'ом
+const aspectOptions = computed(() => [
+  ['3:2', '3:2'], ['4:3', '4:3'], ['5:4', '5:4'], ['16:9', '16:9'], ['1:1', '1:1'], ['4:5', '4:5'],
+  ['page', t('scenes.ratioPage')],
+])
+const ASPECT_VALUES = ['3:2', '4:3', '5:4', '16:9', '1:1', '4:5', 'page']
 const ALIGN_GRID = [
   ['left', 'top'], ['center', 'top'], ['right', 'top'],
   ['left', 'center'], ['center', 'center'], ['right', 'center'],
@@ -281,10 +288,10 @@ function legacy(fn, ...args) {
 
 function normRatio(item) {
   const cur = (item.aspect_ratio || '4:3').trim()
-  return ASPECT_OPTIONS.some(([val]) => val === cur) ? cur : '4:3'
+  return ASPECT_VALUES.includes(cur) ? cur : '4:3'
 }
 function ratioLabel(val) {
-  return String(val).toLowerCase() === 'page' ? 'По листу' : val
+  return String(val).toLowerCase() === 'page' ? t('scenes.ratioPage') : val
 }
 function normAlignH(item) {
   return ['left', 'center', 'right'].includes(item.align_h) ? item.align_h : 'center'
@@ -296,11 +303,11 @@ function alignGlyph(h, v) {
   return ALIGN_GLYPHS[`${h}|${v}`] || '•'
 }
 function alignTitle(h, v) {
-  const H = { left: 'по левому краю', center: 'по центру', right: 'по правому краю' }
-  const V = { top: 'по верху', center: 'по центру', bottom: 'по низу' }
-  if (h === 'center' && v === 'center') return 'по центру страницы'
-  if (v === 'center') return `по горизонтали ${H[h] || h}`
-  if (h === 'center') return `по вертикали ${V[v] || v}`
+  const H = { left: t('scenes.alignH.left'), center: t('scenes.alignH.center'), right: t('scenes.alignH.right') }
+  const V = { top: t('scenes.alignV.top'), center: t('scenes.alignV.center'), bottom: t('scenes.alignV.bottom') }
+  if (h === 'center' && v === 'center') return t('scenes.alignCenterPage')
+  if (v === 'center') return t('scenes.alignHorizontal', { h: H[h] || h })
+  if (h === 'center') return t('scenes.alignVertical', { v: V[v] || v })
   return `${H[h] || h} · ${V[v] || v}`
 }
 function normScale(item) {
@@ -312,13 +319,13 @@ function thumbUrl(item, index) {
 }
 function optionsFor(item) {
   const opts = ui.templateOptions
-  if (item.page_type && !opts.some((t) => t.key === item.page_type)) {
+  if (item.page_type && !opts.some((tpl) => tpl.key === item.page_type)) {
     return [...opts, { key: item.page_type, name: item.page_type, description: '' }]
   }
   return opts
 }
 function typeDescription(item) {
-  const sel = ui.templateOptions.find((t) => t.key === item.page_type)
+  const sel = ui.templateOptions.find((tpl) => tpl.key === item.page_type)
   return sel ? sel.description : ''
 }
 

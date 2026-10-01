@@ -1,4 +1,5 @@
 // Общие утилиты форматирования, используются и legacy-кодом, и Vue-компонентами.
+import { locale, t } from './i18n/index.js'
 
 export function formatFileSize(bytes) {
   if (!bytes || bytes <= 0) return '0 B'
@@ -18,11 +19,15 @@ export function getDocIcon(ext) {
   return '<i class="modus-icons">file</i>'
 }
 
-// Русская плюрализация для счётчика файлов: 1 файл / 2-4 файла / 5 файлов
+// Плюрализация для счётчика файлов: русская (1 файл / 2-4 файла / 5 файлов)
+// и английская (1 file / N files) ветки
 export function pluralFiles(n) {
-  if (n === 1) return 'файл'
-  if (n >= 2 && n <= 4) return 'файла'
-  return 'файлов'
+  if (locale.value === 'en') {
+    return n === 1 ? t('plural.fileOne') : t('plural.fileMany')
+  }
+  if (n === 1) return t('plural.fileOne')
+  if (n >= 2 && n <= 4) return t('plural.fileFew')
+  return t('plural.fileMany')
 }
 
 // Крестик удаления в стиле Modus (иконка из шрифта)

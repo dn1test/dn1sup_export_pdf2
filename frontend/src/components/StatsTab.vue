@@ -2,22 +2,22 @@
   <div class="stats-tab">
     <div class="stats-toolbar">
       <span class="info-text">
-        Статистика активной работы над проектом
+        {{ t('stats.infoText') }}
         <template v-if="articul"> — <span class="font-mono">{{ articul }}</span></template>
         <template v-if="product"> ({{ product }})</template>:
       </span>
       <span class="stats-toolbar-actions">
-        <button type="button" class="btn btn-xs btn-secondary" title="Обновить статистику" @click="legacy('refreshStats')">
-          <i class="modus-icons">refresh</i> Обновить
+        <button type="button" class="btn btn-xs btn-secondary" :title="t('stats.refreshTitle')" @click="legacy('refreshStats')">
+          <i class="modus-icons">refresh</i> {{ t('stats.refreshBtn') }}
         </button>
         <button
           type="button"
           class="btn btn-xs"
           :class="confirmArmed ? 'btn-danger' : 'btn-secondary'"
-          :title="confirmArmed ? 'Нажмите ещё раз для подтверждения' : 'Полностью сбросить статистику этого проекта'"
+          :title="confirmArmed ? t('stats.resetConfirmTitle') : t('stats.resetTitle')"
           @click="onResetClick"
         >
-          <i class="modus-icons">delete</i> {{ confirmArmed ? 'Подтвердить сброс?' : 'Сбросить' }}
+          <i class="modus-icons">delete</i> {{ confirmArmed ? t('stats.resetConfirmBtn') : t('stats.resetBtn') }}
         </button>
       </span>
     </div>
@@ -25,9 +25,9 @@
     <div v-if="statsError" class="stats-error">{{ statsError }}</div>
 
     <!-- Сводки: клик по карточке переключает разрез графика -->
-    <div class="stats-cards" role="group" aria-label="Период статистики">
+    <div class="stats-cards" role="group" :aria-label="t('stats.cardsAria')">
       <button
-        v-for="c in CARDS"
+        v-for="c in cards"
         :key="c.key"
         type="button"
         class="stats-card"
@@ -35,7 +35,7 @@
         @click="range = c.key"
       >
         <span class="stats-card-label">
-          {{ c.label }}
+          {{ t(c.labelKey) }}
           <span v-if="c.key === 'hourly' && todayDate" class="stats-card-date">{{ todayDate }}</span>
         </span>
         <span class="stats-card-value">{{ fmt(report?.[c.seconds]) }}</span>
@@ -47,16 +47,15 @@
       <div class="stats-chart-box">
         <canvas ref="canvasRef"></canvas>
         <div v-if="isEmpty" class="stats-empty">
-          Пока нет данных — статистика накапливается во время активной работы в SketchUp
-          (моделирование и работа с панелью). Бездействие дольше 5 минут не учитывается.
+          {{ t('stats.empty') }}
         </div>
       </div>
     </div>
 
     <div class="stats-footer" v-if="report && !report.empty">
-      <span>Первая активность: <b>{{ report.first_tracked || '—' }}</b></span>
-      <span>Последняя активность: <b>{{ report.last_tracked || '—' }}</b></span>
-      <span v-if="savedAt">Обновлено: <b>{{ savedAt }}</b></span>
+      <span>{{ t('stats.firstActivity') }} <b>{{ report.first_tracked || '—' }}</b></span>
+      <span>{{ t('stats.lastActivity') }} <b>{{ report.last_tracked || '—' }}</b></span>
+      <span v-if="savedAt">{{ t('stats.updated') }} <b>{{ savedAt }}</b></span>
     </div>
   </div>
 </template>
@@ -65,13 +64,14 @@
 import { ref, computed, watch, nextTick, onBeforeUnmount } from 'vue'
 import Chart from 'chart.js/auto'
 import { ui } from '../store.js'
+import { t } from '../i18n/index.js'
 
 // Карточки-кнопки: клик переключает разрез графика (series из report)
-const CARDS = [
-  { key: 'hourly',  label: 'Сегодня',  seconds: 'today_seconds' },
-  { key: 'daily',   label: '3 недели', seconds: 'weeks3_seconds' },
-  { key: 'monthly', label: 'Месяц',   seconds: 'month_seconds' },
-  { key: 'yearly',  label: 'Всего',    seconds: 'total_seconds', total: true },
+const cards = [
+  { key: 'hourly',  labelKey: 'stats.today',  seconds: 'today_seconds' },
+  { key: 'daily',   labelKey: 'stats.weeks3', seconds: 'weeks3_seconds' },
+  { key: 'monthly', labelKey: 'stats.month',  seconds: 'month_seconds' },
+  { key: 'yearly',  labelKey: 'stats.total',  seconds: 'total_seconds', total: true },
 ]
 
 const canvasRef = ref(null)
@@ -92,14 +92,14 @@ function legacy(fn, ...args) {
   window.legacy?.[fn]?.(...args)
 }
 
-// «X ч Y мин» / «N мин» / «N сек»
+// «X ч Y мин» / «N мин» / «N сек» — формулировки берутся из словаря локали
 function fmt(sec) {
   const total = Math.max(0, Math.round(Number(sec) || 0))
-  if (total < 60) return total > 0 ? `${total} сек` : '0 мин'
+  if (total < 60) return total > 0 ? t('stats.timeSec', { n: total }) : t('stats.zeroMin')
   const h = Math.floor(total / 3600)
   const m = Math.round((total % 3600) / 60)
-  if (h === 0) return `${m} мин`
-  return m > 0 ? `${h} ч ${m} мин` : `${h} ч`
+  if (h === 0) return t('stats.timeMin', { n: m })
+  return m > 0 ? t('stats.timeHrMin', { h, m }) : t('stats.timeHr', { h })
 }
 
 function onResetClick() {
@@ -160,7 +160,7 @@ function renderChart() {
     data: {
       labels,
       datasets: [{
-        label: 'Активная работа',
+        label: t('stats.chartLabel'),
         data: seconds,
         backgroundColor: barColors,
         hoverBackgroundColor: hoverColors,
@@ -177,7 +177,7 @@ function renderChart() {
         legend: { display: false },
         tooltip: {
           callbacks: {
-            label: (ctx) => ` Работа: ${fmt(ctx.parsed.y)}`,
+            label: (ctx) => t('stats.tooltipLabel', { time: fmt(ctx.parsed.y) }),
           },
         },
       },
@@ -198,7 +198,7 @@ function renderChart() {
             font: { size: 11 },
             callback: (v) => {
               const h = Number(v) / 3600
-              return h >= 1 ? `${Math.round(h * 10) / 10} ч` : `${Math.round(Number(v) / 60)} мин`
+              return h >= 1 ? t('stats.timeHr', { h: Math.round(h * 10) / 10 }) : t('stats.timeMin', { n: Math.round(Number(v) / 60) })
             },
           },
         },

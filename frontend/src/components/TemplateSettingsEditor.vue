@@ -4,47 +4,47 @@
       <div class="tpl-card-header">
         <div class="tpl-card-title-group">
           <span class="tpl-card-icon"><i class="modus-icons">tune</i></span>
-          <span class="tpl-card-title">Параметры страницы</span>
+          <span class="tpl-card-title">{{ t('tse.title') }}</span>
         </div>
         <div class="tpl-card-header-actions">
-          <label class="tpl-header-ctl" title="Размер между строками (мм) — общий отступ между параметрами и блоками на листе, один для всего шаблона">
-            <span>Между строками</span>
+          <label class="tpl-header-ctl" :title="t('tse.lineGapTitle')">
+            <span>{{ t('tse.lineGapLabel') }}</span>
             <select class="tpl-param-select tpl-header-linegap" :value="String(ed.lineGap)" @change="setLineGap">
-              <option v-for="g in LINE_GAPS" :key="g" :value="String(g)">{{ g }} мм</option>
+              <option v-for="g in LINE_GAPS" :key="g" :value="String(g)">{{ g }} {{ t('tpl.mmUnit') }}</option>
             </select>
           </label>
-          <label class="tpl-header-ctl" title="Небольшая линия-разделитель между соседними строками параметров на листе, шириной с текст строки">
+          <label class="tpl-header-ctl" :title="t('tse.lineTitle')">
             <input type="checkbox" class="tpl-header-line" :checked="ed.lineEnabled" @change="legacy('tplEditorSetLineEnabled', $event.target.checked)">
-            <span>Линия</span>
+            <span>{{ t('tse.lineLabel') }}</span>
           </label>
           <button
             type="button"
             class="btn btn-xs btn-secondary"
-            title="Горизонтальный блок: перетащенные в него параметры выстроятся в одну строку через « | »"
+            :title="t('tse.blockHTitle')"
             @click="legacy('tplEditorCreateGroup', 'horizontal')"
-          ><i class="modus-icons">drag_horiz</i> Блок</button>
+          ><i class="modus-icons">drag_horiz</i> {{ t('tse.blockBtn') }}</button>
           <button
             type="button"
             class="btn btn-xs btn-secondary"
-            title="Вертикальный блок: перетащенные в него параметры выстроятся друг под другом, каждый на своей строке"
+            :title="t('tse.blockVTitle')"
             @click="legacy('tplEditorCreateGroup', 'vertical')"
-          ><i class="modus-icons">drag_vert</i> Блок</button>
+          ><i class="modus-icons">drag_vert</i> {{ t('tse.blockBtn') }}</button>
           <button
             type="button"
             class="btn btn-xs btn-primary"
             @click="legacy('openParamModal', 'create', null, ed.tplKey)"
-          ><i class="modus-icons">add_circle</i> Создать параметр</button>
+          ><i class="modus-icons">add_circle</i> {{ t('tse.createParamBtn') }}</button>
         </div>
       </div>
       <div class="tpl-card-body">
-        <p class="field-hint tpl-param-hint">Параметр создается из данных «Данные проекта», «Папки спецификации», сцены или страницы. В строке параметра задаются: размер шрифта, цвет, заголовок и место на странице — кнопка с 8 направлениями (углы и стороны листа). Шрифт и начертание наследуются из общих настроек над карточкой. «Размер между строками» и линия-разделитель «Линия» — общие для всех параметров и блоков, задаются в шапке карточки. 📦 Блок объединяет параметры: горизонтальный — в одну строку через « | », вертикальный — каждый параметр на своей строке.</p>
+        <p class="field-hint tpl-param-hint">{{ t('tse.hint') }}</p>
 
         <div
           class="tpl-params-list template-settings-scroll"
           id="templateSettingsContainer"
           @dragover="onListDragOver"
         >
-          <div v-if="!ed.params.length" class="tpl-params-empty">Параметров пока нет — нажмите «+ Создать параметр».</div>
+          <div v-if="!ed.params.length" class="tpl-params-empty">{{ t('tse.empty') }}</div>
 
           <!-- Верхнеуровневые строки: параметры и блоки -->
           <div
@@ -70,44 +70,44 @@
             @dragend="clearDrag"
           >
             <div class="tpl-param-head">
-              <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок">⠿</span>
-              <label class="tpl-param-vis" title="Выводить параметр на страницах шаблона">
+              <span class="drag-handle tpl-param-drag" :title="t('tse.dragTitle')">⠿</span>
+              <label class="tpl-param-vis" :title="t('tse.visibleTitle')">
                 <input type="checkbox" class="tpl-param-visible" :checked="p.visible" @change="legacy('tplEditorSetVisible', p.id, $event.target.checked)">
-                <span>Вкл</span>
+                <span>{{ t('tse.visibleLabel') }}</span>
               </label>
               <div class="tpl-param-main">
                 <span v-if="!p.group" class="tpl-param-label">{{ p._label }}</span>
-                <span v-else class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px">{{ p.direction === 'vertical' ? 'drag_vert' : 'drag_horiz' }}</i> Блок</span>
+                <span v-else class="tpl-param-label"><i class="modus-icons" style="font-size: 13px; vertical-align: -1px; margin-right: 3px">{{ p.direction === 'vertical' ? 'drag_vert' : 'drag_horiz' }}</i> {{ t('tse.blockLabel') }}</span>
                 <span class="param-help-badge" :title="paramHelpTitle(p)">!</span>
                 <span v-if="!p.group && p._shownLabel" class="tpl-param-caption">«{{ p._shownLabel }}»</span>
                 <template v-if="!p.group">
                   <span v-if="p._preview" class="tpl-line-preview">({{ p._preview }})</span>
-                  <span v-else class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>
+                  <span v-else class="tpl-line-preview tpl-param-preview-empty">{{ t('tse.noData') }}</span>
                 </template>
                 <input
                   v-if="p.group"
                   v-model="p.label"
                   type="text"
                   class="form-control tpl-param-group-label"
-                  placeholder="Название блока (необязательно)"
+                  :placeholder="t('tse.groupLabelPh')"
                   @input="legacy('tplEditorUpdate', p.id, { label: p.label }, false)"
                 >
                 <span v-if="p.group" class="tpl-param-count">{{ countText(p._children.length) }}</span>
               </div>
               <div class="tpl-param-actions">
-                <button type="button" class="tpl-param-btn tpl-param-up" title="Выше в списке" @click="legacy('tplEditorMove', p.id, -1)">▲</button>
-                <button type="button" class="tpl-param-btn tpl-param-down" title="Ниже в списке" @click="legacy('tplEditorMove', p.id, 1)">▼</button>
+                <button type="button" class="tpl-param-btn tpl-param-up" :title="t('tse.upTitle')" @click="legacy('tplEditorMove', p.id, -1)">▲</button>
+                <button type="button" class="tpl-param-btn tpl-param-down" :title="t('tse.downTitle')" @click="legacy('tplEditorMove', p.id, 1)">▼</button>
                 <button
                   v-if="!p.group"
                   type="button"
                   class="tpl-param-btn tpl-param-edit"
-                  title="Изменить источник и заголовок"
+                  :title="t('tse.editTitle')"
                   @click="legacy('openParamModal', 'edit', p.id, ed.tplKey)"
                 ><i class="modus-icons" style="font-size: 13px">edit</i></button>
                 <button
                   type="button"
                   class="tpl-param-btn tpl-param-del"
-                  :title="p.group ? 'Удалить блок вместе с его параметрами' : 'Удалить параметр'"
+                  :title="p.group ? t('tse.deleteGroupTitle') : t('tse.deleteRowTitle')"
                   @click="legacy('tplEditorDeleteRow', p.id)"
                 ><i class="modus-icons" style="font-size: 13px">delete</i></button>
               </div>
@@ -117,11 +117,11 @@
                 type="color"
                 class="tpl-param-color"
                 :value="p.color"
-                title="Цвет текста параметра"
+                :title="t('tse.colorTitle')"
                 @input="legacy('tplEditorUpdate', p.id, { color: $event.target.value }, false)"
                 @change="legacy('tplEditorUpdate', p.id, { color: $event.target.value }, true)"
               >
-              <div class="tpl-param-box" title="Размер шрифта (пт)">
+              <div class="tpl-param-box" :title="t('tse.sizeTitle')">
                 <select class="tpl-param-select tpl-param-size" :value="String(p.font_size)" @change="setSize(p, $event)">
                   <option v-for="s in sizesFor(p.font_size)" :key="s" :value="String(s)">{{ s }} pt</option>
                 </select>
@@ -130,14 +130,14 @@
                 type="button"
                 class="tpl-param-btn tpl-param-align9"
                 :class="{ active: alignPop && alignPop.rowId === p.id }"
-                :title="`Место на странице: ${alignTitle(p.align, p.valign)}`"
+                :title="t('tse.alignTitle', { align: alignTitle(p.align, p.valign) })"
                 @click.stop="toggleAlignPop(p.id, $event)"
               >{{ alignGlyph(p.align, p.valign) }}</button>
-              <label class="tpl-param-vis" title="Выводить заголовок на отдельной строке над значением на листе">
+              <label class="tpl-param-vis" :title="t('tse.showLabelTitle')">
                 <input type="checkbox" class="tpl-param-show-label" :checked="p.show_label" @change="legacy('tplEditorUpdate', p.id, { show_label: $event.target.checked }, true)">
-                <span>Заголовок</span>
+                <span>{{ t('tse.showLabel') }}</span>
               </label>
-              <span class="tpl-param-zone" title="Зона размещения параметра на странице">{{ p._zone }}</span>
+              <span class="tpl-param-zone" :title="t('tse.zoneTitle')">{{ p._zone }}</span>
             </div>
 
             <!-- Дети блока: одна строка через « | » -->
@@ -168,21 +168,21 @@
                 @drop.stop="onChildDrop($event, c.id, p.id)"
                 @dragend="clearDrag"
               >
-                <span class="drag-handle tpl-param-drag" title="Перетащите, чтобы изменить порядок в блоке">⠿</span>
+                <span class="drag-handle tpl-param-drag" :title="t('tse.dragInGroupTitle')">⠿</span>
                 <span class="tpl-param-child-label">{{ c._label }}</span>
                 <span class="param-help-badge" :title="paramHelpTitle(c)">!</span>
                 <span v-if="c._shownLabel" class="tpl-param-caption">«{{ c._shownLabel }}»</span>
                 <span v-if="c._preview" class="tpl-line-preview">({{ c._preview }})</span>
-                <span v-else class="tpl-line-preview tpl-param-preview-empty">(нет данных)</span>
-                <label class="tpl-param-vis tpl-param-child-vis" title="Выводить заголовок перед значением внутри блока">
+                <span v-else class="tpl-line-preview tpl-param-preview-empty">{{ t('tse.noData') }}</span>
+                <label class="tpl-param-vis tpl-param-child-vis" :title="t('tse.childShowLabelTitle')">
                   <input type="checkbox" class="tpl-param-child-show-label" :checked="c.show_label" @change="legacy('tplEditorChildShowLabel', p.id, c.id, $event.target.checked)">
-                  <span>Заголовок</span>
+                  <span>{{ t('tse.showLabel') }}</span>
                 </label>
-                <button type="button" class="tpl-param-child-out" title="Вывести из блока" @click="legacy('tplEditorChildOut', p.id, c.id)">
+                <button type="button" class="tpl-param-child-out" :title="t('tse.childOutTitle')" @click="legacy('tplEditorChildOut', p.id, c.id)">
                   <i class="modus-icons icon-close-cross" style="font-size: 11px">content_close</i>
                 </button>
               </div>
-              <div v-if="!p._children.length" class="tpl-param-drop-empty">Перетащите сюда параметры — они выстроятся в одну строку через « | »</div>
+              <div v-if="!p._children.length" class="tpl-param-drop-empty">{{ t('tse.groupDropEmpty') }}</div>
             </div>
           </div>
         </div>
@@ -218,6 +218,7 @@
 import { computed, nextTick, ref } from 'vue'
 import { ui } from '../store.js'
 import { paramHelpTitle } from './paramHelp.js'
+import { t, locale } from '../i18n/index.js'
 
 // legacy пересоздаёт объект ui.tplEditor при каждом ре-синке — только computed
 const ed = computed(() => ui.tplEditor)
@@ -241,8 +242,8 @@ function alignGlyph(h, v) {
   return ALIGN_GLYPHS[`${h}|${v}`] || '↖'
 }
 function alignTitle(h, v) {
-  const H = { left: 'слева', center: 'по центру', right: 'справа' }
-  const V = { top: 'вверху', center: 'в середине', bottom: 'внизу' }
+  const H = { left: t('tse.alignH.left'), center: t('tse.alignH.center'), right: t('tse.alignH.right') }
+  const V = { top: t('tse.alignV.top'), center: t('tse.alignV.center'), bottom: t('tse.alignV.bottom') }
   return `${H[h] || h} · ${V[v] || v}`
 }
 
@@ -325,14 +326,17 @@ function setSize(p, e) {
 function setLineGap(e) {
   legacy('tplEditorSetLineGap', e.target.value)
 }
-// «N параметров» с согласованием окончаний
+// «N параметров» с согласованием окончаний (для en — просто форма множественного)
 function countText(n) {
+  if (locale.value === 'en') {
+    return n === 1 ? t('tse.countOne', { n }) : t('tse.countMany', { n })
+  }
   const m10 = n % 10
   const m100 = n % 100
-  const word = m10 === 1 && m100 !== 11 ? 'параметр'
-    : m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14) ? 'параметра'
-      : 'параметров'
-  return `${n} ${word}`
+  const key = (m10 === 1 && m100 !== 11) ? 'tse.countOne'
+    : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? 'tse.countFew'
+      : 'tse.countMany'
+  return t(key, { n })
 }
 
 // --- Drag & Drop: сортировка, перенос в блок/из блока, реордер детей ---

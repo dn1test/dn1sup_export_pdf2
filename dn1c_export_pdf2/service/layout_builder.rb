@@ -49,8 +49,7 @@ module DN1Code
         # Основной метод экспорта через LayOut API
         def export(controller, custom_output_path = nil, &progress_block)
           unless available?
-            raise "LayOut Ruby API не доступен в текущей версии SketchUp.\n" \
-                  "Убедитесь, что используется SketchUp Pro с установленным модулем LayOut."
+            raise Locale.t(:lb_layout_missing)
           end
 
           project_data = controller.project_data
@@ -59,7 +58,7 @@ module DN1Code
 
           enabled_scenes = project_data.scenes.select(&:enabled)
           if enabled_scenes.empty?
-            raise "Не выбрано ни одной сцены для экспорта в LayOut / PDF!"
+            raise Locale.t(:lb_no_scenes)
           end
 
           pdf_path = custom_output_path || controller.send(:resolve_default_pdf_path)
@@ -67,7 +66,7 @@ module DN1Code
           # Целевой PDF открыт в просмотрщике → запись упадёт с EACCES.
           # Предупреждаем сразу и не пытаемся сохранить.
           if Model::FileOpener.file_locked?(pdf_path)
-            raise "Целевой PDF открыт в программе просмотра и заблокирован для записи:\n#{pdf_path}\nЗакройте его и повторите экспорт."
+            raise Locale.t(:lb_pdf_locked, path: pdf_path)
           end
 
           FileUtils.mkdir_p(File.dirname(pdf_path))
@@ -75,7 +74,7 @@ module DN1Code
           temp_images = []
           begin
             total_pages = enabled_scenes.size
-            progress_block&.call(0, total_pages, "Инициализация документа LayOut...")
+            progress_block&.call(0, total_pages, Locale.t(:lb_init))
 
             # Установка шрифта (по умолчанию Sofia Sans Condensed) в систему
             font_family = FontService.layout_font_family(settings)
@@ -159,7 +158,7 @@ module DN1Code
             # 3. Построение страниц по модульной сетке
             enabled_scenes.each_with_index do |scene_item, idx|
               page_index = idx + 1
-              progress_block&.call(page_index, total_pages, "Построение страницы LayOut #{page_index}/#{total_pages}: #{scene_item.name}")
+              progress_block&.call(page_index, total_pages, Locale.t(:lb_page, cur: page_index, total: total_pages, name: scene_item.name))
 
               page = if idx.zero?
                        (doc.pages.respond_to?(:initial) ? doc.pages.initial : doc.pages.first) || doc.pages.add(scene_item.name)
@@ -171,7 +170,7 @@ module DN1Code
               render_modular_page(doc, page, layers, scene_item, page_index, total_pages, page_w_in, page_h_in, margin_in, ctx, temp_images)
             end
 
-            progress_block&.call(total_pages, total_pages, "Экспорт документа LayOut в PDF...")
+              progress_block&.call(total_pages, total_pages, Locale.t(:lb_export_pdf))
 
             # 4. Экспорт в PDF: сам документ ВСЕГДА сжимается без потерь (FlateDecode)
             raw_fmt = (settings[:image_format] || "png").to_s.downcase.strip
@@ -240,7 +239,7 @@ module DN1Code
               project_data.save_program_settings
             end
 
-            progress_block&.call(total_pages, total_pages, "Экспорт через LayOut API успешно завершен!")
+            progress_block&.call(total_pages, total_pages, Locale.t(:lb_done))
 
             # 8. Открытие PDF файла системной программой по умолчанию
             # Открываем именно копию «_last» рядом с .skp, если она создана

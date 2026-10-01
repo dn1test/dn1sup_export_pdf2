@@ -2,47 +2,47 @@
   <!-- Создание шаблона -->
   <BaseModal
     :open="!!m.newTemplate"
-    title="Новый шаблон страницы"
+    :title="t('tm.newTitle')"
     card-class="modal-form-card"
     @close="closeNew"
   >
     <template v-if="m.newTemplate">
       <div class="modal-header-row">
         <span class="modal-card-icon"><i class="modus-icons">add_circle</i></span>
-        <h3>Новый шаблон страницы</h3>
+        <h3>{{ t('tm.newTitle') }}</h3>
       </div>
-      <p class="field-hint">Шаблон копирует видовой экран и параметры выбранной основы; название можно поменять в любой момент.</p>
+      <p class="field-hint">{{ t('tm.newHint') }}</p>
       <div class="form-group">
-        <label for="inputNewTemplateName">Название шаблона *</label>
+        <label for="inputNewTemplateName">{{ t('tm.nameLabel') }}</label>
         <input
           id="inputNewTemplateName"
           v-model="m.newTemplate.name"
           type="text"
           class="form-control"
-          placeholder="Например: Страница с зоной замеров"
+          :placeholder="t('tm.newNamePh')"
           @keydown.enter.prevent="confirmNew"
         >
       </div>
       <div class="form-group">
-        <label for="inputNewTemplateDescription">Описание (подсказка в списках)</label>
+        <label for="inputNewTemplateDescription">{{ t('tm.descHintLabel') }}</label>
         <input
           id="inputNewTemplateDescription"
           v-model="m.newTemplate.description"
           type="text"
           class="form-control"
-          placeholder="Например: Для листов с обмерным планом"
+          :placeholder="t('tm.newDescPh')"
           @keydown.enter.prevent="confirmNew"
         >
       </div>
       <div class="form-group">
-        <label for="selectNewTemplateBase">Основа</label>
+        <label for="selectNewTemplateBase">{{ t('tm.baseLabel') }}</label>
         <select id="selectNewTemplateBase" v-model="m.newTemplate.base" class="form-control">
           <option v-for="b in m.newTemplate.bases" :key="b.key" :value="b.key">{{ b.name }}</option>
         </select>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="closeNew"><i class="modus-icons">content_close</i> Отмена</button>
-        <button type="button" class="btn btn-primary" @click="confirmNew"><i class="modus-icons">check_mark</i> Создать шаблон</button>
+        <button type="button" class="btn btn-secondary" @click="closeNew"><i class="modus-icons">content_close</i> {{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn-primary" @click="confirmNew"><i class="modus-icons">check_mark</i> {{ t('tm.createBtn') }}</button>
       </div>
     </template>
   </BaseModal>
@@ -50,18 +50,18 @@
   <!-- Переименование шаблона -->
   <BaseModal
     :open="!!m.renameTemplate"
-    title="Переименовать шаблон"
+    :title="t('tm.renameTitle')"
     card-class="modal-form-card"
     @close="closeRename"
   >
     <template v-if="m.renameTemplate">
       <div class="modal-header-row">
         <span class="modal-card-icon"><i class="modus-icons">edit</i></span>
-        <h3>Переименовать шаблон</h3>
+        <h3>{{ t('tm.renameTitle') }}</h3>
       </div>
-      <p class="field-hint">Имя и описание шаблона «{{ m.renameTemplate.name }}». Сцены, использующие шаблон, сохраняют привязку.</p>
+      <p class="field-hint">{{ t('tm.renameHint', { name: m.renameTemplate.name }) }}</p>
       <div class="form-group">
-        <label for="inputRenameTemplateName">Название шаблона *</label>
+        <label for="inputRenameTemplateName">{{ t('tm.nameLabel') }}</label>
         <input
           id="inputRenameTemplateName"
           v-model="m.renameTemplate.name"
@@ -71,7 +71,7 @@
         >
       </div>
       <div class="form-group">
-        <label for="inputRenameTemplateDescription">Описание</label>
+        <label for="inputRenameTemplateDescription">{{ t('tm.descLabel') }}</label>
         <input
           id="inputRenameTemplateDescription"
           v-model="m.renameTemplate.description"
@@ -81,8 +81,8 @@
         >
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="closeRename"><i class="modus-icons">content_close</i> Отмена</button>
-        <button type="button" class="btn btn-primary" @click="confirmRename"><i class="modus-icons">check_mark</i> Сохранить</button>
+        <button type="button" class="btn btn-secondary" @click="closeRename"><i class="modus-icons">content_close</i> {{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn-primary" @click="confirmRename"><i class="modus-icons">check_mark</i> {{ t('tm.saveBtn') }}</button>
       </div>
     </template>
   </BaseModal>
@@ -90,23 +90,23 @@
   <!-- Удаление шаблона -->
   <BaseModal
     :open="!!m.deleteTemplate"
-    title="Удаление шаблона"
+    :title="t('tm.deleteTitle')"
     @close="closeDelete"
   >
     <template v-if="m.deleteTemplate">
       <div class="modal-header-with-icon modal-header-danger">
         <div class="modal-badge-icon danger"><i class="modus-icons">delete</i></div>
         <div class="modal-header-text">
-          <h3 class="modal-title">Удаление шаблона</h3>
+          <h3 class="modal-title">{{ t('tm.deleteTitle') }}</h3>
         </div>
       </div>
       <div class="modal-body-pad">
-        <p>{{ m.deleteTemplate.msg || `Вы действительно хотите удалить шаблон «${m.deleteTemplate.name}»?` }}</p>
-        <p class="field-hint">Сцены удалённого шаблона будут переключены на первый оставшийся шаблон.</p>
+        <p>{{ m.deleteTemplate.msg || t('tm.deleteConfirm', { name: m.deleteTemplate.name }) }}</p>
+        <p class="field-hint">{{ t('tm.deleteHint') }}</p>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="closeDelete"><i class="modus-icons">content_close</i> Отмена</button>
-        <button type="button" class="btn btn-danger" @click="confirmDelete"><i class="modus-icons">delete</i> Удалить</button>
+        <button type="button" class="btn btn-secondary" @click="closeDelete"><i class="modus-icons">content_close</i> {{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn-danger" @click="confirmDelete"><i class="modus-icons">delete</i> {{ t('tm.deleteBtn') }}</button>
       </div>
     </template>
   </BaseModal>
@@ -114,30 +114,30 @@
   <!-- Сохранение набора шаблонов -->
   <BaseModal
     :open="!!m.saveSet"
-    title="Сохранение набора шаблонов"
+    :title="t('tm.saveSetTitle')"
     card-class="modal-form-card"
     @close="closeSaveSet"
   >
     <template v-if="m.saveSet">
       <div class="modal-header-row">
         <span class="modal-card-icon"><i class="modus-icons">layers</i></span>
-        <h3>Сохранение набора шаблонов</h3>
+        <h3>{{ t('tm.saveSetTitle') }}</h3>
       </div>
-      <p class="field-hint">Набор сохраняет текущий список всех шаблонов страниц. Загрузив набор позже, вы мгновенно переключите оформление PDF под другой проект:</p>
+      <p class="field-hint">{{ t('tm.saveSetHint') }}</p>
       <div class="form-group">
-        <label for="inputTemplateSetName">Название набора *</label>
+        <label for="inputTemplateSetName">{{ t('tm.setLabel') }}</label>
         <input
           id="inputTemplateSetName"
           v-model="m.saveSet.name"
           type="text"
           class="form-control"
-          placeholder="Например: Кухни, Шкафы-купе, Проект Иванов"
+          :placeholder="t('tm.setPh')"
           @keydown.enter.prevent="confirmSaveSet"
         >
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="closeSaveSet"><i class="modus-icons">content_close</i> Отмена</button>
-        <button type="button" class="btn btn-primary" @click="confirmSaveSet"><i class="modus-icons">save</i> Сохранить набор</button>
+        <button type="button" class="btn btn-secondary" @click="closeSaveSet"><i class="modus-icons">content_close</i> {{ t('common.cancel') }}</button>
+        <button type="button" class="btn btn-primary" @click="confirmSaveSet"><i class="modus-icons">save</i> {{ t('tm.saveSetBtn') }}</button>
       </div>
     </template>
   </BaseModal>
@@ -158,11 +158,11 @@
       <div class="modal-body-pad">
         <p>{{ m.confirmSet.msg }}</p>
         <p v-if="!m.confirmSet.danger" class="field-hint">
-          Текущие шаблоны и их параметры будут заменены содержимым набора. Сцены отсутствующих в наборе шаблонов переключатся на первый доступный шаблон.
+          {{ t('tm.confirmHint') }}
         </p>
       </div>
       <div class="modal-actions">
-        <button type="button" class="btn btn-secondary" @click="closeConfirmSet"><i class="modus-icons">content_close</i> Отмена</button>
+        <button type="button" class="btn btn-secondary" @click="closeConfirmSet"><i class="modus-icons">content_close</i> {{ t('common.cancel') }}</button>
         <button
           type="button"
           class="btn"
@@ -170,7 +170,7 @@
           @click="confirmSet"
         >
           <i class="modus-icons">{{ m.confirmSet.danger ? 'delete' : 'check_mark' }}</i>
-          {{ m.confirmSet.danger ? 'Удалить' : (m.confirmSet.type === 'refresh' || m.confirmSet.type === 'overwrite' ? 'Перезаписать' : 'Загрузить') }}
+          {{ m.confirmSet.danger ? t('tm.deleteBtn') : (m.confirmSet.type === 'refresh' || m.confirmSet.type === 'overwrite' ? t('tm.btnOverwrite') : t('tm.btnLoad')) }}
         </button>
       </div>
     </template>
@@ -181,6 +181,7 @@
 import { computed } from 'vue'
 import BaseModal from './BaseModal.vue'
 import { ui } from '../store.js'
+import { t } from '../i18n/index.js'
 
 const m = computed(() => ui.tplModals)
 

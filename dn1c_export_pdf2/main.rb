@@ -13,6 +13,9 @@ end
 # Загрузка версии
 require_relative "version"
 
+# Локализация строк Ruby-стороны, видимых в GUI (язык — pdf_settings.language)
+require_relative "locale"
+
 # Загрузка сервисов (генерация PDF через SketchUp LayOut Ruby API)
 require_relative "service/observer_service"
 require_relative "service/overlay_service"

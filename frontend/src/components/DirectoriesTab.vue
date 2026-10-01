@@ -3,20 +3,19 @@
     <div class="card-header">
       <div class="card-header-title-wrap">
         <span class="card-header-icon"><i class="modus-icons">folder</i></span>
-        <span class="card-header-title">Рабочие папки и спецификации проекта (directories)</span>
+        <span class="card-header-title">{{ t('dirs.title') }}</span>
       </div>
       <div class="card-header-buttons">
         <button type="button" class="btn btn-xs btn-secondary" @click="legacy('refreshDirectories')">
-          <i class="modus-icons">refresh</i> Обновить
+          <i class="modus-icons">refresh</i> {{ t('dirs.refresh') }}
         </button>
         <button type="button" class="btn btn-xs btn-primary" @click="legacy('addDirectory')">
-          <i class="modus-icons">add_circle</i> Добавить папку
+          <i class="modus-icons">add_circle</i> {{ t('dirs.add') }}
         </button>
       </div>
     </div>
     <p class="field-hint">
-      Для каждой папки проекта настраивается путь, полноценный блок спецификаций/описания и блок предпросмотра
-      файлов (фото, замеры, материалы, чертежи):
+      {{ t('dirs.hint') }}
     </p>
 
     <div class="directories-cards-container">
@@ -24,9 +23,9 @@
         <div style="font-size: 32px; margin-bottom: 8px">
           <i class="modus-icons" style="font-size: 36px; color: var(--text-dim, #6a6e79)">folder</i>
         </div>
-        <div style="font-weight: 600; color: var(--text-color); font-size: 14px">Папки проекта не заданы</div>
+        <div style="font-weight: 600; color: var(--text-color); font-size: 14px">{{ t('dirs.emptyTitle') }}</div>
         <div style="font-size: 12px; color: var(--text-dim); margin-top: 4px">
-          Нажмите «+ Добавить папку», чтобы создать раздел спецификаций и привязать рабочие файлы.
+          {{ t('dirs.emptyHint') }}
         </div>
       </div>
 
@@ -54,8 +53,8 @@
               v-model="d.title"
               type="text"
               class="form-control dir-title-input"
-              placeholder="Название раздела проекта (например: Материалы и фурнитура)..."
-              title="Название блока/раздела (сохраняется в спецификациях)"
+              :placeholder="t('dirs.titlePh')"
+              :title="t('dirs.titleTitle')"
               @mousedown="dragArm = null"
               @change="commit()"
             >
@@ -63,19 +62,19 @@
               type="button"
               class="dir-path-text btn btn-xs btn-secondary"
               :class="{ empty: !d.path }"
-              :title="d.path ? `${d.path}\nНажмите, чтобы выбрать другую папку` : 'Нажмите, чтобы выбрать папку на диске'"
+              :title="d.path ? t('dirs.pathWithTitle', { path: d.path }) : t('dirs.pathNoPathTitle')"
               @click="selectDirectory(index)"
-            >{{ d.path || 'выбрать папку…' }}</button>
+            >{{ d.path || t('dirs.pickFolder') }}</button>
 
             <div class="dir-header-actions">
               <label class="checkbox-label dir-send-server-label">
                 <input
                   v-model="d.send_to_server"
                   type="checkbox"
-                  title="Отправлять эту папку на сервер при отправке проекта"
+                  :title="t('dirs.sendTitle')"
                   @change="commit()"
                 >
-                <span>Отправлять на сервер</span>
+                <span>{{ t('dirs.sendLabel') }}</span>
               </label>
             </div>
           </div>
@@ -85,23 +84,23 @@
               type="button"
               class="btn-move-dir"
               :disabled="index === 0"
-              title="Поднять раздел выше"
+              :title="t('dirs.upTitle')"
               @click="moveUp(index)"
             >▲</button>
             <button
               type="button"
               class="btn-move-dir"
               :disabled="index === ui.directories.length - 1"
-              title="Опустить раздел ниже"
+              :title="t('dirs.downTitle')"
               @click="moveDown(index)"
             >▼</button>
             <div
               class="dir-drag-handle"
-              title="Потяните мышкой для изменения порядка разделов"
+              :title="t('dirs.dragTitle')"
               @mousedown="dragArm = d.uid"
               @mouseup="dragArm = null"
             >⠿</div>
-            <button type="button" class="btn-icon btn-delete" title="Удалить этот раздел папки" @click="removeDir(index)">
+            <button type="button" class="btn-icon btn-delete" :title="t('dirs.deleteTitle')" @click="removeDir(index)">
               <i class="modus-icons icon-close-cross" style="font-size: 11px">content_close</i>
             </button>
           </div>
@@ -113,7 +112,7 @@
             v-model="d.description"
             class="form-control dir-desc-textarea"
             rows="3"
-            placeholder="Спецификация раздела (материалы, фурнитура, техника, размеры, пояснения к заказу)..."
+            :placeholder="t('dirs.descPh')"
             @mousedown="dragArm = null"
             @input="commit()"
           ></textarea>
@@ -125,9 +124,9 @@
             <div class="dir-section-title">
               <span>
                 <i class="modus-icons" style="font-size: 15px; vertical-align: -2px; margin-right: 4px">insert_photo</i>
-                Файлы и предпросмотр в папке:
+                {{ t('dirs.filesLabel') }}
               </span>
-              <code style="font-size: 11px; color: var(--text-dim); text-transform: none">{{ d.path || '(папка не задана)' }}</code>
+              <code style="font-size: 11px; color: var(--text-dim); text-transform: none">{{ d.path || t('dirs.noPathCode') }}</code>
             </div>
 
             <div class="dir-preview-header-right">
@@ -138,7 +137,7 @@
                   type="button"
                   class="dir-thumb-size-btn"
                   :class="{ active: d.thumb_size === v.key }"
-                  :title="v.title"
+                  :title="t(v.titleKey)"
                   @click="setThumbSize(d, v.key)"
                 >{{ v.label }}</button>
               </div>
@@ -148,7 +147,7 @@
               <button
                 type="button"
                 class="dir-open-folder-btn"
-                title="Открыть папку в проводнике Windows"
+                :title="t('dirs.openTitle')"
                 @click="openInExplorer(d)"
               >↗</button>
             </div>
@@ -156,22 +155,22 @@
 
           <div class="dir-preview-grid" :class="`thumb-${d.thumb_size}`">
             <div v-if="d.preview.state === 'loading'" class="dir-empty-state" style="grid-column: 1 / -1">
-              Загрузка файлов...
+              {{ t('dirs.stateLoading') }}
             </div>
             <div v-else-if="d.preview.state === 'timeout'" class="dir-empty-state" style="grid-column: 1 / -1; color: #b45309">
-              ⏱️ Сканирование заняло слишком много времени. Проверьте правильность пути или нажмите «🔄 Обновить».
+              {{ t('dirs.stateTimeout') }}
             </div>
             <div v-else-if="d.preview.state === 'missing'" class="dir-empty-state" style="grid-column: 1 / -1; color: #b45309">
               <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px">warning</i>
-              Папка не найдена на диске. Нажмите «Обзор», чтобы указать существующий каталог.
+              {{ t('dirs.stateMissing') }}
             </div>
             <div v-else-if="d.preview.state === 'nopath'" class="dir-empty-state" style="grid-column: 1 / -1">
               <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px">folder</i>
-              Путь к папке не задан. Нажмите «Обзор», чтобы выбрать рабочую папку с файлами.
+              {{ t('dirs.stateNoPath') }}
             </div>
             <div v-else-if="d.preview.state === 'empty'" class="dir-empty-state" style="grid-column: 1 / -1">
               <i class="modus-icons" style="font-size: 16px; vertical-align: -2px; margin-right: 4px">folder</i>
-              Папка существует, но файлов в ней пока нет. Вы можете поместить в неё фото, замеры или спецификации.
+              {{ t('dirs.stateEmpty') }}
             </div>
 
             <template v-else>
@@ -179,7 +178,7 @@
                 v-for="file in d.preview.files"
                 :key="file.path"
                 class="dir-preview-item"
-                :title="`${file.name} (${formatFileSize(file.size)})\nНажмите, чтобы открыть файл`"
+                :title="t('dirs.fileTitle', { name: file.name, size: formatFileSize(file.size) })"
                 @click="callRuby('openFile', file.path)"
               >
                 <div class="dir-preview-thumb-wrap">
@@ -213,11 +212,12 @@
 import { ref } from 'vue'
 import { ui, showToast } from '../store.js'
 import { formatFileSize, getDocIcon as docIcon, pluralFiles } from '../format.js'
+import { t } from '../i18n/index.js'
 
 const thumbVariants = [
-  { key: 'small', label: 'S', title: 'Мелкие эскизы' },
-  { key: 'medium', label: 'M', title: 'Средние эскизы' },
-  { key: 'large', label: 'L', title: 'Крупные эскизы' },
+  { key: 'small', label: 'S', titleKey: 'dirs.thumbSmall' },
+  { key: 'medium', label: 'M', titleKey: 'dirs.thumbMedium' },
+  { key: 'large', label: 'L', titleKey: 'dirs.thumbLarge' },
 ]
 
 // Отправка изменённого списка в legacy: state.directories + спецификации + автосейв
@@ -239,7 +239,7 @@ function selectDirectory(index) {
 }
 function openInExplorer(d) {
   if (d.path) callRuby('openDirectoryPath', d.path)
-  else showToast('Папка не выбрана', 'warning')
+  else showToast(t('dirs.toastNoFolder'), 'warning')
 }
 
 function moveUp(index) {
@@ -307,16 +307,16 @@ function onDrop(e, index) {
   ui.directories.splice(dropIndex, 0, moved)
   clearDrag()
   commit()
-  showToast(`Раздел «${moved.title || 'Папка'}» перемещен на позицию #${dropIndex + 1}`, 'info')
+  showToast(t('dirs.toastMoved', { name: moved.title || t('dirs.folderWord'), n: dropIndex + 1 }), 'info')
 }
 
 function badgeText(preview) {
   switch (preview.state) {
-    case 'loading': return 'Сканирование...'
-    case 'timeout': return 'Не ответил'
-    case 'missing': return 'Не найдена'
-    case 'nopath': return '0 файлов'
-    case 'empty': return '0 файлов'
+    case 'loading': return t('dirs.badgeScanning')
+    case 'timeout': return t('dirs.badgeTimeout')
+    case 'missing': return t('dirs.badgeMissing')
+    case 'nopath': return t('dirs.badgeNoFiles')
+    case 'empty': return t('dirs.badgeNoFiles')
     default: return `${preview.count} ${pluralFiles(preview.count)}`
   }
 }
