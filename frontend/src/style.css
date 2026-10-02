@@ -1,5 +1,13 @@
 @import 'tailwindcss';
 
+/* Узкий шрифт интерфейса — переменный TTF бандлится Vite'ом из src/assets */
+@font-face {
+  font-family: 'Roboto Condensed';
+  src: url('./assets/fonts/RobotoCondensed-VariableFont_wght.ttf') format('truetype');
+  font-weight: 100 900;
+  font-display: swap;
+}
+
 /* -----------------------------------------------------------------------------
    DN1C Export PDF 2 — дизайн-токены (Tailwind v4, CSS-first).
    Светлая «про-инструментальная» тема: нейтральный серый + один синий акцент.
@@ -8,7 +16,8 @@
 ----------------------------------------------------------------------------- */
 @theme {
   --font-sans:
-    'Segoe UI', system-ui, -apple-system, 'Helvetica Neue', Arial, sans-serif;
+    'Roboto Condensed', 'Segoe UI', system-ui, -apple-system, 'Helvetica Neue',
+    Arial, sans-serif;
   --font-doc:
     'Sofia Sans Condensed', 'Sofia Sans Extra Condensed', 'Oswald',
     'Roboto Condensed', 'Ubuntu Condensed', sans-serif;
