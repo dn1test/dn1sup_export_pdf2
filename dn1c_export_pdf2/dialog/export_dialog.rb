@@ -73,7 +73,9 @@ module DN1Code
             height:          700,
             left:            120,
             top:             80,
-            min_width:       720,
+            # Минимальная ширина = естественная ширина панели вкладок (~856px),
+            # чтобы верхнее меню никогда не прокручивалось горизонтально
+            min_width:       860,
             min_height:      520,
             style:           UI::HtmlDialog::STYLE_DIALOG
           }

@@ -1,7 +1,7 @@
 <template>
   <div class="flex flex-col gap-3">
     <!-- Паспорт объекта + Карточка заказчика -->
-    <div class="grid grid-cols-1 gap-3 xl:grid-cols-2">
+    <div class="grid grid-cols-2 gap-3">
       <UiCard :title="t('project.title')">
         <template #icon><ClipboardListIcon :size="14" /></template>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
@@ -48,11 +48,11 @@
     </div>
 
     <!-- Ход работы + стадии -->
-    <UiCard :title="t('workflow.title')" body-class="p-0">
+    <UiCard :title="t('workflow.title')" body-class="p-0 @container">
       <template #icon><ClockIcon :size="14" /></template>
-      <div class="grid grid-cols-1 gap-0 lg:grid-cols-[1fr_300px]">
+      <div class="grid grid-cols-[1fr_300px] gap-0">
         <!-- Левая колонка: параметры -->
-        <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-3 gap-y-3 p-3.5">
+        <div class="grid grid-cols-1 gap-x-3 gap-y-3 p-3.5 @min-[900px]:grid-cols-2">
           <!-- Автор / Конструктор -->
           <UiField :label="t('workflow.authorLabel')">
             <UiInput v-model="project.workflow.author" :placeholder="t('workflow.authorPh')" @update:model-value="notifyChange()" />
@@ -129,21 +129,21 @@
           </div>
 
           <!-- Комментарий к последней правке -->
-          <UiField class="sm:col-span-2" :label="t('workflow.lastEditLabel')">
+          <UiField class="@min-[900px]:col-span-2" :label="t('workflow.lastEditLabel')">
             <UiInput v-model="project.lastEdit" :placeholder="t('workflow.lastEditPh')" @update:model-value="notifyChange()" />
           </UiField>
 
           <!-- Спецификации -->
-          <UiField class="sm:col-span-1" :label="t('workflow.materialsLabel')">
+          <UiField :label="t('workflow.materialsLabel')">
             <UiTextarea v-model="project.project.materials" :rows="4" :placeholder="t('workflow.materialsPh')" @update:model-value="onSpecsChanged" />
           </UiField>
-          <UiField class="sm:col-span-1" :label="t('workflow.lightingLabel')">
+          <UiField :label="t('workflow.lightingLabel')">
             <UiTextarea v-model="project.project.lighting" :rows="4" :placeholder="t('workflow.lightingPh')" @update:model-value="onSpecsChanged" />
           </UiField>
         </div>
 
         <!-- Правая колонка: стадии -->
-        <div class="flex flex-col border-t border-ink-100 lg:border-t-0 lg:border-l">
+        <div class="flex flex-col border-l border-ink-100">
           <div class="flex items-center gap-2 px-3.5 py-2.5">
             <CheckSquareIcon :size="14" class="text-ink-400" />
             <span class="text-[13px] font-semibold text-ink-900">{{ t('stadia.title') }}</span>
