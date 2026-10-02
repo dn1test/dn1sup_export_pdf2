@@ -39,6 +39,7 @@ export function migrateHistoryEntries(history) {
     if (!item || typeof item !== 'object') return
     item.ver = String(item.ver || '').trim()
     item.rev = String(item.rev || '').trim()
+    item.skp_link = String(item.skp_link || '').trim()
     const clean = splitRevSuffix(item.text || item.edit || item.description || '')
     if (!item.rev && clean.rev) item.rev = clean.rev
     if (clean.rev) {
@@ -155,7 +156,7 @@ export const useProjectStore = defineStore('project', {
         if (Array.isArray(wf.history_edit) && wf.history_edit.length > 0) {
           history = wf.history_edit.map((item) => {
             if (Array.isArray(item)) {
-              return { date: item[0] || '', text: item[1] || '', description: item[1] || '', pdf_link: item[2] || '', ver: '', rev: '' }
+              return { date: item[0] || '', text: item[1] || '', description: item[1] || '', pdf_link: item[2] || '', skp_link: item[3] || '', ver: '', rev: '' }
             }
             if (item && typeof item === 'object') {
               const txt = item.text || item.description || ''
@@ -164,6 +165,7 @@ export const useProjectStore = defineStore('project', {
                 text: txt,
                 description: txt,
                 pdf_link: item.pdf_link || '',
+                skp_link: item.skp_link || '',
                 ver: item.ver || item.version || '',
                 rev: item.rev || item.revision || '',
               }
@@ -318,6 +320,7 @@ export const useProjectStore = defineStore('project', {
         text: defaultText,
         description: defaultText,
         pdf_link: '',
+        skp_link: '',
         ver: '',
         rev: '',
       })
@@ -348,6 +351,15 @@ export const useProjectStore = defineStore('project', {
       const first = this.history[0]
       if (first && !String(first.pdf_link || '').trim()) {
         first.pdf_link = pdfPath
+        this.syncHistoryEditPairs()
+        notifyChange()
+      }
+    },
+    // Штамп SKP-копии экспорта к самой свежей записи (зеркало Ruby stamp_history_skp_link!)
+    stampHistorySkpLink(skpPath) {
+      const first = this.history[0]
+      if (first && skpPath && !String(first.skp_link || '').trim()) {
+        first.skp_link = skpPath
         this.syncHistoryEditPairs()
         notifyChange()
       }

@@ -4639,12 +4639,25 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(!project_data.stamp_history_pdf_link!("other.pdf"), "Повторный штамп не перезаписывает существующую ссылку")
     assert(project_data.history.first[:pdf_link] == result_path.to_s, "Ссылка первой записи сохранена после повторного штампа")
 
+    # SKP-копия: путь сохранен на контроллере и приштампован к свежей записи истории
+    # прямо при экспорте (layout_builder -> save_skp_backup -> stamp_history_skp_link!)
+    expected_skp = File.join(skp_dir, "EXP-300", "skp", "EXP-300_01#007.skp")
+    assert(File.exist?(expected_skp), "SKP-копия модели в папке артикула создана: #{expected_skp}")
+    assert(File.expand_path(controller.last_skp_path.to_s) == File.expand_path(expected_skp),
+           "controller.last_skp_path указывает на SKP-копию (#{controller.last_skp_path.inspect})")
+    assert(project_data.history.first[:skp_link].to_s.tr("\\", "/") == expected_skp.tr("\\", "/"),
+           "Самая свежая запись истории содержит путь SKP-копии (#{project_data.history.first[:skp_link].inspect})")
+    assert(project_data.history.last[:skp_link].to_s.empty?, "Старые записи истории без skp_link")
+    assert(!project_data.stamp_history_skp_link!("other.skp"), "Повторный штамп SKP не перезаписывает существующую ссылку")
+
     # Ссылка переживает запись/чтение YAML (корневая секция history_edit)
     yaml_temp = File.join(test_dir, "EXP-300.yaml")
     project_data.save_to_yaml(yaml_temp)
     reloaded = DN1Code::ExportPdf2::Model::ProjectData.new
     assert(reloaded.load_from_yaml(yaml_temp), "YAML с pdf_link прочитан обратно")
     assert(reloaded.history.first[:pdf_link].to_s == result_path.to_s, "pdf_link сохраняется в YAML и читается из него")
+    assert(reloaded.history.first[:skp_link].to_s.tr("\\", "/") == expected_skp.tr("\\", "/"),
+           "skp_link сохраняется в YAML и читается из него (#{reloaded.history.first[:skp_link].inspect})")
 
     FileUtils.rm_rf(test_dir)
   end

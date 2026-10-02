@@ -2,7 +2,22 @@
   <div class="flex flex-col gap-2">
     <div class="flex items-center gap-2">
       <span class="text-[11px] text-ink-400">{{ t('hist.infoText') }}</span>
-      <UiButton class="ml-auto" size="xs" variant="primary" :icon="PlusIcon" @click="project.addHistoryEntry()">
+      <UiButton
+        class="ml-auto"
+        size="xs"
+        :icon="FolderOpenIcon"
+        :disabled="!pdfFolderLink"
+        :title="pdfFolderLink ? t('hist.historyPdfTitle') : t('hist.historyNo')"
+        @click="openPdfFolder"
+      >{{ t('hist.historyPdfBtn') }}</UiButton>
+      <UiButton
+        size="xs"
+        :icon="FolderOpenIcon"
+        :disabled="!skpFolderLink"
+        :title="skpFolderLink ? t('hist.historySkpTitle') : t('hist.historyNo')"
+        @click="openSkpFolder"
+      >{{ t('hist.historySkpBtn') }}</UiButton>
+      <UiButton size="xs" variant="primary" :icon="PlusIcon" @click="project.addHistoryEntry()">
         {{ t('hist.addBtn') }}
       </UiButton>
     </div>
@@ -15,12 +30,13 @@
             <th class="w-[95px] border-b border-ink-200 px-3 py-1.5">{{ t('hist.thVerRev') }}</th>
             <th class="border-b border-ink-200 px-3 py-1.5">{{ t('hist.thName') }}</th>
             <th class="w-[80px] border-b border-ink-200 px-3 py-1.5" />
+            <th class="w-[80px] border-b border-ink-200 px-3 py-1.5" />
             <th class="w-[60px] border-b border-ink-200 px-3 py-1.5" />
           </tr>
         </thead>
         <tbody>
           <tr v-if="!project.history.length">
-            <td colspan="5" class="px-3 py-8 text-center text-ink-400">{{ t('hist.empty') }}</td>
+            <td colspan="6" class="px-3 py-8 text-center text-ink-400">{{ t('hist.empty') }}</td>
           </tr>
           <tr
             v-for="(h, index) in project.history"
@@ -52,7 +68,16 @@
                 :disabled="!openable(h)"
                 :title="openable(h) ? t('hist.openTitlePdf', { path: h.pdf_link }) : t('hist.openTitleNo')"
                 @click="openPdf(h)"
-              >{{ t('hist.openBtn') }}</UiButton>
+              >{{ t('hist.openPdfBtn') }}</UiButton>
+            </td>
+            <td class="border-b border-ink-100 px-3 py-1.5">
+              <UiButton
+                size="xs"
+                :icon="FileBoxIcon"
+                :disabled="!skpOpenable(h)"
+                :title="skpTitle(h)"
+                @click="openSkp(h)"
+              >{{ t('hist.openSkpBtn') }}</UiButton>
             </td>
             <td class="border-b border-ink-100 px-3 py-1.5">
               <UiButton size="xs" variant="danger" :icon="TrashIcon" :title="t('hist.deleteTitle')" @click="project.removeHistoryEntry(index)">
@@ -67,7 +92,8 @@
 </template>
 
 <script setup>
-import { Plus, FileText, Trash2 } from '@lucide/vue'
+import { computed } from 'vue'
+import { Plus, FileText, FileBox, FolderOpen, Trash2 } from '@lucide/vue'
 import UiButton from '../ui/UiButton.vue'
 import { t } from '../../i18n/index.js'
 import { useProjectStore } from '../../stores/project.js'
@@ -78,6 +104,8 @@ const project = useProjectStore()
 
 const PlusIcon = Plus
 const FileTextIcon = FileText
+const FileBoxIcon = FileBox
+const FolderOpenIcon = FolderOpen
 const TrashIcon = Trash2
 
 function verStr(item) {
@@ -89,6 +117,14 @@ function revStr(item) {
 function openable(item) {
   return Boolean(String(item.pdf_link || '').trim())
 }
+function skpOpenable(item) {
+  return Boolean(String(item.skp_link || '').trim()) || (verStr(item) && revStr(item))
+}
+function skpTitle(item) {
+  const link = String(item.skp_link || '').trim()
+  if (link) return t('hist.openTitleSkp', { path: link })
+  return verStr(item) && revStr(item) ? t('hist.openTitleSkpFind', { ver: verStr(item), rev: revStr(item) }) : t('hist.openTitleSkpNo')
+}
 function onEdit(index, value) {
   project.syncHistoryEdit(index, value)
   notifyChange()
@@ -96,5 +132,29 @@ function onEdit(index, value) {
 function openPdf(item) {
   const link = String(item.pdf_link || '').trim()
   if (link) callRuby('openFile', link)
+}
+function openSkp(item) {
+  const link = String(item.skp_link || '').trim()
+  if (link) {
+    callRuby('openFile', link)
+  } else if (verStr(item) && revStr(item)) {
+    callRuby('openHistorySkp', JSON.stringify({ ver: verStr(item), rev: revStr(item) }))
+  }
+}
+
+// Папки истории: первая известная ссылка задает папку <Артикул>/pdf или <Артикул>/skp
+const pdfFolderLink = computed(() => {
+  const found = project.history.find((h) => String(h.pdf_link || '').trim())
+  return found ? String(found.pdf_link).trim() : ''
+})
+const skpFolderLink = computed(() => {
+  const found = project.history.find((h) => String(h.skp_link || '').trim())
+  return found ? String(found.skp_link).trim() : ''
+})
+function openPdfFolder() {
+  if (pdfFolderLink.value) callRuby('openFolder', pdfFolderLink.value)
+}
+function openSkpFolder() {
+  if (skpFolderLink.value) callRuby('openFolder', skpFolderLink.value)
 }
 </script>

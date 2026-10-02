@@ -1121,27 +1121,30 @@ module DN1Code
         # @return [Hash]
         def normalize_history_entry(item)
           if item.is_a?(Array)
-            d   = item[0].to_s
-            t   = item[1].to_s
-            lnk = item[2].to_s
-            ver = ""
-            rev = ""
+            d    = item[0].to_s
+            t    = item[1].to_s
+            lnk  = item[2].to_s
+            slnk = item[3].to_s
+            ver  = ""
+            rev  = ""
           elsif item.is_a?(Hash)
-            d   = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
-            t   = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
-            lnk = (item[:pdf_link] || item["pdf_link"]).to_s
-            ver = (item[:ver] || item["ver"] || item[:version] || item["version"]).to_s
-            rev = (item[:rev] || item["rev"]).to_s
+            d    = (item[:data] || item[:date] || item["data"] || item["date"]).to_s
+            t    = (item[:edit] || item[:text] || item["edit"] || item["text"] || item[:description] || item["description"]).to_s
+            lnk  = (item[:pdf_link] || item["pdf_link"]).to_s
+            slnk = (item[:skp_link] || item["skp_link"]).to_s
+            ver  = (item[:ver] || item["ver"] || item[:version] || item["version"]).to_s
+            rev  = (item[:rev] || item["rev"]).to_s
           else
-            d   = ""
-            t   = item.to_s
-            lnk = ""
-            ver = ""
-            rev = ""
+            d    = ""
+            t    = item.to_s
+            lnk  = ""
+            slnk = ""
+            ver  = ""
+            rev  = ""
           end
           # Миграция старых записей: "(rev. 004)" из текста переносится в поле rev
           t, rev = split_history_rev(t) if rev.empty?
-          { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk, ver: ver, rev: rev }
+          { date: d, text: t, description: t, data: d, edit: t, pdf_link: lnk, skp_link: slnk, ver: ver, rev: rev }
         end
 
         # Синхронизирует кортежи @workflow[:history_edit] и структуру @history
@@ -1209,6 +1212,29 @@ module DN1Code
           return false unless entry[key].to_s.strip.empty?
 
           entry[key] = pdf_path.to_s
+          true
+        end
+
+        # Привязывает путь к SKP-копии (резервная копия .skp при экспорте) к самой
+        # свежей записи истории изменений. Аналог stamp_history_pdf_link!: пустая
+        # ссылка заполняется только у одной (самой верхней) записи — повторный
+        # экспорт «без записи правок» не затирает ссылку предыдущей правки.
+        # @param skp_path [String] путь к SKP-копии этого экспорта
+        # @return [Boolean] true, если ссылка была проставлена
+        def stamp_history_skp_link!(skp_path)
+          entry = @history.is_a?(Array) ? @history.find { |h| h.is_a?(Hash) } : nil
+          return false unless entry
+
+          key = if entry.key?(:skp_link)
+                  :skp_link
+                elsif entry.key?("skp_link")
+                  "skp_link"
+                else
+                  :skp_link # каноническая форма — всегда пишем символьный ключ
+                end
+          return false unless entry[key].to_s.strip.empty?
+
+          entry[key] = skp_path.to_s
           true
         end
 
@@ -2269,8 +2295,9 @@ module DN1Code
               "data" => n[:data],
               "edit" => n[:text]
             }
-            entry["pdf_link"] = n[:pdf_link] unless n[:pdf_link].empty?
-            entry["ver"]      = n[:ver] unless n[:ver].empty?
+          entry["pdf_link"] = n[:pdf_link] unless n[:pdf_link].empty?
+          entry["skp_link"] = n[:skp_link] unless n[:skp_link].empty?
+          entry["ver"]      = n[:ver] unless n[:ver].empty?
             entry["rev"]      = n[:rev] unless n[:rev].empty?
             entry
           end.compact
@@ -2330,6 +2357,7 @@ module DN1Code
               edit:     n[:text],
               text:     n[:text],
               pdf_link: n[:pdf_link],
+              skp_link: n[:skp_link],
               ver:      n[:ver],
               rev:      n[:rev]
             }

@@ -226,9 +226,12 @@ module DN1Code
               doc.save(layout_path) rescue nil
             end
 
-            # 6. Резервная копия .skp
+            # 6. Резервная копия .skp + привязка её пути к самой свежей записи истории
             if settings[:save_skp_backup] && model && model.respond_to?(:path) && !model.path.empty?
-              controller.save_skp_backup
+              skp_backup = controller.save_skp_backup
+              if skp_backup && project_data.respond_to?(:stamp_history_skp_link!)
+                project_data.stamp_history_skp_link!(skp_backup)
+              end
             end
 
             # 7. Запись данных в YAML (проект + настройки/шаблоны расширения)

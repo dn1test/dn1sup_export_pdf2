@@ -15,6 +15,9 @@ module DN1Code
         # Путь к копии «_last», заполненный LayoutBuilder после успешного экспорта
         attr_accessor :last_pdf_path
 
+        # Путь к SKP-копии модели (<Артикул>/skp/...), заполненный после успешного экспорта
+        attr_accessor :last_skp_path
+
         def initialize(project_data, model = nil)
           @project_data = project_data
           @model        = model || (defined?(Sketchup) ? Sketchup.active_model : nil)
@@ -91,6 +94,7 @@ module DN1Code
 
           if @model.respond_to?(:save_copy)
             @model.save_copy(backup_path)
+            @last_skp_path = backup_path
             backup_path
           end
         end

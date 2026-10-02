@@ -278,7 +278,7 @@ export function mockRubyCall(action, param) {
         if (pct >= 100) {
           clearInterval(timer)
           app().updateProgress && app().updateProgress(100, 'Готово (мок)')
-          delay(() => app().onExportSuccess && app().onExportSuccess('U:/mock/articul/pdf/preview.pdf', '004', 'U:/mock/preview_last.pdf'))
+          delay(() => app().onExportSuccess && app().onExportSuccess('U:/mock/articul/pdf/preview.pdf', '004', 'U:/mock/preview_last.pdf', 'U:/mock/articul/skp/preview_01#004.skp'))
         } else {
           app().updateProgress && app().updateProgress(pct, `Рендер страниц… ${pct}% (мок)`)
         }

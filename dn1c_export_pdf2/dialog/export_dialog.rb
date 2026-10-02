@@ -688,9 +688,10 @@ module DN1Code
                 end
 
                 last_pdf  = controller.respond_to?(:last_pdf_path) ? controller.last_pdf_path : nil
+                last_skp  = controller.respond_to?(:last_skp_path) ? controller.last_skp_path : nil
                 escaped_path = JSON.generate(pdf_file)
                 new_rev = project_data.project_info[:revision] || 1
-                dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev}, #{JSON.generate(last_pdf)});")
+                dialog.execute_script("window.app && window.app.onExportSuccess(#{escaped_path}, #{new_rev}, #{JSON.generate(last_pdf)}, #{JSON.generate(last_skp)});")
               rescue StandardError => e
                 dialog.execute_script("window.app && window.app.onExportError(#{JSON.generate(e.message)});")
               end
@@ -770,6 +771,46 @@ module DN1Code
               end
             rescue StandardError => e
               puts "[openFile error]: #{e.message}"
+            end
+          end
+
+          # Открыть SKP-копию правки из истории. Точный путь (skp_link) фронт открывает
+          # через openFile; сюда приходят только ver/rev записи — ищем файл по стандартным
+          # местам сохранения копий: <Артикул>/skp/<Артикул>_NN#NNN.skp либо
+          # фолбэк <папка модели>/<имя>_backup/<имя>_NN#NNN.skp
+          dialog.add_action_callback("openHistorySkp") do |_action_context, data_json|
+            begin
+              params = JSON.parse(data_json.to_s, symbolize_names: true)
+              ver = params[:ver].to_s
+              rev = params[:rev].to_s
+              if ver.empty? && rev.empty?
+                # Запись без версии/ревизии — искать нечего
+              else
+                model = Sketchup.active_model
+                project_data = Model::SessionStore.data(model)
+                vrs = format("%02d#%03d", ver.to_i, rev.to_i)
+                candidates = []
+
+                art_dir  = project_data.articul_dir_for_model(model)
+                art_name = project_data.class.articul_folder_name(project_data.project_info, model)
+                candidates << File.join(art_dir, "skp", "#{art_name}_#{vrs}.skp") if art_dir && art_name
+
+                model_path = model.respond_to?(:path) ? model.path.to_s : ""
+                unless model_path.empty?
+                  model_dir  = File.dirname(model_path.tr("\\", "/"))
+                  model_base = File.basename(model_path, ".skp")
+                  candidates << File.join(model_dir, "#{model_base}_backup", "#{model_base}_#{vrs}.skp")
+                end
+
+                found = candidates.find { |p| File.exist?(p) }
+                if found
+                  Model::FileOpener.open_path(found)
+                else
+                  UI.messagebox(Locale.t(:open_skp_not_found, path: candidates.last || vrs))
+                end
+              end
+            rescue StandardError => e
+              puts "[openHistorySkp error]: #{e.message}"
             end
           end
 

@@ -250,7 +250,7 @@ export const useAppStore = defineStore('app', {
       this.progress.percent = percent
       if (message) this.progress.message = message
     },
-    onExportSuccess(pdfPath, newRevision, lastPdfPath) {
+    onExportSuccess(pdfPath, newRevision, lastPdfPath, lastSkpPath) {
       this.progress.visible = false
       // Открыта копия «_last» рядом с .skp — она первична для пользователя
       this.lastExportedPdf = lastPdfPath || pdfPath
@@ -258,6 +258,7 @@ export const useAppStore = defineStore('app', {
       this.successModal.visible = true
       const project = useProjectStore()
       project.stampHistoryPdfLink(pdfPath)
+      if (lastSkpPath) project.stampHistorySkpLink(lastSkpPath)
       if (newRevision !== undefined && newRevision !== null && newRevision !== '') {
         project.workflow.revision = String(newRevision)
       }

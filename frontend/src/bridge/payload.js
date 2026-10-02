@@ -91,6 +91,7 @@ export function collectFormData() {
     data: item.data || item.date || '',
     edit: item.edit || item.text || item.description || '',
     pdf_link: item.pdf_link || '',
+    skp_link: item.skp_link || '',
     ver: item.ver || '',
     rev: item.rev || '',
   }))
