@@ -113,19 +113,22 @@ export const useProjectStore = defineStore('project', {
       const tags = state.project.product_tags
       return Array.isArray(tags) && tags.length ? tags.join(', ') : state.project.product
     },
-    headerTitle(state) {
-      const parts = [String(state.project.place || '').trim(), String(this.furnitureName || '').trim()].filter(Boolean)
-      return parts.length ? parts.join(' — ') : t('app.newProject')
+    // Шапка, строка 1: название изделия
+    headerProduct(state) {
+      const name = String(this.furnitureName || '').trim()
+      return { text: name || t('app.newProject'), real: Boolean(name) }
     },
-    headerHasRealTitle() {
-      return Boolean(String(this.headerTitle).trim() && this.headerTitle !== t('app.newProject'))
+    // Шапка, строка 2: помещение — адрес
+    headerPlaceAdress(state) {
+      const parts = [String(state.project.place || '').trim(), String(state.project.adress || '').trim()].filter(Boolean)
+      return { text: parts.join(' — ') || t('app.headerPlacePlaceholder'), real: parts.length > 0 }
     },
-    headerSubtitle(state) {
-      const parts = [String(state.customer.name || '').trim(), String(state.project.adress || '').trim()].filter(Boolean)
-      return parts.length ? parts.join(' — ') : t('app.subtitlePlaceholder')
-    },
-    headerHasRealSubtitle() {
-      return this.headerSubtitle !== t('app.subtitlePlaceholder')
+    // Шапка, строка 3: заказчик, у коммерческих — компания (если заполнена)
+    headerClient(state) {
+      const name = String(state.customer.name || '').trim()
+      const company = String(state.customer.company || '').trim()
+      const text = this.isCommercial ? (company || name) : (name || company)
+      return { text: text || t('app.headerClientPlaceholder'), real: Boolean(text) }
     },
     versionNum(state) {
       return parseInt(state.workflow.version, 10) || 1

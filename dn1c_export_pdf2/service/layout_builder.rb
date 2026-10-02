@@ -398,6 +398,10 @@ module DN1Code
         # page_cfg, если мастер не применим (выключен, обложка, страница уже
         # на мастере). Настройки в ctx не мутируются — возвращается копия.
         def merge_master_page_cfg(ctx, pt, page_cfg)
+          # «Без шаблона» (пустой page_type): не применяется никакой шаблон,
+          # включая мастер-шаблон
+          return page_cfg if pt.to_s.strip.empty?
+
           master_cfg = active_master_cfg(ctx)
           return page_cfg if master_cfg.nil? || cover_page?(ctx, pt)
 

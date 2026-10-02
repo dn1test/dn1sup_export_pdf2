@@ -30,6 +30,24 @@
         @update:model-value="scenes.frameAllChanged"
       >{{ t('scenes.frameAllLabel') }}</UiCheckbox>
 
+      <div class="mx-1 h-5 w-px bg-ink-200" />
+
+      <label class="flex items-center gap-1.5 text-[13px] text-ink-600" :title="t('scenes.marginTitle')">
+        <span>{{ t('scenes.marginLabel') }}</span>
+        <UiInput
+          :model-value="settings.marginMm"
+          type="number"
+          min="0"
+          max="100"
+          step="1"
+          class="!h-7 !w-14 !px-1.5 text-center"
+          :title="t('scenes.marginInputTitle')"
+          @update:model-value="settings.marginMm = parseFloat($event) || 0"
+          @change="settings.setMargin($event.target.value)"
+        />
+        <span class="text-ink-400">{{ t('scenes.marginUnit') }}</span>
+      </label>
+
       <span class="ml-auto hidden text-[11px] text-ink-400 lg:block">{{ t('scenes.infoText') }}</span>
 
       <UiButton size="xs" :icon="LayersIcon" :title="t('scenes.applyTemplateTitle')" @click="scenes.applyTemplateToAll()">
@@ -272,16 +290,19 @@ import {
 import UiButton from '../ui/UiButton.vue'
 import UiCheckbox from '../ui/UiCheckbox.vue'
 import UiSelect from '../ui/UiSelect.vue'
+import UiInput from '../ui/UiInput.vue'
 import UiPopover from '../ui/UiPopover.vue'
 import AlignGrid from '../ui/AlignGrid.vue'
 import { t } from '../../i18n/index.js'
 import { useScenesStore } from '../../stores/scenes.js'
 import { useTemplatesStore } from '../../stores/templates.js'
+import { useSettingsStore } from '../../stores/settings.js'
 import { useAppStore } from '../../stores/app.js'
 import { useDragSort } from '../../composables/useDragSort.js'
 
 const scenes = useScenesStore()
 const templates = useTemplatesStore()
+const settings = useSettingsStore()
 const app = useAppStore()
 
 const CheckIcon = Check
@@ -337,24 +358,28 @@ function normScale(item) {
   return String(parseInt(item?.scale_pct, 10) || 100)
 }
 
-// Селект «Шаблон»: если текущий ключ удалён — держим его как опцию
+// Селект «Шаблон»: если текущий ключ удалён — держим его как опцию;
+// последней опцией всегда идёт «Без шаблона» (пустой page_type — экспорт
+// без элементов шаблона и мастер-шаблона)
 function optionsFor(item) {
-  const opts = templates.sceneOptions
+  const opts = [...templates.sceneOptions]
   if (item.page_type && !opts.some((tpl) => tpl.key === item.page_type)) {
-    return [...opts, { key: item.page_type, name: item.page_type, description: '' }]
+    opts.push({ key: item.page_type, name: item.page_type, description: '' })
   }
+  opts.push({ key: '', name: t('scenes.noTemplate'), description: t('scenes.noTemplateDesc') })
   return opts
 }
 
-// Мастер-шаблон затрагивает страницу: включен, страница не на самом мастере
-// и не является обложкой
+// Мастер-шаблон затрагивает страницу: включен, страница не на самом мастере,
+// не является обложкой и не «Без шаблона»
 function masterAffects(item) {
+  if (!item.page_type) return false
   if (!templates.masterEnabled || !templates.masterKey || item.page_type === templates.masterKey) return false
   const opt = templates.sceneOptions.find((tpl) => tpl.key === item.page_type)
   return !(opt && opt.cover)
 }
 function templateDesc(item) {
-  const sel = templates.sceneOptions.find((tpl) => tpl.key === item.page_type)
+  const sel = optionsFor(item).find((tpl) => tpl.key === item.page_type)
   return sel ? sel.description : ''
 }
 
