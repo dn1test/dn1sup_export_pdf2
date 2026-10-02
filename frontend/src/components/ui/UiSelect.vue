@@ -2,7 +2,7 @@
   <select
     :value="modelValue"
     :title="title"
-    class="h-8 w-full min-w-0 cursor-pointer rounded-md border border-ink-200 bg-white px-1.5 pr-6 text-[13px] text-ink-900 transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:cursor-default disabled:bg-ink-50"
+    class="h-8 w-full min-w-0 cursor-pointer appearance-none rounded-md border border-ink-200 bg-white px-1.5 pr-6 text-[13px] text-ink-900 transition-colors focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 disabled:cursor-default disabled:bg-ink-50"
     :style="{ 'background-image': caret, 'background-repeat': 'no-repeat', 'background-position': 'right 6px center', 'background-size': '10px' }"
     @change="$emit('update:modelValue', $event.target.value)"
   >

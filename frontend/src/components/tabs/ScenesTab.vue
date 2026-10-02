@@ -47,7 +47,7 @@
             <th class="w-[104px] border-b border-ink-200 px-2 py-1.5" :title="t('scenes.thPreviewTitle')">{{ t('scenes.thPreview') }}</th>
             <th class="border-b border-ink-200 px-2 py-1.5">{{ t('scenes.thSceneDesc') }}</th>
             <th class="w-[100px] border-b border-ink-200 px-2 py-1.5" :title="t('scenes.thFrameTitle')">{{ t('scenes.thFrame') }}</th>
-            <th class="w-[74px] border-b border-ink-200 px-2 py-1.5" :title="t('scenes.thScaleTitle')">{{ t('scenes.thScale') }}</th>
+            <th class="w-[88px] border-b border-ink-200 px-2 py-1.5" :title="t('scenes.thScaleTitle')">{{ t('scenes.thScale') }}</th>
             <th class="w-[54px] border-b border-ink-200 px-2 py-1.5 text-center" :title="t('scenes.thAlignTitle')">{{ t('scenes.thAlign') }}</th>
             <th class="w-[172px] border-b border-ink-200 px-2 py-1.5" :title="t('scenes.thTemplateTitle')">{{ t('scenes.thTemplate') }}</th>
           </tr>
@@ -171,7 +171,7 @@
             <td class="border-b border-ink-100 px-2 py-1">
               <UiSelect
                 :model-value="normScale(sc)"
-                class="!h-7 text-xs"
+                class="!h-7"
                 :title="t('scenes.scaleTitle')"
                 @click.stop
                 @update:model-value="scenes.scaleChanged(index, parseInt($event, 10) || 100)"
