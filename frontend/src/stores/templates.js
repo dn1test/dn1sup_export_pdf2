@@ -423,7 +423,7 @@ export const useTemplatesStore = defineStore('templates', {
       }
       const raw = cfg.line_enabled
       return {
-        line_gap: num(cfg.line_gap, 2.5, 0, 50),
+        line_gap: num(cfg.line_gap, 2.5, -2, 50),
         line_enabled: raw !== undefined && raw !== null && !(raw === false || raw === 'false' || raw === 0 || raw === '0'),
       }
     },
@@ -563,7 +563,7 @@ export const useTemplatesStore = defineStore('templates', {
             .map(normalizeTemplateParam)
         }
         const rawGap = parseFloat(cfg.line_gap)
-        cfg.line_gap = isNaN(rawGap) ? 2.5 : Math.min(50, Math.max(0, rawGap))
+        cfg.line_gap = isNaN(rawGap) ? 2.5 : Math.min(50, Math.max(-2, rawGap))
         const rawLine = cfg.line_enabled
         cfg.line_enabled = rawLine !== undefined && rawLine !== null &&
           !(rawLine === false || rawLine === 'false' || rawLine === 0 || rawLine === '0')
@@ -607,7 +607,7 @@ export const useTemplatesStore = defineStore('templates', {
       this.ensureLayouts()
       const newKey = 'custom_' + Date.now().toString(36)
       const baseCfg = this.layouts[baseKey] ||
-        { image_4_3: deepClone(DEFAULT_IMAGE_SLOT), params: [], line_gap: 2.5, line_enabled: false }
+        { image_4_3: deepClone(DEFAULT_IMAGE_SLOT), params: [], line_gap: 2, line_enabled: false }
       this.layouts[newKey] = deepClone(baseCfg)
       this.layouts[newKey].name = trimmedName
       this.layouts[newKey]._name = trimmedName
@@ -853,7 +853,7 @@ export const useTemplatesStore = defineStore('templates', {
     },
     setLineGap(rawGap) {
       const g = parseFloat(rawGap)
-      if (!isNaN(g) && g >= 0) {
+      if (!isNaN(g) && g >= -2) {
         const cfg = this.layouts[this.currentKey] || (this.layouts[this.currentKey] = {})
         cfg.line_gap = g
         notifyChange()

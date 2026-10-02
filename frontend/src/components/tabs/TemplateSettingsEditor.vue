@@ -1,22 +1,31 @@
 <template>
   <div class="flex min-h-0 flex-1 flex-col">
-    <!-- Шапка карточки: общие настройки стека параметров -->
+    <!-- Шапка карточки: шрифт и поля — в одной строке с общими настройками стека параметров -->
     <div class="flex flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-ink-100 px-3.5 py-2">
-      <div class="flex items-center gap-1.5 text-[13px] font-semibold text-ink-900">
-        <SlidersIcon :size="14" class="text-ink-400" />
-        {{ t('tse.title') }}
-      </div>
+      <UiSelect
+        v-model="fontFamilyModel"
+        class="!h-6 !w-[75px] text-xs"
+        :title="t('tpl.fontDocTitle')"
+      >
+        <option v-for="f in FONTS" :key="f" :value="f">{{ f }}</option>
+      </UiSelect>
+      <UiSelect
+        :model-value="String(settings.marginMm)"
+        class="!h-6 !w-[70px] text-xs"
+        :title="t('tpl.marginInputTitle')"
+        @update:model-value="settings.setMargin($event)"
+      >
+        <option v-for="m in marginOptions" :key="m" :value="String(m)">{{ m }} {{ t('tpl.mmUnit') }}</option>
+      </UiSelect>
       <div class="ml-auto flex flex-wrap items-center gap-x-3 gap-y-1.5">
-        <label class="flex items-center gap-1.5 text-[11px] text-ink-500" :title="t('tse.lineGapTitle')">
-          {{ t('tse.lineGapLabel') }}
-          <UiSelect
-            :model-value="String(templates.lineSettings.line_gap)"
-            class="!h-6 !w-[70px] text-xs"
-            @update:model-value="templates.setLineGap($event)"
-          >
-            <option v-for="g in LINE_GAPS" :key="g" :value="String(g)">{{ g }} {{ t('tpl.mmUnit') }}</option>
-          </UiSelect>
-        </label>
+        <UiSelect
+          :model-value="String(templates.lineSettings.line_gap)"
+          class="!h-6 !w-[70px] text-xs"
+          :title="t('tse.lineGapTitle')"
+          @update:model-value="templates.setLineGap($event)"
+        >
+          <option v-for="g in gapOptions" :key="g" :value="String(g)">{{ g }} {{ t('tpl.mmUnit') }}</option>
+        </UiSelect>
         <UiCheckbox
           :model-value="templates.lineSettings.line_enabled"
           class="text-[11px]"
@@ -37,7 +46,6 @@
 
     <!-- Список параметров -->
     <div class="min-h-0 flex-1 overflow-y-auto p-3" @dragover="onListDragOver">
-      <p class="mb-2 text-[11px] text-ink-400">{{ t('tse.hint') }}</p>
       <div v-if="!templates.editorView.length" class="rounded-lg border border-dashed border-ink-200 py-8 text-center text-[13px] text-ink-400">
         {{ t('tse.empty') }}
       </div>
@@ -89,7 +97,7 @@
             :placeholder="t('tse.groupLabelPh')"
             @input="templates.update(p.id, { label: $event.target.value })"
           >
-          <span v-if="p.group" class="shrink-0 text-[10px] text-ink-400">{{ countText(p._children.length) }}</span>
+          <span v-if="p.group" class="shrink-0 text-[10px] text-ink-400">{{ p._children.length }}</span>
           <UiCheckbox
             :model-value="p.show_label"
             class="text-[11px]"
@@ -214,7 +222,7 @@
 <script setup>
 import { computed, ref } from 'vue'
 import {
-  SlidersHorizontal, GripVertical, Plus, Pencil, Trash, X,
+  GripVertical, Plus, Pencil, Trash, X,
   ArrowLeftRight, ArrowUpDown,
   ArrowUpLeft, ArrowUp, ArrowUpRight, ArrowLeft, Circle, ArrowRight,
   ArrowDownLeft, ArrowDown, ArrowDownRight,
@@ -226,15 +234,45 @@ import UiPopover from '../ui/UiPopover.vue'
 import AlignGrid from '../ui/AlignGrid.vue'
 import IconBtn from './IconBtn.vue'
 import { paramHelpTitle } from '../paramHelp.js'
-import { t, locale } from '../../i18n/index.js'
+import { t } from '../../i18n/index.js'
 import { useTemplatesStore } from '../../stores/templates.js'
+import { useSettingsStore } from '../../stores/settings.js'
 
 const templates = useTemplatesStore()
+const settings = useSettingsStore()
 
-const LINE_GAPS = [0, 1, 1.5, 2, 2.5, 3, 4, 5, 6, 8, 10]
+const LINE_GAPS = [-2, 0, 2, 4, 6, 8]
+const MARGINS = [0, 5, 10, 15, 20, 25, 30, 35, 40]
+
+// Значения из старых настроек (например 2.5 мм) показываются дополнительной
+// опцией, чтобы селект не оставался пустым до первого выбора
+const gapOptions = computed(() => {
+  const cur = Number(templates.lineSettings.line_gap)
+  return Number.isFinite(cur) && !LINE_GAPS.includes(cur)
+    ? [...LINE_GAPS, cur].sort((a, b) => a - b)
+    : LINE_GAPS
+})
+const marginOptions = computed(() => {
+  const cur = Number(settings.marginMm)
+  return Number.isFinite(cur) && !MARGINS.includes(cur)
+    ? [...MARGINS, cur].sort((a, b) => a - b)
+    : MARGINS
+})
 const FONT_SIZES = [6, 7, 8, 9, 10, 11, 12, 14, 16, 18, 20, 24, 28, 32, 36, 40, 48, 56, 64, 72]
 
-const SlidersIcon = SlidersHorizontal
+const FONTS = [
+  'Sofia Sans Condensed',
+  'Sofia Sans Extra Condensed',
+  'Oswald',
+  'Roboto Condensed',
+  'Ubuntu Condensed',
+]
+
+const fontFamilyModel = computed({
+  get: () => settings.fontFamily,
+  set: (v) => settings.setFontFamily(v),
+})
+
 const GripVerticalIcon = GripVertical
 const PlusIcon = Plus
 const PencilIcon = Pencil
@@ -259,17 +297,6 @@ function zoneTitle(p) {
 
 function sizesFor(current) {
   return FONT_SIZES.includes(current) ? FONT_SIZES : FONT_SIZES.concat([current]).sort((a, b) => a - b)
-}
-
-// «N параметров» с согласованием окончаний
-function countText(n) {
-  if (locale.value === 'en') return n === 1 ? t('tse.countOne', { n }) : t('tse.countMany', { n })
-  const m10 = n % 10
-  const m100 = n % 100
-  const key = (m10 === 1 && m100 !== 11) ? 'tse.countOne'
-    : (m10 >= 2 && m10 <= 4 && (m100 < 12 || m100 > 14)) ? 'tse.countFew'
-      : 'tse.countMany'
-  return t(key, { n })
 }
 
 // --- Поповер выравнивания ---

@@ -4288,21 +4288,24 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     FileUtils.rm_rf(audit_dir)
 
-    # 4. Проверка GUI: селекторы шрифтов (SettingsTab + тулбар TemplatesTab)
+    # 4. Проверка GUI: селекторы шрифтов (SettingsTab + шапка редактора параметров)
     html_path = frontend_source
     html_text = html_path
 
     settings_vue = File.read(File.expand_path("../../frontend/src/components/tabs/SettingsTab.vue", __dir__), encoding: "utf-8")
     templates_vue = File.read(File.expand_path("../../frontend/src/components/tabs/TemplatesTab.vue", __dir__), encoding: "utf-8")
+    editor_vue = File.read(File.expand_path("../../frontend/src/components/tabs/TemplateSettingsEditor.vue", __dir__), encoding: "utf-8")
 
     assert(settings_vue.include?('settings.setFontFamily($event)'), "SettingsTab содержит выбор семейства шрифта документа")
-    assert(templates_vue.include?("v-model=\"fontFamilyModel\""), "Тулбар панели шаблонов содержит выбор шрифта (fontFamilyModel)")
-    assert(templates_vue.include?("settings.setMargin($event.target.value)"), "Тулбар содержит поле полей страницы (margin)")
+    # Выбор шрифта и поля страницы находятся в шапке редактора параметров шаблона
+    # (в одной строке с «Между строками», «Линия» и кнопками «Блок»)
+    assert(editor_vue.include?("v-model=\"fontFamilyModel\""), "Шапка редактора параметров содержит выбор шрифта (fontFamilyModel)")
+    assert(editor_vue.include?("settings.setMargin($event)"), "Редактор параметров содержит поле полей страницы (margin)")
 
-    # Начертание и ширина выведены из GUI: на тулбаре панели шаблонов и на
+    # Начертание и ширина выведены из GUI: на панели шаблонов и на
     # вкладке настроек остаётся только выбор семейства шрифта
     assert(!templates_vue.include?("fontWeightModel") && !templates_vue.include?("fontWidthModel"),
-           "На тулбаре панели шаблонов нет селекторов начертания/ширины")
+           "На панели шаблонов нет селекторов начертания/ширины")
     assert(!settings_vue.include?("fontWeightModel") && !settings_vue.include?("fontWidthModel"),
            "На вкладке настроек нет селекторов начертания/ширины")
 
@@ -4310,14 +4313,14 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
     assert(templates_vue.include?("templates.reset()"), "Кнопка «Сбросить» (reset) находится в шапке панели шаблонов")
     assert(templates_vue.include?("templates.openDelete(templates.currentKey)"), "Кнопка удаления шаблона — в шапке панели")
 
-    # Проверка наличия всех 5 шрифтов в селекторе тулбара шаблонов
+    # Проверка наличия всех 5 шрифтов в селекторе шапки редактора параметров
     %w[Sofia\ Sans\ Condensed Sofia\ Sans\ Extra\ Condensed Oswald Roboto\ Condensed Ubuntu\ Condensed].each do |f|
-      assert(templates_vue.include?("value=\"#{f}\"") || templates_vue.include?("'#{f}'"),
+      assert(editor_vue.include?("value=\"#{f}\"") || editor_vue.include?("'#{f}'"),
              "Селектор шрифтов содержит вариант #{f}")
     end
 
-    # Контрол выбора шрифта в панели шаблонов — v-model на тулбаре
-    assert(templates_vue.include?("v-model=\"fontFamilyModel\""), "Контрол выбора шрифта присутствует в панели шаблонов")
+    # Контрол выбора шрифта в панели шаблонов — v-model в шапке редактора параметров
+    assert(editor_vue.include?("v-model=\"fontFamilyModel\""), "Контрол выбора шрифта присутствует в панели шаблонов")
 
     # 5. Проверка фронта: регистрация и обработка шрифтов (settings-стор)
     app_js_path = frontend_source

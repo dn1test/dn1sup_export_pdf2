@@ -1339,7 +1339,7 @@ module DN1Code
 
           # Общие настройки стека параметров на уровне шаблона: «размер между
           # строками» (мм, один для всех параметров и блоков) и галочка «Линия»
-          line_gap_mm = (page_cfg[:line_gap] || page_cfg["line_gap"] || PARAM_ZONE_GAP_MM).to_f.clamp(0.0, 50.0)
+          line_gap_mm = (page_cfg[:line_gap] || page_cfg["line_gap"] || PARAM_ZONE_GAP_MM).to_f.clamp(-2.0, 50.0)
           raw_line = page_cfg.key?(:line_enabled) ? page_cfg[:line_enabled] : page_cfg["line_enabled"]
           line_on = !raw_line.nil? && !(raw_line == false || raw_line.to_s.strip.downcase == "false" || raw_line.to_s.strip == "0")
           gap_pt = (line_gap_mm * PT_PER_INCH / 25.4).round(2)

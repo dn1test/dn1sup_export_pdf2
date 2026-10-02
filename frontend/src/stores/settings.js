@@ -151,7 +151,7 @@ export const useSettingsStore = defineStore('settings', {
     },
 
     setMargin(mm) {
-      const num = Math.max(0, Math.min(100, parseFloat(mm) || 0))
+      const num = Math.max(0, Math.min(40, parseFloat(mm) || 0))
       this.marginMm = num
       notifyChange()
     },

@@ -7,7 +7,7 @@
       <!-- Заголовок панели -->
       <div class="flex shrink-0 items-center gap-2 border-b border-ink-200 px-3.5 py-2">
         <TuneIcon :size="14" class="text-ink-400" />
-        <span class="text-[13px] font-semibold text-ink-900">{{ t('tpl.panelTitle') }}</span>
+        <span class="text-[13px] font-semibold text-ink-900" :title="t('tse.hint')">{{ t('tpl.panelTitle') }}</span>
         <div class="ml-auto flex items-center gap-1.5">
           <UiButton size="xs" :icon="UndoIcon" :title="t('tpl.resetTitle')" @click="templates.reset()">
             {{ t('tpl.resetBtn') }}
@@ -18,7 +18,7 @@
         </div>
       </div>
 
-      <!-- Тулбар: имя шаблона, бейджи, шрифты, поля -->
+      <!-- Тулбар: имя шаблона, бейджи (шрифт и поля перенесены в строку параметров) -->
       <div class="flex shrink-0 flex-wrap items-center gap-x-3 gap-y-1.5 border-b border-ink-100 bg-ink-50/50 px-3.5 py-1.5">
         <div class="flex min-w-0 items-center gap-2">
           <span class="truncate text-[13px] font-medium text-ink-900">{{ templates.currentDef.name }}</span>
@@ -30,33 +30,6 @@
             :class="templates.usageBadge.empty ? 'bg-ink-100 text-ink-400' : 'bg-accent-50 text-accent-700'"
             :title="templates.usageBadge.title"
           >{{ templates.usageBadge.text }}</span>
-        </div>
-
-        <div class="ml-auto flex flex-wrap items-center gap-x-2.5 gap-y-1">
-          <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tpl.fontDocTitle')">
-            {{ t('tpl.fontLabel') }}
-            <UiSelect
-              v-model="fontFamilyModel"
-              class="!h-6 w-[150px] text-xs"
-              :title="t('tpl.fontTitle')"
-            >
-              <option v-for="f in FONTS" :key="f" :value="f">{{ f }}</option>
-            </UiSelect>
-          </label>
-          <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tpl.marginInputTitle')">
-            {{ t('tpl.marginLabel') }}
-            <input
-              :value="settings.marginMm"
-              type="number"
-              min="0"
-              max="100"
-              step="1"
-              class="h-6 w-14 rounded border border-ink-200 bg-white px-1 text-xs focus:border-accent-500 focus:outline-none"
-              :title="t('tpl.marginTitle')"
-              @change="settings.setMargin($event.target.value)"
-            >
-            <span class="text-[10px] text-ink-400">{{ t('tpl.mmUnit') }}</span>
-          </label>
         </div>
       </div>
 
@@ -70,10 +43,8 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
 import { SlidersHorizontal, Undo2, Trash2 } from '@lucide/vue'
 import UiButton from '../ui/UiButton.vue'
-import UiSelect from '../ui/UiSelect.vue'
 import TemplatesSidebar from './TemplatesSidebar.vue'
 import TemplateSettingsEditor from './TemplateSettingsEditor.vue'
 import { t } from '../../i18n/index.js'
@@ -86,17 +57,4 @@ const settings = useSettingsStore()
 const TuneIcon = SlidersHorizontal
 const UndoIcon = Undo2
 const TrashIcon = Trash2
-
-const FONTS = [
-  'Sofia Sans Condensed',
-  'Sofia Sans Extra Condensed',
-  'Oswald',
-  'Roboto Condensed',
-  'Ubuntu Condensed',
-]
-
-const fontFamilyModel = computed({
-  get: () => settings.fontFamily,
-  set: (v) => settings.setFontFamily(v),
-})
 </script>
