@@ -225,8 +225,10 @@ export const useProjectStore = defineStore('project', {
       // не трогаем)
       this.recalcPrice(false)
 
-      // Стадии
-      let stadia = this.workflow.stadia || wf.stadia
+      // Стадии: приоритет у данных, пришедших с сервера (пустой массив
+      // this.workflow.stadia — truthy, поэтому сравнивать через ||
+      // с ним нельзя — иначе загруженный список всегда игнорируется)
+      let stadia = Array.isArray(wf.stadia) && wf.stadia.length > 0 ? wf.stadia : this.workflow.stadia
       if (!Array.isArray(stadia) || stadia.length === 0) stadia = DEFAULT_STADIA.map((s) => ({ ...s }))
       this.workflow.stadia = stadia.map((s) => ({
         name: tval(s && s.name),

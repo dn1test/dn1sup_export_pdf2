@@ -4,14 +4,14 @@
     <div class="grid grid-cols-2 gap-3">
       <UiCard :title="t('project.title')">
         <template #icon><ClipboardListIcon :size="14" /></template>
-        <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
-          <UiField class="sm:col-span-3" :label="t('project.furnitureLabel')">
+        <div class="grid grid-cols-1 gap-3 sm:grid-cols-2">
+          <UiField class="sm:col-span-2" :label="t('project.furnitureLabel')">
             <UiInput v-model="project.project.product" :placeholder="t('project.furniturePh')" @update:model-value="onProductInput" />
           </UiField>
           <UiField class="sm:col-span-1" :label="t('project.roomLabel')">
             <UiInput v-model="project.project.place" :placeholder="t('project.roomPh')" @update:model-value="notifyChange()" />
           </UiField>
-          <UiField class="sm:col-span-2" :label="t('project.addressLabel')">
+          <UiField class="sm:col-span-1" :label="t('project.addressLabel')">
             <UiInput v-model="project.project.adress" :placeholder="t('project.addressPh')" @update:model-value="notifyChange()" />
           </UiField>
         </div>
