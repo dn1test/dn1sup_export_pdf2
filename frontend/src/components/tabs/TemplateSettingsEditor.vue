@@ -125,7 +125,6 @@
           >
             <component :is="alignIcon(p)" :size="12" />
           </button>
-          <span class="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500" :title="t('tse.zoneTitle')">{{ p._zone }}</span>
 
           <div class="ml-auto flex shrink-0 items-center gap-0.5">
             <IconBtn v-if="!p.group" :title="t('tse.editTitle')" @click="templates.openParamModal('edit', p.id, templates.currentKey)">
@@ -137,13 +136,14 @@
           </div>
         </div>
 
-        <!-- Строка 2: подпись и значение (только у параметров; у блока имя перенесено в строку 1) -->
+        <!-- Строка 2: подпись и значение, справа — зона размещения (только у параметров; у блока имя перенесено в строку 1) -->
         <div v-if="!p.group" class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-ink-100 px-2 py-1.5">
           <span v-if="p._shownLabel" class="truncate text-[11px] text-ink-400">«{{ p._shownLabel }}»</span>
           <div class="flex min-w-0 flex-1 items-center gap-1.5">
             <span v-if="p._preview" class="truncate text-[12px] text-ink-500" style="font-family: var(--page-font-family)">{{ p._preview }}</span>
             <span v-else class="text-[11px] text-ink-300 italic">{{ t('tse.noData') }}</span>
           </div>
+          <span class="shrink-0 rounded bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500" :title="t('tse.zoneTitle')">{{ p._zone }}</span>
         </div>
 
         <!-- Дети блока -->
