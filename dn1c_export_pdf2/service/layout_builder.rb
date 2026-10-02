@@ -1138,6 +1138,7 @@ module DN1Code
           "workflow.rate"        => "Ставка руб./час",
           "workflow.version"     => "Версия",
           "workflow.revision"    => "Ревизия",
+          "workflow.version_rev" => "Версия#Ревизия",
           "workflow.date"        => "Дата",
           "workflow.status"      => "Статус",
           "workflow.stadia"      => "Стадии проекта",

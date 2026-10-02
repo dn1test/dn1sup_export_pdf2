@@ -63,8 +63,8 @@
         @drop="onRowDrop($event, p.id)"
         @dragend="clearDrag()"
       >
-        <!-- Строка параметра / блока -->
-        <div class="flex items-center gap-2 px-2 py-1.5">
+        <!-- Строка 1: вкл (после ручки), название (у блока — имя блока), порядок (ручка) и настройки отображения (заголовок, цвет, размер, выравнивание, зона) -->
+        <div class="flex flex-wrap items-center gap-2 px-2 py-1.5">
           <GripVerticalIcon :size="13" class="shrink-0 cursor-grab text-ink-300" :title="t('tse.dragTitle')" />
           <UiCheckbox
             :model-value="p.visible"
@@ -72,47 +72,31 @@
             :title="t('tse.visibleTitle')"
             @update:model-value="templates.setVisible(p.id, $event)"
           >{{ t('tse.visibleLabel') }}</UiCheckbox>
+          <span v-if="!p.group" class="max-w-40 shrink-0 truncate text-[13px] font-medium text-ink-900" :title="p._label">{{ p._label }}</span>
+          <span v-else class="flex shrink-0 items-center gap-1 text-[13px] font-medium text-ink-700">
+            <component :is="p.direction === 'vertical' ? ArrowUDIcon : ArrowLRIcon" :size="12" class="text-ink-400" />
+            {{ t('tse.blockLabel') }}
+          </span>
+          <span
+            class="flex size-4 shrink-0 cursor-help items-center justify-center rounded-full bg-ink-100 text-[9px] font-bold text-ink-400 hover:bg-accent-100 hover:text-accent-600"
+            :title="paramHelpTitle(p)"
+          >!</span>
+          <input
+            v-if="p.group"
+            :value="p.label"
+            type="text"
+            class="h-6 w-40 min-w-0 rounded border border-ink-200 bg-white px-1.5 text-xs focus:border-accent-500 focus:outline-none"
+            :placeholder="t('tse.groupLabelPh')"
+            @input="templates.update(p.id, { label: $event.target.value })"
+          >
+          <span v-if="p.group" class="shrink-0 text-[10px] text-ink-400">{{ countText(p._children.length) }}</span>
+          <UiCheckbox
+            :model-value="p.show_label"
+            class="text-[11px]"
+            :title="t('tse.showLabelTitle')"
+            @update:model-value="templates.update(p.id, { show_label: $event })"
+          >{{ t('tse.showLabel') }}</UiCheckbox>
 
-          <div class="flex min-w-0 flex-1 items-center gap-1.5">
-            <span v-if="!p.group" class="truncate text-[13px] font-medium text-ink-900">{{ p._label }}</span>
-            <span v-else class="flex items-center gap-1 text-[13px] font-medium text-ink-700">
-              <component :is="p.direction === 'vertical' ? ArrowUDIcon : ArrowLRIcon" :size="12" class="text-ink-400" />
-              {{ t('tse.blockLabel') }}
-            </span>
-            <span
-              class="flex size-4 shrink-0 cursor-help items-center justify-center rounded-full bg-ink-100 text-[9px] font-bold text-ink-400 hover:bg-accent-100 hover:text-accent-600"
-              :title="paramHelpTitle(p)"
-            >!</span>
-            <span v-if="!p.group && p._shownLabel" class="truncate text-[11px] text-ink-400">«{{ p._shownLabel }}»</span>
-            <template v-if="!p.group">
-              <span v-if="p._preview" class="truncate text-[12px] text-ink-500" style="font-family: var(--page-font-family)">{{ p._preview }}</span>
-              <span v-else class="text-[11px] text-ink-300 italic">{{ t('tse.noData') }}</span>
-            </template>
-            <input
-              v-if="p.group"
-              :value="p.label"
-              type="text"
-              class="h-6 w-40 min-w-0 rounded border border-ink-200 bg-white px-1.5 text-xs focus:border-accent-500 focus:outline-none"
-              :placeholder="t('tse.groupLabelPh')"
-              @input="templates.update(p.id, { label: $event.target.value })"
-            >
-            <span v-if="p.group" class="shrink-0 text-[10px] text-ink-400">{{ countText(p._children.length) }}</span>
-          </div>
-
-          <div class="flex shrink-0 items-center gap-0.5">
-            <IconBtn :title="t('tse.upTitle')" @click="templates.move(p.id, -1)"><ChevronUpIcon :size="12" /></IconBtn>
-            <IconBtn :title="t('tse.downTitle')" @click="templates.move(p.id, 1)"><ChevronDownIcon :size="12" /></IconBtn>
-            <IconBtn v-if="!p.group" :title="t('tse.editTitle')" @click="templates.openParamModal('edit', p.id, templates.currentKey)">
-              <PencilIcon :size="12" />
-            </IconBtn>
-            <IconBtn :title="p.group ? t('tse.deleteGroupTitle') : t('tse.deleteRowTitle')" danger @click="templates.deleteRow(p.id)">
-              <TrashIcon :size="12" />
-            </IconBtn>
-          </div>
-        </div>
-
-        <!-- Контролы строки -->
-        <div class="flex flex-wrap items-center gap-x-3 gap-y-1 border-t border-ink-100 px-2 py-1.5">
           <input
             type="color"
             :value="p.color"
@@ -141,13 +125,25 @@
           >
             <component :is="alignIcon(p)" :size="12" />
           </button>
-          <UiCheckbox
-            :model-value="p.show_label"
-            class="text-[11px]"
-            :title="t('tse.showLabelTitle')"
-            @update:model-value="templates.update(p.id, { show_label: $event })"
-          >{{ t('tse.showLabel') }}</UiCheckbox>
           <span class="rounded bg-ink-100 px-1.5 py-0.5 text-[10px] text-ink-500" :title="t('tse.zoneTitle')">{{ p._zone }}</span>
+
+          <div class="ml-auto flex shrink-0 items-center gap-0.5">
+            <IconBtn v-if="!p.group" :title="t('tse.editTitle')" @click="templates.openParamModal('edit', p.id, templates.currentKey)">
+              <PencilIcon :size="12" />
+            </IconBtn>
+            <IconBtn :title="p.group ? t('tse.deleteGroupTitle') : t('tse.deleteRowTitle')" danger @click="templates.deleteRow(p.id)">
+              <TrashIcon :size="12" />
+            </IconBtn>
+          </div>
+        </div>
+
+        <!-- Строка 2: подпись и значение (только у параметров; у блока имя перенесено в строку 1) -->
+        <div v-if="!p.group" class="flex flex-wrap items-center gap-x-2 gap-y-1 border-t border-ink-100 px-2 py-1.5">
+          <span v-if="p._shownLabel" class="truncate text-[11px] text-ink-400">«{{ p._shownLabel }}»</span>
+          <div class="flex min-w-0 flex-1 items-center gap-1.5">
+            <span v-if="p._preview" class="truncate text-[12px] text-ink-500" style="font-family: var(--page-font-family)">{{ p._preview }}</span>
+            <span v-else class="text-[11px] text-ink-300 italic">{{ t('tse.noData') }}</span>
+          </div>
         </div>
 
         <!-- Дети блока -->
@@ -220,7 +216,7 @@
 import { computed, ref } from 'vue'
 import {
   SlidersHorizontal, GripVertical, Plus, Pencil, Trash, X,
-  ChevronUp, ChevronDown, ArrowLeftRight, ArrowUpDown,
+  ArrowLeftRight, ArrowUpDown,
   ArrowUpLeft, ArrowUp, ArrowUpRight, ArrowLeft, Circle, ArrowRight,
   ArrowDownLeft, ArrowDown, ArrowDownRight,
 } from '@lucide/vue'
@@ -245,8 +241,6 @@ const PlusIcon = Plus
 const PencilIcon = Pencil
 const TrashIcon = Trash
 const XIcon = X
-const ChevronUpIcon = ChevronUp
-const ChevronDownIcon = ChevronDown
 const ArrowLRIcon = ArrowLeftRight
 const ArrowUDIcon = ArrowUpDown
 

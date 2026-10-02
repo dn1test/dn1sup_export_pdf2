@@ -62,6 +62,7 @@ module DN1Code
             "workflow.rate"           => "Ставка руб./час",
             "workflow.version"        => "Версия",
             "workflow.revision"       => "Ревизия",
+            "workflow.version_rev"    => "Версия#Ревизия",
             "workflow.date"           => "Дата",
             "workflow.status"         => "Статус",
             "workflow.stadia"         => "Стадии проекта",
@@ -113,6 +114,11 @@ module DN1Code
           when "workflow.rate"          then non_blank(workflow[:rate] || info[:rate])
           when "workflow.version"       then "v#{non_blank(workflow[:version] || info[:version]) || '01'}"
           when "workflow.revision"      then "#r#{non_blank(workflow[:revision] || info[:revision]) || '001'}"
+          when "workflow.version_rev"
+            # Объединённый параметр: формат как в имени файла PDF — 01#001
+            v = non_blank(workflow[:version] || info[:version]) || "01"
+            r = non_blank(workflow[:revision] || info[:revision]) || "001"
+            "#{v.to_s.rjust(2, "0")}##{r.to_s.rjust(3, "0")}"
           when "workflow.date"          then non_blank(workflow[:date_order] || info[:date]) || Time.now.strftime("%d.%m.%Y")
           when "workflow.status"        then non_blank(workflow[:status] || info[:status])
           when "workflow.stadia"        then stadia_value(workflow, info)

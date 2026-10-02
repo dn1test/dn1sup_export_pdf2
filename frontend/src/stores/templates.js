@@ -187,6 +187,7 @@ export function paramPreviewValue(source) {
     case 'workflow.rate': return tval(wf.rate)
     case 'workflow.version': return `v${tval(wf.version) || '01'}`
     case 'workflow.revision': return `#r${tval(wf.revision) || '001'}`
+    case 'workflow.version_rev': return `${String(tval(wf.version) || '01').padStart(2, '0')}#${String(tval(wf.revision) || '001').padStart(3, '0')}`
     case 'workflow.date': return previewDate(wf.date_order || info.date)
     case 'workflow.status': return tval(wf.status)
     case 'workflow.stadia': {
@@ -266,8 +267,7 @@ export function buildParamSources() {
       { value: 'workflow.end_date', label: t('src.workflow.end_date') },
       { value: 'workflow.duration', label: t('src.workflow.duration') },
       { value: 'workflow.rate', label: t('src.workflow.rate') },
-      { value: 'workflow.version', label: t('src.workflow.version') },
-      { value: 'workflow.revision', label: t('src.workflow.revision') },
+      { value: 'workflow.version_rev', label: t('src.workflow.version_rev') },
       { value: 'workflow.date', label: t('src.workflow.date') },
       { value: 'workflow.status', label: t('src.workflow.status') },
       { value: 'workflow.stadia', label: t('src.workflow.stadia') },
@@ -311,6 +311,9 @@ export function paramSourceLabel(source) {
     const opt = g.options.find((o) => o.value === s)
     if (opt) return opt.label
   }
+  // Источник отсутствует в списке (legacy, напр. workflow.version/revision) — берём подпись из словаря
+  const legacy = t(`src.${s}`)
+  if (legacy !== `src.${s}`) return legacy
   return s || '—'
 }
 
