@@ -71,7 +71,7 @@
             class="text-[11px]"
             :title="t('tse.visibleTitle')"
             @update:model-value="templates.setVisible(p.id, $event)"
-          >{{ t('tse.visibleLabel') }}</UiCheckbox>
+          />
           <span v-if="!p.group" class="max-w-40 shrink-0 truncate text-[13px] font-medium text-ink-900" :title="p._label">{{ p._label }}</span>
           <span v-else class="flex shrink-0 items-center gap-1 text-[13px] font-medium text-ink-700">
             <component :is="p.direction === 'vertical' ? ArrowUDIcon : ArrowLRIcon" :size="12" class="text-ink-400" />
