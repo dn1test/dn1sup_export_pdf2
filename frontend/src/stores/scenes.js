@@ -167,6 +167,9 @@ export const useScenesStore = defineStore('scenes', {
     frameToggled(index, on) {
       const s = this.scenes[index]
       if (!s) return
+      // Write-through обязателен: иначе автосохранение перетрёт флаг кадра
+      // в сессии Ruby и при переключении страниц оверлей отключится
+      s.frame_overlay = on
       this.selectedSceneIndex = index
       this.switchToSketchupScene(s, index)
       callRuby('toggleAspectOverlay', JSON.stringify({ enabled: on, scene_index: index }))
