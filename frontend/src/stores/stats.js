@@ -3,6 +3,7 @@
 
 import { defineStore } from 'pinia'
 import { callRuby } from '../bridge/sketchup.js'
+import { notifyChange } from './autosave.js'
 import { useProjectStore } from './project.js'
 
 export const useStatsStore = defineStore('stats', {
@@ -37,6 +38,8 @@ export const useStatsStore = defineStore('stats', {
       const project = useProjectStore()
       if (typeof payload.total_duration === 'string' && payload.total_duration !== '') {
         project.workflow.total_duration = payload.total_duration
+        // Автостоимость: заполняем, только если поле стоимости пустое
+        if (project.recalcPrice(false)) notifyChange()
       }
     },
   },

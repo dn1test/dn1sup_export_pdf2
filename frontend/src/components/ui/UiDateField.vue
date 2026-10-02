@@ -5,7 +5,7 @@
     <input
       :value="display"
       type="text"
-      class="h-8 w-full min-w-0 rounded-md border border-ink-200 bg-white pr-8 pl-2.5 text-[13px] text-ink-900 transition-colors placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
+      :class="plain ? plainClass : boxClass"
       :placeholder="placeholder"
       inputmode="numeric"
       maxlength="10"
@@ -43,8 +43,13 @@ const props = defineProps({
   modelValue: { type: String, default: '' },
   placeholder: { type: String, default: '' },
   pickTitle: { type: String, default: '' },
+  // Без своей рамки — для сегментных групп, где рамку рисует контейнер
+  plain: { type: Boolean, default: false },
 })
 const emit = defineEmits(['update:modelValue'])
+
+const boxClass = 'h-8 w-full min-w-0 rounded-md border border-ink-200 bg-white pr-8 pl-2.5 text-[13px] text-ink-900 transition-colors placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20'
+const plainClass = 'h-8 w-full min-w-0 bg-transparent pr-8 pl-2.5 text-[13px] text-ink-900 transition-colors placeholder:text-ink-400 focus:outline-none'
 
 const display = ref(isoToRuDate(props.modelValue))
 const lastValid = ref(display.value)

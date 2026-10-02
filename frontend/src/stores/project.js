@@ -7,6 +7,7 @@ import { callRuby } from '../bridge/sketchup.js'
 import { notifyChange } from './autosave.js'
 import { t } from '../i18n/index.js'
 import { nowStamp } from '../lib/dates.js'
+import { formatCost, parseDurationHours, parseRate } from '../lib/calc.js'
 
 const tval = (v) => String(v === undefined || v === null ? '' : v).trim()
 
@@ -217,6 +218,10 @@ export const useProjectStore = defineStore('project', {
       this.workflow.revision = String(parseInt(wf.revision ?? info.revision, 10) || 1)
       this.lastEdit = tval(info.last_edit) || tval(info.edit)
 
+      // Стоимость: при загрузке только заполняем пустое поле (ручное значение
+      // не трогаем)
+      this.recalcPrice(false)
+
       // Стадии
       let stadia = this.workflow.stadia || wf.stadia
       if (!Array.isArray(stadia) || stadia.length === 0) stadia = DEFAULT_STADIA.map((s) => ({ ...s }))
@@ -244,6 +249,21 @@ export const useProjectStore = defineStore('project', {
       this.project.articul_locked = this.articulValue !== ''
       if (this.articulValue.startsWith('CF#')) this.setTrade('1')
       else if (this.articulValue.startsWith('HF#')) this.setTrade('0')
+    },
+
+    // Автостоимость: Ставка (₽/ч) × Время. force=true — перезаписать любое
+    // значение (реакция на правку Ставки/Времени в форме); false — заполнить
+    // только пустое поле (загрузка проекта, подтяжка времени из статистики).
+    // Возвращает true, если стоимость изменилась.
+    recalcPrice(force = true) {
+      const rate = parseRate(this.workflow.rate)
+      const hours = parseDurationHours(this.workflow.total_duration)
+      if (!(rate > 0) || !(hours > 0)) return false
+      const cost = formatCost(rate * hours)
+      const current = String(this.workflow.price || '').trim()
+      if ((!force && current !== '') || current === cost) return false
+      this.workflow.price = cost
+      return true
     },
 
     // Статус = название последней отмеченной стадии
