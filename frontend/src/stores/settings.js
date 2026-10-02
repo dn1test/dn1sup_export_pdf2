@@ -8,14 +8,6 @@ import { notifyChange } from './autosave.js'
 
 const VALID_ASPECT_RATIOS = ['page', '16:9', '4:3', '3:2', '5:4', '1:1', '4:5', 'custom']
 
-// Эффективное семейство для предпросмотра: параметр ширины повышает сжатие
-// Sofia Sans Condensed до Extra Condensed (зеркало FontService.apply_font_width)
-export function previewFontFamilyFor(family, width) {
-  const f = (family || '').toLowerCase()
-  if (!f.includes('sofia sans condensed')) return family || 'Sofia Sans Condensed'
-  return width === 'extra_condensed' ? 'Sofia Sans Extra Condensed' : 'Sofia Sans Condensed'
-}
-
 function normScaleMult(v) {
   const s = String(v ?? '2.0')
   if (['auto', '0.5', '1', '1.0', '1.5', '2', '2.0', '2.5', '3', '3.0'].includes(s)) {
@@ -38,8 +30,6 @@ export const useSettingsStore = defineStore('settings', {
     pageLayout: 'landscape',
     marginMm: 5,
     fontFamily: 'Sofia Sans Condensed',
-    fontWeight: 'normal',
-    fontWidth: 'condensed',
     imageAspectRatio: '4:3',
     customRatioW: 16,
     customRatioH: 9,
@@ -97,7 +87,7 @@ export const useSettingsStore = defineStore('settings', {
     },
 
     docFontFamily(state) {
-      return previewFontFamilyFor(state.fontFamily, state.fontWidth)
+      return state.fontFamily
     },
   },
 
@@ -121,8 +111,6 @@ export const useSettingsStore = defineStore('settings', {
       let family = (settings.font_family || 'Sofia Sans Condensed').trim()
       if (family.toLowerCase().includes('din')) family = 'Oswald'
       this.fontFamily = family
-      this.fontWeight = String(settings.font_weight || 'normal').toLowerCase() === 'bold' ? 'bold' : 'normal'
-      this.fontWidth = settings.font_width === 'extra_condensed' ? 'extra_condensed' : 'condensed'
       this.imageAspectRatio = VALID_ASPECT_RATIOS.includes(settings.image_aspect_ratio)
         ? settings.image_aspect_ratio
         : '4:3'
@@ -160,7 +148,6 @@ export const useSettingsStore = defineStore('settings', {
     syncDocFontVars() {
       if (typeof document === 'undefined') return
       document.documentElement.style.setProperty('--page-font-family', `"${this.docFontFamily}", sans-serif`)
-      document.documentElement.style.setProperty('--page-font-weight', this.fontWeight === 'bold' ? '700' : '400')
     },
 
     setMargin(mm) {
@@ -173,16 +160,6 @@ export const useSettingsStore = defineStore('settings', {
       let family = (val || 'Sofia Sans Condensed').trim()
       if (family.toLowerCase().includes('din')) family = 'Oswald'
       this.fontFamily = family
-      this.syncDocFontVars()
-      notifyChange()
-    },
-    setFontWeight(val) {
-      this.fontWeight = String(val || 'normal').toLowerCase() === 'bold' ? 'bold' : 'normal'
-      this.syncDocFontVars()
-      notifyChange()
-    },
-    setFontWidth(val) {
-      this.fontWidth = val === 'extra_condensed' ? 'extra_condensed' : 'condensed'
       this.syncDocFontVars()
       notifyChange()
     },

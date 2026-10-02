@@ -43,20 +43,6 @@
               <option v-for="f in FONTS" :key="f" :value="f">{{ f }}</option>
             </UiSelect>
           </label>
-          <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tpl.weightTitle')">
-            {{ t('tpl.weightLabel') }}
-            <UiSelect v-model="fontWeightModel" class="!h-6 w-[70px] text-xs">
-              <option value="normal">{{ t('tpl.weightNormal') }}</option>
-              <option value="bold">{{ t('tpl.weightBold') }}</option>
-            </UiSelect>
-          </label>
-          <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tpl.widthTitle')">
-            {{ t('tpl.widthLabel') }}
-            <UiSelect v-model="fontWidthModel" class="!h-6 w-[90px] text-xs">
-              <option value="condensed">{{ t('tpl.widthCondensed') }}</option>
-              <option value="extra_condensed">{{ t('tpl.widthExtra') }}</option>
-            </UiSelect>
-          </label>
           <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tpl.marginInputTitle')">
             {{ t('tpl.marginLabel') }}
             <input
@@ -112,13 +98,5 @@ const FONTS = [
 const fontFamilyModel = computed({
   get: () => settings.fontFamily,
   set: (v) => settings.setFontFamily(v),
-})
-const fontWeightModel = computed({
-  get: () => settings.fontWeight,
-  set: (v) => settings.setFontWeight(v),
-})
-const fontWidthModel = computed({
-  get: () => settings.fontWidth,
-  set: (v) => settings.setFontWidth(v),
 })
 </script>

@@ -51,7 +51,6 @@
 /* Шрифт печатного документа (превью параметров в редакторе шаблона) */
 :root {
   --page-font-family: 'Sofia Sans Condensed', sans-serif;
-  --page-font-weight: 400;
 }
 
 html,

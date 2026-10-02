@@ -182,8 +182,10 @@ export function collectFormData() {
     scale_factor: settings.effectiveScaleMultiplier,
     annotation_font_size: settings.annotationFontSize,
     font_family: settings.fontFamily,
-    font_weight: settings.fontWeight,
-    font_width: settings.fontWidth,
+    // Начертание/ширина выведены из GUI: шлём дефолты, чтобы старые
+    // сохранённые значения сходились к ним при следующем сохранении
+    font_weight: 'normal',
+    font_width: 'condensed',
     primary_color: String(settings.primaryColor || '').replace('#', ''),
     auto_open_pdf: settings.autoOpenPdf,
     save_skp_backup: settings.saveSkpBackup,

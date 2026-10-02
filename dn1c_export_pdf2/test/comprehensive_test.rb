@@ -4306,14 +4306,12 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     assert(settings_vue.include?('settings.setFontFamily($event)'), "SettingsTab содержит выбор семейства шрифта документа")
     assert(templates_vue.include?("v-model=\"fontFamilyModel\""), "Тулбар панели шаблонов содержит выбор шрифта (fontFamilyModel)")
-    assert(templates_vue.include?('v-model="fontWeightModel"'), "Тулбар содержит начертание (fontWeightModel)")
-    assert(templates_vue.include?('v-model="fontWidthModel"'), "Тулбар содержит ширину (fontWidthModel)")
-    assert(templates_vue.include?('value="bold"'), "selectFontWeight содержит вариант bold")
-    assert(templates_vue.include?('value="extra_condensed"'), "selectFontWidth содержит вариант extra_condensed")
     assert(templates_vue.include?("settings.setMargin($event.target.value)"), "Тулбар содержит поле полей страницы (margin)")
 
-    # Начертание и ширина размещаются только на тулбаре панели шаблонов,
-    # а не на вкладке настроек страницы
+    # Начертание и ширина выведены из GUI: на тулбаре панели шаблонов и на
+    # вкладке настроек остаётся только выбор семейства шрифта
+    assert(!templates_vue.include?("fontWeightModel") && !templates_vue.include?("fontWidthModel"),
+           "На тулбаре панели шаблонов нет селекторов начертания/ширины")
     assert(!settings_vue.include?("fontWeightModel") && !settings_vue.include?("fontWidthModel"),
            "На вкладке настроек нет селекторов начертания/ширины")
 
@@ -4340,22 +4338,11 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
            "settings-стор динамически обновляет CSS-переменную --page-font-family")
     assert(app_js_text.include?('font_family:'),
            "payload собирает font_family в pdf_settings")
-    assert(app_js_text.include?('setFontWeight(val)'),
-           "settings-стор содержит обработчик смены насыщенности (setFontWeight)")
-    assert(app_js_text.include?('setFontWidth(val)'),
-           "settings-стор содержит обработчик смены ширины (setFontWidth)")
-    assert(app_js_text.include?('--page-font-weight'),
-           "settings-стор динамически обновляет CSS-переменную --page-font-weight")
-    assert(app_js_text.include?('font_weight:'),
-           "payload собирает font_weight в pdf_settings")
-    assert(app_js_text.include?('font_width:'),
-           "payload собирает font_width в pdf_settings")
-    assert(app_js_text.include?('v-model="fontWeightModel"') || app_js_text.include?('setFontWeight'),
-           "GUI биндит насыщенность шрифта")
-    assert(app_js_text.include?('v-model="fontWidthModel"') || app_js_text.include?('setFontWidth'),
-           "GUI биндит ширину шрифта")
-    assert(app_js_text.include?('previewFontFamilyFor'),
-           "settings-стор синхронизирует превью семейства с параметром ширины")
+    # Начертание/ширина выведены из GUI: payload шлёт фиксированные дефолты
+    assert(app_js_text.include?("font_weight: 'normal'"),
+           "payload отправляет дефолт font_weight в pdf_settings")
+    assert(app_js_text.include?("font_width: 'condensed'"),
+           "payload отправляет дефолт font_width в pdf_settings")
 
     # 6. Печатные шрифты: TTF в config/fonts (ставятся FontService в систему),
     #    семьи перечислены в style.css и SettingsTab
@@ -4371,7 +4358,6 @@ test_project_data.project_info[:appliances] = "Духовой шкаф Bosch"
 
     style_css = File.read(File.expand_path("../../frontend/src/style.css", __dir__), encoding: "utf-8")
     assert(style_css.include?("--page-font-family"), "style.css содержит CSS-переменную --page-font-family")
-    assert(style_css.include?("--page-font-weight"), "style.css содержит CSS-переменную --page-font-weight")
     assert(style_css.include?("--font-doc"), "style.css описывает стек печатного шрифта (--font-doc)")
     assert(app_js_text.include?('"Sofia Sans Condensed"'), "GUI предлагает семейство Sofia Sans Condensed")
     assert(app_js_text.include?('"Ubuntu Condensed"'), "GUI предлагает семейство Ubuntu Condensed")
