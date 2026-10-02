@@ -848,7 +848,7 @@ module DN1Code
           # Оценка по итоговому тексту (заголовок ЗАГЛАВНЫМИ) плюс надбавка за
           # кегль заголовка +1 (PARAM_LABEL_SIZE_DELTA × межстрочный коэффициент)
           expected_h = LB.send(:estimate_text_height, "#{long_label.upcase}\nCF#260922_100000",
-                               10.0, CONTENT_W * 0.45, "Sofia Sans Condensed", false) +
+                               10.0, CONTENT_W * 0.20, "Sofia Sans Condensed", false) +
                        1.0 * LB.send(:font_line_pitch_ratio, "Sofia Sans Condensed") + 1.5
           actual_h = ent.bounds.height * 72.0
           assert((actual_h - expected_h).abs < 0.6,

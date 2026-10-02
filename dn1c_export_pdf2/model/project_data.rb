@@ -2213,6 +2213,7 @@ module DN1Code
             articul_locked: @project[:articul_locked] == true,
             background_default_migrated: @project[:background_default_migrated] == true,
             watermark_default_migrated: @project[:watermark_default_migrated] == true,
+            frame_overlay_default_migrated: @project[:frame_overlay_default_migrated] == true,
             product_tags: @project[:product_tags] || [],
             place:        @project[:place].to_s,
             adress:       @project[:adress].to_s,
@@ -2250,6 +2251,7 @@ module DN1Code
           wf_out = {
             author:         @workflow[:author].to_s,
             price:          @workflow[:price].to_s.empty? ? "" : @workflow[:price],
+            rate:           @workflow[:rate].to_s.empty? ? "" : @workflow[:rate],
             start_date:     @workflow[:start_date].to_s,
             end_date:       @workflow[:end_date].to_s,
             total_duration: @workflow[:total_duration].to_s,

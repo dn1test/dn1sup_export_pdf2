@@ -1170,6 +1170,7 @@ class TestRunner
 
     data.workflow[:author]         = "Иванов И.И."
     data.workflow[:price]          = 150000
+    data.workflow[:rate]           = "2500"
     data.workflow[:start_date]     = "2026-09-01"
     data.workflow[:end_date]       = "2026-09-15"
     data.workflow[:total_duration] = "12h 40m"
@@ -1210,6 +1211,7 @@ class TestRunner
 
     raw_wf = raw["workflow"] || raw[:workflow]
     assert((raw_wf["price"] || raw_wf[:price]) == 150000, "Стоимость проекта сохранена")
+    assert((raw_wf["rate"] || raw_wf[:rate]).to_s == "2500", "Ставка (rate) сохранена в workflow")
     assert((raw_wf["total_duration"] || raw_wf[:total_duration]) == "12h 40m", "Общее время работы сохранено")
     raw_hist = raw_wf["history_edit"] || raw_wf[:history_edit]
     assert(raw_hist.is_a?(Array) && raw_hist.size == 2, "Список history_edit сохранен как массив кортежей")
@@ -1222,6 +1224,7 @@ class TestRunner
     assert(loaded.customer[:name] == "Иван Петров", "customer.name корректно прочитан")
     assert(loaded.customer[:id] == cust_id, "customer.id корректно прочитан")
     assert(loaded.workflow[:total_duration] == "12h 40m", "workflow.total_duration прочитан")
+    assert(loaded.workflow[:rate].to_s == "2500", "workflow.rate прочитан из YAML")
     assert(loaded.workflow[:history_edit].size == 2, "Все записи history_edit прочитаны")
 
     # 6. Генерация PDF из модульных данных
@@ -2009,6 +2012,36 @@ class TestRunner
     reloaded_data.load_from_yaml(test_yaml)
     assert(reloaded_data.pdf_settings[:image_aspect_ratio] == "16:9", "Загруженный из YAML image_aspect_ratio равен 16:9")
     assert(reloaded_data.pdf_settings[:show_aspect_overlay] == true, "Загруженный из YAML show_aspect_overlay равен true")
+
+    # 5.1 Постраничные флаги frame_overlay переживают сохранение/загрузку:
+    # гард-флаг миграции пишется в project.yaml, поэтому повторная загрузка
+    # не запускает migrate_frame_overlay_default! заново
+    mig_data = DN1Code::ExportPdf2::Model::ProjectData.new
+    mig_model = Sketchup::MockModel.new
+    mig_model.pages = Sketchup::MockPages.new(
+      ["01. Обложка", "02. Перспектива", "03. Спецификация"].map { |s| Sketchup::MockPage.new(s) }
+    )
+    mig_data.sync_with_model_scenes(mig_model)
+    mig_data.pdf_settings[:show_aspect_overlay] = false
+    mig_data.migrate_frame_overlay_default!
+    mig_data.scenes[0].frame_overlay = true
+    mig_data.scenes[1].frame_overlay = false
+    mig_data.scenes[2].frame_overlay = true
+
+    mig_yaml = File.join(tmp_dir, "frame_migrated.yaml")
+    assert(mig_data.save_to_yaml(mig_yaml), "Проект с постраничной рамкой сохранен в YAML")
+    yaml_mig = File.read(mig_yaml, encoding: "utf-8")
+    assert(yaml_mig.include?("frame_overlay_default_migrated: true"), "Гард-флаг миграции рамки сохранен в project.yaml")
+
+    mig_loaded = DN1Code::ExportPdf2::Model::ProjectData.new
+    mig_loaded.load_from_yaml(mig_yaml)
+    assert(mig_loaded.project[:frame_overlay_default_migrated] == true, "Гард-флаг миграции прочитан из YAML")
+    assert(mig_loaded.scenes[0].frame_overlay == true, "Постраничный флаг рамки сцены 1 пережил загрузку")
+    assert(mig_loaded.scenes[1].frame_overlay == false, "Постраничный флаг рамки сцены 2 пережил загрузку")
+    assert(mig_loaded.scenes[2].frame_overlay == true, "Постраничный флаг рамки сцены 3 пережил загрузку")
+    mig_loaded.migrate_frame_overlay_default!
+    assert(mig_loaded.scenes[0].frame_overlay == true, "Повторная миграция не перетирает постраничные флаги")
+    assert(mig_loaded.scenes[1].frame_overlay == false, "Повторная миграция не включает рамку на странице 2")
 
     # 6. Проверка файлов конфигурации плагина
     def_settings_text = File.read(File.join(__dir__, "../config/default_settings.yaml"), encoding: "utf-8")

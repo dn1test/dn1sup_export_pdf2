@@ -1197,13 +1197,13 @@ module DN1Code
         def param_zone_box(content, align, y_top, box_h)
           case align
           when :center
-            w = content[:w] * 0.5
+            w = content[:w] * 0.80
             x = content[:left] + ((content[:w] - w) / 2.0)
           when :right
-            w = content[:w] * 0.45
+            w = content[:w] * 0.20
             x = content[:left] + content[:w] - w
           else
-            w = content[:w] * 0.45
+            w = content[:w] * 0.20
             x = content[:left]
           end
           { x: x, y: y_top, width: w, height: [box_h, 10.0].max }

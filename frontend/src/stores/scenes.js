@@ -108,6 +108,9 @@ export const useScenesStore = defineStore('scenes', {
       if (!VALID_ASPECT_RATIOS.includes(ratio)) ratio = '4:3'
       if (!isUserAction) return
       const settings = useSettingsStore()
+      // Write-through обязателен: иначе отложенный автосейв отправит
+      // устаревший глобальный image_aspect_ratio и перетрёт выбор в сессии Ruby
+      settings.imageAspectRatio = ratio
       callRuby('updateAspectSettings', JSON.stringify({
         template_key: scene.page_type || 'cover',
         scene_name: scene.name || '',

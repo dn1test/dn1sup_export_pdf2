@@ -6,7 +6,7 @@
         <template #icon><ClipboardListIcon :size="14" /></template>
         <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <UiField class="sm:col-span-3" :label="t('project.furnitureLabel')">
-            <UiInput v-model="project.project.product" :placeholder="t('project.furniturePh')" @update:model-value="notifyChange()" />
+            <UiInput v-model="project.project.product" :placeholder="t('project.furniturePh')" @update:model-value="onProductInput" />
           </UiField>
           <UiField class="sm:col-span-1" :label="t('project.roomLabel')">
             <UiInput v-model="project.project.place" :placeholder="t('project.roomPh')" @update:model-value="notifyChange()" />
@@ -280,6 +280,14 @@ function onSpecsChanged() {
 // Правка Ставки/Времени: автопересчёт стоимости (Ставка × Время) + автосохранение
 function onAutoCostInput() {
   project.recalcPrice()
+  notifyChange()
+}
+
+// Изделие: product_tags — зеркало строки «Изделие» (как на Ruby-прокси).
+// Без синка на вводе payload уходит со старым значением из тегов
+// (furnitureName предпочитает непустые теги), и правка откатывается
+function onProductInput(val) {
+  project.syncProductTags(val)
   notifyChange()
 }
 

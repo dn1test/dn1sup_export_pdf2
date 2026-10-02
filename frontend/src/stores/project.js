@@ -108,10 +108,13 @@ export const useProjectStore = defineStore('project', {
     isCommercial(state) {
       return state.trade === '1'
     },
-    // Отображаемое имя изделия: теги через запятую либо строка product
+    // Отображаемое имя изделия: строка «Изделие», при пустой — теги через запятую.
+    // product первичен: иначе правка поля не попадает в payload (теги старше)
     furnitureName(state) {
+      const product = String(state.project.product || '').trim()
+      if (product) return product
       const tags = state.project.product_tags
-      return Array.isArray(tags) && tags.length ? tags.join(', ') : state.project.product
+      return Array.isArray(tags) && tags.length ? tags.join(', ') : ''
     },
     // Шапка, строка 1: название изделия
     headerProduct(state) {
@@ -246,6 +249,13 @@ export const useProjectStore = defineStore('project', {
       this.project.articul_locked = this.articulValue !== ''
       if (this.articulValue.startsWith('CF#')) this.setTrade('1')
       else if (this.articulValue.startsWith('HF#')) this.setTrade('0')
+    },
+
+    // product_tags — зеркало строки «Изделие» (в Ruby то же делает прокси
+    // project_info на ключе :product): синхрон на вводе, чтобы payload
+    // и шапка не возвращали старые теги после правки поля
+    syncProductTags(val) {
+      this.project.product_tags = String(val || '').split(',').map((s) => s.trim()).filter(Boolean)
     },
 
     // Автостоимость: Ставка (₽/ч) × Время. force=true — перезаписать любое
