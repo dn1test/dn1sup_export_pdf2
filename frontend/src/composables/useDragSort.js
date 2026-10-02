@@ -4,7 +4,9 @@
 
 import { ref } from 'vue'
 
-export function useDragSort({ onDrop, armIgnore = 'input, select, button, label, a, textarea, [contenteditable]' }) {
+// onDrop переименован в commitDrop: локальная function onDrop(e, index) ниже
+// затеняла колбэк, drop рекурсивно вызывал сам себя и падал с TypeError.
+export function useDragSort({ onDrop: commitDrop, armIgnore = 'input, select, button, label, a, textarea, [contenteditable]' }) {
   const dragArm = ref(null) // ключ строки с зажатой ручкой — включает draggable
   const dragging = ref(null) // индекс перетаскиваемой строки
   const overIdx = ref(null)
@@ -55,7 +57,7 @@ export function useDragSort({ onDrop, armIgnore = 'input, select, button, label,
     const isTop = e.clientY - rect.top < rect.height / 2
     let dropIndex = isTop ? index : index + 1
     if (dragging.value < dropIndex) dropIndex -= 1
-    if (dropIndex !== dragging.value) onDrop(dragging.value, dropIndex)
+    if (dropIndex !== dragging.value) commitDrop(dragging.value, dropIndex)
     clearDrag()
   }
 

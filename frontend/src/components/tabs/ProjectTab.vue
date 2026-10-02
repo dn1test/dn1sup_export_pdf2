@@ -198,6 +198,7 @@
               >
               <input
                 v-if="editingIdx === idx"
+                ref="editInput"
                 v-model="editName"
                 type="text"
                 class="h-6 min-w-0 flex-1 rounded border border-accent-400 bg-white px-1.5 text-[13px] focus:outline-none"
