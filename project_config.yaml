@@ -4,7 +4,6 @@ project:
   name_place: "Мансарда"
   adress: "Белая Колпь"
   customer: "Алексей, Мария"
-  status: "Правки"
   trade: "0"
   last_edit: "Добавлены замки"
 directories:

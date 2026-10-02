@@ -1140,7 +1140,6 @@ module DN1Code
           "workflow.revision"    => "Ревизия",
           "workflow.version_rev" => "Версия#Ревизия",
           "workflow.date"        => "Дата",
-          "workflow.status"      => "Статус",
           "workflow.stadia"      => "Стадии проекта",
           "workflow.last_edit"   => "Последние изменения",
           "workflow.history"     => "История правок",

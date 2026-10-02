@@ -10,7 +10,7 @@ import { t } from '../i18n/index.js'
 const FILLED_BY_USER = new Set([
   "project.articul", "project.address", "project.materials", "project.lighting",
   "customer.id", "customer.name", "customer.phone", "customer.email",
-  "workflow.author", "workflow.rate", "workflow.status",
+  "workflow.author", "workflow.rate",
 ])
 
 export function paramHelpTitle(p) {

@@ -44,7 +44,6 @@ project_data.project_info = {
   articul:       "CITY-2026-AP142",
   version:       1,
   revision:      3,
-  status:        "НА СОГЛАСОВАНИИ",
   designer:      "DESTUDIONS Architecture",
   notes:         "Материалы:\n• Фасады: МДФ эмаль матовая RAL 9003\n• Столешница: Кварцевый агломерат Technistone 20мм\n• Фурнитура: Blum Legrabox soft-close\n• Подсветка: Светодиодная лента 3000K CRI>95"
 }

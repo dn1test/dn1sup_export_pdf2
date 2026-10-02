@@ -177,9 +177,6 @@ module DN1Code
             when :rate
               @owner.workflow[:rate] = val.to_s
               super(:rate, val.to_s)
-            when :status
-              @owner.workflow[:status] = val.to_s
-              super(:status, val.to_s)
             when :stadia
               norm = @owner.normalize_stadia(val)
               @owner.workflow[:stadia] = norm
@@ -227,7 +224,7 @@ module DN1Code
         attr_accessor :project
         # @return [Hash] карточка заказчика (id, name, phone, email, company)
         attr_accessor :customer
-        # @return [Hash] ход работы и жизненный цикл (author, price, start_date, end_date, total_duration, rate, status, version, revision, history_edit)
+        # @return [Hash] ход работы и жизненный цикл (author, price, start_date, end_date, total_duration, rate, version, revision, history_edit)
         attr_accessor :workflow
         # @return [Hash] метаданные и реквизиты проекта для обратной совместимости
         attr_accessor :project_info
@@ -583,7 +580,6 @@ module DN1Code
             end_date:       "",
             total_duration: "",
             rate:           "",
-            status:         "Правки",
             version:        "01",
             revision:       "001",
             stadia:         default_stadia,
@@ -619,7 +615,6 @@ module DN1Code
             adress:           "",
             customer:         "",
             company:          "",
-            status:           "Правки",
             revision:         1,
             version:          1,
             last_edit:        "",
@@ -1008,14 +1003,6 @@ module DN1Code
           norm_stadia = normalize_stadia(st_raw)
           @workflow[:stadia]     = norm_stadia
           @project_info[:stadia] = norm_stadia
-
-          w_status = self.class.pick_str(@workflow[:status], @project_info[:status])
-          if w_status.empty?
-            last_done = norm_stadia.reverse.find { |s| s[:status] == true }
-            w_status = last_done ? last_done[:name] : "Предварительный"
-          end
-          @workflow[:status]     = w_status
-          @project_info[:status] = w_status
 
           # Версия и Ревизия (поддержка и форматированных строк "001", и целых чисел)
           v_raw = @workflow[:version] || @project_info[:version] || 1
@@ -2066,10 +2053,6 @@ module DN1Code
                 @customer.merge!(root[:customer]) if root[:customer].is_a?(Hash)
                 if root[:workflow].is_a?(Hash)
                   @workflow.merge!(root[:workflow])
-                  unless root[:workflow].key?(:status)
-                    @workflow[:status] = ""
-                    @project_info.delete(:status) if @project_info
-                  end
                   if root[:workflow][:stadia]
                     @workflow[:stadia] = normalize_stadia(root[:workflow][:stadia])
                   end
@@ -2102,7 +2085,6 @@ module DN1Code
                   @customer[:email]       = src[:email].to_s
                   @customer[:company]     = src[:company].to_s
 
-                  @workflow[:status]      = (src[:status] || "Предварительный").to_s
                   @workflow[:version]     = (src[:version] || "01").to_s
                   @workflow[:revision]    = (src[:revision] || "001").to_s
                   @workflow[:last_edit]   = (src[:last_edit] || src[:edit]).to_s
@@ -2276,7 +2258,6 @@ module DN1Code
             stadia:         normalize_stadia(@workflow[:stadia]),
             history_edit:   (@workflow[:history_edit] || []).reverse
           }
-          wf_out[:status] = @workflow[:status].to_s unless @workflow[:status].to_s.empty?
 
           # 4. Секция history_edit (Корневая, как в project.yaml, хронологический порядок)
           hist_out = (@history || []).reverse.map do |h|

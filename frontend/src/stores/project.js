@@ -80,7 +80,6 @@ export const useProjectStore = defineStore('project', {
       end_date: '',
       total_duration: '',
       rate: '',
-      status: '',
       version: '1',
       revision: '1',
       stadia: [],
@@ -213,7 +212,6 @@ export const useProjectStore = defineStore('project', {
       this.workflow.end_date = tval(wf.end_date)
       this.workflow.total_duration = tval(wf.total_duration)
       this.workflow.rate = tval(wf.rate) || tval(info.rate)
-      this.workflow.status = tval(wf.status) || tval(info.status) || 'Предварительный'
       this.workflow.version = String(parseInt(wf.version ?? info.version, 10) || 1)
       this.workflow.revision = String(parseInt(wf.revision ?? info.revision, 10) || 1)
       this.lastEdit = tval(info.last_edit) || tval(info.edit)
@@ -229,7 +227,6 @@ export const useProjectStore = defineStore('project', {
         name: tval(s && s.name),
         status: !!(Array.isArray(s) ? s[1] : s && s.status),
       }))
-      this.updateStadiaStatus(false)
 
       // Скрытые поля ТЗ/спецификаций
       this.taskDescription = tval(info.task_description) || tval(prj.description)
@@ -266,17 +263,7 @@ export const useProjectStore = defineStore('project', {
       return true
     },
 
-    // Статус = название последней отмеченной стадии
-    updateStadiaStatus(notify = true) {
-      const stadia = this.workflow.stadia || []
-      const lastChecked = [...stadia].reverse().find((s) => s.status)
-      if (!lastChecked) return
-      this.workflow.status = lastChecked.name
-      if (notify) notifyChange()
-    },
-
     stadiaChanged() {
-      this.updateStadiaStatus(false)
       notifyChange()
     },
     addStadia(name) {
@@ -288,7 +275,6 @@ export const useProjectStore = defineStore('project', {
     removeStadia(index) {
       if (this.workflow.stadia.length <= 1) return
       this.workflow.stadia.splice(index, 1)
-      this.updateStadiaStatus(false)
       notifyChange()
     },
     renameStadia(index, name) {
@@ -296,14 +282,12 @@ export const useProjectStore = defineStore('project', {
       const item = this.workflow.stadia[index]
       if (!item || !n || item.name === n) return
       item.name = n
-      this.updateStadiaStatus(false)
       notifyChange()
     },
     moveStadia(from, to) {
       const arr = this.workflow.stadia
       const [item] = arr.splice(from, 1)
       arr.splice(to, 0, item)
-      this.updateStadiaStatus(false)
       notifyChange()
     },
     // Сохранить имена стадий как глобальный список по умолчанию (settings.yaml)

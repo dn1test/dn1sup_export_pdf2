@@ -64,7 +64,6 @@ module DN1Code
             "workflow.revision"       => "Ревизия",
             "workflow.version_rev"    => "Версия#Ревизия",
             "workflow.date"           => "Дата",
-            "workflow.status"         => "Статус",
             "workflow.stadia"         => "Стадии проекта",
             "workflow.last_edit"      => "Последние изменения",
             "workflow.history"        => "История правок",
@@ -120,7 +119,6 @@ module DN1Code
             r = non_blank(workflow[:revision] || info[:revision]) || "001"
             "#{v.to_s.rjust(2, "0")}##{r.to_s.rjust(3, "0")}"
           when "workflow.date"          then non_blank(workflow[:date_order] || info[:date]) || Time.now.strftime("%d.%m.%Y")
-          when "workflow.status"        then non_blank(workflow[:status] || info[:status])
           when "workflow.stadia"        then stadia_value(workflow, info)
           when "workflow.last_edit"     then last_edit_value(workflow, info)
           when "workflow.history"       then history_value(workflow, info)
@@ -204,7 +202,7 @@ module DN1Code
             end.reject(&:empty?)
             lines_arr.empty? ? nil : lines_arr.join("\n")
           else
-            non_blank(workflow[:status] || info[:status])
+            nil
           end
         end
 

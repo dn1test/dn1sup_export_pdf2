@@ -152,7 +152,6 @@ export function paramPreviewValue(source) {
     rate: project.workflow.rate,
     version: project.workflow.version,
     revision: project.workflow.revision,
-    status: project.workflow.status,
     stadia: project.workflow.stadia,
     history_edit: project.workflow.history_edit,
     last_edit: project.lastEdit,
@@ -189,10 +188,9 @@ export function paramPreviewValue(source) {
     case 'workflow.revision': return `#r${tval(wf.revision) || '001'}`
     case 'workflow.version_rev': return `${String(tval(wf.version) || '01').padStart(2, '0')}#${String(tval(wf.revision) || '001').padStart(3, '0')}`
     case 'workflow.date': return previewDate(wf.date_order || info.date)
-    case 'workflow.status': return tval(wf.status)
     case 'workflow.stadia': {
       const arr = Array.isArray(wf.stadia) && wf.stadia.length > 0 ? wf.stadia : null
-      return arr ? arr.map(stadiaMark).join('\n') : tval(wf.status)
+      return arr ? arr.map(stadiaMark).join('\n') : ''
     }
     case 'workflow.last_edit': {
       const h = wf.history_edit
@@ -269,7 +267,6 @@ export function buildParamSources() {
       { value: 'workflow.rate', label: t('src.workflow.rate') },
       { value: 'workflow.version_rev', label: t('src.workflow.version_rev') },
       { value: 'workflow.date', label: t('src.workflow.date') },
-      { value: 'workflow.status', label: t('src.workflow.status') },
       { value: 'workflow.stadia', label: t('src.workflow.stadia') },
       { value: 'workflow.last_edit', label: t('src.workflow.last_edit') },
       { value: 'workflow.history', label: t('src.workflow.history') },

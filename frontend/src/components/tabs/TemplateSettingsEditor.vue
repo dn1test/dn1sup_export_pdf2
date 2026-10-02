@@ -105,7 +105,6 @@
             @input="templates.update(p.id, { color: $event.target.value })"
           >
           <label class="flex items-center gap-1 text-[11px] text-ink-500" :title="t('tse.sizeTitle')">
-            {{ t('tse.sizeLabel') }}
             <UiSelect
               :model-value="String(p.font_size)"
               class="!h-6 !w-[64px] text-xs"

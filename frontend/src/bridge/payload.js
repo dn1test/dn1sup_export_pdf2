@@ -38,10 +38,6 @@ export function collectFormData() {
   const totalDurationVal = String(project.workflow.total_duration || '').trim()
   const rateVal = String(project.workflow.rate || '').trim()
 
-  // Статус — по последней отмеченной стадии
-  const activeStadia = (project.workflow.stadia || []).filter((s) => s.status)
-  const statusVal = activeStadia.length ? activeStadia[activeStadia.length - 1].name : project.workflow.status || 'Предварительный'
-
   const revVal = parseInt(project.workflow.revision, 10) || 1
   const verVal = parseInt(project.workflow.version, 10) || 1
 
@@ -84,7 +80,6 @@ export function collectFormData() {
     end_date: endDateVal,
     total_duration: totalDurationVal,
     rate: rateVal,
-    status: statusVal,
     version: String(verVal),
     revision: String(revVal),
     stadia: project.workflow.stadia || [],
@@ -109,7 +104,6 @@ export function collectFormData() {
     adress: addrVal,
     customer: custVal,
     company: compVal,
-    status: statusVal,
     revision: String(revVal),
     version: String(verVal),
     last_edit: lastEditVal,

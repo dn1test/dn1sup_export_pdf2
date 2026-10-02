@@ -666,7 +666,6 @@ class TestRunner
       articul:       "VIL-2026-09",
       version:       1,
       revision:      2,
-      status:        "В РАБОТЕ",
       designer:      "DESTUDIONS Architecture",
       notes:         "Материалы фасада: клинкерный кирпич Roben, планкен из термоясеня, алюминиевые витражи Reynaers."
     }
@@ -855,7 +854,6 @@ class TestRunner
       articul:        "PAN-2026-X",
       version:        1,
       revision:       3,
-      status:         "В РАБОТЕ",
       materials:      "Шпон американского ореха, металлокаркас латунь, подсветка 2700K.",
       appliances:     "Аудиосистема Hi-Fi, панель OLED 85'.",
       lighting:       "Профиль Arlight 24V, сенсорное диммирование.",
@@ -905,7 +903,6 @@ class TestRunner
         name_project: "Проект с ревизией 7"
         version: 2
         revision: 7
-        status: "В РАБОТЕ"
       pdf_settings:
         page_size: "A3"
         page_layout: "landscape"
@@ -954,7 +951,6 @@ class TestRunner
           name_place: "Мансарда"
           adress: "Белая Колпь"
           customer: "Алексей, Мария"
-          status: "Правки"
           trade: "0"
           last_edit: "Добавлены замки"
         directories:
@@ -992,7 +988,6 @@ class TestRunner
     assert(info[:address] == "Белая Колпь", "address синхронизирован с adress")
     assert(info[:customer] == "Алексей, Мария", "customer прочитан: #{info[:customer]}")
     assert(info[:name_customer] == "Алексей, Мария", "name_customer синхронизирован с customer")
-    assert(info[:status] == "Правки", "status прочитан: #{info[:status]}")
     assert(info[:trade] == "0", "trade '0' (домашний HF#) корректно определен")
     assert(info[:last_edit] == "Добавлены замки", "last_edit прочитан: #{info[:last_edit]}")
 
@@ -1178,7 +1173,6 @@ class TestRunner
     data.workflow[:start_date]     = "2026-09-01"
     data.workflow[:end_date]       = "2026-09-15"
     data.workflow[:total_duration] = "12h 40m"
-    data.workflow[:status]         = "Утвержден"
     data.workflow[:version]        = "01"
     data.workflow[:revision]       = "001"
     data.workflow[:history_edit]   = [
@@ -1227,7 +1221,6 @@ class TestRunner
     assert(loaded.project[:product] == "Шкаф купе, Тумба", "product корректно прочитан")
     assert(loaded.customer[:name] == "Иван Петров", "customer.name корректно прочитан")
     assert(loaded.customer[:id] == cust_id, "customer.id корректно прочитан")
-    assert(loaded.workflow[:status] == "Утвержден", "workflow.status корректно прочитан")
     assert(loaded.workflow[:total_duration] == "12h 40m", "workflow.total_duration прочитан")
     assert(loaded.workflow[:history_edit].size == 2, "Все записи history_edit прочитаны")
 
@@ -1258,8 +1251,7 @@ class TestRunner
         phone: "+7 (900) 111-22-33"
       },
       workflow: {
-        price: 85000,
-        status: "В РАБОТЕ"
+        price: 85000
       },
       directories: [
         { path: "!_новые_папки", title: "Папка", description: "Тестовое описание", display: "grid" }
@@ -2316,7 +2308,6 @@ class TestRunner
     assert(stadia[2][:name] == "Выбраны материалы и фурнитура" && stadia[2][:status] == true, "Стадия 3: Выбраны материалы и фурнитура (выполнена)")
     assert(stadia[3][:name] == "Предварительно Утвержден" && stadia[3][:status] == false, "Стадия 4: Предварительно Утвержден (не выполнена)")
     assert(stadia[7][:name] == "Оплачен" && stadia[7][:status] == false, "Стадия 8: Оплачен (не выполнена)")
-    assert(proj.workflow[:status] == "Выбраны материалы и фурнитура", "Текущий статус вычисляется как последняя отмеченная стадия")
 
     # 6. Проверка корневой секции history_edit (канонический порядок в памяти: новые сверху)
     assert(proj.history.is_a?(Array) && proj.history.size == 4, "История изменений загружена на корневом уровне и содержит 4 записи")
