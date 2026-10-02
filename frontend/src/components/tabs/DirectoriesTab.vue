@@ -32,7 +32,7 @@
           @dragend="drag.clearDrag()"
         >
           <!-- Шапка карточки -->
-          <div class="flex flex-wrap items-center gap-2 border-b border-ink-100 px-2.5 py-2">
+          <div class="flex flex-nowrap items-center gap-2 border-b border-ink-100 px-2.5 py-2">
             <GripVerticalIcon
               :size="13"
               class="shrink-0 cursor-grab text-ink-300 hover:text-ink-500"
@@ -40,14 +40,15 @@
               @mousedown="drag.dragArm.value = d.uid"
               @mouseup="drag.dragArm.value = null"
             />
-            <UiInput
-              v-model="d.title"
-              class="w-52"
-              :placeholder="t('dirs.titlePh')"
-              :title="t('dirs.titleTitle')"
-              @mousedown="drag.dragArm.value = null"
-              @update:model-value="commit"
-            />
+            <div class="w-52 shrink-0">
+              <UiInput
+                v-model="d.title"
+                :placeholder="t('dirs.titlePh')"
+                :title="t('dirs.titleTitle')"
+                @mousedown="drag.dragArm.value = null"
+                @update:model-value="commit"
+              />
+            </div>
             <button
               type="button"
               class="flex h-7 min-w-0 flex-1 items-center gap-1.5 rounded-md border px-2.5 text-left font-mono text-[11px] transition-colors"
