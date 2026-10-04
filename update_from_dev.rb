@@ -1,18 +1,18 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Standalone CLI Script: Обновление DN1C Export PDF 2 из dev-папки в SketchUp Plugins
+# Standalone CLI Script: Обновление DN1SUP Export PDF 2 из dev-папки в SketchUp Plugins
 # Запуск:
 #   ruby update_from_dev.rb
 # -------------------------------------------------------------------------------
 
-require_relative "dn1c_export_pdf2/version"
-require_relative "dn1c_export_pdf2/service/dev_updater"
+require_relative "dn1sup_export_pdf2/version"
+require_relative "dn1sup_export_pdf2/service/dev_updater"
 require "net/http"
 require "json"
 
 puts "=========================================================="
-puts "  DN1C Export PDF 2 (v#{DN1Code::ExportPdf2::PLUGIN_VERSION}) — Обновление из dev-папки"
+puts "  DN1SUP Export PDF 2 (v#{DN1Code::ExportPdf2::PLUGIN_VERSION}) — Обновление из dev-папки"
 puts "=========================================================="
 
 dev_dir = ARGV[0] || File.expand_path(__dir__)
@@ -40,7 +40,7 @@ frontend_dir = File.join(__dir__, "frontend")
 if Dir.exist?(File.join(frontend_dir, "node_modules"))
   npm = Gem.win_platform? ? "npm.cmd" : "npm"
   if system(npm, "run", "build", chdir: frontend_dir)
-    puts "  ✅ GUI собран в dn1c_export_pdf2/dialog/html"
+    puts "  ✅ GUI собран в dn1sup_export_pdf2/dialog/html"
   else
     warn "  ⚠️  Сборка GUI завершилась с ошибкой — в Plugins уйдёт последняя успешная сборка"
   end
@@ -74,7 +74,7 @@ begin
     if defined?(DN1Code::ExportPdf2::Service::DevUpdater)
       DN1Code::ExportPdf2::Service::DevUpdater.reload!
     else
-      load File.join(Sketchup.find_support_file("Plugins"), "dn1c_export_pdf2.rb")
+      load File.join(Sketchup.find_support_file("Plugins"), "dn1sup_export_pdf2.rb")
     end
   RUBY
 

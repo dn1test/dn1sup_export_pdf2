@@ -18,20 +18,20 @@ vendor/bundle/
 .ruby-lsp/
 .solargraph/
 
-# libvips DLL (ставятся вручную, см. dn1c_export_pdf2/vendor/libvips/README.md)
-dn1c_export_pdf2/vendor/libvips/*.dll
+# libvips DLL (ставятся вручную, см. dn1sup_export_pdf2/vendor/libvips/README.md)
+dn1sup_export_pdf2/vendor/libvips/*.dll
 
 # Локальные настройки плагина (содержат личные API-токены, в git не попадают)
-dn1c_export_pdf2/config/settings.yaml
+dn1sup_export_pdf2/config/settings.yaml
 
 .zcode
 .tmp*
 dist/
-dn1c_export_pdf2/test/test_snapshot_worker/
+dn1sup_export_pdf2/test/test_snapshot_worker/
 # Frontend build deps
 node_modules/
 
 # Тестовые артефакты comprehensive_test
-_dn1c_export_pdf2_test/
+_dn1sup_export_pdf2_test/
 test_history_save_dir/
 test_separate_layout_dir/

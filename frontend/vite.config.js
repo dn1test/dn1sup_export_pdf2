@@ -9,7 +9,7 @@ export default defineConfig({
   base: './',
   plugins: [vue(), tailwindcss()],
   build: {
-    outDir: fileURLToPath(new URL('../dn1c_export_pdf2/dialog/html', import.meta.url)),
+    outDir: fileURLToPath(new URL('../dn1sup_export_pdf2/dialog/html', import.meta.url)),
     emptyOutDir: true,
   },
 })

@@ -1,6 +1,6 @@
-# DN1C Export PDF 2 (SketchUp API 2026)
+# DN1SUP Export PDF 2 (SketchUp API 2026)
 
-**DN1C Export PDF 2** — современное, расширяемое расширение для Trimble SketchUp 2026, предназначенное для профессионального формирования презентационных и технико-коммерческих многостраничных PDF-документов из сцен 3D-модели.
+**DN1SUP Export PDF 2** — современное, расширяемое расширение для Trimble SketchUp 2026, предназначенное для профессионального формирования презентационных и технико-коммерческих многостраничных PDF-документов из сцен 3D-модели.
 
 ---
 
@@ -20,9 +20,9 @@
      - **Векторный (Vector)**: Прецизионная векторная графика с высочайшей резкостью линий чертежа.
      - **Растровый (Raster)**: Быстрый рендеринг растровых видов и текстур.
    - 🗂️ **Структурированные слои LayOut**:
-     - `DN1C_Viewports` — живые 3D-видовые экраны модели SketchUp.
-     - `DN1C_Graphics` — фоновые разделители, акцентные плашки и рамки.
-     - `DN1C_Content` — форматированный типографический текст и информационные блоки.
+     - `DN1SUP_Viewports` — живые 3D-видовые экраны модели SketchUp.
+     - `DN1SUP_Graphics` — фоновые разделители, акцентные плашки и рамки.
+     - `DN1SUP_Content` — форматированный типографический текст и информационные блоки.
    - 💾 **Сохранение `.layout` проекта**: При экспорте создается не только итоговый PDF-документ, но и файл проекта `.layout` рядом с ним для открытия и доработки в Trimble LayOut.
    - 🚀 **100% автономность**: Полное отсутствие сторонних гемов (`prawn`, `pdf-core`, `ttfunk`), нет проблем с компиляцией C-расширений или установкой RubyGems.
 
@@ -43,7 +43,7 @@
    - **Журнал правок**: `edit_history.yaml` читается из папки артикула, при отсутствии — из папки `.skp` (совместимость).
    - **Двухуровневое хранение и приоритеты чтения**:
      - 🥇 **Первично**: YAML файлы (данные проекта — `project.yaml` в папке артикула; настройки программы — `settings.yaml`/`layout.yaml` внутри расширения).
-     - 🥈 **Вторично**: Библиотека файла (словарь атрибутов SketchUp `DN1C_ExportPDF`) не используется.
+     - 🥈 **Вторично**: Библиотека файла (словарь атрибутов SketchUp `DN1SUP_ExportPDF`) не используется.
    - **Чистые поля по умолчанию**: Все поля метаданных изначально пусты и содержат наглядные подсказки (`placeholders`), без захардкоженных тестовых данных.
    - Автоматическое сохранение резервной копии `.skp` модели с номером ревизии в папку `<Артикул>/skp/`.
    - Автоматическое сохранение сгенерированного PDF документа (версионная копия в `<Артикул>/pdf/`, рабочая копия `_last.pdf` рядом с `.skp`) и открытие в PDF-просмотрщике по умолчанию.
@@ -73,11 +73,11 @@
 ## 📁 Структура расширения
 
 ```
-dn1c_export_pdf2/
-├── dn1c_export_pdf2.rb                        # Корневой загрузчик для SketchUp (SketchupExtension)
+dn1sup_export_pdf2/
+├── dn1sup_export_pdf2.rb                        # Корневой загрузчик для SketchUp (SketchupExtension)
 ├── Gemfile                                    # Зависимости гемов Ruby
 ├── README.MD                                  # Документация
-└── dn1c_export_pdf2/                          # Исходный код расширения
+└── dn1sup_export_pdf2/                          # Исходный код расширения
     ├── main.rb                                # Меню, тулбар и регистрация команд
     ├── version.rb                             # Метаданные и константы версии
     ├── config/
@@ -117,7 +117,7 @@ dn1c_export_pdf2/
         └── comprehensive_test.rb
 frontend/                                      # Исходники веб-интерфейса (Vue 3 + Vite + Tailwind)
 ├── package.json                               # Зависимости: vue, pinia, chart.js, @lucide/vue, tailwindcss
-├── vite.config.js                             # outDir → dn1c_export_pdf2/dialog/html (+ @tailwindcss/vite)
+├── vite.config.js                             # outDir → dn1sup_export_pdf2/dialog/html (+ @tailwindcss/vite)
 ├── index.html                                 # Vite-шаблон входа
 └── src/
     ├── main.js                                # createApp + Pinia + initBridge (мост к Ruby)
@@ -162,13 +162,13 @@ frontend/                                      # Исходники веб-ин�
 
 ## 🎨 Разработка GUI (Vue 3 + Vite + Tailwind)
 
-Веб-интерфейс диалога — SPA на Vue 3 (Composition API) с Pinia-сторами и Tailwind CSS v4: разметка, состояние и бизнес-логика полностью во фронтенде, без DOM-манипуляций по id. Мост к SketchUp — `frontend/src/bridge/`: `callRuby(action, json)` (JS→Ruby) и `window.app.*` (Ruby→JS), контракты не изменились. Готовая сборка пишется прямо в `dn1c_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
+Веб-интерфейс диалога — SPA на Vue 3 (Composition API) с Pinia-сторами и Tailwind CSS v4: разметка, состояние и бизнес-логика полностью во фронтенде, без DOM-манипуляций по id. Мост к SketchUp — `frontend/src/bridge/`: `callRuby(action, json)` (JS→Ruby) и `window.app.*` (Ruby→JS), контракты не изменились. Готовая сборка пишется прямо в `dn1sup_export_pdf2/dialog/html/` (путь загрузки в Ruby не меняется) и коммитится в репозиторий.
 
 ```bash
 cd frontend
 npm install        # один раз
 npm run dev        # dev-сервер с HMR: http://localhost:5173 (работает мок-режим без SketchUp)
-npm run build      # сборка в dn1c_export_pdf2/dialog/html
+npm run build      # сборка в dn1sup_export_pdf2/dialog/html
 ```
 
 - Ruby↔JS мост не зависит от фреймворка: `callRuby(action, json)` и `window.app.*` — контракты сохраняются.
@@ -182,16 +182,16 @@ npm run build      # сборка в dn1c_export_pdf2/dialog/html
 ## 🚀 Установка и использование
 
 ### Установка в SketchUp 2026:
-1. Скопируйте файл `dn1c_export_pdf2.rb` и папку `dn1c_export_pdf2/` в каталог плагинов SketchUp:
+1. Скопируйте файл `dn1sup_export_pdf2.rb` и папку `dn1sup_export_pdf2/` в каталог плагинов SketchUp:
    - **Windows**: `C:\Users\<Имя_Пользователя>\AppData\Roaming\SketchUp\SketchUp 2026\SketchUp\Plugins\`
 2. Перезапустите SketchUp или выполните в Ruby Console:
    ```ruby
-   load 'dn1c_export_pdf2.rb'
+   load 'dn1sup_export_pdf2.rb'
    ```
-3. На панели инструментов появится группа кнопок **DN1C PDF Export 2**, а также пункт в меню **Plugins** (Расширения).
+3. На панели инструментов появится группа кнопок **DN1SUP PDF Export 2**, а также пункт в меню **Plugins** (Расширения).
 
 ### Запуск автономных тестов в терминале:
 ```powershell
-ruby -I dn1c_export_pdf2 dn1c_export_pdf2/test/comprehensive_test.rb
-ruby -I dn1c_export_pdf2 dn1c_export_pdf2/test/test_work_stats.rb   # статистика работы
+ruby -I dn1sup_export_pdf2 dn1sup_export_pdf2/test/comprehensive_test.rb
+ruby -I dn1sup_export_pdf2 dn1sup_export_pdf2/test/test_work_stats.rb   # статистика работы
 ```

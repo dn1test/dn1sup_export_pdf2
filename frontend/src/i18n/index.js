@@ -14,7 +14,9 @@ export const LOCALES = [
   { value: 'en', label: 'English' },
 ]
 
-const STORAGE_KEY = 'dn1c_lang'
+const STORAGE_KEY = 'dn1sup_lang'
+// Ключ языка до переименования пакета (до v2.15.0) — читается один раз для миграции
+const LEGACY_STORAGE_KEY = 'dn1c_lang'
 
 function normalizeLang(v) {
   return String(v || '').toLowerCase().trim() === 'en' ? 'en' : 'ru'
@@ -22,7 +24,12 @@ function normalizeLang(v) {
 
 function cachedLang() {
   try {
-    return normalizeLang(localStorage.getItem(STORAGE_KEY))
+    let value = localStorage.getItem(STORAGE_KEY)
+    if (value === null) {
+      value = localStorage.getItem(LEGACY_STORAGE_KEY)
+      if (value !== null) localStorage.setItem(STORAGE_KEY, value)
+    }
+    return normalizeLang(value)
   } catch (e) {
     return 'ru'
   }

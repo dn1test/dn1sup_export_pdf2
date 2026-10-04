@@ -1,0 +1,81 @@
+# -------------------------------------------------------------------------------
+# DN1SUP Export PDF 2 - Default Configuration Template (project_config.yaml)
+# -------------------------------------------------------------------------------
+
+# Несколько адресатов — список ссылок целиком, как при копировании из админ-панели.
+# ВАЖНО: реальные токены храните локально в config/settings.yaml (он в .gitignore),
+# в шаблоне — только плейсхолдеры.
+api_targets:
+  - "https://list.prodmd.top/api/projects?token=YOUR_TOKEN_HERE"
+  - "http://localhost:3000/api/projects?token=YOUR_LOCAL_TOKEN"
+
+project:
+  # Артикул проекта: HF#ГГММДД_ЧЧММСС — домашний, CF#ГГММДД_ЧЧММСС — коммерческий (без суффикса)
+  articul: "HF#260504_182804"
+  # Название мебели: Шкаф купе, Кухонный гарнитур и подобное
+  name_product: "Дверки, полки (Шкаф), Люк"
+  # Название места установки: Гостиная, Детская, Прихожая;
+  # для коммерческого проекта — название торгового центра или павильона
+  name_place: "Мансарда"
+  # Адрес установки проекта
+  adress: "Белая Колпь"
+  # Имя заказчика
+  customer: "Алексей, Мария"
+  # Имя фирмы или компании — для коммерческих проектов
+  company: ""
+  # Стадия проекта: предварительный, правки, утвержден
+  status: "Правки"
+  # Число, показывающее количество изменений
+  revision: 1
+  # Вариант проекта
+  version: 1
+  # Комментарий к очередной правке проекта
+  last_edit: "Добавлены замки"
+  # Коммерческий проект или домашний: 1 или 0
+  trade: "0"
+  phone: "+7 (999) 000-00-00"
+  email: "client@example.com"
+  task_description: "Разработка проекта и визуализаций изделия согласно габаритам помещения и техническому заданию."
+  task_dimensions: "Монтажные габариты согласно замерному листу."
+  task_wishes: "Интеграция встроенной техники и скрытых коммуникаций."
+  materials: "Фасады: МДФ эмаль матовая, корпус: ЛДСП Egger 18мм, фурнитура: Blum Legrabox."
+  appliances: "Встраиваемая бытовая техника: варочная панель, духовой шкаф, вытяжка, посудомоечная машина."
+  lighting: "LED подсветка 3000K CRI>95 в профиле, блок питания 24V с запасом 30%."
+  notes: "Монтаж производить после завершения чистовых отделочных работ."
+
+# Рабочие папки проекта (directories) не задаются по умолчанию:
+# список пуст у новой модели, папки добавляются вручную на вкладке
+# «Папки и спецификации» и сохраняются в YAML рядом с .skp.
+
+pdf_settings:
+  layout_render_mode: "image"  # 'image' (Растровый GPU), 'hybrid' (Гибридный)
+  save_layout_file: true        # Сохранять файл .layout рядом с PDF (для LayOut API)
+  compress_pdf: true            # У самого документа PDF всегда сжатие без потерь (true)
+  image_format: "png"           # Лучший формат для картинок: 'png' (lossless) или 'jpg'
+  webp_quality: 85              # Качество WebP-снимков сцен: 1..100 или 'lossless' (сжатие без потерь)
+  render_quality: "medium"      # 'low' (96 dpi), 'medium' (150 dpi), 'high' (300 dpi)
+  page_size: "A3"          # Формат листа: 'A3'
+  page_layout: "landscape" # 'landscape' или 'portrait'
+  margin: 15               # Отступ от края листа (в пунктах)
+  margin_mm: 5             # Отступ от края листа (в миллиметрах)
+  image_width: 1754        # Базовая ширина рендера сцены
+  image_aspect_ratio: "4:3"  # Пропорции кадра: 'page' (по листу), '16:9', '4:3', '3:2', '1:1', 'custom'
+  custom_ratio_w: 16       # Пользовательская ширина для custom
+  custom_ratio_h: 9        # Пользовательская высота для custom
+  show_aspect_overlay: false # Отображать рамку пропорций через Sketchup::Overlay
+  overlay_border_color: "#0EA5E9" # Цвет рамки кадра (HEX)
+  overlay_border_opacity: 100     # Прозрачность рамки (10-100%)
+  overlay_mask_color: "#0F172A"   # Цвет затемнения вне кадра (HEX)
+  overlay_mask_opacity: 55        # Степень затемнения вне кадра (0-100%)
+  scale_factor: 2.0        # Множитель четкости (1.0 - 3.0)
+  scale_multiplier: "2.0"  # Множитель толщины линий (Line Scale Multiplier)
+  annotation_font_size: "auto"  # Размер шрифта выносок и размеров ('auto', '8', '10', '12', '14', '16', '18', '20')
+  antialias: true          # Сглаживание линий SketchUp
+  font_family: "Sofia Sans Condensed" # Доступные шрифты: 'Sofia Sans Condensed', 'Sofia Sans Extra Condensed', 'Oswald', 'Roboto Condensed', 'Ubuntu Condensed'
+  font_weight: "normal"    # Начертание: 'normal' (Обычное) или 'bold' (Жирное) — для всего текста PDF
+  font_width: "condensed"  # Ширина: 'condensed' (Узкая) или 'extra_condensed' (Сверхузкая) — переключает пару Sofia Sans Condensed/Extra Condensed
+  language: "ru"           # Язык интерфейса GUI: 'ru' (Русский) или 'en' (English) — селект на вкладке «Настройки»
+  auto_open_pdf: true      # Открывать PDF в просмотрщике после создания
+  save_skp_backup: true    # Сохранять копию .skp с номером ревизии
+  primary_color: "005EB0"  # Цвет заголовков и акцентов
+  secondary_color: "64748B"# Цвет подзаголовков
