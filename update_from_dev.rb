@@ -96,7 +96,7 @@ begin
 rescue Errno::ECONNREFUSED, Net::OpenTimeout, StandardError
   puts "  ℹ️  SketchUp dev-мост не запущен на порту #{bridge_port}."
   puts "     Файлы в каталоге Plugins обновлены. При следующем открытии SketchUp"
-  puts "     или через меню 'Plugins -> #{DN1Code::ExportPdf2::PLUGIN_NAME} -> Перезагрузить' изменения вступят в силу."
+  puts "     или через меню 'Extensions -> DN1SUP -> Export PDF 2 -> Перезагрузить' изменения вступят в силу."
 end
 
 puts "\n=========================================================="

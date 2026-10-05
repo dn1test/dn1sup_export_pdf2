@@ -132,9 +132,17 @@ module DN1Code
       # Запуск трекера активной работы (статистика на вкладке «Статистика»)
       Service::StatsTracker.register!
 
-      # Создание пункта меню в Plugins с версией в заголовке
-      menu = UI.menu("Plugins")
-      submenu = menu.add_submenu("#{NAME_EXTENSION} v#{PLUGIN_VERSION}")
+      # Общее меню DN1SUP — разделяется всеми расширениями DN1SUP. API не умеет
+      # искать существующие подменю по имени (add_submenu всегда создаёт новое),
+      # поэтому первое загрузившееся расширение создаёт меню и кладёт его в
+      # $dn1sup_common_menu (и в $dn1sup_menu — старое соглашение Comp Add View),
+      # а остальные переиспользуют.
+      common = $dn1sup_common_menu || $dn1sup_menu
+      common ||= UI.menu("Extensions").add_submenu("DN1SUP")
+      $dn1sup_common_menu = $dn1sup_menu = common
+
+      # Пункты расширения — в подменю «Export PDF 2» внутри DN1SUP
+      submenu = common.add_submenu("Export PDF 2")
 
       submenu.add_item("Экспорт сцен в PDF (Диалог)...") do
         open_export_dialog
