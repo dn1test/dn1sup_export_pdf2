@@ -46,6 +46,7 @@
           </span>
           <UiInput
             v-model="settings.apiTargets[index]"
+            :spellcheck="false"
             class="flex-1 font-mono text-xs"
             placeholder="https://domain.com/api/projects?token=..."
             :title="t('send.urlTitle')"

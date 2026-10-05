@@ -1,3 +1,4 @@
+# frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
 # Extension Entry Point: DN1SUP Export PDF 2
@@ -36,13 +37,12 @@ require_relative "controller/export_controller"
 # Загрузка пользовательского интерфейса
 require_relative "dialog/export_dialog"
 
-# Пространство имен плагина DN1Code
+# Общее меню DN1SUP — синглтон в корневом модуле Dn1sup: первое загрузившееся
+# расширение DN1SUP создаёт подменю, остальные переиспользуют. Без глобальных
+# переменных — все расширения DN1SUP уже определяют этот модуль у себя.
 module Dn1sup
   def self.common_menu
-    @common_menu ||= begin
-      legacy = (defined?($dn1sup_common_menu) && $dn1sup_common_menu) || (defined?($dn1sup_menu) && $dn1sup_menu)
-      legacy || UI.menu('Extensions').add_submenu('DN1SUP')
-    end
+    @common_menu ||= UI.menu('Extensions').add_submenu('DN1SUP')
   end
 end
 
@@ -140,11 +140,6 @@ module DN1Code
       # Запуск трекера активной работы (статистика на вкладке «Статистика»)
       Service::StatsTracker.register!
 
-      # Общее меню DN1SUP — разделяется всеми расширениями DN1SUP. API не умеет
-      # искать существующие подменю по имени (add_submenu всегда создаёт новое),
-      # поэтому первое загрузившееся расширение создаёт меню и кладёт его в
-      # $dn1sup_common_menu (и в $dn1sup_menu — старое соглашение Comp Add View),
-      # а остальные переиспользуют.
       # Общее меню DN1SUP — синглтон в корневом модуле Dn1sup, разделяется всеми
       # расширениями DN1SUP без глобальных переменных.
       common = Dn1sup.common_menu

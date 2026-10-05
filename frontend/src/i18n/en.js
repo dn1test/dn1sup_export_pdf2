@@ -669,4 +669,8 @@ export const en = {
   'help.group.vertical': 'The group combines parameters into a column: each parameter prints on its own line. Drag parameters onto the group; the cross next to a parameter moves it out of the group.',
   'help.group.horizontal': 'The group combines parameters into one row: values are printed separated by " | ". Drag parameters onto the group; the cross next to a parameter moves it out of the group.',
   'help.default': 'The value is substituted automatically from the project data.',
+
+  // --- Spell checking ---
+  'spell.addToDict': 'Add to dictionary',
+  'spell.noSuggestions': 'No suggestions',
 }

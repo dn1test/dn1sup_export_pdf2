@@ -11,6 +11,7 @@
       <input
         v-model="app.articulPrompt.value"
         type="text"
+        spellcheck="false"
         class="h-8 w-full rounded-md border border-ink-200 bg-white px-2.5 font-mono text-[13px] text-ink-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         :placeholder="t('articulPrompt.ph')"
         @keydown.enter.prevent="app.confirmArticulPrompt()"

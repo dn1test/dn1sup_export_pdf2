@@ -28,6 +28,8 @@
       <input
         v-model="templates.paramModal.label"
         type="text"
+        spellcheck="false"
+        v-spell
         class="h-8 w-full rounded-md border border-ink-200 bg-white px-2.5 text-[13px] text-ink-900 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20"
         :placeholder="templates.paramModalLabelPlaceholder"
         @keydown.enter.prevent="templates.confirmParamModal()"

@@ -5,6 +5,8 @@
     :placeholder="placeholder"
     :title="title"
     :readonly="readonly"
+    spellcheck="false"
+    v-spell="resolvedSpellcheck"
     :min="min"
     :max="max"
     :step="step"
@@ -17,7 +19,9 @@
 </template>
 
 <script setup>
-defineProps({
+import { computed } from 'vue'
+
+const props = defineProps({
   modelValue: { type: [String, Number], default: '' },
   type: { type: String, default: 'text' },
   placeholder: { type: String, default: '' },
@@ -27,10 +31,16 @@ defineProps({
   max: { type: [String, Number], default: undefined },
   step: { type: [String, Number], default: undefined },
   autocomplete: { type: String, default: 'off' },
+  // null = авто: своя проверка орфографии (v-spell) для текстовых полей,
+  // для number/email выключена. Родной spellcheck всегда off — он не работает
+  // во встроенном браузере SketchUp (CEF), подсветку рисует оверлей overlay.js
+  spellcheck: { type: Boolean, default: null },
   // Без своей рамки — для сегментных групп, где рамку рисует контейнер
   plain: { type: Boolean, default: false },
 })
 defineEmits(['update:modelValue', 'change', 'enter'])
+
+const resolvedSpellcheck = computed(() => (props.spellcheck !== null ? props.spellcheck : props.type === 'text'))
 
 const boxClass = 'h-8 w-full min-w-0 rounded-md border border-ink-200 bg-white px-2.5 text-[13px] text-ink-900 transition-colors placeholder:text-ink-400 focus:border-accent-500 focus:outline-none focus:ring-2 focus:ring-accent-500/20 read-only:bg-ink-50 read-only:text-ink-500'
 const plainClass = 'h-8 w-full min-w-0 bg-transparent px-2.5 text-[13px] text-ink-900 transition-colors placeholder:text-ink-400 focus:outline-none read-only:text-ink-500'

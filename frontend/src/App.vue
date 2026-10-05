@@ -64,6 +64,7 @@
 
     <!-- Глобальные оверлеи и модалки -->
     <AppToast />
+    <SpellMenu />
     <ProgressOverlay />
     <RevisionModal />
     <ArticulTypeModal />
@@ -83,6 +84,7 @@ import {
 import AppHeader from './components/layout/AppHeader.vue'
 import AppFooter from './components/layout/AppFooter.vue'
 import AppToast from './components/layout/AppToast.vue'
+import SpellMenu from './components/ui/SpellMenu.vue'
 import ProgressOverlay from './components/layout/ProgressOverlay.vue'
 import RevisionModal from './components/modals/RevisionModal.vue'
 import ArticulTypeModal from './components/modals/ArticulTypeModal.vue'

@@ -99,3 +99,25 @@ body {
 input[type='number']::-webkit-inner-spin-button {
   opacity: 0.35;
 }
+
+/* Спеллчекер: плавающий оверлей над полем. Текст прозрачен — видна только
+   волнистая декорация подчёркивания, вёрстка полей не затрагивается.
+   z-index 55 — выше модалок (z-50): поля есть и в модальных окнах */
+.dn1-spell-overlay {
+  position: fixed;
+  z-index: 55;
+  display: none;
+  overflow: hidden;
+  color: transparent;
+  pointer-events: none;
+  user-select: none;
+  overflow-wrap: break-word;
+}
+.dn1-spell-err {
+  color: transparent;
+  text-decoration-line: underline;
+  text-decoration-style: wavy;
+  text-decoration-color: #f43f5e;
+  text-decoration-thickness: 1px;
+  text-underline-offset: 2px;
+}

@@ -56,6 +56,8 @@
               <input
                 v-model="h.edit"
                 type="text"
+                spellcheck="false"
+                v-spell
                 class="h-7 w-full min-w-0 rounded border border-transparent bg-transparent px-1.5 hover:border-ink-200 focus:border-accent-500 focus:bg-white focus:outline-none"
                 :placeholder="t('hist.editPh')"
                 @input="onEdit(index, h.edit)"

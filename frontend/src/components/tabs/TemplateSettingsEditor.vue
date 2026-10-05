@@ -93,6 +93,8 @@
             v-if="p.group"
             :value="p.label"
             type="text"
+            spellcheck="false"
+            v-spell
             class="h-6 w-40 min-w-0 rounded border border-ink-200 bg-white px-1.5 text-xs focus:border-accent-500 focus:outline-none"
             :placeholder="t('tse.groupLabelPh')"
             @input="templates.update(p.id, { label: $event.target.value })"

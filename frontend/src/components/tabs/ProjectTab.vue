@@ -25,7 +25,7 @@
           </UiField>
           <UiField :label="t('customer.idLabel')">
             <div class="flex gap-1.5">
-              <UiInput v-model="project.customer.id" class="flex-1 font-mono" placeholder="CUST-260905-142650" @update:model-value="notifyChange()" />
+              <UiInput v-model="project.customer.id" :spellcheck="false" class="flex-1 font-mono" placeholder="CUST-260905-142650" @update:model-value="notifyChange()" />
               <UiButton
                 :icon="WandIcon"
                 :title="t('customer.idGenTitle')"
@@ -201,6 +201,8 @@
                 ref="editInput"
                 v-model="editName"
                 type="text"
+                spellcheck="false"
+                v-spell
                 class="h-6 min-w-0 flex-1 rounded border border-accent-400 bg-white px-1.5 text-[13px] focus:outline-none"
                 @click.stop
                 @keydown.enter.prevent="commitEdit(idx)"

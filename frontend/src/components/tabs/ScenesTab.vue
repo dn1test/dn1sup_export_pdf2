@@ -137,6 +137,8 @@
                 <input
                   v-model="sc.name"
                   type="text"
+                  spellcheck="false"
+                  v-spell
                   class="h-7 w-full min-w-0 rounded border border-transparent bg-transparent px-1.5 text-[13px] font-medium text-ink-900 hover:border-ink-200 focus:border-accent-500 focus:bg-white focus:outline-none"
                   :placeholder="t('scenes.namePh')"
                   :title="t('scenes.nameTitle')"
@@ -148,6 +150,8 @@
                 <input
                   v-model="sc.description"
                   type="text"
+                  spellcheck="false"
+                  v-spell
                   class="h-7 w-full min-w-0 rounded border border-transparent bg-transparent px-1.5 text-xs text-ink-500 hover:border-ink-200 focus:border-accent-500 focus:bg-white focus:outline-none"
                   :placeholder="t('scenes.descPh')"
                   :title="t('scenes.descTitle')"
