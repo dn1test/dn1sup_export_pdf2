@@ -1,4 +1,3 @@
-# frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
 # Extension Entry Point: DN1SUP Export PDF 2
@@ -38,6 +37,15 @@ require_relative "controller/export_controller"
 require_relative "dialog/export_dialog"
 
 # Пространство имен плагина DN1Code
+module Dn1sup
+  def self.common_menu
+    @common_menu ||= begin
+      legacy = (defined?($dn1sup_common_menu) && $dn1sup_common_menu) || (defined?($dn1sup_menu) && $dn1sup_menu)
+      legacy || UI.menu('Extensions').add_submenu('DN1SUP')
+    end
+  end
+end
+
 module DN1Code
   # Основной модуль плагина DN1SUP Export PDF 2
   module ExportPdf2
@@ -137,9 +145,9 @@ module DN1Code
       # поэтому первое загрузившееся расширение создаёт меню и кладёт его в
       # $dn1sup_common_menu (и в $dn1sup_menu — старое соглашение Comp Add View),
       # а остальные переиспользуют.
-      common = $dn1sup_common_menu || $dn1sup_menu
-      common ||= UI.menu("Extensions").add_submenu("DN1SUP")
-      $dn1sup_common_menu = $dn1sup_menu = common
+      # Общее меню DN1SUP — синглтон в корневом модуле Dn1sup, разделяется всеми
+      # расширениями DN1SUP без глобальных переменных.
+      common = Dn1sup.common_menu
 
       # Пункты расширения — в подменю «Export PDF 2» внутри DN1SUP
       submenu = common.add_submenu("Export PDF 2")
