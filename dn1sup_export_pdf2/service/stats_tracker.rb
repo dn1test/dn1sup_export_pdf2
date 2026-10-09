@@ -49,7 +49,7 @@ module DN1Code
 
             @timer_id = UI.start_timer(TICK_INTERVAL, true) { tick }
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] StatsTracker: не удалось запустить: #{e.message}"
+            warn "[DN1Sup Export PDF] StatsTracker: не удалось запустить: #{e.message}"
           end
 
           # Отметка активности (из наблюдателей SketchUp и пульсов диалога)
@@ -68,7 +68,7 @@ module DN1Code
             heartbeat
             attach_to_model(model)
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] StatsTracker: ошибка активации модели: #{e.message}"
+            warn "[DN1Sup Export PDF] StatsTracker: ошибка активации модели: #{e.message}"
           end
 
           # Подключает наблюдателей активности к модели (без дублей — по образцу
@@ -95,7 +95,7 @@ module DN1Code
               @observed_models << WeakRef.new(model)
             end
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] StatsTracker: не удалось подключить наблюдателей: #{e.message}"
+            warn "[DN1Sup Export PDF] StatsTracker: не удалось подключить наблюдателей: #{e.message}"
           end
 
           # ----------------------------------------------------------------
@@ -117,7 +117,7 @@ module DN1Code
 
             persist_periodically
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] StatsTracker: ошибка тика: #{e.message}"
+            warn "[DN1Sup Export PDF] StatsTracker: ошибка тика: #{e.message}"
           end
 
           def accrue_delta(delta, now)
@@ -151,7 +151,7 @@ module DN1Code
 
             Model::SessionStore.flush(model)
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] StatsTracker: периодическая запись не удалась: #{e.message}"
+            warn "[DN1Sup Export PDF] StatsTracker: периодическая запись не удалась: #{e.message}"
             false
           end
 

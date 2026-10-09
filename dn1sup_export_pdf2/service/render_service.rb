@@ -274,7 +274,7 @@ module DN1Code
                   view.write_image(write_options)
                   rendered = File.exist?(temp_file)
                 rescue StandardError => e
-                  warn "[DN1SUP Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
+                  warn "[DN1Sup Export PDF] Ошибка write_image (#{e.message}) — используется резервное изображение"
                 ensure
                   # Восстановление исходных параметров отрисовки линий, фона и водяных знаков
                   if ro && !orig_widths.empty?
@@ -294,7 +294,14 @@ module DN1Code
 
           unless rendered
             # Если рендер запущен в автономном/тестовом окружении или моке, создаем placeholder
-            create_fallback_image(temp_file, width, height, scene ? scene.name : "Scene")
+            scene_label = if scene.is_a?(String) || scene.is_a?(Symbol)
+                            scene.to_s
+                          elsif scene.respond_to?(:name)
+                            scene.name.to_s
+                          else
+                            "Scene"
+                          end
+            create_fallback_image(temp_file, width, height, scene_label)
           end
 
           temp_file

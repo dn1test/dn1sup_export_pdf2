@@ -2,11 +2,11 @@
 
 # Основное пространство имен расширений DN1Code
 module DN1Code
-  # Модуль расширения DN1SUP Export PDF 2 для SketchUp
+  # Модуль расширения DN1Sup Export PDF 2 для SketchUp
   module ExportPdf2
     unless const_defined?(:PLUGIN_VERSION)
       # Название плагина
-      PLUGIN_NAME        = "DN1SUP Export PDF 2"
+      PLUGIN_NAME        = "DN1Sup Export PDF 2"
       # Название расширения в реестре SketchUp
       NAME_EXTENSION     = PLUGIN_NAME
       # Подробное описание назначения плагина
@@ -14,13 +14,13 @@ module DN1Code
       # Текущая версия плагина.
       # Схема: вторая цифра — добавление функций, третья цифра — изменения
       # в дизайне/мелкие правки
-      PLUGIN_VERSION     = "2.18.1"
+      PLUGIN_VERSION     = "2.18.2"
       # Автор и разработчик плагина
-      PLUGIN_AUTHOR      = "DN1Code"
+      PLUGIN_AUTHOR      = "DN1Sup"
       # Имя создателя для регистрации расширения
       NAME_CREATOR       = PLUGIN_AUTHOR
       # Информация об авторских правах
-      PLUGIN_COPYRIGHT   = "Copyright 2026 #{PLUGIN_AUTHOR}"
+      PLUGIN_COPYRIGHT   = "Copyright 2026 DN1Sup <dn1codegen@gmail.com> (MIT)"
     end
   end
 end

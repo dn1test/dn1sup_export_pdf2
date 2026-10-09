@@ -121,8 +121,8 @@ export function registerRubyApi() {
       useAppStore().updateProgress(percent, message)
     },
 
-    onExportSuccess(pdfPath, newRevision, lastPdfPath) {
-      useAppStore().onExportSuccess(pdfPath, newRevision, lastPdfPath)
+    onExportSuccess(pdfPath, newRevision, lastPdfPath, lastSkpPath) {
+      useAppStore().onExportSuccess(pdfPath, newRevision, lastPdfPath, lastSkpPath)
     },
 
     onExportError(errorMsg) {

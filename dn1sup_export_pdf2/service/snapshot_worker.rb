@@ -105,7 +105,7 @@ module DN1Code
           return finish_batch_and_stop unless running?
 
           tick_job
-          set_status_text("DN1SUP Export PDF: WebP-снимки: #{@done + @failed}/#{@total}…") if @total.positive?
+          set_status_text("DN1Sup Export PDF: WebP-снимки: #{@done + @failed}/#{@total}…") if @total.positive?
           true # таймер продолжается
         end
 
@@ -131,9 +131,9 @@ module DN1Code
           if @total.positive?
             msg =
               if @failed.zero?
-                "DN1SUP Export PDF: WebP-снимки готовы (#{@total})"
+                "DN1Sup Export PDF: WebP-снимки готовы (#{@total})"
               else
-                "DN1SUP Export PDF: WebP-снимки: готово #{@done}, с ошибками #{@failed} (эти сцены сохранены в PNG)"
+                "DN1Sup Export PDF: WebP-снимки: готово #{@done}, с ошибками #{@failed} (эти сцены сохранены в PNG)"
               end
             set_status_text(msg)
           end

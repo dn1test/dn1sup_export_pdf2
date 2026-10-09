@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Standalone CLI Script: Обновление DN1SUP Export PDF 2 из dev-папки в SketchUp Plugins
+# Standalone CLI Script: Обновление DN1Sup Export PDF 2 из dev-папки в SketchUp Plugins
 # Запуск:
 #   ruby update_from_dev.rb
 # -------------------------------------------------------------------------------
@@ -12,13 +12,13 @@ require "net/http"
 require "json"
 
 puts "=========================================================="
-puts "  DN1SUP Export PDF 2 (v#{DN1Code::ExportPdf2::PLUGIN_VERSION}) — Обновление из dev-папки"
+puts "  DN1Sup Export PDF 2 (v#{DN1Code::ExportPdf2::PLUGIN_VERSION}) — Обновление из dev-папки"
 puts "=========================================================="
 
 dev_dir = ARGV[0] || File.expand_path(__dir__)
 plugins_dir = ARGV[1]
 
-puts "[1/3] Поиск каталогов..."
+puts "[1/4] Поиск каталогов..."
 src = DN1Code::ExportPdf2::Service::DevUpdater.resolve_dev_dir(dev_dir)
 dst = DN1Code::ExportPdf2::Service::DevUpdater.resolve_plugins_dir(plugins_dir)
 
@@ -96,7 +96,7 @@ begin
 rescue Errno::ECONNREFUSED, Net::OpenTimeout, StandardError
   puts "  ℹ️  SketchUp dev-мост не запущен на порту #{bridge_port}."
   puts "     Файлы в каталоге Plugins обновлены. При следующем открытии SketchUp"
-  puts "     или через меню 'Extensions -> DN1SUP -> Export PDF 2 -> Перезагрузить' изменения вступят в силу."
+  puts "     или через меню 'Extensions -> DN1Sup -> Export PDF 2 -> Перезагрузить' изменения вступят в силу."
 end
 
 puts "\n=========================================================="

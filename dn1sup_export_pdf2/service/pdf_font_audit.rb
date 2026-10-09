@@ -31,7 +31,7 @@ module DN1Code
             end
             names.uniq
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] PdfFontAudit: не удалось прочитать #{pdf_path}: #{e.message}"
+            warn "[DN1Sup Export PDF] PdfFontAudit: не удалось прочитать #{pdf_path}: #{e.message}"
             []
           end
 
@@ -59,11 +59,11 @@ module DN1Code
               fb_names = fonts.select { |f| KNOWN_FALLBACKS.include?(normalize(f)) }
               parts << "обнаружены фолбэк-шрифты: #{fb_names.uniq.join(', ')}"
             end
-            warn "[DN1SUP Export PDF] Аудит шрифтов (#{File.basename(pdf_path)}): #{parts.join('; ')}. " \
+            warn "[DN1Sup Export PDF] Аудит шрифтов (#{File.basename(pdf_path)}): #{parts.join('; ')}. " \
                  "Встроены: #{fonts.join(', ')}. Если шрифт установлен — перезапустите SketchUp/LayOut."
             false
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] PdfFontAudit: #{e.message}"
+            warn "[DN1Sup Export PDF] PdfFontAudit: #{e.message}"
             true
           end
 

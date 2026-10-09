@@ -246,9 +246,6 @@ export function mockRubyCall(action, param) {
     case 'generateCustomerId':
       delay(() => app().onCustomerIdGenerated && app().onCustomerIdGenerated(`CUST-${Date.now().toString(36).toUpperCase()}`))
       break
-    case 'getTemplateSets':
-      delay(() => app().onTemplateSetsUpdated && app().onTemplateSetsUpdated({ sets: buildGetDataPayload().template_sets }))
-      break
     case 'deleteTemplateSet':
       delay(() => app().onTemplateSetsUpdated && app().onTemplateSetsUpdated({ sets: [] }))
       break

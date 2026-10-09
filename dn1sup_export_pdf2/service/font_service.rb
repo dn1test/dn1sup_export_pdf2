@@ -231,7 +231,7 @@ module DN1Code
                   begin
                     FileUtils.cp(source_path, target_path)
                   rescue StandardError => e
-                    warn "[DN1SUP Export PDF] Не удалось скопировать шрифт #{file_name}: #{e.message}"
+                    warn "[DN1Sup Export PDF] Не удалось скопировать шрифт #{file_name}: #{e.message}"
                   end
                 end
 
@@ -248,12 +248,12 @@ module DN1Code
                 # Шрифт попадает в коллекцию шрифтов LayOut только при старте
                 # приложения — до перезапуска экспорт может идти с системным
                 # фолбэком (Verdana), предупреждает пользователя заранее
-                warn "[DN1SUP Export PDF] Шрифт '#{layout_face_name(family_name)}' установлен в систему. " \
+                warn "[DN1Sup Export PDF] Шрифт '#{layout_face_name(family_name)}' установлен в систему. " \
                      "Если он не применился к страницам — перезапустите SketchUp и повторите экспорт."
               end
               result
             rescue StandardError => e
-              warn "[DN1SUP Export PDF] Не удалось установить шрифт #{family_name}: #{e.message}"
+              warn "[DN1Sup Export PDF] Не удалось установить шрифт #{family_name}: #{e.message}"
               false
             end
           end
@@ -305,7 +305,7 @@ module DN1Code
                     ensure_font_resolvable!(cand)
                 end
                 if resolvable_cand
-                  warn "[DN1SUP Export PDF] Шрифт '#{layout_face_name(target_family)}' недоступен " \
+                  warn "[DN1Sup Export PDF] Шрифт '#{layout_face_name(target_family)}' недоступен " \
                        "в этой сессии — использован '#{layout_face_name(resolvable_cand)}'. " \
                        "Перезапустите SketchUp, чтобы применить выбранный шрифт."
                   target_family = resolvable_cand
@@ -445,6 +445,9 @@ module DN1Code
               path = File.join(user_fonts_dir, fn)
               next unless File.exist?(path)
 
+              # Выгружаем из GDI-сессии ДО удаления файла: RemoveFontResourceW
+              # требует существующий путь, рег-имя тут не подходит
+              unload_font_from_session(fn)
               begin
                 FileUtils.rm_f(path)
                 removed += 1
@@ -452,7 +455,6 @@ module DN1Code
                 # файл занят другим процессом — пропускаем
               end
             end
-            LEGACY_FONT_FILES.each_value { |reg_name| unload_font_from_session(reg_name) }
             removed
           rescue StandardError
             0
@@ -535,7 +537,7 @@ module DN1Code
             @font_restart_warned ||= {}
             unless @font_restart_warned[face]
               @font_restart_warned[face] = true
-              warn "[DN1SUP Export PDF] Шрифт '#{face}' пока не виден системе. " \
+              warn "[DN1Sup Export PDF] Шрифт '#{face}' пока не виден системе. " \
                    "Если в PDF он заменится на fallback — перезапустите SketchUp/LayOut."
             end
             false

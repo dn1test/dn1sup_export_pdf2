@@ -11,6 +11,7 @@ import { t, locale } from '../i18n/index.js'
 import { useProjectStore } from './project.js'
 import { useScenesStore } from './scenes.js'
 import { useDirectoriesStore } from './directories.js'
+import { useSettingsStore } from './settings.js'
 import { previewDate, isoToRuDate } from '../lib/dates.js'
 
 const tval = (v) => String(v === undefined || v === null ? '' : v).trim()

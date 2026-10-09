@@ -134,7 +134,7 @@ Dir.mktmpdir do |tmp|
       if File.directory?(child)
         copy_dir.call(child, File.join(dst, name), rel_name)
       else
-        FileUtils.mkdir_p(File.join(dst, name))
+        FileUtils.mkdir_p(dst)
         FileUtils.cp(child, File.join(dst, name))
         entries << [File.join(target_dir_name, rel_name).tr('\\', '/'), File.binread(child)]
       end

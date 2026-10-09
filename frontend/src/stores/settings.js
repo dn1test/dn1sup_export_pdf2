@@ -53,7 +53,8 @@ export const useSettingsStore = defineStore('settings', {
 
   getters: {
     // Разрешение рендера по длинной стороне листа: 96/150/300 dpi (зеркало
-    // legacy getEffectiveRenderWidth)
+    // legacy getEffectiveRenderWidth; длинные стороны — как в Ruby
+    // Model::ProjectData::PDF_PAGE_SIZES)
     effectiveRenderWidth(state) {
       const val = String(state.renderQuality || '').toLowerCase().trim()
       const pageSz = (state.pageSize || 'A3').toUpperCase().trim()
@@ -62,7 +63,7 @@ export const useSettingsStore = defineStore('settings', {
       else if (val === 'high') dpi = 300
       else if (val === 'medium') dpi = 150
       else if (parseFloat(val) > 100) return Math.round(parseFloat(val))
-      const longInches = pageSz === 'A3' ? 16.535433 : 11.692913
+      const longInches = { A4: 11.692913, A3: 16.535433, A2: 23.3858, LETTER: 11.0 }[pageSz] || 11.692913
       return Math.round(longInches * dpi)
     },
 

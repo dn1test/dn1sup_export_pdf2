@@ -1,14 +1,14 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Standalone Automated Test for DN1SUP Export PDF 2
+# Standalone Automated Test for DN1Sup Export PDF 2
 # -------------------------------------------------------------------------------
 
 require_relative "mock_sketchup"
 require_relative "../main"
 
 puts "=========================================================="
-puts "  Запуск теста DN1SUP Export PDF 2"
+puts "  Запуск теста DN1Sup Export PDF 2"
 puts "=========================================================="
 
 # 1. Инициализация модели и сцен для теста

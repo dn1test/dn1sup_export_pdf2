@@ -9,7 +9,7 @@ module DN1Code
       # Позволяет пользователю в реальном времени видеть границы кадра рендера в окне SketchUp
       module OverlayService
         OVERLAY_ID   = "dn1code.export_pdf2.safe_frame_overlay"
-        OVERLAY_NAME = "DN1SUP: Рамка экспорта PDF (Safe Frame)"
+        OVERLAY_NAME = "DN1Sup: Рамка экспорта PDF (Safe Frame)"
 
         # Постраничные ключи session-настроек: описывают конкретную страницу и
         # сбрасываются при смене активной страницы, чтобы пропорции/шаблон/флаги

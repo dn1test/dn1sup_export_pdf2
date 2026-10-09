@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Extension Entry Point: DN1SUP Export PDF 2
+# Extension Entry Point: DN1Sup Export PDF 2
 # -------------------------------------------------------------------------------
 
 begin
@@ -37,17 +37,17 @@ require_relative "controller/export_controller"
 # Загрузка пользовательского интерфейса
 require_relative "dialog/export_dialog"
 
-# Общее меню DN1SUP — синглтон в корневом модуле Dn1sup: первое загрузившееся
-# расширение DN1SUP создаёт подменю, остальные переиспользуют. Без глобальных
-# переменных — все расширения DN1SUP уже определяют этот модуль у себя.
+# Общее меню DN1Sup — синглтон в корневом модуле Dn1sup: первое загрузившееся
+# расширение DN1Sup создаёт подменю, остальные переиспользуют. Без глобальных
+# переменных — все расширения DN1Sup уже определяют этот модуль у себя.
 module Dn1sup
   def self.common_menu
-    @common_menu ||= UI.menu('Extensions').add_submenu('DN1SUP')
+    @common_menu ||= UI.menu('Extensions').add_submenu('DN1Sup')
   end
 end
 
 module DN1Code
-  # Основной модуль плагина DN1SUP Export PDF 2
+  # Основной модуль плагина DN1Sup Export PDF 2
   module ExportPdf2
     extend self
 
@@ -140,11 +140,11 @@ module DN1Code
       # Запуск трекера активной работы (статистика на вкладке «Статистика»)
       Service::StatsTracker.register!
 
-      # Общее меню DN1SUP — синглтон в корневом модуле Dn1sup, разделяется всеми
-      # расширениями DN1SUP без глобальных переменных.
+      # Общее меню DN1Sup — синглтон в корневом модуле Dn1sup, разделяется всеми
+      # расширениями DN1Sup без глобальных переменных.
       common = Dn1sup.common_menu
 
-      # Пункты расширения — в подменю «Export PDF 2» внутри DN1SUP
+      # Пункты расширения — в подменю «Export PDF 2» внутри DN1Sup
       submenu = common.add_submenu("Export PDF 2")
 
       submenu.add_item("Экспорт сцен в PDF (Диалог)...") do

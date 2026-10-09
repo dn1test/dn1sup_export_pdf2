@@ -48,7 +48,7 @@ module DN1Code
             dlg.execute_script("window.app && window.app.updateAspectInfo && window.app.updateAspectInfo(#{JSON.generate(info)});")
             dlg.execute_script("window.app && window.app.syncOverlayState && window.app.syncOverlayState(#{overlay_on});")
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Не удалось синхронизировать панель со сменой страницы: #{e.message}"
+            warn "[DN1Sup Export PDF] Не удалось синхронизировать панель со сменой страницы: #{e.message}"
           end
         end
 
@@ -198,7 +198,7 @@ module DN1Code
                 end
               end
             rescue StandardError => e
-              warn "[DN1SUP Export PDF] Ошибка updateAspectSettings: #{e.class}: #{e.message}"
+              warn "[DN1Sup Export PDF] Ошибка updateAspectSettings: #{e.class}: #{e.message}"
             end
           end
 
@@ -232,7 +232,7 @@ module DN1Code
                   begin
                     FileUtils.mkdir_p(art_dir)
                   rescue StandardError => e
-                    puts "[createProjectFolder] mkdir_p: #{e.message}"
+                    warn "[createProjectFolder] mkdir_p: #{e.message}"
                   end
                   yaml_ok = project_data.save_project_yaml(model)
                   dialog.execute_script("window.app && window.app.onProjectFolderCreated(#{JSON.generate(art_dir)}, #{yaml_ok});")
@@ -385,7 +385,7 @@ module DN1Code
               json_payload = JSON.generate(resp)
               dialog.execute_script("window.app && window.app.onFolderFilesLoaded(#{json_payload});")
             rescue StandardError => e
-              puts "[getFolderFiles error]: #{e.message}"
+              warn "[getFolderFiles error]: #{e.message}"
               fallback = { index: idx || 0, path: folder_raw || "", exists: false, full_path: "", files: [], error: e.message }
               dialog.execute_script("window.app && window.app.onFolderFilesLoaded(#{JSON.generate(fallback)});") rescue nil
             end
@@ -402,7 +402,7 @@ module DN1Code
               scenes_json = JSON.generate(project_data.scenes.map(&:to_h))
               dialog.execute_script("window.app && window.app.onScenesRefreshed && window.app.onScenesRefreshed(#{scenes_json});")
             rescue StandardError => e
-              puts "[refreshScenes error]: #{e.message}"
+              warn "[refreshScenes error]: #{e.message}"
             end
           end
 
@@ -493,7 +493,7 @@ module DN1Code
                       begin
                         ro[ro_key] = ro_val
                       rescue StandardError => e
-                        warn "[DN1SUP Export PDF] Не удалось восстановить #{ro_key} после эскизов: #{e.message}"
+                        warn "[DN1Sup Export PDF] Не удалось восстановить #{ro_key} после эскизов: #{e.message}"
                       end
                     end
                   end
@@ -507,7 +507,7 @@ module DN1Code
               end
               dialog.execute_script("window.app && window.app.onSceneThumbnailsLoaded && window.app.onSceneThumbnailsLoaded(#{JSON.generate(thumbs)});")
             rescue StandardError => e
-              puts "[getSceneThumbnails error]: #{e.message}"
+              warn "[getSceneThumbnails error]: #{e.message}"
               # Обязательно снимаем флаг ожидания в UI, иначе эскизы больше не запросятся
               dialog.execute_script("window.app && window.app.onSceneThumbnailsLoaded && window.app.onSceneThumbnailsLoaded({});") rescue nil
             end
@@ -550,7 +550,7 @@ module DN1Code
                 end
               end
             rescue StandardError => e
-              puts "[selectScene error]: #{e.message}"
+              warn "[selectScene error]: #{e.message}"
             end
           end
 
@@ -586,7 +586,7 @@ module DN1Code
                 UI.messagebox(Locale.t(:open_folder_missing, path: folder_raw))
               end
             rescue StandardError => e
-              puts "[openDirectoryPath error]: #{e.message}"
+              warn "[openDirectoryPath error]: #{e.message}"
             end
           end
 
@@ -754,7 +754,7 @@ module DN1Code
                 UI.messagebox(Locale.t(:open_folder_missing, path: clean_path))
               end
             rescue StandardError => e
-              puts "[openFolder error]: #{e.message}"
+              warn "[openFolder error]: #{e.message}"
             end
           end
 
@@ -770,7 +770,7 @@ module DN1Code
                 UI.messagebox(Locale.t(:open_file_missing, path: clean_path))
               end
             rescue StandardError => e
-              puts "[openFile error]: #{e.message}"
+              warn "[openFile error]: #{e.message}"
             end
           end
 
@@ -810,7 +810,7 @@ module DN1Code
                 end
               end
             rescue StandardError => e
-              puts "[openHistorySkp error]: #{e.message}"
+              warn "[openHistorySkp error]: #{e.message}"
             end
           end
 
@@ -849,14 +849,8 @@ module DN1Code
 
           # --- Наборы шаблонов (config/layout_sets/*.yaml) -------------------------
 
-          # Список сохранённых наборов шаблонов
-          dialog.add_action_callback("getTemplateSets") do |_action_context|
-            model = Sketchup.active_model
-            project_data = Model::SessionStore.data(model) if defined?(Model::SessionStore)
-            sets = project_data ? project_data.list_template_sets : []
-            json_str = JSON.generate({ sets: sets })
-            dialog.execute_script("window.app && window.app.onTemplateSetsUpdated(#{json_str});")
-          end
+          # Список наборов фронтенд получает в payload getData (template_sets);
+          # отдельный колбэк не нужен.
 
           # Сохранить текущие шаблоны как набор: { name, custom_layouts }
           dialog.add_action_callback("saveTemplateSet") do |_action_context, data_json|
@@ -979,7 +973,7 @@ module DN1Code
               json_res = JSON.generate(payload)
               dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{json_res});")
             rescue StandardError => e
-              warn "[DN1SUP Export PDF] Ошибка получения статистики: #{e.message}"
+              warn "[DN1Sup Export PDF] Ошибка получения статистики: #{e.message}"
               dialog.execute_script("window.app && window.app.onWorkStats && window.app.onWorkStats(#{JSON.generate({ error: e.message.to_s })});")
             end
           end

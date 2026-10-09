@@ -73,7 +73,7 @@ module DN1Code
             info = OverlayService.on_page_changed(model)
             Dialog::ExportDialog.notify_active_scene(info) if info && defined?(Dialog::ExportDialog)
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Ошибка обработки смены страницы: #{e.message}"
+            warn "[DN1Sup Export PDF] Ошибка обработки смены страницы: #{e.message}"
           end
         end
 
@@ -111,7 +111,7 @@ module DN1Code
             @observed_pages.reject! { |wr| !wr.weakref_alive? }
             true
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Не удалось подключить наблюдатель страниц: #{e.message}"
+            warn "[DN1Sup Export PDF] Не удалось подключить наблюдатель страниц: #{e.message}"
             false
           end
 
@@ -158,18 +158,18 @@ module DN1Code
             if defined?(Sketchup) && Sketchup.respond_to?(:status_text=)
               yaml_name = Model::ProjectData::PROJECT_YAML_NAME
               rev = project_data.project_info[:revision]
-              Sketchup.status_text = "DN1SUP Export PDF: Открыт проект #{yaml_name} (Ревизия r#{sprintf('%03d', rev)})"
+              Sketchup.status_text = "DN1Sup Export PDF: Открыт проект #{yaml_name} (Ревизия r#{sprintf('%03d', rev)})"
             end
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Ошибка при автозагрузке проекта: #{e.message}"
+            warn "[DN1Sup Export PDF] Ошибка при автозагрузке проекта: #{e.message}"
           end
 
           # Закрытие SketchUp: запись всех измененных сессий в YAML файлы
           def handle_quit
             saved = Model::SessionStore.flush_all
-            warn "[DN1SUP Export PDF] При закрытии сохранено сессий: #{saved}" if saved.positive?
+            warn "[DN1Sup Export PDF] При закрытии сохранено сессий: #{saved}" if saved.positive?
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Ошибка сохранения при закрытии: #{e.message}"
+            warn "[DN1Sup Export PDF] Ошибка сохранения при закрытии: #{e.message}"
           end
         end
       end

@@ -2,7 +2,7 @@
 
 # -------------------------------------------------------------------------------
 # Проверка консистентности фронтенда (Vue 3 + Pinia) и Ruby-бэкенда
-# DN1SUP Export PDF 2:
+# DN1Sup Export PDF 2:
 #
 # 1. Ключи pdf_settings, собираемые bridge/payload.js (collectFormData),
 #    должны входить в белый список Ruby (PDF_SETTINGS_ALLOWED) — иначе
@@ -131,6 +131,13 @@ module DN1Code
         unregistered = frontend_actions - ruby_actions
         assert(unregistered.empty?,
                "все callRuby-действия зарегистрированы в Ruby; незарегистрированные: #{unregistered.inspect}")
+
+        # --- 6. Ruby → JS: обратное направление — зарегистрированные колбэки,
+        #        которые фронтенд никогда не вызывает (мёртвый мост-код) ---
+        puts "\n--- 6. add_action_callback без вызовов из фронтенда ---"
+        unused_actions = ruby_actions - frontend_actions
+        assert(unused_actions.empty?,
+               "нет мёртвых колбэков моста; неиспользуемые: #{unused_actions.inspect}")
 
         puts "=========================================================="
         puts "  ИТОГИ ТЕСТИРОВАНИЯ: Успешно: #{@passed}, Ошибок: #{@failed}"

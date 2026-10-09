@@ -33,7 +33,7 @@ module DN1Code
               model.set_attribute(DICT_NAME, KEY_ARTICUL, value)
               true
             rescue StandardError => e
-              warn "[DN1SUP Export PDF] Не удалось записать артикул в файл модели: #{e.message}"
+              warn "[DN1Sup Export PDF] Не удалось записать артикул в файл модели: #{e.message}"
               false
             end
           end

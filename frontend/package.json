@@ -1,7 +1,7 @@
 {
   "name": "dn1sup-export-pdf2-frontend",
   "private": true,
-  "version": "2.9.0",
+  "version": "2.18.2",
   "type": "module",
   "scripts": {
     "dev": "vite",

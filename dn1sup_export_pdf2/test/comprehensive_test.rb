@@ -1,7 +1,7 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Comprehensive End-to-End Test Suite for DN1SUP Export PDF 2
+# Comprehensive End-to-End Test Suite for DN1Sup Export PDF 2
 # -------------------------------------------------------------------------------
 
 require_relative "mock_sketchup"
@@ -154,7 +154,7 @@ class TestRunner
 
   def run_all
     puts "=========================================================="
-    puts "  Комплексное тестирование DN1SUP Export PDF 2"
+    puts "  Комплексное тестирование DN1Sup Export PDF 2"
     puts "=========================================================="
 
     test_default_blank_parameters

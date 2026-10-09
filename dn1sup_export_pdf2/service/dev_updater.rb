@@ -9,7 +9,7 @@ module DN1Code
       # Сервис обновления расширения из каталога разработки (dev-папки)
       # в системную директорию Plugins SketchUp с поддержкой горячей перезагрузки
       module DevUpdater
-        DEFAULT_DEV_DIR = "U:/dn1code/su_plugs_app/dn1sup_export_pdf2"
+        DEFAULT_DEV_DIR = "U:/dn1code/sketchup_ext/dn1sup_export_pdf2"
 
         # Игнорируемые файлы и папки при копировании в Plugins
         EXCLUDE_PATTERNS = [
@@ -111,8 +111,9 @@ module DN1Code
           end
 
           appdata = ENV["APPDATA"] || "C:/Users/#{ENV['USERNAME']}/AppData/Roaming"
-          su_ver = defined?(Sketchup) && Sketchup.respond_to?(:version) ? Sketchup.version.to_i : 2026
-          su_ver = 2026 if su_ver.zero?
+          # Sketchup.version вида "26.0.xxxxx" соответствует папке "SketchUp 2026"
+          su_ver = defined?(Sketchup) && Sketchup.respond_to?(:version) ? 2000 + Sketchup.version.to_i : 2026
+          su_ver = 2026 if su_ver < 2020
 
           default_path = File.join(appdata, "SketchUp", "SketchUp #{su_ver}", "SketchUp", "Plugins").tr("\\", "/")
           FileUtils.mkdir_p(default_path) unless Dir.exist?(default_path)

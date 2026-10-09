@@ -128,7 +128,7 @@ module DN1Code
             }
             pd
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Ошибка импорта YAML: #{e.message}"
+            warn "[DN1Sup Export PDF] Ошибка импорта YAML: #{e.message}"
             nil
           end
 
@@ -162,7 +162,7 @@ module DN1Code
             entry[:dirty] = false
             ok_yaml || ok_cfg
           rescue StandardError => e
-            warn "[DN1SUP Export PDF] Ошибка сохранения сессии: #{e.message}"
+            warn "[DN1Sup Export PDF] Ошибка сохранения сессии: #{e.message}"
             false
           end
 

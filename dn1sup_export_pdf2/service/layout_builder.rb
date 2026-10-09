@@ -97,7 +97,9 @@ module DN1Code
               page_info.top_margin    = margin_in if page_info.respond_to?(:top_margin=)
               page_info.bottom_margin = margin_in if page_info.respond_to?(:bottom_margin=)
               page_info.show_margins  = false if page_info.respond_to?(:show_margins=)
-              # Настройка качества разрешения LayOut (low: 96 dpi, medium: 150 dpi, high: 300 dpi)
+              # Качество разрешения LayOut: "low" -> 96 dpi (RESOLUTION_MEDIUM),
+              # "medium"/"high" -> 300 dpi (RESOLUTION_HIGH); от image_width —
+              # только если render_quality не задан
               q_mode = (settings[:render_quality] || settings["render_quality"] || "").to_s.downcase.strip
               if q_mode.empty?
                 w_val = (settings[:image_width] || settings["image_width"] || 2400).to_i
@@ -136,9 +138,9 @@ module DN1Code
             layers = {}
             if doc.respond_to?(:layers) && doc.layers
               first_layer = doc.layers.first rescue nil
-              layers[:viewport]   = doc.layers.add("DN1SUP_Viewports", false) rescue first_layer
-              layers[:graphics]   = doc.layers.add("DN1SUP_Graphics", false) rescue (layers[:viewport] || first_layer)
-              layers[:content]    = doc.layers.add("DN1SUP_Content", false) rescue (layers[:graphics] || first_layer)
+              layers[:viewport]   = doc.layers.add("DN1Sup_Viewports", false) rescue first_layer
+              layers[:graphics]   = doc.layers.add("DN1Sup_Graphics", false) rescue (layers[:viewport] || first_layer)
+              layers[:content]    = doc.layers.add("DN1Sup_Content", false) rescue (layers[:graphics] || first_layer)
               layers[:default]    = layers[:content] || first_layer
             else
               first_layer = (doc.respond_to?(:layers) && doc.layers) ? (doc.layers.first rescue nil) : nil
@@ -187,7 +189,7 @@ module DN1Code
               begin
                 doc.export(pdf_path, export_opts)
               rescue StandardError, ScriptError => e
-                warn "[DN1SUP Export PDF] Экспорт с опциями сжатия не удался (#{e.message}) — повтор без опций"
+                warn "[DN1Sup Export PDF] Экспорт с опциями сжатия не удался (#{e.message}) — повтор без опций"
                 doc.export(pdf_path)
               end
             else
@@ -301,9 +303,9 @@ module DN1Code
 
         def resolve_margin_inches(settings)
           if settings.key?(:margin_mm) && !settings[:margin_mm].nil?
-            settings[:margin_mm].to_f.clamp(0.0, MAX_MARGIN_MM) * PT_PER_INCH / 25.4 / PT_PER_INCH
+            settings[:margin_mm].to_f.clamp(0.0, MAX_MARGIN_MM) / 25.4
           elsif settings.key?("margin_mm") && !settings["margin_mm"].nil?
-            settings["margin_mm"].to_f.clamp(0.0, MAX_MARGIN_MM) * PT_PER_INCH / 25.4 / PT_PER_INCH
+            settings["margin_mm"].to_f.clamp(0.0, MAX_MARGIN_MM) / 25.4
           elsif settings.key?(:margin) && !settings[:margin].nil?
             settings[:margin].to_f.clamp(0.0, MAX_MARGIN_PT) / PT_PER_INCH
           elsif settings.key?("margin") && !settings["margin"].nil?
@@ -945,33 +947,16 @@ module DN1Code
                 sf_setting = ctx[:settings][:scale_factor] || ctx[:settings]["scale_factor"]
                 page_sz = (ctx[:settings][:page_size] || ctx[:settings]["page_size"] || "A4").to_s.upcase.strip
 
+                # Здесь всегда гибридный режим (use_skp_viewport): база — по
+                # формату листа. Растровая таблица для image-режима — в
+                # RenderService.render_scene_temp, не дублируем.
                 line_mult = if sm_setting
                               case sm_setting.to_s.downcase.strip
                               when "auto"
-                                base_val = if mode_str == "hybrid"
-                                             case page_sz
-                                             when "A2" then 1.20
-                                             when "A3" then 0.90
-                                             else 0.60
-                                             end
-                                           else
-                                             img_w = (ctx[:settings][:image_width] || ctx[:settings]["image_width"] || 2400).to_i
-                                             ras_mult = if img_w <= 1400
-                                                          0.60
-                                                        elsif img_w <= 2000
-                                                          0.90
-                                                        elsif img_w <= 2800
-                                                          1.20
-                                                        elsif img_w <= 3400
-                                                          1.50
-                                                        else
-                                                          1.80
-                                                        end
-                                             case page_sz
-                                             when "A2" then [ras_mult, 1.20].max
-                                             when "A3" then [ras_mult, 0.90].max
-                                             else ras_mult
-                                             end
+                                base_val = case page_sz
+                                           when "A2" then 1.20
+                                           when "A3" then 0.90
+                                           else 0.60
                                            end
                                 # При авто scale множитель меньше на 30% (* 0.70)
                                 (base_val * 0.70).round(2)
@@ -1120,7 +1105,7 @@ module DN1Code
 
         # Авто-подпись параметра, когда «Заголовок» включён, а текст подписи
         # (label) не задан: короткие печатные формулировки без эмодзи.
-        # Зеркало AUTO_PARAM_LABELS в dialog/html/app.js — держать синхронно.
+        # Зеркало ключей auto.* в frontend/src/i18n/{ru,en}.js — держать синхронно.
         AUTO_PARAM_LABELS = {
           "project.articul"      => "Артикул",
           "project.furniture_name" => "Изделие",

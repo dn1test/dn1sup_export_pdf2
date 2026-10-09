@@ -101,7 +101,7 @@ export const useAppStore = defineStore('app', {
 
       if (data.plugin_version) {
         this.pluginVersion = String(data.plugin_version)
-        document.title = `DN1SUP Export PDF 2 v${this.pluginVersion}`
+        document.title = `DN1Sup Export PDF 2 v${this.pluginVersion}`
       }
 
       const settings = useSettingsStore()
