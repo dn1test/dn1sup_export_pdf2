@@ -1,6 +1,6 @@
-# DN1SUP Export PDF 2 (SketchUp API 2026)
+# DN1Sup Export PDF 2 (SketchUp API 2026)
 
-**DN1SUP Export PDF 2** — современное, расширяемое расширение для Trimble SketchUp 2026, предназначенное для профессионального формирования презентационных и технико-коммерческих многостраничных PDF-документов из сцен 3D-модели.
+**DN1Sup Export PDF 2** — современное, расширяемое расширение для Trimble SketchUp 2026, предназначенное для профессионального формирования презентационных и технико-коммерческих многостраничных PDF-документов из сцен 3D-модели.
 
 ---
 
@@ -188,10 +188,22 @@ npm run build      # сборка в dn1sup_export_pdf2/dialog/html
    ```ruby
    load 'dn1sup_export_pdf2.rb'
    ```
-3. На панели инструментов появится группа кнопок **DN1SUP PDF Export 2**, а также пункт в меню **Plugins** (Расширения).
+3. На панели инструментов появится группа кнопок **DN1Sup PDF Export 2**, а также пункт в меню **Plugins** (Расширения).
 
 ### Запуск автономных тестов в терминале:
 ```powershell
 ruby -I dn1sup_export_pdf2 dn1sup_export_pdf2/test/comprehensive_test.rb
 ruby -I dn1sup_export_pdf2 dn1sup_export_pdf2/test/test_work_stats.rb   # статистика работы
 ```
+
+## Автор и лицензия
+
+- **Автор**: DN1Sup <dn1codegen@gmail.com>
+- **Лицензия**: MIT — см. файл [LICENSE](LICENSE)
+
+---
+
+## Публикация на GitHub
+
+Как оформить репозиторий, чтобы DN1Sup Extension Store находил расширение,
+показывал его в каталоге и предлагал обновления, — см. [PUBLISHING.md](PUBLISHING.md).

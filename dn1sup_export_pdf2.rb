@@ -1,8 +1,9 @@
 # frozen_string_literal: true
 
 # -------------------------------------------------------------------------------
-# Extension Loader: DN1SUP Export PDF 2 for SketchUp 2026
-# Developer: DN1Code / DESTUDIONS
+# Extension Loader: DN1Sup Export PDF 2 for SketchUp 2026
+# Developer: DN1Sup <dn1codegen@gmail.com>
+# License: MIT
 # Description: Generates multi-page high-resolution PDF documents from SketchUp scenes.
 # -------------------------------------------------------------------------------
 
@@ -33,7 +34,7 @@ require_relative "dn1sup_export_pdf2/version"
 
 # Основное пространство имен расширений DN1Code
 module DN1Code
-  # Модуль расширения DN1SUP Export PDF 2 для SketchUp
+  # Модуль расширения DN1Sup Export PDF 2 для SketchUp
   module ExportPdf2
     unless file_loaded?(__FILE__)
       # Регистрация плагина в диспетчере расширений SketchUp
@@ -43,6 +44,7 @@ module DN1Code
       ex.version     = PLUGIN_VERSION
       ex.copyright   = PLUGIN_COPYRIGHT
       ex.creator     = NAME_CREATOR
+      ex.id          = 'dn1sup_export_pdf2' if ex.respond_to?(:id=)
 
       Sketchup.register_extension(ex, true)
       file_loaded(__FILE__)
