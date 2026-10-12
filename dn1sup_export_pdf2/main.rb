@@ -132,6 +132,33 @@ module DN1Code
       res
     end
 
+    # Выгрузка неймспейса при переключении канала dev/prod (dn1sup_ext_manager,
+    # метод switch_extension): остановка фоновых процессов, снятие наблюдателей,
+    # закрытие диалога, скрытие тулбара, запись незанесённых сессий. Меню через
+    # SketchUp API не удаляются — пункты старого канала остаются до перезапуска.
+    # @return [Boolean]
+    def unload!
+      Service::ObserverService.unregister! if defined?(Service::ObserverService)
+      Service::StatsTracker.unregister! if defined?(Service::StatsTracker)
+      Service::SnapshotWorker.shutdown if defined?(Service::SnapshotWorker)
+      if defined?(Service::OverlayService)
+        model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+        Service::OverlayService.disable(model) if model && Service::OverlayService.overlay_active?(model)
+      end
+      Dialog::ExportDialog.close if defined?(Dialog::ExportDialog)
+      # Запись всех изменённых сессий: код выгружается, данные на диске должны
+      # остаться консистентными (то же, что onQuit).
+      Model::SessionStore.flush_all if defined?(Model::SessionStore) && Model::SessionStore.respond_to?(:flush_all)
+      if defined?(UI) && defined?(NAME_EXTENSION)
+        toolbar = UI::Toolbar.new(NAME_EXTENSION)
+        toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
+      end
+      true
+    rescue StandardError => e
+      warn "[DN1Sup Export PDF] unload!: #{e.message}"
+      false
+    end
+
     # Регистрация команд, меню, панели инструментов и наблюдателей SketchUp
     unless file_loaded?(__FILE__)
       # Регистрация наблюдателя сохранения и открытия моделей SketchUp

@@ -52,6 +52,31 @@ module DN1Code
             warn "[DN1Sup Export PDF] StatsTracker: не удалось запустить: #{e.message}"
           end
 
+          # Остановка трекера при выгрузке неймспейса (переключение канала
+          # dev/prod, unload!): таймер начисления и наблюдатели не должны
+          # переживать remove_const. Незачисленный хвост записывается.
+          # @return [void]
+          def unregister!
+            if @timer_id && defined?(UI) && UI.respond_to?(:stop_timer)
+              UI.stop_timer(@timer_id)
+            end
+            @timer_id = nil
+            if @unflushed
+              persist_periodically
+              @unflushed = false
+              @ticks_since_persist = 0
+            end
+            prune_weakrefs!
+            unregister_observers(@observed_tools, @tools_observer)
+            unregister_observers(@observed_models, @model_observer)
+            @observed_tools = []
+            @observed_models = []
+            @tools_observer = nil
+            @model_observer = nil
+          rescue StandardError => e
+            warn "[DN1Sup Export PDF] StatsTracker: ошибка выгрузки: #{e.message}"
+          end
+
           # Отметка активности (из наблюдателей SketchUp и пульсов диалога)
           # @return [void]
           def heartbeat
@@ -186,6 +211,23 @@ module DN1Code
             wr == obj
           rescue StandardError
             false
+          end
+
+          # Снятие одного экземпляра наблюдателя со всех живых целей списка
+          # (модель/коллекция могла закрыться — ошибки игнорируются)
+          def unregister_observers(wr_list, observer)
+            return unless observer
+
+            wr_list.each do |wr|
+              next unless wr.is_a?(WeakRef) && wr.weakref_alive?
+
+              begin
+                target = wr.__getobj__
+                target.remove_observer(observer) if target.respond_to?(:remove_observer)
+              rescue StandardError
+                nil
+              end
+            end
           end
         end
 

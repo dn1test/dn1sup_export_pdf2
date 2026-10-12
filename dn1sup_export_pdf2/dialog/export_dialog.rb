@@ -88,6 +88,22 @@ module DN1Code
           @dialog.show
         end
 
+        # Закрытие окна при выгрузке неймспейса (переключение канала dev/prod,
+        # unload!). Открытое окно пережило бы remove_const и продолжало бы
+        # слать колбэки в мёртвый код.
+        # @return [Boolean]
+        def self.close
+          return false unless @dialog
+
+          begin
+            @dialog.close if @dialog.visible?
+          rescue StandardError
+            nil
+          end
+          @dialog = nil
+          true
+        end
+
         def self.populate_project_data(project_data, payload)
           project_data.apply_payload!(payload)
         end

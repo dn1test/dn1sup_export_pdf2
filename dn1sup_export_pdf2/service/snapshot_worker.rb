@@ -74,6 +74,14 @@ module DN1Code
           }
         end
 
+        # Остановка воркера при выгрузке неймспейса (переключение канала
+        # dev/prod, unload!): повторяющийся таймер конвертации должен умереть
+        # вместе с кодом, иначе переживает remove_const.
+        # @return [void]
+        def shutdown
+          stop_worker_timer
+        end
+
         private
 
         def initialize_state

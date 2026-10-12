@@ -95,6 +95,34 @@ module DN1Code
             end
           end
 
+          # Выгрузка неймспейса (переключение канала dev/prod, unload!):
+          # снятие AppObserver с Sketchup и PagesObserver со всех живых
+          # коллекций страниц; кэш сессий очищается.
+          # @return [void]
+          def unregister!
+            return unless defined?(Sketchup) && Sketchup.respond_to?(:remove_observer) && @app_observer
+
+            Sketchup.remove_observer(@app_observer)
+            @app_observer = nil
+            @observed_pages.each do |wr|
+              next unless wr.is_a?(WeakRef) && wr.weakref_alive?
+
+              begin
+                pages = wr.__getobj__
+                if pages.respond_to?(:remove_observer) && @pages_observer
+                  pages.remove_observer(@pages_observer)
+                end
+              rescue StandardError
+                nil # модель уже закрыта
+              end
+            end
+            @pages_observer = nil
+            @observed_pages = []
+            @session_opened_models = {}
+          rescue StandardError => e
+            warn "[DN1Sup Export PDF] ObserverService: ошибка выгрузки: #{e.message}"
+          end
+
           # Подключает наблюдатель страниц к коллекции страниц модели (без дублей:
           # SketchUp уведомляет через один и тот же экземпляр наблюдателя)
           # @param model [Sketchup::Model, nil]

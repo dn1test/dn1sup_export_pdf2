@@ -3,6 +3,19 @@
 Лог изменений **DN1Sup Export PDF 2** (`dn1sup_export_pdf2`).
 Формат версий соответствует правилам `MAJOR.MINOR.PATCH`.
 
+## [2.18.3] — 2026-10-12
+
+- feat: `DN1Code::ExportPdf2.unload!` — подготовка к переключателю каналов
+  dev/prod в dn1sup_ext_manager (v0.12.0). Выгрузка неймспейса теперь
+  останавливает фоновые процессы и снимает наблюдателей: новые
+  `ObserverService.unregister!` (AppObserver + PagesObserver всех живых
+  моделей), `StatsTracker.unregister!` (таймер начисления + наблюдатели
+  активности с записью незанесённого хвоста, новые `unregister_observers`),
+  `SnapshotWorker.shutdown` (таймер WebP-конвертации), `ExportDialog.close`
+  (открытое окно переживало бы remove_const), скрытие Overlay-рамки и
+  тулбара, запись всех изменённых сессий (как onQuit). Пункты меню
+  остаются до перезапуска SketchUp (ограничение SketchUp API).
+
 ## [2.18.1] — 2026-10-09
 
 - feat: publish for Extension Store - registrar ex.id, registry.json, pack tool + release workflow; docs: PUBLISHING.md + README link
