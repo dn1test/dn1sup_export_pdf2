@@ -110,26 +110,6 @@ module DN1Code
       end
     end
 
-    # Выполняет обновление плагина из рабочей dev-папки в Plugins и перезагружает его
-    # @param dev_dir [String, nil] опциональный путь к папке разработки
-    # @return [Hash]
-    def update_from_dev(dev_dir = nil)
-      res = Service::DevUpdater.update_and_reload!(dev_dir)
-      if res[:success]
-        msg = "✅ #{NAME_EXTENSION} (v#{PLUGIN_VERSION}) успешно обновлен из dev-папки!\n\n" \
-              "Скопировано файлов: #{res[:files_copied]}"
-        if res[:warnings] && !res[:warnings].empty?
-          msg += "\n\n⚠ Пропущены залоченные файлы (обновятся после перезапуска SketchUp):\n" \
-                 "#{res[:warnings].join("\n")}"
-        end
-        UI.messagebox(msg, defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
-      else
-        err = "❌ Ошибка обновления из dev-папки:\n#{res[:error]}"
-        UI.messagebox(err, defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
-      end
-      res
-    end
-
     # Папка разработки задана в самом расширении (корень репозитория):
     # проверка обновления сначала смотрит её, потом GitHub.
     UPDATE_ID       = "dn1sup_export_pdf2".freeze
@@ -141,18 +121,6 @@ module DN1Code
       id: UPDATE_ID, repo: UPDATE_REPO, version: PLUGIN_VERSION,
       asset: UPDATE_ASSET, dev_dir: UPDATE_DEV_DIR
     }.freeze
-
-    # Выполняет быструю горячую перезагрузку кода плагина в памяти SketchUp
-    # @return [Hash]
-    def hot_reload
-      res = Service::DevUpdater.reload!
-      if res[:success]
-        UI.messagebox("⚡ Плагин #{NAME_EXTENSION} v#{PLUGIN_VERSION} перезагружен!", defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
-      else
-        UI.messagebox("❌ Ошибка перезагрузки:\n#{res[:error]}", defined?(MB_OK) ? MB_OK : 0) if defined?(UI)
-      end
-      res
-    end
 
     # Выгрузка неймспейса при переключении канала dev/prod (dn1sup_ext_manager,
     # метод switch_extension): остановка фоновых процессов, снятие наблюдателей,
@@ -212,13 +180,6 @@ module DN1Code
         Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
       end
 
-      submenu.add_separator if submenu.respond_to?(:add_separator)
-      submenu.add_item("🔄 Обновить из рабочей копии...") do
-        update_from_dev
-      end
-      submenu.add_item("⚡ Перезагрузить расширение (Hot Reload)") do
-        hot_reload
-      end
       submenu.add_separator if submenu.respond_to?(:add_separator)
       submenu.add_item("Проверить обновления сейчас") do
         if defined?(Dn1sup::Updater)

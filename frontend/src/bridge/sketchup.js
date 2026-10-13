@@ -137,14 +137,6 @@ export function registerRubyApi() {
       useTemplatesStore().onTemplateSetLoaded(payload)
     },
 
-    onUpdateCheckResult(res) {
-      useAppStore().onUpdateCheckResult(res)
-    },
-
-    onDevUpdateResult(res) {
-      useAppStore().onDevUpdateResult(res)
-    },
-
     onWorkStats(payload) {
       useStatsStore().apply(payload)
     },

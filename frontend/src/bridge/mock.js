@@ -258,12 +258,6 @@ export function mockRubyCall(action, param) {
         app().showNotification && app().showNotification('Набор сохранён (мок)', 'success')
       })
       break
-    case 'checkForUpdate':
-      delay(() => app().onUpdateCheckResult && app().onUpdateCheckResult({ success: true, current_version: '2.9.0', dev_version: '2.9.0', update_available: false }))
-      break
-    case 'updateFromDev':
-      delay(() => app().onDevUpdateResult && app().onDevUpdateResult({ success: true, same_dir: true, files_copied: 0, reloaded_at: new Date().toLocaleTimeString() }))
-      break
     case 'toggleAspectOverlay':
       delay(() => app().syncOverlayState && app().syncOverlayState(true))
       break

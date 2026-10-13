@@ -43,8 +43,6 @@ export const useAppStore = defineStore('app', {
     // Успешный экспорт
     successModal: { visible: false, pdfPath: '' },
     lastExportedPdf: '',
-    // Обновление плагина (вкладка «Настройки»)
-    update: { status: '', kind: '', available: false, devVersion: '', updateBtnEnabled: false },
     lastExportSendsToast: '',
   }),
 
@@ -314,71 +312,6 @@ export const useAppStore = defineStore('app', {
     // (кнопка «круг со стрелками» в шапке; папки нет — только GitHub)
     checkUpdateFull() {
       callRuby('check_update')
-    },
-    // --- Обновление плагина из dev-папки ---
-    checkUpdate() {
-      this.update.status = t('toast.checkingUpdate')
-      this.update.kind = 'busy'
-      callRuby('checkForUpdate')
-    },
-    applyUpdate() {
-      this.update.status = t('toast.updating')
-      this.update.kind = 'busy'
-      this.update.updateBtnEnabled = false
-      callRuby('updateFromDev')
-    },
-    onUpdateCheckResult(res) {
-      if (!res || !res.success) {
-        this.update.devVersion = ''
-        this.update.available = false
-        this.update.updateBtnEnabled = false
-        this.update.kind = 'error'
-        this.update.status = `❌ ${res ? res.error : t('toast.unknownError')}`
-        return
-      }
-      if (res.update_available) {
-        this.update.devVersion = res.dev_version
-        this.update.available = true
-        this.update.kind = 'warn'
-        this.update.status = t('toast.updateFound', { cur: res.current_version, dev: res.dev_version })
-        this.update.updateBtnEnabled = true
-      } else {
-        this.update.devVersion = ''
-        this.update.available = false
-        this.update.updateBtnEnabled = false
-        this.update.kind = 'ok'
-        this.update.status = t('toast.noUpdates', { cur: res.current_version })
-      }
-    },
-    onDevUpdateResult(res) {
-      if (res && res.success) {
-        this.update.available = false
-        this.update.updateBtnEnabled = false
-        this.update.kind = 'ok'
-        const newVer = this.update.devVersion || null
-        this.update.devVersion = ''
-        let msg
-        if (res.same_dir) {
-          msg = newVer ? t('toast.devSameDirVer', { ver: newVer }) : t('toast.devSameDir')
-        } else if (newVer) {
-          msg = t('toast.devUpdated', { ver: newVer, files: res.files_copied || 0 })
-        } else if (res.files_copied !== undefined) {
-          msg = t('toast.devUpdatedFiles', { files: res.files_copied })
-        } else {
-          msg = t('toast.devReloaded')
-        }
-        this.update.status = `✅ ${msg} [${res.updated_at || res.reloaded_at || ''}]`
-        const warnings = (res.warnings || []).filter(Boolean)
-        if (warnings.length) {
-          this.update.status += '\n' + t('toast.devWarnings', { n: warnings.length, list: warnings.join('; ') })
-        }
-        showToast(msg, 'success')
-      } else {
-        const errMsg = res ? res.error : t('toast.unknownError')
-        this.update.kind = 'error'
-        this.update.status = t('toast.updateErrorPrefix', { msg: errMsg })
-        showToast(t('toast.updateFailed', { msg: errMsg }), 'error')
-      }
     },
   },
 })
