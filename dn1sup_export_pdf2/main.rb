@@ -37,6 +37,16 @@ require_relative "controller/export_controller"
 # Загрузка пользовательского интерфейса
 require_relative "dialog/export_dialog"
 
+# Общий модуль автообновления (shared/dn1sup_updater.rb, пакуется в .rbz
+# как dn1sup_export_pdf2/dn1sup_updater.rb); в dev-копии его нет.
+if defined?(Sketchup) && Sketchup.respond_to?(:require)
+  begin
+    Sketchup.require "dn1sup_export_pdf2/dn1sup_updater"
+  rescue LoadError, StandardError
+    nil
+  end
+end
+
 # Общее меню DN1Sup — синглтон в корневом модуле Dn1sup: первое загрузившееся
 # расширение DN1Sup создаёт подменю, остальные переиспользуют. Без глобальных
 # переменных — все расширения DN1Sup уже определяют этот модуль у себя.
@@ -120,6 +130,18 @@ module DN1Code
       res
     end
 
+    # Папка разработки задана в самом расширении (корень репозитория):
+    # проверка обновления сначала смотрит её, потом GitHub.
+    UPDATE_ID       = "dn1sup_export_pdf2".freeze
+    UPDATE_REPO     = "dn1test/dn1sup_export_pdf2".freeze
+    UPDATE_ASSET    = "#{UPDATE_ID}.rbz".freeze
+    UPDATE_PAGE     = "https://github.com/#{UPDATE_REPO}/releases".freeze
+    UPDATE_DEV_DIR  = File.expand_path("../..", __dir__).freeze
+    UPDATE_MANIFEST = {
+      id: UPDATE_ID, repo: UPDATE_REPO, version: PLUGIN_VERSION,
+      asset: UPDATE_ASSET, dev_dir: UPDATE_DEV_DIR
+    }.freeze
+
     # Выполняет быструю горячую перезагрузку кода плагина в памяти SketchUp
     # @return [Hash]
     def hot_reload
@@ -197,6 +219,15 @@ module DN1Code
       submenu.add_item("⚡ Перезагрузить расширение (Hot Reload)") do
         hot_reload
       end
+      submenu.add_separator if submenu.respond_to?(:add_separator)
+      submenu.add_item("Проверить обновления сейчас") do
+        if defined?(Dn1sup::Updater)
+          Dn1sup::Updater.check_local_first!(UPDATE_MANIFEST.merge(force: true, async: true))
+        else
+          UI.openURL(UPDATE_PAGE)
+        end
+      end
+      submenu.add_item("Страница релизов на GitHub") { UI.openURL(UPDATE_PAGE) }
 
       # Создание панели инструментов
       toolbar = UI::Toolbar.new(NAME_EXTENSION)
@@ -237,6 +268,16 @@ module DN1Code
       toolbar.add_item(cmd_overlay)
 
       toolbar.restore
+      # Фоновая проверка обновлений один раз за сессию: сначала локальная
+      # папка, потом GitHub (ненавязчивое уведомление, без модалок).
+      unless $dn1sup_export_pdf2_update_check_scheduled
+        $dn1sup_export_pdf2_update_check_scheduled = true
+        if defined?(Dn1sup::Updater) && UI.respond_to?(:start_timer)
+          UI.start_timer(15, false) do
+            Dn1sup::Updater.check_local_first!(UPDATE_MANIFEST.merge(async: true))
+          end
+        end
+      end
       file_loaded(__FILE__)
     end
   end

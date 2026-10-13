@@ -310,6 +310,11 @@ export const useAppStore = defineStore('app', {
       callRuby('startSend', JSON.stringify(collectFormData()))
     },
 
+    // --- Обновление плагина: сначала локальная папка, потом GitHub ---
+    // (кнопка «круг со стрелками» в шапке; папки нет — только GitHub)
+    checkUpdateFull() {
+      callRuby('check_update')
+    },
     // --- Обновление плагина из dev-папки ---
     checkUpdate() {
       this.update.status = t('toast.checkingUpdate')

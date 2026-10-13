@@ -39,7 +39,17 @@
 
     <!-- Правый столбец: язык в верхнем углу, под ним артикул -->
     <div class="flex shrink-0 flex-col items-end gap-1.5">
-      <!-- Язык RU|EN -->
+      <div class="flex items-center gap-1">
+        <!-- Проверить обновление: сначала локальная папка, потом GitHub -->
+        <button
+          type="button"
+          class="rounded-full p-1.5 text-ink-400 transition-colors hover:bg-ink-50 hover:text-accent-600"
+          :title="t('app.checkUpdateTitle')"
+          @click="app.checkUpdateFull()"
+        >
+          <RefreshIcon :size="14" />
+        </button>
+        <!-- Язык RU|EN -->
       <div class="flex items-center gap-1.5" :title="t('app.languageTitle')">
         <GlobeIcon :size="14" class="text-ink-400" />
         <div class="flex rounded-md border border-ink-200 p-0.5" role="group" :aria-label="t('app.languageTitle')">
@@ -53,6 +63,7 @@
             @click="app.setLanguage(lang)"
           >{{ lang }}</button>
         </div>
+      </div>
       </div>
 
       <!-- Артикул -->
@@ -74,7 +85,7 @@
 </template>
 
 <script setup>
-import { FileText, Globe, Hash, User, Users } from '@lucide/vue'
+import { FileText, Globe, Hash, RefreshCw, User, Users } from '@lucide/vue'
 import { t, locale } from '../../i18n/index.js'
 import { useAppStore } from '../../stores/app.js'
 import { useProjectStore } from '../../stores/project.js'
@@ -86,4 +97,5 @@ const GlobeIcon = Globe
 const HashIcon = Hash
 const UsersIcon = Users
 const UserIcon = User
+const RefreshIcon = RefreshCw
 </script>

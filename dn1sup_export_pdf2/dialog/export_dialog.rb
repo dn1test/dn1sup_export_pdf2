@@ -974,6 +974,17 @@ module DN1Code
             dialog.execute_script("window.app && window.app.onDevUpdateResult && window.app.onDevUpdateResult(#{json_res});")
           end
 
+          # Кнопка «круг со стрелками» в шапке: сначала локальная папка
+          # (UPDATE_DEV_DIR из UPDATE_MANIFEST), потом GitHub — ставится
+          # свежайшее. Папки нет — только GitHub.
+          dialog.add_action_callback("check_update") do |_action_context|
+            if defined?(Dn1sup::Updater)
+              Dn1sup::Updater.check_local_first!(DN1Code::ExportPdf2::UPDATE_MANIFEST.merge(force: true, async: true))
+            else
+              UI.openURL(DN1Code::ExportPdf2::UPDATE_PAGE)
+            end
+          end
+
           # Пульс активности из диалога (мышь/клавиатура/колесо в панели) —
           # отмечает активную работу для трекера статистики
           dialog.add_action_callback("activityPing") do |_action_context|
