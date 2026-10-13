@@ -191,7 +191,7 @@ module DN1Code
       end
 
       submenu.add_separator if submenu.respond_to?(:add_separator)
-      submenu.add_item("🔄 Обновить из dev-папки...") do
+      submenu.add_item("🔄 Обновить из рабочей копии...") do
         update_from_dev
       end
       submenu.add_item("⚡ Перезагрузить расширение (Hot Reload)") do

@@ -33,7 +33,6 @@ export const useAppStore = defineStore('app', {
   state: () => ({
     activeTab: 'tab-project',
     pluginVersion: '',
-    isDev: false, // загружен dev-вариант (Plugins/<id>_dev) — бейдж DEV в шапке
     progress: { visible: false, percent: 0, message: '' },
     // Предложение создать артикул при открытии панели
     articulTypeModal: { visible: false },
@@ -104,7 +103,6 @@ export const useAppStore = defineStore('app', {
         this.pluginVersion = String(data.plugin_version)
         document.title = `DN1Sup Export PDF 2 v${this.pluginVersion}`
       }
-      this.isDev = Boolean(data.dev_build)
 
       const settings = useSettingsStore()
       settings.applyPayload(data.pdf_settings || {})

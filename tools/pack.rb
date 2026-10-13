@@ -25,7 +25,7 @@ CONFIG = {
 }.freeze
 
 EXCLUDE_FILES = %w[
-  .sketchup_dev.json README.md README.MD
+  README.md README.MD
   .gitignore package.json package-lock.json CHANGELOG.md NOTES.md
 ].map(&:downcase).freeze
 
