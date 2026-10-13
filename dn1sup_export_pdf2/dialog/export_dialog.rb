@@ -135,6 +135,8 @@ module DN1Code
             # писать внутрь pdf_settings нельзя, иначе ключ уйдёт в settings.yaml).
             payload = project_data.to_h
             payload[:plugin_version] = PLUGIN_VERSION
+            # загружен именно dev-вариант (Plugins/<id>_dev) — для бейджа DEV в шапке
+            payload[:dev_build] = DEV_BUILD
             payload[:plugins_dir] = Service::DevUpdater.resolve_plugins_dir if defined?(Service::DevUpdater)
             payload[:vips_available] = Service::VipsService.available? if defined?(Service::VipsService)
             payload[:template_sets] = project_data.list_template_sets

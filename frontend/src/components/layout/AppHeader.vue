@@ -10,7 +10,14 @@
       </div>
       <div class="leading-tight">
         <div class="text-[13px] font-semibold text-ink-900">export PDF</div>
-        <div class="font-mono text-[10px] text-ink-400">v{{ app.pluginVersion || '…' }}</div>
+        <div class="flex items-center gap-1.5">
+          <span class="font-mono text-[10px] text-ink-400">v{{ app.pluginVersion || '…' }}</span>
+          <span
+            v-if="app.isDev"
+            class="rounded-full bg-amber-100 px-1.5 py-px text-[10px] font-bold tracking-wide text-amber-700"
+            title="Работает dev-вариант (рабочая копия sketchup-dev-mcp), не релиз"
+          >DEV</span>
+        </div>
       </div>
     </div>
 
