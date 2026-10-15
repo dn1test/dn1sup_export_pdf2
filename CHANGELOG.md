@@ -3,25 +3,25 @@
 Лог изменений **DN1Sup Export PDF 2** (`dn1sup_export_pdf2`).
 Формат версий соответствует правилам `MAJOR.MINOR.PATCH`.
 
-## [2.19.0] — 2026-10-13
+## [2.19.0] — 2026-10-15
 
 - Удалён функционал dev/prod (второй id `dn1sup_export_pdf2_dev`): удалены
   `DEV_BUILD`, поле `dev_build` в данных диалога и бейдж DEV в шапке.
   Разработка — рабочая копия под тем же id («Обновить из рабочей копии» /
   Hot Reload). Файлы `.sketchup_dev.json` удалены.
-
-## [2.18.3] — 2026-10-12
-
-- feat: `DN1Code::ExportPdf2.unload!` — подготовка к переключателю каналов
-  dev/prod в dn1sup_ext_manager (v0.12.0). Выгрузка неймспейса теперь
-  останавливает фоновые процессы и снимает наблюдателей: новые
-  `ObserverService.unregister!` (AppObserver + PagesObserver всех живых
-  моделей), `StatsTracker.unregister!` (таймер начисления + наблюдатели
-  активности с записью незанесённого хвоста, новые `unregister_observers`),
-  `SnapshotWorker.shutdown` (таймер WebP-конвертации), `ExportDialog.close`
-  (открытое окно переживало бы remove_const), скрытие Overlay-рамки и
-  тулбара, запись всех изменённых сессий (как onQuit). Пункты меню
-  остаются до перезапуска SketchUp (ограничение SketchUp API).
+- refactor!: из диалога убраны dev-кнопки обновления из рабочей копии и
+  Hot Reload; удалён `update_from_dev.ps1`.
+- feat(updates): проверка обновлений из локальной папки разработки и с
+  GitHub (кнопка проверки в шапке диалога); общий апдейтер v3 —
+  совместимость копий разных версий, учёт даты сборки и времени файлов
+  при равной версии.
+- feat: `DN1Code::ExportPdf2.unload!` — выгрузка неймспейса: останавливает
+  фоновые процессы и снимает наблюдателей (`ObserverService.unregister!`,
+  `StatsTracker.unregister!`, `SnapshotWorker.shutdown`,
+  `ExportDialog.close`, скрытие Overlay-рамки и тулбара, запись изменённых
+  сессий).
+- fix: аудит кодовой базы и ребрендинг DN1Sup; `registry.json` — поле
+  `author`.
 
 ## [2.18.1] — 2026-10-09
 
