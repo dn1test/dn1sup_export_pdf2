@@ -8,8 +8,8 @@
 
 require_relative "dn1sup_export_pdf2/version"
 require_relative "dn1sup_export_pdf2/service/dev_updater"
-require "net/http"
 require "json"
+require "socket"
 
 puts "=========================================================="
 puts "  DN1Sup Export PDF 2 (v#{DN1Code::ExportPdf2::PLUGIN_VERSION}) — Обновление из dev-папки"
@@ -65,10 +65,13 @@ else
 end
 
 puts "\n[4/4] Проверка запущенного SketchUp и горячая перезагрузка..."
-# Попытка послать команду горячей перезагрузки через dev-мост SketchUp (порт 9877)
+# Мост dn1sup_mcp2 слушает 127.0.0.1:9877 по TCP newline-JSON (НЕ HTTP):
+# один запрос = одно соединение, одна строка JSON с "\n", ответ — одна строка JSON.
+# Команды: eval | status | ping | stop (см. bridge_client.rb моста).
+# Старый код слал сюда HTTP POST /eval — мост HTTP не понимает, и скрипт всегда
+# врал "мост не запущен", хотя SketchUp работал (проверено через MCP status).
 bridge_port = 9877
 begin
-  uri = URI("http://127.0.0.1:#{bridge_port}/eval")
   # Код на Ruby для выполнения внутри SketchUp
   ruby_code = <<~RUBY
     if defined?(DN1Code::ExportPdf2::Service::DevUpdater)
@@ -78,25 +81,34 @@ begin
     end
   RUBY
 
-  req = Net::HTTP::Post.new(uri)
-  req["Content-Type"] = "application/json"
-  req.body = JSON.generate({ code: ruby_code })
+  request = JSON.generate({ id: rand(1..1_000_000_000), cmd: "eval", code: ruby_code }) + "\n"
 
-  http = Net::HTTP.new(uri.host, uri.port)
-  http.open_timeout = 1.0
-  # Перезагрузка расширения внутри SketchUp может занять несколько секунд
-  http.read_timeout = 15.0
-  response = http.request(req)
+  sock = Socket.tcp("127.0.0.1", bridge_port, connect_timeout: 2)
+  sock.write(request)
+  line = nil
+  line = sock.gets if IO.select([sock], nil, nil, 15.0)
+  sock.close
 
-  if response.is_a?(Net::HTTPSuccess)
-    puts "  ⚡ SketchUp обнаружен (порт #{bridge_port}): плагин успешно перезагружен на лету!"
+  if line
+    resp = (JSON.parse(line) rescue {})
+    err = resp["error"] || resp["backtrace"]
+    if err
+      puts "  ⚠️  SketchUp ответил с ошибкой: #{err}"
+      puts "     Файлы в каталоге Plugins обновлены — перезагрузите расширение вручную."
+    else
+      puts "  ⚡ SketchUp обнаружен (порт #{bridge_port}): плагин успешно перезагружен на лету!"
+    end
   else
-    puts "  ⚡ SketchUp ответил (код #{response.code}), расширение обновлено в Plugins."
+    puts "  ⚠️  Мост на порту #{bridge_port} закрыл соединение без ответа."
+    puts "     Файлы в каталоге Plugins обновлены — перезагрузите расширение вручную."
   end
-rescue Errno::ECONNREFUSED, Net::OpenTimeout, StandardError
-  puts "  ℹ️  SketchUp dev-мост не запущен на порту #{bridge_port}."
+rescue Errno::ECONNREFUSED, Errno::ETIMEDOUT, SocketError
+  puts "  ℹ️  SketchUp-мост не отвечает на порту #{bridge_port} (SketchUp закрыт?)."
   puts "     Файлы в каталоге Plugins обновлены. При следующем открытии SketchUp"
   puts "     или через меню 'Extensions -> DN1Sup -> Export PDF 2 -> Перезагрузить' изменения вступят в силу."
+rescue StandardError => e
+  puts "  ⚠️  Hot Reload не удался (#{e.class}: #{e.message})."
+  puts "     Файлы в каталоге Plugins обновлены — перезагрузите расширение вручную."
 end
 
 puts "\n=========================================================="

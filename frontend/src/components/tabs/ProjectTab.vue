@@ -61,9 +61,9 @@
 
             <div>
               <div class="grid grid-cols-3 pb-1">
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.rateLabel')">{{ t('workflow.rateLabel') }}</label>
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.durationLabel')">{{ t('workflow.durationLabel') }}</label>
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.priceLabel')">{{ t('workflow.priceLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.rateLabel')">{{ t('workflow.rateLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.durationLabel')">{{ t('workflow.durationLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.priceLabel')">{{ t('workflow.priceLabel') }}</label>
               </div>
               <div class="flex rounded-md border border-ink-200 bg-white divide-x divide-ink-200 transition-colors focus-within:border-accent-500 focus-within:ring-2 focus-within:ring-accent-500/20">
                 <div class="flex min-w-0 flex-1 items-center">
@@ -84,8 +84,8 @@
           <div class="grid grid-cols-[38fr_62fr] gap-3">
             <div>
               <div class="grid grid-cols-2 pb-1">
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.versionLabel')">{{ t('workflow.versionLabel') }}</label>
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.revisionLabel')">{{ t('workflow.revisionLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.versionLabel')">{{ t('workflow.versionLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.revisionLabel')">{{ t('workflow.revisionLabel') }}</label>
               </div>
               <div class="flex rounded-md border border-ink-200 bg-white divide-x divide-ink-200 transition-colors focus-within:border-accent-500 focus-within:ring-2 focus-within:ring-accent-500/20">
                 <div class="min-w-0 flex-1">
@@ -115,8 +115,8 @@
 
             <div>
               <div class="grid grid-cols-2 pb-1">
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.startProjectLabel')">{{ t('workflow.startProjectLabel') }}</label>
-                <label class="truncate pl-2.5 text-xs font-medium text-ink-500" :title="t('workflow.endProjectLabel')">{{ t('workflow.endProjectLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.startProjectLabel')">{{ t('workflow.startProjectLabel') }}</label>
+                <label class="truncate text-xs font-medium text-ink-500" :title="t('workflow.endProjectLabel')">{{ t('workflow.endProjectLabel') }}</label>
               </div>
               <div class="flex rounded-md border border-ink-200 bg-white divide-x divide-ink-200 transition-colors focus-within:border-accent-500 focus-within:ring-2 focus-within:ring-accent-500/20">
                 <div class="min-w-0 flex-1">

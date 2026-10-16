@@ -3,6 +3,15 @@
 Лог изменений **DN1Sup Export PDF 2** (`dn1sup_export_pdf2`).
 Формат версий соответствует правилам `MAJOR.MINOR.PATCH`.
 
+## [2.21.2] — 2026-10-16
+
+- fix(ui): подзаголовки сегментных групп workflow (Ставка/Время/Стоимость,
+  Вариант/Ревизия, Старт/Сдача) лишились лишнего `pl-2.5` — все лейблы вкладки
+  Project на одной вертикали с обычными полями (`frontend/.../ProjectTab.vue`).
+- fix(dev): `update_from_dev.rb` говорил с мостом dn1sup_mcp2 по HTTP POST /eval,
+  а мост понимает только TCP newline-JSON — всегда врал «мост не запущен».
+  Шаг Hot Reload переписан на `Socket.tcp` + `{"cmd":"eval"}`.
+
 ## [2.21.0] — 2026-10-16
 
 - feat(updates): кнопка обновления работает только с GitHub (GitHub
