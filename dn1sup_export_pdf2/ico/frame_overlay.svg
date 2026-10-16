@@ -1,33 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <defs>
-    <linearGradient id="framePlate" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#1E293B"/>
-      <stop offset="100%" stop-color="#0F172A"/>
-    </linearGradient>
-    <linearGradient id="frameGrad" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#38BDF8"/>
-      <stop offset="100%" stop-color="#0284C7"/>
-    </linearGradient>
-  </defs>
-  <!-- Background Plate -->
-  <rect x="4" y="4" width="40" height="40" rx="10" fill="url(#framePlate)" stroke="#334155" stroke-width="1.5"/>
-  
-  <!-- Outer Viewport Outline (dimmed) -->
-  <rect x="8" y="11" width="32" height="26" rx="2" fill="none" stroke="#475569" stroke-width="1" stroke-dasharray="2 2" opacity="0.7"/>
-  
-  <!-- Safe Frame (Aspect Ratio Rect) -->
-  <rect x="11" y="14" width="26" height="20" rx="1.5" fill="#0369A1" fill-opacity="0.2" stroke="url(#frameGrad)" stroke-width="2"/>
-  
-  <!-- Corner Crop Marks -->
-  <!-- Top-Left -->
-  <path d="M 8 18 L 8 11 L 15 11" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-  <!-- Top-Right -->
-  <path d="M 40 18 L 40 11 L 33 11" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-  <!-- Bottom-Left -->
-  <path d="M 8 30 L 8 37 L 15 37" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-  <!-- Bottom-Right -->
-  <path d="M 40 30 L 40 37 L 33 37" fill="none" stroke="#38BDF8" stroke-width="2" stroke-linecap="round"/>
-
-  <!-- Center Crosshair / Proportions target -->
-  <circle cx="24" cy="24" r="2.5" fill="#38BDF8"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+<defs>
+<mask id="g" maskUnits="userSpaceOnUse" x="0" y="0" width="24" height="24">
+<rect width="24" height="24" fill="#000000"/>
+<rect x="3" y="3" width="2.2" height="6" fill="#ffffff"/><rect x="3" y="3" width="6" height="2.2" fill="#ffffff"/><rect x="18.8" y="3" width="2.2" height="6" fill="#ffffff"/><rect x="15" y="3" width="6" height="2.2" fill="#ffffff"/><rect x="3" y="15" width="2.2" height="6" fill="#ffffff"/><rect x="3" y="18.8" width="6" height="2.2" fill="#ffffff"/><rect x="18.8" y="15" width="2.2" height="6" fill="#ffffff"/><rect x="15" y="18.8" width="6" height="2.2" fill="#ffffff"/><path d="M8.6 6.9L12.5 6.9L15.4 9.8L15.4 16.8L14.3 17.9L9.7 17.9L8.6 16.8Z" fill="#ffffff"/><path d="M12.5 6.9L15.4 9.8L12.5 9.8Z" fill="#000000"/>
+</mask>
+</defs>
+<rect width="24" height="24" fill="#f43f5e" mask="url(#g)"/>
 </svg>
