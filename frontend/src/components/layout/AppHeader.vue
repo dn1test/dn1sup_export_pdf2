@@ -48,7 +48,7 @@
           :disabled="app.updateStatus.checking"
           @click="app.checkUpdateFull()"
         >
-          <RefreshIcon :size="14" :class="{ 'animate-spin': app.updateStatus.checking }" />
+          <RefreshIcon :size="16" :class="{ 'animate-spin': app.updateStatus.checking }" />
         </button>
         <!-- Справка: как пользоваться расширением -->
         <button
@@ -57,7 +57,7 @@
           :title="t('app.helpTitle')"
           @click="$emit('open-help')"
         >
-          <HelpIcon :size="14" />
+          <HelpIcon :size="16" />
         </button>
         <!-- Светлая / тёмная тема -->
         <button
@@ -66,11 +66,11 @@
           :title="isDark ? t('theme.toLight') : t('theme.toDark')"
           @click="toggleTheme()"
         >
-          <component :is="isDark ? SunIcon : MoonIcon" :size="14" />
+          <component :is="isDark ? SunIcon : MoonIcon" :size="16" />
         </button>
         <!-- Язык RU|EN -->
       <div class="flex items-center gap-1.5" :title="t('app.languageTitle')">
-        <GlobeIcon :size="14" class="text-ink-400" />
+        <GlobeIcon :size="16" class="text-ink-400" />
         <div class="flex rounded-md border border-ink-200 p-0.5" role="group" :aria-label="t('app.languageTitle')">
           <button
             v-for="lang in ['ru', 'en']"
@@ -104,7 +104,7 @@
 </template>
 
 <script setup>
-import { FileText, Globe, Hash, HelpCircle, Moon, RefreshCw, Sun, User, Users } from '@lucide/vue'
+import { FileText, Globe, Hash, HelpCircle, Moon, RotateCw, Sun, User, Users } from '@lucide/vue'
 import { computed } from 'vue'
 import { t, locale } from '../../i18n/index.js'
 import { useAppStore } from '../../stores/app.js'
@@ -132,7 +132,7 @@ const GlobeIcon = Globe
 const HashIcon = Hash
 const UsersIcon = Users
 const UserIcon = User
-const RefreshIcon = RefreshCw
+const RefreshIcon = RotateCw
 const HelpIcon = HelpCircle
 const SunIcon = Sun
 const MoonIcon = Moon
