@@ -3,6 +3,12 @@
 Лог изменений **DN1Sup Export PDF 2** (`dn1sup_export_pdf2`).
 Формат версий соответствует правилам `MAJOR.MINOR.PATCH`.
 
+## [2.21.8] — 2026-10-16
+
+### DN1Sup Export PDF 2 (v2.21.8)
+- **Фирменная плитка DN1Sup в шапке GUI** — та же плитка, что в каталоге
+  Extension Store (цветной квадрат, знак с «воздухом»); работает в светлой
+  и тёмной теме. Источник — `dn1sup_extensions` (`tools/make_icons.rb`).
 ## [2.21.7] — 2026-10-16
 
 ### DN1Sup Export PDF 2 (v2.21.7)

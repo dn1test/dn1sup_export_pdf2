@@ -2,12 +2,14 @@
   <header class="flex shrink-0 items-center gap-3 border-b border-ink-200 bg-white px-3.5 py-2">
     <!-- Бренд -->
     <div class="flex items-center gap-2.5">
-      <div
-        class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-600 text-white"
+      <img
+        src="../../assets/logo.svg"
+        width="32"
+        height="32"
+        class="shrink-0"
         :title="t('app.versionBadgeTitle', { version: app.pluginVersion || '—' })"
+        alt="DN1Sup Export PDF 2"
       >
-        <FileTextIcon :size="16" />
-      </div>
       <div class="leading-tight">
         <div class="text-[13px] font-semibold text-ink-900">export PDF</div>
         <div class="flex items-center gap-1.5">
@@ -101,7 +103,7 @@
 </template>
 
 <script setup>
-import { FileText, Globe, Hash, HelpCircle, Moon, RotateCw, Sun, User, Users } from '@lucide/vue'
+import { Globe, Hash, HelpCircle, Moon, RotateCw, Sun, User, Users } from '@lucide/vue'
 import { computed } from 'vue'
 import { t, locale } from '../../i18n/index.js'
 import { useAppStore } from '../../stores/app.js'
@@ -124,7 +126,6 @@ const updateBtnTitle = computed(() => {
   }
   return t('app.checkUpdateTitle')
 })
-const FileTextIcon = FileText
 const GlobeIcon = Globe
 const HashIcon = Hash
 const UsersIcon = Users
