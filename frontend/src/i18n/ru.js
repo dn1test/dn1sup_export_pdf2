@@ -14,6 +14,8 @@ export const ru = {
   'app.tradeHousehold': 'Бытовой',
   'app.tradeTitle': 'Тип проекта — выбирается при создании артикула и больше не меняется',
   'app.languageTitle': 'Язык интерфейса',
+  'app.languageToEn': 'Переключить на английский язык',
+  'app.languageToRu': 'Переключить на русский язык',
   'app.checkUpdateTitle': 'Проверить обновление с GitHub',
   'tabs.project': 'Проект',
   'tabs.scenes': 'Страницы',

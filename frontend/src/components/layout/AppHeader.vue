@@ -68,21 +68,18 @@
         >
           <component :is="isDark ? SunIcon : MoonIcon" :size="16" />
         </button>
-        <!-- Язык RU|EN -->
-      <div class="flex items-center gap-1.5" :title="t('app.languageTitle')">
-        <GlobeIcon :size="16" class="text-ink-400" />
-        <div class="flex rounded-md border border-ink-200 p-0.5" role="group" :aria-label="t('app.languageTitle')">
-          <button
-            v-for="lang in ['ru', 'en']"
-            :key="lang"
-            type="button"
-            class="rounded px-2 py-0.5 text-[11px] font-semibold uppercase transition-colors"
-            :class="locale === lang ? 'bg-accent-600 text-white' : 'text-ink-500 hover:text-ink-700'"
-            :aria-pressed="locale === lang"
-            @click="app.setLanguage(lang)"
-          >{{ lang }}</button>
-        </div>
-      </div>
+        <!-- Язык: одна кнопка с глобусом, показывает ЦЕЛЕВОЙ язык -->
+        <button
+          type="button"
+          class="flex items-center gap-1 rounded-md border border-ink-200 px-2 py-0.5 text-[11px] font-semibold uppercase text-ink-500 transition-colors hover:text-ink-700"
+          :title="locale === 'ru' ? t('app.languageToEn') : t('app.languageToRu')"
+          :aria-label="locale === 'ru' ? t('app.languageToEn') : t('app.languageToRu')"
+          :aria-pressed="false"
+          @click="app.setLanguage(locale === 'ru' ? 'en' : 'ru')"
+        >
+          <GlobeIcon :size="14" class="text-ink-400" />
+          {{ locale === 'ru' ? 'EN' : 'RU' }}
+        </button>
       </div>
 
       <!-- Артикул -->

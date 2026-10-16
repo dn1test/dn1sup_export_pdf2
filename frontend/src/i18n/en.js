@@ -13,6 +13,8 @@ export const en = {
   'app.tradeHousehold': 'Household',
   'app.tradeTitle': 'Project type — selected when the articul is created and never changes afterwards',
   'app.languageTitle': 'Interface language',
+  'app.languageToEn': 'Switch to English',
+  'app.languageToRu': 'Switch to Russian',
   'app.checkUpdateTitle': 'Check for updates from GitHub',
   'tabs.project': 'Project',
   'tabs.scenes': 'Pages',
