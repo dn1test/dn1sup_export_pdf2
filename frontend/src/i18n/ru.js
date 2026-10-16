@@ -550,6 +550,7 @@ export const ru = {
   'toast.devWarnings': '⚠ Пропущено файлов: {n} (загруженные DLL обновятся после перезапуска SketchUp) — {list}',
   'toast.updateErrorPrefix': '❌ Ошибка: {msg}',
   'toast.updateFailed': 'Ошибка обновления: {msg}',
+  'toast.githubUnreachable': 'GitHub не отвечает ({msg}). Проверьте позднее.',
   'toast.folderCreated': 'Папка проекта создана: {path} (project.yaml записан)',
   'toast.folderCreatedNoYaml': 'Папка проекта создана: {path}',
   'toast.folderCreatedSuffix': ' — сохраните модель (Ctrl+S), чтобы артикул остался в файле .skp',

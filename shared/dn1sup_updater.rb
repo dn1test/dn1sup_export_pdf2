@@ -31,7 +31,9 @@ require 'time'
 #   { stage: 'done', latest:, current: }                — установлено
 #   { stage: 'current', current: }                      — уже актуально
 #   { stage: 'dismissed' }                              — пользователь отказался
-#   { stage: 'error', message: }                        — сеть/установка упала
+#   { stage: 'error', message:, code: }                 — сеть/установка упала;
+#     code 'github_unreachable' — GitHub не отвечает (проверьте позднее),
+#     code 'dev_copy' — рабочая копия, проверка GitHub отключена
 # При переданном status_cb нативные messagebox для промежуточных/конечных
 # состояний не показываются (диалог сам показывает тосты); вопрос
 # «скачать и установить сейчас?» остаётся нативным ask.
@@ -67,8 +69,15 @@ module Dn1sup
     # v4: только GitHub + status_cb с прогрессом для HtmlDialog.
     UPDATER_VERSION = 4 unless defined?(UPDATER_VERSION) && UPDATER_VERSION.to_i >= 4
 
+    # Причина, по которой рабочая копия не проверяет GitHub (текст для UI):
+    # обновления такой копии идут через reload из рабочей папки.
+    DEV_COPY_REASON = 'Это рабочая копия из папки разработки: обновления ' \
+                      'подтягиваются через reload из рабочей папки, ' \
+                      'а проверка GitHub для неё отключена.' unless defined?(DEV_COPY_REASON)
+
     @checking ||= {}
     @registry_cache ||= {}
+    @last_fetch_error ||= nil
 
     # --- public ------------------------------------------------------------
 
@@ -81,14 +90,28 @@ module Dn1sup
     def check!(cfg)
       id_str = cfg[:id].to_s
       status_cb = status_cb_of(cfg)
-      return nil if @checking[id_str]
-      return nil if dev_source?
+      silent = !!(cfg[:silent] || cfg['silent'])
+      if @checking[id_str]
+        # Повторное нажатие во время проверки: спиннер в диалоге уже крутится,
+        # подтверждаем stage, чтобы UI не завис без ответа.
+        emit_status(status_cb, { stage: 'checking', id: id_str }) if status_cb && !silent
+        return nil
+      end
+      if dev_source?
+        # Рабочая копия разработки: обновления идут через reload из рабочей
+        # папки, а не с GitHub. Молчаливый возврат вешал спиннер кнопки
+        # в диалоге навсегда — отдаём явный завершающий stage.
+        if status_cb && !silent
+          emit_status(status_cb, { stage: 'error', id: id_str, code: 'dev_copy',
+                                              message: DEV_COPY_REASON })
+        end
+        return nil
+      end
 
       @checking[id_str] = true
 
-      force  = !!cfg[:force]
-      silent = !!cfg[:silent]
-      async  = !!cfg[:async] && async_ui?
+      force  = !!(cfg[:force] || cfg['force'])
+      async  = !!(cfg[:async] || cfg['async']) && async_ui?
 
       unless force || throttle_ok?(id_str)
         @checking[id_str] = false
@@ -100,7 +123,8 @@ module Dn1sup
       done = lambda do |fetched|
         result = nil
         begin
-          result = apply_check(cfg, fetched, force: force, silent: silent)
+          result = apply_check(cfg, fetched, force: force, silent: silent,
+                                              fetch_error: last_fetch_error)
         rescue StandardError, ScriptError => e
           log_error(e)
           emit_status(status_cb, { stage: 'error', id: id_str, message: e.message.to_s })
@@ -152,12 +176,23 @@ module Dn1sup
 
     # GET https://api.github.com/repos/{owner}/{repo}/releases/latest
     # Возвращает Hash JSON или {} при любой ошибке (сеть, лимиты и т.п.).
+    # Причина недоступности запоминается в last_fetch_error, чтобы проверка
+    # могла честно сказать «GitHub не отвечает, проверьте позднее» вместо
+    # молчания или ложного «обновлений нет».
     def latest_release(repo)
       require 'net/http'
       require 'json'
+      @last_fetch_error = nil
       uri = URI.parse("#{GITHUB_API}/repos/#{repo}/releases/latest")
       res = http_get(uri)
       unless res.is_a?(Net::HTTPSuccess)
+        code = res.respond_to?(:code) ? res.code.to_i : 0
+        if code == 403 || code == 429
+          @last_fetch_error = { kind: 'rate_limit', code: code,
+                                retry_after: rate_limit_retry_after(res) }
+        else
+          @last_fetch_error = { kind: 'http', code: code }
+        end
         log_debug("latest_release(#{repo}): HTTP #{res.respond_to?(:code) ? res.code : '?'}")
         return {}
       end
@@ -165,8 +200,51 @@ module Dn1sup
       log_debug("latest_release(#{repo}): OK #{json['tag_name'].to_s}")
       json
     rescue StandardError, ScriptError => e
+      @last_fetch_error = { kind: 'network' }
       log_error(e)
       {}
+    end
+
+    # Причина последней недоступности GitHub API
+    # ({ kind: 'rate_limit'/'network'/'http', code:, retry_after: } в минутах)
+    # или nil, если последний запрос релиза прошёл успешно.
+    def last_fetch_error
+      err = @last_fetch_error
+      err.is_a?(Hash) ? err : nil
+    end
+
+    # Минут до сброса лимита GitHub API по заголовку x-ratelimit-reset.
+    # nil, если заголовка нет или срок уже прошёл.
+    def rate_limit_retry_after(res)
+      reset = res.respond_to?(:[]) ? res['x-ratelimit-reset'].to_s : ''
+      return nil unless reset =~ /\A\d+\z/
+
+      secs = reset.to_i - Time.now.to_i
+      return nil unless secs > 0
+
+      (secs / 60) + 1
+    rescue StandardError
+      nil
+    end
+
+    # Короткая причина недоступности GitHub (без «проверьте позднее» —
+    # этот призыв добавляет вызывающая сторона на своём языке).
+    def github_unreachable_reason(err = nil)
+      err = last_fetch_error if err.nil?
+      err = {} unless err.is_a?(Hash)
+      case err[:kind].to_s
+      when 'rate_limit'
+        mins = err[:retry_after].to_i
+        base = 'превышен лимит запросов к GitHub API'
+        mins > 0 ? "#{base} (повторите примерно через #{mins} мин.)" : base
+      when 'network'
+        'нет соединения с GitHub'
+      when 'http'
+        code = err[:code].to_i
+        code > 0 ? "GitHub вернул ошибку HTTP #{code}" : 'GitHub вернул ошибку'
+      else
+        'релиз на GitHub недоступен'
+      end
     end
 
     # GET https://api.github.com/repos/{owner}/{repo}/releases?per_page=N
@@ -1117,15 +1195,20 @@ module Dn1sup
     # UI-часть проверки (главный поток). Возвращает summary или nil.
     # При cfg[:status_cb] конечные состояния («актуально» / «сеть упала»)
     # отдаются в диалог этапами current/error без нативных messagebox.
-    def apply_check(cfg, fetched, force: false, silent: false)
+    # Недоступность GitHub — всегда явный error «не отвечает, проверьте
+    # позднее», никогда молчание и никогда ложное «обновлений нет».
+    def apply_check(cfg, fetched, force: false, silent: false, fetch_error: nil)
       id_str = cfg[:id].to_s
       status_cb = status_cb_of(cfg)
       unless fetched
+        reason = github_unreachable_reason(fetch_error)
         if force && !silent && status_cb.nil?
-          inform("#{id_str}: не удалось проверить релизы на GitHub.\n" \
-                 'Проверьте соединение с интернетом или настройки репозитория.')
+          inform("#{id_str}: GitHub не отвечает (#{reason}). Проверьте позднее.")
         end
-        emit_status(status_cb, { stage: 'error', id: id_str, message: 'не удалось проверить релизы на GitHub' }) if force && !silent
+        if force && !silent && status_cb
+          emit_status(status_cb, { stage: 'error', id: id_str, code: 'github_unreachable',
+                                                message: reason })
+        end
         return nil
       end
       mark_checked(id_str)

@@ -549,6 +549,7 @@ export const en = {
   'toast.devWarnings': '⚠ Files skipped: {n} (loaded DLLs update after SketchUp restart) — {list}',
   'toast.updateErrorPrefix': '❌ Error: {msg}',
   'toast.updateFailed': 'Update error: {msg}',
+  'toast.githubUnreachable': 'GitHub is unreachable ({msg}). Please check later.',
   'toast.folderCreated': 'Project folder created: {path} (project.yaml written)',
   'toast.folderCreatedNoYaml': 'Project folder created: {path}',
   'toast.folderCreatedSuffix': ' — save the model (Ctrl+S) so the articul stays in the .skp file',

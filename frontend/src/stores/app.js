@@ -355,8 +355,15 @@ export const useAppStore = defineStore('app', {
           break
         case 'error': {
           const msg = String(payload.message || '')
+          const code = String(payload.code || '')
           this.updateStatus = { checking: false, stage, percent: 0, message: '' }
-          showToast(msg ? t('toast.updateFailed', { msg }) : t('toast.unknownError'), 'error')
+          if (code === 'github_unreachable') {
+            showToast(t('toast.githubUnreachable', { msg }), 'error')
+          } else if (code === 'dev_copy') {
+            showToast(msg || t('toast.unknownError'), 'error')
+          } else {
+            showToast(msg ? t('toast.updateFailed', { msg }) : t('toast.unknownError'), 'error')
+          }
           break
         }
         default:
