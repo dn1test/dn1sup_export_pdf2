@@ -40,14 +40,33 @@
     <!-- Правый столбец: язык в верхнем углу, под ним артикул -->
     <div class="flex shrink-0 flex-col items-end gap-1.5">
       <div class="flex items-center gap-1">
-        <!-- Проверить обновление: сначала локальная папка, потом GitHub -->
+        <!-- Проверить обновление — только с GitHub, процесс виден спиннером и тостами -->
+        <button
+          type="button"
+          class="rounded-full p-1.5 text-ink-400 transition-colors hover:bg-ink-50 hover:text-accent-600 disabled:opacity-50"
+          :title="updateBtnTitle"
+          :disabled="app.updateStatus.checking"
+          @click="app.checkUpdateFull()"
+        >
+          <RefreshIcon :size="14" :class="{ 'animate-spin': app.updateStatus.checking }" />
+        </button>
+        <!-- Справка: как пользоваться расширением -->
         <button
           type="button"
           class="rounded-full p-1.5 text-ink-400 transition-colors hover:bg-ink-50 hover:text-accent-600"
-          :title="t('app.checkUpdateTitle')"
-          @click="app.checkUpdateFull()"
+          :title="t('app.helpTitle')"
+          @click="$emit('open-help')"
         >
-          <RefreshIcon :size="14" />
+          <HelpIcon :size="14" />
+        </button>
+        <!-- Светлая / тёмная тема -->
+        <button
+          type="button"
+          class="rounded-full p-1.5 text-ink-400 transition-colors hover:bg-ink-50 hover:text-accent-600"
+          :title="isDark ? t('theme.toLight') : t('theme.toDark')"
+          @click="toggleTheme()"
+        >
+          <component :is="isDark ? SunIcon : MoonIcon" :size="14" />
         </button>
         <!-- Язык RU|EN -->
       <div class="flex items-center gap-1.5" :title="t('app.languageTitle')">
@@ -85,17 +104,36 @@
 </template>
 
 <script setup>
-import { FileText, Globe, Hash, RefreshCw, User, Users } from '@lucide/vue'
+import { FileText, Globe, Hash, HelpCircle, Moon, RefreshCw, Sun, User, Users } from '@lucide/vue'
+import { computed } from 'vue'
 import { t, locale } from '../../i18n/index.js'
 import { useAppStore } from '../../stores/app.js'
 import { useProjectStore } from '../../stores/project.js'
+import { useTheme } from '../../composables/useTheme.js'
+
+defineEmits(['open-help'])
 
 const app = useAppStore()
 const project = useProjectStore()
+const { isDark, toggleTheme } = useTheme()
+// Тултип кнопки обновления: во время проверки показывает живой этап/процент
+const updateBtnTitle = computed(() => {
+  const st = app.updateStatus
+  if (st && st.checking) {
+    if (st.stage === 'downloading') return t('toast.updateDownloading', { pct: st.percent })
+    if (st.stage === 'installing') return t('toast.updateInstalling')
+    if (st.stage === 'found') return t('toast.updateFound', { cur: app.pluginVersion || '…', dev: '' })
+    return t('toast.checkingUpdate')
+  }
+  return t('app.checkUpdateTitle')
+})
 const FileTextIcon = FileText
 const GlobeIcon = Globe
 const HashIcon = Hash
 const UsersIcon = Users
 const UserIcon = User
 const RefreshIcon = RefreshCw
+const HelpIcon = HelpCircle
+const SunIcon = Sun
+const MoonIcon = Moon
 </script>

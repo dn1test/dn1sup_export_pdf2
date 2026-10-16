@@ -129,6 +129,10 @@ export function registerRubyApi() {
       useAppStore().onExportError(errorMsg)
     },
 
+    onUpdateStatus(payload) {
+      useAppStore().onUpdateStatus(payload)
+    },
+
     onTemplateSetsUpdated(payload) {
       useTemplatesStore().onTemplateSetsUpdated(payload)
     },

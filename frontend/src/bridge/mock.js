@@ -261,6 +261,22 @@ export function mockRubyCall(action, param) {
     case 'toggleAspectOverlay':
       delay(() => app().syncOverlayState && app().syncOverlayState(true))
       break
+    case 'check_update': {
+      // Обновление только с GitHub: checking → downloading (%) → done
+      delay(() => app().onUpdateStatus && app().onUpdateStatus({ stage: 'checking' }), 100)
+      let pct = 0
+      const timer = setInterval(() => {
+        pct += 25
+        if (pct >= 100) {
+          clearInterval(timer)
+          app().onUpdateStatus && app().onUpdateStatus({ stage: 'installing' })
+          delay(() => app().onUpdateStatus && app().onUpdateStatus({ stage: 'done', latest: '9.9.9', current: '2.9.0-dev' }), 600)
+        } else {
+          app().onUpdateStatus && app().onUpdateStatus({ stage: 'downloading', percent: pct })
+        }
+      }, 300)
+      break
+    }
     case 'startExport': {
       // Имитация прогресса экспорта
       let pct = 0

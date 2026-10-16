@@ -1,6 +1,6 @@
 <template>
   <div class="flex h-screen flex-col overflow-hidden bg-ink-100">
-    <AppHeader />
+    <AppHeader @open-help="helpOpen = true" />
 
     <!-- Навигация по вкладкам: рабочие вкладки слева, «Настройки» и «Отправка» — группа справа -->
     <nav class="flex shrink-0 items-stretch gap-0.5 overflow-x-auto overflow-y-hidden border-b border-ink-200 bg-white px-2">
@@ -72,11 +72,12 @@
     <SuccessModal />
     <ParamModal />
     <TemplateModals />
+    <HelpModal :open="helpOpen" @close="helpOpen = false" />
   </div>
 </template>
 
 <script setup>
-import { onMounted, onBeforeUnmount } from 'vue'
+import { onMounted, onBeforeUnmount, ref } from 'vue'
 import {
   ClipboardList, Layers, LayoutTemplate, Folder, History as HistoryIcon,
   BarChart3, Settings as SettingsIcon, Send as SendIcon,
@@ -92,6 +93,7 @@ import ArticulPromptModal from './components/modals/ArticulPromptModal.vue'
 import SuccessModal from './components/modals/SuccessModal.vue'
 import ParamModal from './components/modals/ParamModal.vue'
 import TemplateModals from './components/modals/TemplateModals.vue'
+import HelpModal from './components/help/HelpModal.vue'
 import ProjectTab from './components/tabs/ProjectTab.vue'
 import ScenesTab from './components/tabs/ScenesTab.vue'
 import TemplatesTab from './components/tabs/TemplatesTab.vue'
@@ -106,6 +108,9 @@ import { useScenesStore } from './stores/scenes.js'
 
 const app = useAppStore()
 const scenes = useScenesStore()
+
+// Справка «Как пользоваться» — кнопка «?» в шапке
+const helpOpen = ref(false)
 
 const tabs = [
   { id: 'tab-project', label: 'tabs.project', icon: ClipboardList },

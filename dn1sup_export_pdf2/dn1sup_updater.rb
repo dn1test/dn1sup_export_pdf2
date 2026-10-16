@@ -18,6 +18,24 @@ require 'time'
 #   Dn1sup::Updater.check!(MANIFEST.merge(force: true))             # по кнопке «Проверить обновления»
 #   Dn1sup::Updater.check!(MANIFEST.merge(silent: true))            # без UI (сервисные вызовы, тесты)
 #
+# Проверка всегда идёт только с GitHub (GitHub Releases + registry.json).
+# Локальная папка разработки (check_local_first! и др.) оставлена для
+# dev-сценариев и здесь не используется.
+#
+# Прогресс для HtmlDialog: передайте в cfg proc status_cb — апдейтер зовёт
+# его на главном потоке на каждом этапе:
+#   { stage: 'checking' }                              — запрос к GitHub ушёл
+#   { stage: 'found', latest:, current: }               — есть что ставить
+#   { stage: 'downloading', percent:, received:, total: } — скачивание .rbz
+#   { stage: 'installing' }                             — установка архива
+#   { stage: 'done', latest:, current: }                — установлено
+#   { stage: 'current', current: }                      — уже актуально
+#   { stage: 'dismissed' }                              — пользователь отказался
+#   { stage: 'error', message: }                        — сеть/установка упала
+# При переданном status_cb нативные messagebox для промежуточных/конечных
+# состояний не показываются (диалог сам показывает тосты); вопрос
+# «скачать и установить сейчас?» остаётся нативным ask.
+#
 # MANIFEST = { id: 'my_extension', repo: 'owner/repo', version: '1.2.3', asset: 'my_extension.rbz' }
 #
 # Актуальная версия расширения берётся из registry.json репозитория (поле version
@@ -46,19 +64,23 @@ module Dn1sup
     # Методы при этом обратно совместимы (позиционный Hash опций + kwargs),
     # чтобы старые и новые копии не роняли друг друга с
     # "wrong number of arguments (given 4, expected 3)".
-    UPDATER_VERSION = 3 unless defined?(UPDATER_VERSION) && UPDATER_VERSION.to_i >= 3
+    # v4: только GitHub + status_cb с прогрессом для HtmlDialog.
+    UPDATER_VERSION = 4 unless defined?(UPDATER_VERSION) && UPDATER_VERSION.to_i >= 4
 
     @checking ||= {}
     @registry_cache ||= {}
 
     # --- public ------------------------------------------------------------
 
-    # Проверяет обновление. Никогда не бросает исключений наружу.
+    # Проверяет обновление только с GitHub. Никогда не бросает исключений наружу.
     # Синхронно возвращает Hash-сводку, если есть более свежая версия, иначе nil.
     # При async: true внутри живого SketchUp сеть уходит в фоновый поток,
     # UI показывается по готовности на главном потоке — метод сразу возвращает nil.
+    # cfg[:status_cb] (proc) — этапы проверки/установки для HtmlDialog
+    # (см. шапку файла); вызывается всегда на главном потоке.
     def check!(cfg)
       id_str = cfg[:id].to_s
+      status_cb = status_cb_of(cfg)
       return nil if @checking[id_str]
       return nil if dev_source?
 
@@ -73,6 +95,7 @@ module Dn1sup
         return nil
       end
 
+      emit_status(status_cb, { stage: 'checking', id: id_str })
       work = -> { fetch_latest(cfg) }
       done = lambda do |fetched|
         result = nil
@@ -80,6 +103,7 @@ module Dn1sup
           result = apply_check(cfg, fetched, force: force, silent: silent)
         rescue StandardError, ScriptError => e
           log_error(e)
+          emit_status(status_cb, { stage: 'error', id: id_str, message: e.message.to_s })
         ensure
           @checking[id_str] = false
         end
@@ -103,6 +127,27 @@ module Dn1sup
       !dir.include?('Plugins')
     rescue StandardError
       false
+    end
+
+    # Proc прогресса из cfg (:status_cb / 'status_cb', фолбэк :on_status).
+    # nil — обычный режим с нативными messagebox.
+    def status_cb_of(cfg)
+      return nil unless cfg.is_a?(Hash)
+
+      cb = cfg[:status_cb] || cfg['status_cb'] || cfg[:on_status] || cfg['on_status']
+      cb.respond_to?(:call) ? cb : nil
+    end
+
+    # Безопасный вызов прогресса: никогда не бросает исключений наружу.
+    def emit_status(cb, payload)
+      return unless cb.respond_to?(:call)
+      return unless payload.is_a?(Hash)
+
+      begin
+        cb.call(payload)
+      rescue StandardError, ScriptError => e
+        log_error(e)
+      end
     end
 
     # GET https://api.github.com/repos/{owner}/{repo}/releases/latest
@@ -258,14 +303,87 @@ module Dn1sup
     end
 
     # Скачивает файл во временную папку и возвращает путь (nil при ошибке).
-    def download_to_temp(url)
+    # progress — опциональный lambda (received_bytes, total_bytes) для
+    # отображения процесса (при нём качает потоково с Content-Length).
+    def download_to_temp(url, progress = nil)
       filename = File.basename(URI.parse(url).path.to_s)
       filename = 'download.rbz' if filename.to_s.empty?
       path = File.join(temp_dir, filename)
-      download(url, path)
+      if progress.respond_to?(:call)
+        download_with_progress(url, path, progress)
+      else
+        download(url, path)
+      end
     rescue StandardError, ScriptError => e
       log_error(e)
       nil
+    end
+
+    # Потоковое скачивание с прогрессом: progress.call(received, total)
+    # на каждом чанке. Редиректы (GitHub-архивы) проходит сам.
+    # Возвращает путь или nil.
+    def download_with_progress(url, dest_path, progress = nil)
+      require 'net/http'
+      require 'uri'
+      uri = URI.parse(url.to_s)
+      redirects_left = 5
+      loop do
+        outcome = nil
+        http = Net::HTTP.new(uri.host, uri.port)
+        http.use_ssl      = (uri.scheme == 'https')
+        http.open_timeout = 4
+        http.read_timeout = 60
+        req = Net::HTTP::Get.new(uri.request_uri, HEADERS)
+        http.request(req) do |res|
+          case res
+          when Net::HTTPRedirection
+            location = res['location'].to_s
+            if location.empty? || redirects_left <= 0
+              log_error(RuntimeError.new("HTTP-редирект без location при скачивании #{url}"))
+              outcome = :fail
+            else
+              redirects_left -= 1
+              uri = URI.join(uri.to_s, location)
+              outcome = :redirect
+            end
+          when Net::HTTPSuccess
+            total = res['content-length'].to_i
+            received = 0
+            begin
+              File.open(dest_path, 'wb') do |f|
+                res.read_body do |chunk|
+                  f.write(chunk)
+                  received += chunk.bytesize
+                  begin
+                    progress.call(received, total) if progress.respond_to?(:call)
+                  rescue StandardError, ScriptError
+                    nil
+                  end
+                end
+              end
+              outcome = (File.file?(dest_path) && File.size(dest_path) > 200) ? :ok : :fail
+            rescue StandardError, ScriptError => e
+              log_error(e)
+              outcome = :fail
+            end
+          else
+            code = res.respond_to?(:code) ? res.code : 'unknown'
+            log_error(RuntimeError.new("HTTP #{code} при скачивании #{url}"))
+            outcome = :fail
+          end
+        end
+        case outcome
+        when :ok
+          return dest_path
+        when :redirect
+          next
+        else
+          return nil
+        end
+      rescue StandardError, ScriptError => e
+        log_error(e)
+        return nil
+      end
     end
 
     # Загружает текст по URL (для JSON-реестров и т.п.). nil при ошибке.
@@ -402,11 +520,16 @@ module Dn1sup
     # релизы без бампа версии.
     # opts — позиционный Hash опций ({ id: ... }): совместимость со старыми
     # вызывающими и упаковкой kwargs на Ruby 2.7. Приоритет — у явного kwargs.
-    def install_from_url(url, what = 'расширение', silent = false, opts = nil, id: nil)
-      if id.nil? && opts.is_a?(Hash)
-        id = opts[:id] if opts.key?(:id)
-        id = opts['id'] if id.nil? && opts.key?('id')
+    # status_cb (там же или kwarg) — этапы для HtmlDialog: downloading
+    # (percent), installing, done/error. При нём конечные нативные messagebox
+    # не показываются — итог рисует диалог.
+    def install_from_url(url, what = 'расширение', silent = false, opts = nil, id: nil, progress: nil, status_cb: nil)
+      if opts.is_a?(Hash)
+        id ||= opts[:id] || opts['id'] if opts.key?(:id) || opts.key?('id')
+        progress ||= opts[:progress] || opts['progress']
+        status_cb ||= opts[:status_cb] || opts['status_cb'] || opts[:on_status] || opts['on_status']
       end
+      status_cb = nil unless status_cb.respond_to?(:call)
       url = url.to_s
       if url.empty?
         log_debug("install_from_url(#{what}): пустой URL — отмена")
@@ -415,21 +538,41 @@ module Dn1sup
       unless defined?(Sketchup) && Sketchup.respond_to?(:install_from_archive)
         log_debug("install_from_url(#{what}): install_from_archive недоступен")
         inform("#{what}: Sketchup.install_from_archive недоступен в этой версии SketchUp.") unless silent
+        emit_status(status_cb, { stage: 'error', id: id, message: 'install_from_archive недоступен' })
         return false
       end
       log_debug("install_from_url(#{what}): скачивание #{url}")
-      path = download_to_temp(url)
+      emit_status(status_cb, { stage: 'downloading', id: id, percent: 0 })
+      chunk_cb = nil
+      if status_cb
+        last_pct = -1
+        chunk_cb = lambda do |received, total|
+          pct = total.to_i > 0 ? (received.to_f / total * 100).round : 0
+          pct = 0 if pct < 0
+          pct = 100 if pct > 100
+          if pct >= last_pct + 5 || pct >= 100
+            last_pct = pct
+            emit_status(status_cb, { stage: 'downloading', id: id, percent: pct, received: received, total: total })
+          end
+        end
+      elsif progress.respond_to?(:call)
+        chunk_cb = progress
+      end
+      path = chunk_cb ? download_with_progress(url, File.join(temp_dir, File.basename(URI.parse(url).path.to_s).then { |n| n.empty? ? 'download.rbz' : n }), chunk_cb) : download_to_temp(url)
       unless path
         log_debug("install_from_url(#{what}): скачивание не удалось")
         inform("#{what}: не удалось скачать обновление.\n" \
-               'Проверьте соединение или скачайте .rbz вручную со страницы релиза.') unless silent
+               'Проверьте соединение или скачайте .rbz вручную со страницы релиза.') unless silent || status_cb
+        emit_status(status_cb, { stage: 'error', id: id, message: 'не удалось скачать обновление' })
         return false
       end
       unless rbz?(path)
         log_debug("install_from_url(#{what}): файл #{File.basename(path)} не похож на .rbz")
-        inform("#{what}: скачанный файл не похож на .rbz — вероятно, ошибка сети. Попробуйте позже.") unless silent
+        inform("#{what}: скачанный файл не похож на .rbz — вероятно, ошибка сети. Попробуйте позже.") unless silent || status_cb
+        emit_status(status_cb, { stage: 'error', id: id, message: 'скачанный файл не похож на .rbz' })
         return false
       end
+      emit_status(status_cb, { stage: 'installing', id: id, percent: 100 })
       ok = begin
         # false = без собственного диалога SketchUp: итог покажет вызывающая сторона
         Sketchup.install_from_archive(path, false)
@@ -441,9 +584,11 @@ module Dn1sup
       if ok
         mark_installed(id) if id
         inform("#{what}: обновление установлено.\n\n" \
-               'Перезапустите SketchUp, чтобы новый код загрузился.') unless silent
+               'Перезапустите SketchUp, чтобы новый код загрузился.') unless silent || status_cb
+        emit_status(status_cb, { stage: 'done', id: id })
       else
-        inform("#{what}: SketchUp не удалось установить архив. Скачайте .rbz вручную с GitHub.") unless silent
+        inform("#{what}: SketchUp не удалось установить архив. Скачайте .rbz вручную с GitHub.") unless silent || status_cb
+        emit_status(status_cb, { stage: 'error', id: id, message: 'SketchUp не удалось установить архив' })
       end
       ok
     ensure
@@ -970,11 +1115,17 @@ module Dn1sup
     end
 
     # UI-часть проверки (главный поток). Возвращает summary или nil.
+    # При cfg[:status_cb] конечные состояния («актуально» / «сеть упала»)
+    # отдаются в диалог этапами current/error без нативных messagebox.
     def apply_check(cfg, fetched, force: false, silent: false)
       id_str = cfg[:id].to_s
+      status_cb = status_cb_of(cfg)
       unless fetched
-        inform("#{id_str}: не удалось проверить релизы на GitHub.\n" \
-               'Проверьте соединение с интернетом или настройки репозитория.') if force && !silent
+        if force && !silent && status_cb.nil?
+          inform("#{id_str}: не удалось проверить релизы на GitHub.\n" \
+                 'Проверьте соединение с интернетом или настройки репозитория.')
+        end
+        emit_status(status_cb, { stage: 'error', id: id_str, message: 'не удалось проверить релизы на GitHub' }) if force && !silent
         return nil
       end
       mark_checked(id_str)
@@ -987,7 +1138,10 @@ module Dn1sup
         # изданный позже установленной сборки (переизпуск без бампа версии,
         # смена схемы нумерации), тоже считается обновлением.
         unless release_newer_than_install?(cfg, fetched)
-          inform("#{id_str}: у вас уже установлена актуальная версия (#{cfg[:version]}).") if force && !silent
+          if force && !silent && status_cb.nil?
+            inform("#{id_str}: у вас уже установлена актуальная версия (#{cfg[:version]}).")
+          end
+          emit_status(status_cb, { stage: 'current', id: id_str, current: cfg[:version].to_s }) if force && !silent
           return nil
         end
         same_version = true
@@ -1003,7 +1157,9 @@ module Dn1sup
         asset_url: asset_url(release, cfg[:asset].to_s)
       }
       summary[:same_version] = true if same_version
-      offer_install(summary, background: !force) unless silent
+      summary[:source] = 'github'
+      emit_status(status_cb, { stage: 'found', id: id_str, latest: summary[:latest], current: summary[:current] })
+      offer_install(summary, background: !force, status_cb: status_cb) unless silent
       summary
     end
 
@@ -1126,10 +1282,11 @@ module Dn1sup
 
     # Фоновая (незапрошенная) проверка — ненавязчивое уведомление вместо модалки;
     # YES/NO-диалог остаётся для проверки по явному запросу (force).
-    def offer_install(summary, background: false)
+    # status_cb — этапы для HtmlDialog (прокидывается в offer_dialog).
+    def offer_install(summary, background: false, status_cb: nil)
       return nil if background && notify_background(summary)
 
-      offer_dialog(summary)
+      offer_dialog(summary, status_cb: status_cb)
     end
 
     # Уведомление в системном центре (SU2017+). false, если недоступно.
@@ -1161,18 +1318,28 @@ module Dn1sup
     end
 
     # Диалог установки (YES/NO) — по явному запросу пользователя.
-    def offer_dialog(summary)
+    # При status_cb отказ пользователя отдаётся этапом dismissed, а процесс
+    # скачивания/установки — этапами downloading/installing/done/error.
+    def offer_dialog(summary, status_cb: nil)
+      status_cb = nil unless status_cb.respond_to?(:call)
       if summary[:asset_url].to_s.empty?
-        return unless ask("#{summary[:id]}: #{update_headline(summary)}" \
+        unless ask("#{summary[:id]}: #{update_headline(summary)}" \
                           'Открыть страницу релизов?')
+          emit_status(status_cb, { stage: 'dismissed', id: summary[:id] })
+          return
+        end
         open_url(summary[:page_url])
+        emit_status(status_cb, { stage: 'dismissed', id: summary[:id] })
         return
       end
       msg = "#{summary[:id]}: #{update_headline(summary)}" \
             "\n#{short_notes(summary[:notes])}\n" \
             "\nСкачать и установить обновление сейчас?"
-      return unless ask(msg)
-      install_from_url(summary[:asset_url], summary[:id], false, id: summary[:id])
+      unless ask(msg)
+        emit_status(status_cb, { stage: 'dismissed', id: summary[:id] })
+        return
+      end
+      install_from_url(summary[:asset_url], summary[:id], false, id: summary[:id], status_cb: status_cb)
     end
 
     # .rbz — это zip: начинается с "PK".

@@ -110,16 +110,15 @@ module DN1Code
       end
     end
 
-    # Папка разработки задана в самом расширении (корень репозитория):
-    # проверка обновления сначала смотрит её, потом GitHub.
+    # Обновление — только с GitHub (GitHub Releases + registry.json):
+    # манифест без локальных путей, локальная dev-папка не используется.
     UPDATE_ID       = "dn1sup_export_pdf2".freeze
     UPDATE_REPO     = "dn1test/dn1sup_export_pdf2".freeze
     UPDATE_ASSET    = "#{UPDATE_ID}.rbz".freeze
     UPDATE_PAGE     = "https://github.com/#{UPDATE_REPO}/releases".freeze
-    UPDATE_DEV_DIR  = File.expand_path("../..", __dir__).freeze
     UPDATE_MANIFEST = {
       id: UPDATE_ID, repo: UPDATE_REPO, version: PLUGIN_VERSION,
-      asset: UPDATE_ASSET, dev_dir: UPDATE_DEV_DIR
+      asset: UPDATE_ASSET
     }.freeze
 
     # Выгрузка неймспейса при переключении канала dev/prod (dn1sup_ext_manager,
@@ -183,7 +182,7 @@ module DN1Code
       submenu.add_separator if submenu.respond_to?(:add_separator)
       submenu.add_item("Проверить обновления сейчас") do
         if defined?(Dn1sup::Updater)
-          Dn1sup::Updater.check_local_first!(UPDATE_MANIFEST.merge(force: true, async: true))
+          Dn1sup::Updater.check!(UPDATE_MANIFEST.merge(force: true, async: true))
         else
           UI.openURL(UPDATE_PAGE)
         end
@@ -229,13 +228,13 @@ module DN1Code
       toolbar.add_item(cmd_overlay)
 
       toolbar.restore
-      # Фоновая проверка обновлений один раз за сессию: сначала локальная
-      # папка, потом GitHub (ненавязчивое уведомление, без модалок).
+      # Фоновая проверка обновлений один раз за сессию — только GitHub
+      # (ненавязчивое уведомление, без модалок).
       unless $dn1sup_export_pdf2_update_check_scheduled
         $dn1sup_export_pdf2_update_check_scheduled = true
         if defined?(Dn1sup::Updater) && UI.respond_to?(:start_timer)
           UI.start_timer(15, false) do
-            Dn1sup::Updater.check_local_first!(UPDATE_MANIFEST.merge(async: true))
+            Dn1sup::Updater.check!(UPDATE_MANIFEST.merge(async: true))
           end
         end
       end

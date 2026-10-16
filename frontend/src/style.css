@@ -1,5 +1,10 @@
 @import 'tailwindcss';
 
+/* Тёмная тема переключается классом .dark на <html> (композабл useTheme),
+   Tailwind v4: регистрируем class-вариант, иначе dark: смотрит на
+   prefers-color-scheme и кнопка темы не работала бы. */
+@custom-variant dark (&:where(.dark, .dark *));
+
 /* Узкий шрифт интерфейса — переменный TTF бандлится Vite'ом из src/assets */
 @font-face {
   font-family: 'Roboto Condensed';
@@ -51,6 +56,68 @@
 /* Шрифт печатного документа (превью параметров в редакторе шаблона) */
 :root {
   --page-font-family: 'Sofia Sans Condensed', sans-serif;
+  color-scheme: light;
+}
+
+/* ---------------------------------------------------------------------------
+   Тёмная тема: ремаппинг дизайн-токенов под .dark.
+   Весь UI построен на токенах ink/accent плюс bg-white, поэтому инверсия
+   переменных перекрашивает весь диалог без правок в десятках Vue-файлов.
+   Светлые поверхности становятся тёмными, тёмный текст — светлым,
+   бордеры — приглушёнными.
+--------------------------------------------------------------------------- */
+.dark {
+  color-scheme: dark;
+
+  --color-accent-50: #172554;
+  --color-accent-100: #1e3a8a;
+  --color-accent-200: #1e40af;
+  --color-accent-300: #1d4ed8;
+  --color-accent-400: #60a5fa;
+  --color-accent-500: #60a5fa;
+  --color-accent-600: #93c5fd;
+  --color-accent-700: #bfdbfe;
+
+  --color-ink-900: #f1f5f9;
+  --color-ink-700: #cbd5e1;
+  --color-ink-500: #94a3b8;
+  --color-ink-400: #64748b;
+  --color-ink-300: #475569;
+  --color-ink-200: #334155;
+  --color-ink-100: #1e293b;
+  --color-ink-50: #0f172a;
+
+  --color-white: #0f172a;
+
+  --shadow-pop: 0 8px 24px rgb(0 0 0 / 0.5), 0 2px 6px rgb(0 0 0 / 0.4);
+  --shadow-card: 0 1px 2px rgb(0 0 0 / 0.4);
+}
+
+/* text-white используется только на цветных кнопках/бейджах (accent, red,
+   emerald) — там белый текст нужен и в тёмной теме, возвращаем настоящий. */
+.dark .text-white {
+  color: #fff;
+}
+
+/* Мягкие red/emerald-бейджи (артикул, статусы, иконка danger-модалки):
+   светлые подложки в тёмной теме слепят — приглушаем, текст светлее. */
+.dark .bg-red-50 {
+  background-color: rgb(127 29 29 / 0.4);
+}
+.dark .text-red-600 {
+  color: #fca5a5;
+}
+.dark .bg-emerald-50 {
+  background-color: rgb(6 78 59 / 0.4);
+}
+.dark .text-emerald-600,
+.dark .text-emerald-700 {
+  color: #6ee7b7;
+}
+
+.dark body {
+  color: var(--color-ink-900);
+  background: var(--color-ink-50);
 }
 
 html,

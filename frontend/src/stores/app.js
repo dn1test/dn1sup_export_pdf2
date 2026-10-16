@@ -1,5 +1,5 @@
 // App-стор: активная вкладка, прогресс экспорта, глобальные модалки
-// (ревизия/артикул/успех), экспортный флоу, обновление плагина из dev-папки.
+// (ревизия/артикул/успех), экспортный флоу, обновление плагина с GitHub.
 
 import { defineStore } from 'pinia'
 import { callRuby } from '../bridge/sketchup.js'
@@ -44,6 +44,8 @@ export const useAppStore = defineStore('app', {
     successModal: { visible: false, pdfPath: '' },
     lastExportedPdf: '',
     lastExportSendsToast: '',
+    // Обновление плагина с GitHub: процесс виден в шапке (спиннер) и тостах.
+    updateStatus: { checking: false, stage: '', percent: 0, message: '' },
   }),
 
   getters: {
@@ -308,10 +310,58 @@ export const useAppStore = defineStore('app', {
       callRuby('startSend', JSON.stringify(collectFormData()))
     },
 
-    // --- Обновление плагина: сначала локальная папка, потом GitHub ---
-    // (кнопка «круг со стрелками» в шапке; папки нет — только GitHub)
+    // --- Обновление плагина только с GitHub ---
+    // (кнопка «круг со стрелками» в шапке; этапы приходят из Ruby через
+    // window.app.onUpdateStatus: checking → found → downloading →
+    // installing → done | current | dismissed | error)
     checkUpdateFull() {
+      if (this.updateStatus.checking) return
+      this.updateStatus = { checking: true, stage: 'checking', percent: 0, message: '' }
+      showToast(t('toast.checkingUpdate'), 'info')
       callRuby('check_update')
+    },
+    onUpdateStatus(payload) {
+      const stage = String(payload && payload.stage ? payload.stage : '')
+      if (!stage) return
+      const cur = payload.current !== undefined && payload.current !== null ? String(payload.current) : ''
+      const latest = payload.latest !== undefined && payload.latest !== null ? String(payload.latest) : ''
+      switch (stage) {
+        case 'checking':
+          this.updateStatus = { checking: true, stage, percent: 0, message: '' }
+          break
+        case 'found':
+          this.updateStatus = { checking: true, stage, percent: 0, message: '' }
+          showToast(t('toast.updateFound', { cur, dev: latest }), 'info')
+          break
+        case 'downloading': {
+          const pct = Math.max(0, Math.min(100, parseInt(payload.percent, 10) || 0))
+          this.updateStatus = { checking: true, stage, percent: pct, message: '' }
+          break
+        }
+        case 'installing':
+          this.updateStatus = { checking: true, stage, percent: 100, message: '' }
+          showToast(t('toast.updating'), 'info')
+          break
+        case 'done':
+          this.updateStatus = { checking: false, stage, percent: 100, message: '' }
+          showToast(t('toast.updateInstalled', { ver: latest || cur }), 'success')
+          break
+        case 'current':
+          this.updateStatus = { checking: false, stage, percent: 0, message: '' }
+          showToast(t('toast.noUpdates', { cur }), 'success')
+          break
+        case 'dismissed':
+          this.updateStatus = { checking: false, stage, percent: 0, message: '' }
+          break
+        case 'error': {
+          const msg = String(payload.message || '')
+          this.updateStatus = { checking: false, stage, percent: 0, message: '' }
+          showToast(msg ? t('toast.updateFailed', { msg }) : t('toast.unknownError'), 'error')
+          break
+        }
+        default:
+          break
+      }
     },
   },
 })

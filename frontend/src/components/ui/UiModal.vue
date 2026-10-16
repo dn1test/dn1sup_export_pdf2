@@ -57,7 +57,7 @@ const props = defineProps({
   subtitle: { type: String, default: '' },
   icon: { type: [Object, Function], default: null },
   danger: { type: Boolean, default: false },
-  width: { type: String, default: 'sm' }, // xs|sm|md
+  width: { type: String, default: 'sm' }, // xs|sm|md|lg
 })
 const emit = defineEmits(['close'])
 
@@ -65,6 +65,7 @@ const widthCls = computed(() => ({
   xs: 'max-w-sm',
   sm: 'max-w-md',
   md: 'max-w-lg',
+  lg: 'max-w-2xl',
 }[props.width] || 'max-w-md'))
 
 const cardEl = ref(null)

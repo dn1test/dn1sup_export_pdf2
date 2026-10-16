@@ -117,6 +117,22 @@ module DN1Code
           )
         end
 
+        # Пуш этапа обновления в диалог: { stage:, percent:, latest:,
+        # current:, message: }. Ключи строковые — фронт читает payload.stage.
+        # Вызывается с главного потока SketchUp (колбэки апдейтера).
+        def self.push_update_status(dialog, status)
+          payload = {}
+          if status.is_a?(Hash)
+            status.each { |k, v| payload[k.to_s] = v }
+          end
+          payload["stage"] = payload["stage"].to_s
+          dialog.execute_script(
+            "window.app && window.app.onUpdateStatus && window.app.onUpdateStatus(#{JSON.generate(payload)});"
+          )
+        rescue StandardError => e
+          warn "[DN1Sup Export PDF] Не удалось отправить статус обновления: #{e.message}"
+        end
+
         def self.setup_callbacks(dialog)
           # Загрузка данных проекта в веб-интерфейс (из сессии памяти, первично YAML рядом с моделью)
           dialog.add_action_callback("getData") do |_action_context|
@@ -958,12 +974,20 @@ module DN1Code
             end
           end
 
-          # Кнопка «круг со стрелками» в шапке: сначала локальная папка
-          # (UPDATE_DEV_DIR из UPDATE_MANIFEST), потом GitHub — ставится
-          # свежайшее. Папки нет — только GitHub.
+          # Кнопка «круг со стрелками» в шапке: обновление только с GitHub
+          # (GitHub Releases + registry.json). Этапы проверки/скачивания/
+          # установки пушатся в диалог через window.app.onUpdateStatus —
+          # процесс виден в шапке (спиннер) и тостах.
           dialog.add_action_callback("check_update") do |_action_context|
             if defined?(Dn1sup::Updater)
-              Dn1sup::Updater.check_local_first!(DN1Code::ExportPdf2::UPDATE_MANIFEST.merge(force: true, async: true))
+              dlg = dialog
+              cb = lambda do |status|
+                push_update_status(dlg, status)
+              end
+              push_update_status(dialog, { stage: "checking" })
+              Dn1sup::Updater.check!(DN1Code::ExportPdf2::UPDATE_MANIFEST.merge(
+                force: true, async: true, status_cb: cb
+              ))
             else
               UI.openURL(DN1Code::ExportPdf2::UPDATE_PAGE)
             end
