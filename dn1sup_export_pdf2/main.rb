@@ -129,9 +129,9 @@ module DN1Code
       # Запись всех изменённых сессий: код выгружается, данные на диске должны
       # остаться консистентными (то же, что onQuit).
       Model::SessionStore.flush_all if defined?(Model::SessionStore) && Model::SessionStore.respond_to?(:flush_all)
-      # Тулбар всегда отдельный: прячем реально созданную панель.
-      # UI::Toolbar.new для несуществующей регистрирует её в списке
-      # панелей SketchUp (фантом), поэтому hide — только по visible?.
+      # Прячем реально созданную панель: UI::Toolbar.new для несуществующей
+      # регистрирует её в списке панелей SketchUp (фантом),
+      # поэтому hide — только по visible?.
       if defined?(UI) && defined?(NAME_EXTENSION)
         toolbar = UI::Toolbar.new(NAME_EXTENSION)
         toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
@@ -180,8 +180,7 @@ module DN1Code
       end
       submenu.add_item("Страница релизов на GitHub") { UI.openURL(UPDATE_PAGE) }
 
-      # Панель инструментов создаётся всегда: тулбар отдельный, общая
-      # панель DN1Sup больше не используется.
+      # Панель инструментов создаётся всегда.
       toolbar = UI::Toolbar.new(NAME_EXTENSION)
       ico_dir = File.join(__dir__, "ico")
 
