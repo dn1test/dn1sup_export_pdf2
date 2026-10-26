@@ -47,15 +47,6 @@ if defined?(Sketchup) && Sketchup.respond_to?(:require)
   end
 end
 
-# Общее меню DN1Sup — синглтон в корневом модуле Dn1sup: первое загрузившееся
-# расширение DN1Sup создаёт подменю, остальные переиспользуют. Без глобальных
-# переменных — все расширения DN1Sup уже определяют этот модуль у себя.
-module Dn1sup
-  def self.common_menu
-    @common_menu ||= UI.menu('Extensions').add_submenu('DN1Sup')
-  end
-end
-
 module DN1Code
   # Основной модуль плагина DN1Sup Export PDF 2
   module ExportPdf2
@@ -159,12 +150,9 @@ module DN1Code
       # Запуск трекера активной работы (статистика на вкладке «Статистика»)
       Service::StatsTracker.register!
 
-      # Общее меню DN1Sup — синглтон в корневом модуле Dn1sup, разделяется всеми
-      # расширениями DN1Sup без глобальных переменных.
-      common = Dn1sup.common_menu
-
-      # Пункты расширения — в подменю «Export PDF 2» внутри DN1Sup
-      submenu = common.add_submenu("Export PDF 2")
+      # Отдельное меню расширения на верхнем уровне Extensions — вне общего
+      # меню DN1Sup (имя как у тулбара и карточки Store).
+      submenu = UI.menu('Extensions').add_submenu(NAME_EXTENSION)
 
       submenu.add_item("Экспорт сцен в PDF (Диалог)...") do
         open_export_dialog
