@@ -129,10 +129,10 @@ module DN1Code
       # Запись всех изменённых сессий: код выгружается, данные на диске должны
       # остаться консистентными (то же, что onQuit).
       Model::SessionStore.flush_all if defined?(Model::SessionStore) && Model::SessionStore.respond_to?(:flush_all)
-      if defined?(UI) && defined?(NAME_EXTENSION) && Sketchup.respond_to?(:read_default) &&
-         Sketchup.read_default('DN1Sup ExtManager', 'shared_toolbar_show_individual')
-        # Прячем только реально созданную панель: конструирование UI::Toolbar
-        # для несуществующей регистрирует её в списке панелей SketchUp.
+      # Тулбар всегда отдельный: прячем реально созданную панель.
+      # UI::Toolbar.new для несуществующей регистрирует её в списке
+      # панелей SketchUp (фантом), поэтому hide — только по visible?.
+      if defined?(UI) && defined?(NAME_EXTENSION)
         toolbar = UI::Toolbar.new(NAME_EXTENSION)
         toolbar.hide if toolbar.respond_to?(:visible?) && toolbar.visible?
       end
@@ -180,50 +180,46 @@ module DN1Code
       end
       submenu.add_item("Страница релизов на GitHub") { UI.openURL(UPDATE_PAGE) }
 
-      # Создание панели инструментов. Не создаём её, пока включена общая
-      # панель DN1Sup (параметр «Показывать отдельные тулбары расширений»
-      # выключен): тогда тулбара нет и в списке панелей SketchUp.
-      if Sketchup.respond_to?(:read_default) &&
-         Sketchup.read_default('DN1Sup ExtManager', 'shared_toolbar_show_individual')
-        toolbar = UI::Toolbar.new(NAME_EXTENSION)
-        ico_dir = File.join(__dir__, "ico")
+      # Панель инструментов создаётся всегда: тулбар отдельный, общая
+      # панель DN1Sup больше не используется.
+      toolbar = UI::Toolbar.new(NAME_EXTENSION)
+      ico_dir = File.join(__dir__, "ico")
 
-        # UI::Command требует растровые PNG-иконки (16px малая, 24px большая);
-        # SVG оставлен как запасной вариант на случай отсутствия PNG
-        icon_path = lambda do |base|
-          small_png = File.join(ico_dir, "#{base}.png")
-          large_png = File.join(ico_dir, "#{base}_large.png")
-          [File.exist?(small_png) ? small_png : File.join(ico_dir, "#{base}.svg"),
-           File.exist?(large_png) ? large_png : File.join(ico_dir, "#{base}.svg")]
-        end
-
-        # Команда 1: Открыть диалог экспорта
-        cmd_dialog = UI::Command.new("Экспорт сцен в PDF") { open_export_dialog }
-        cmd_dialog.tooltip = "Открыть панель экспорта сцен в PDF"
-        cmd_dialog.status_bar_text = "Настройка метаданных, сцен и создание многостраничного PDF документа"
-        cmd_dialog.small_icon, cmd_dialog.large_icon = icon_path.call("export_dialog")
-        toolbar.add_item(cmd_dialog)
-
-        # Команда 2: Быстрый экспорт
-        cmd_quick = UI::Command.new("Быстрый экспорт PDF") { quick_export }
-        cmd_quick.tooltip = "Быстрый экспорт PDF с текущими настройками"
-        cmd_quick.status_bar_text = "Мгновенное создание PDF из активных сцен модели"
-        cmd_quick.small_icon, cmd_quick.large_icon = icon_path.call("quick_export")
-        toolbar.add_item(cmd_quick)
-
-        # Команда 3: Рамка пропорций кадра (Overlay)
-        cmd_overlay = UI::Command.new("Рамка пропорций кадра") { toggle_aspect_overlay }
-        cmd_overlay.tooltip = "Показать/скрыть рамку пропорций кадра (Overlay)"
-        cmd_overlay.status_bar_text = "Отображение границ кадра и пропорций страницы в окне SketchUp"
-        cmd_overlay.small_icon, cmd_overlay.large_icon = icon_path.call("frame_overlay")
-        cmd_overlay.set_validation_proc do
-          model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
-          Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
-        end
-        toolbar.add_item(cmd_overlay)
-
-        toolbar.restore
+      # UI::Command требует растровые PNG-иконки (16px малая, 24px большая);
+      # SVG оставлен как запасной вариант на случай отсутствия PNG
+      icon_path = lambda do |base|
+        small_png = File.join(ico_dir, "#{base}.png")
+        large_png = File.join(ico_dir, "#{base}_large.png")
+        [File.exist?(small_png) ? small_png : File.join(ico_dir, "#{base}.svg"),
+         File.exist?(large_png) ? large_png : File.join(ico_dir, "#{base}.svg")]
       end
+
+      # Команда 1: Открыть диалог экспорта
+      cmd_dialog = UI::Command.new("Экспорт сцен в PDF") { open_export_dialog }
+      cmd_dialog.tooltip = "Открыть панель экспорта сцен в PDF"
+      cmd_dialog.status_bar_text = "Настройка метаданных, сцен и создание многостраничного PDF документа"
+      cmd_dialog.small_icon, cmd_dialog.large_icon = icon_path.call("export_dialog")
+      toolbar.add_item(cmd_dialog)
+
+      # Команда 2: Быстрый экспорт
+      cmd_quick = UI::Command.new("Быстрый экспорт PDF") { quick_export }
+      cmd_quick.tooltip = "Быстрый экспорт PDF с текущими настройками"
+      cmd_quick.status_bar_text = "Мгновенное создание PDF из активных сцен модели"
+      cmd_quick.small_icon, cmd_quick.large_icon = icon_path.call("quick_export")
+      toolbar.add_item(cmd_quick)
+
+      # Команда 3: Рамка пропорций кадра (Overlay)
+      cmd_overlay = UI::Command.new("Рамка пропорций кадра") { toggle_aspect_overlay }
+      cmd_overlay.tooltip = "Показать/скрыть рамку пропорций кадра (Overlay)"
+      cmd_overlay.status_bar_text = "Отображение границ кадра и пропорций страницы в окне SketchUp"
+      cmd_overlay.small_icon, cmd_overlay.large_icon = icon_path.call("frame_overlay")
+      cmd_overlay.set_validation_proc do
+        model = defined?(Sketchup) && Sketchup.respond_to?(:active_model) ? Sketchup.active_model : nil
+        Service::OverlayService.overlay_active?(model) ? MF_CHECKED : MF_UNCHECKED
+      end
+      toolbar.add_item(cmd_overlay)
+
+      toolbar.restore
       # Фоновая проверка обновлений один раз за сессию — только GitHub
       # (ненавязчивое уведомление, без модалок).
       unless $dn1sup_export_pdf2_update_check_scheduled
